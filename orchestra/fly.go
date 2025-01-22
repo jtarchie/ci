@@ -59,6 +59,10 @@ type FlyContainer struct {
 	task        Task
 }
 
+func (f *Fly) Name() string {
+	return "fly"
+}
+
 func (f *Fly) RunContainer(ctx context.Context, task Task) (Container, error) {
 	containerName := fmt.Sprintf("%s-%s", f.namespace, task.ID)
 

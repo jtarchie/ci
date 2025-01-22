@@ -18,6 +18,7 @@ type Container interface {
 
 type Orchestrator interface {
 	RunContainer(ctx context.Context, task Task) (Container, error)
+	Name() string
 }
 
 var _ Orchestrator = &Docker{}
@@ -27,3 +28,7 @@ var _ ContainerStatus = &DockerContainerStatus{}
 var _ Orchestrator = &Fly{}
 var _ Container = &FlyContainer{}
 var _ ContainerStatus = &FlyContainerStatus{}
+
+var _ Orchestrator = &Native{}
+var _ Container = &NativeContainer{}
+var _ ContainerStatus = &NativeStatus{}

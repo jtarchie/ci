@@ -20,6 +20,10 @@ func NewNative(namespace string) (Orchestrator, error) {
 	}, nil
 }
 
+func (n *Native) Name() string {
+	return "native"
+}
+
 type NativeContainer struct {
 	command *exec.Cmd
 	stdout  *strings.Builder

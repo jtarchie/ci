@@ -41,6 +41,10 @@ func NewDocker(namespace string) (Orchestrator, error) {
 	}, nil
 }
 
+func (d *Docker) Name() string {
+	return "docker"
+}
+
 func (d *Docker) RunContainer(ctx context.Context, task Task) (Container, error) {
 	reader, err := d.client.ImagePull(ctx, task.Image, image.PullOptions{})
 	if err != nil {
