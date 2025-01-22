@@ -17,6 +17,8 @@ func TestDrivers(t *testing.T) {
 
 	orchestra.Each(func(name string, init orchestra.InitFunc) {
 		t.Run(fmt.Sprintf("%s exit code failed", name), func(t *testing.T) {
+			t.Parallel()
+
 			assert := NewGomegaWithT(t)
 
 			client, err := init("test")
