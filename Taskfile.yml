@@ -3,6 +3,7 @@ version: 3
 tasks:
   default:
     cmds:
+      - deno fmt .
       - gofmt -w .
       - golangci-lint run ./... --fix
       - go test -race ./...
