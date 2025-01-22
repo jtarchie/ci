@@ -7,11 +7,6 @@ tasks:
       - gofmt -w .
       - golangci-lint run ./... --fix
       - go test -race ./...
-      - task: local
-  local:
-    cmds:
-      - go run main.go runtime --orchestrator docker examples/hello-world.js
-      - go run main.go runtime --orchestrator native examples/hello-world.js
   cleanup:
     cmds:
       - fly machines ls -a $FLY_APP_NAME --json | jq .[].id -r | xargs -I {} fly machines destroy -f -a $FLY_APP_NAME {}
