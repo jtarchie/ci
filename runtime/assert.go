@@ -43,6 +43,12 @@ func (a *Assert) ContainsString(substr, str string) {
 	}
 }
 
+func (a *Assert) Truthy(value interface{}) {
+	if value == false {
+		a.Fail(fmt.Sprintf("expected %v to be truthy", value))
+	}
+}
+
 func (a *Assert) ContainsElement(element interface{}, array []interface{}) {
 	found := false
 	for _, item := range array {
