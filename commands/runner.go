@@ -10,12 +10,12 @@ import (
 	"github.com/jtarchie/ci/runtime"
 )
 
-type Runtime struct {
+type Runner struct {
 	Pipeline     *os.File `arg:"" help:"Path to pipeline javascript file"`
 	Orchestrator string   `help:"orchestrator runtime to use" default:"native"`
 }
 
-func (c *Runtime) Run() error {
+func (c *Runner) Run() error {
 	result := api.Build(api.BuildOptions{
 		EntryPoints:      []string{c.Pipeline.Name()},
 		Bundle:           true,

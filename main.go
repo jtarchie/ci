@@ -9,7 +9,7 @@ import (
 )
 
 type CLI struct {
-	Runtime commands.Runtime `cmd:"" help:"Run a pipeline"`
+	Runner commands.Runner `cmd:"" help:"Run a pipeline"`
 }
 
 func main() {

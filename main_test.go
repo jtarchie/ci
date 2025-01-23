@@ -35,7 +35,7 @@ func TestExamples(t *testing.T) {
 
 				session, err := gexec.Start(
 					exec.Command(
-						path, "runtime",
+						path, "runner",
 						"--orchestrator", driver,
 						examplePath,
 					), os.Stderr, os.Stderr)
