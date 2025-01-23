@@ -1,0 +1,14 @@
+{
+  "name": "examples",
+  "version": "1.0.0",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "MIT",
+  "description": "",
+  "devDependencies": {
+    "@jtarchie/ci": "file:../packages/ci",
+    "typescript": "^5.7.3"
+  }
+}

@@ -2,9 +2,10 @@ package commands
 
 import (
 	"fmt"
-	"io"
 	"os"
+	"path/filepath"
 
+	"github.com/evanw/esbuild/pkg/api"
 	"github.com/jtarchie/ci/orchestra"
 	"github.com/jtarchie/ci/runtime"
 )
@@ -15,10 +16,19 @@ type Runtime struct {
 }
 
 func (c *Runtime) Run() error {
-	contents, err := io.ReadAll(c.Pipeline)
-	if err != nil {
-		return fmt.Errorf("failed to read pipeline file: %w", err)
+	result := api.Build(api.BuildOptions{
+		EntryPoints:      []string{c.Pipeline.Name()},
+		Bundle:           true,
+		Sourcemap:        api.SourceMapInline,
+		Platform:         api.PlatformNeutral,
+		PreserveSymlinks: true,
+		AbsWorkingDir:    filepath.Dir(c.Pipeline.Name()),
+	})
+	if len(result.Errors) > 0 {
+		return fmt.Errorf("could not bundle pipeline: %s", result.Errors[0].Text)
 	}
+
+	contents := result.OutputFiles[0].Contents
 
 	orchestrator, found := orchestra.Get(c.Orchestrator)
 	if !found {

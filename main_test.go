@@ -1,7 +1,7 @@
 package main_test
 
 import (
-	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
@@ -11,12 +11,14 @@ import (
 )
 
 func TestExamples(t *testing.T) {
+	t.Parallel()
+
 	assert := NewGomegaWithT(t)
 
 	path, err := gexec.Build("github.com/jtarchie/ci")
 	assert.Expect(err).ToNot(HaveOccurred())
 
-	matches, err := filepath.Glob("examples/*.js")
+	matches, err := filepath.Glob("examples/*.[jt]s")
 	assert.Expect(err).ToNot(HaveOccurred())
 
 	drivers := []string{"docker", "native"}
@@ -31,8 +33,12 @@ func TestExamples(t *testing.T) {
 
 				assert := NewGomegaWithT(t)
 
-				// go run main.go runtime --orchestrator native examples/hello-world.js
-				session, err := gexec.Start(exec.Command(path, "runtime", "--orchestrator", driver, examplePath), io.Discard, io.Discard)
+				session, err := gexec.Start(
+					exec.Command(
+						path, "runtime",
+						"--orchestrator", driver,
+						examplePath,
+					), os.Stderr, os.Stderr)
 				assert.Expect(err).ToNot(HaveOccurred())
 				assert.Eventually(session, "5s").Should(gexec.Exit(0))
 			})

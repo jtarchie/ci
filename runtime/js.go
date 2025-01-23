@@ -32,7 +32,7 @@ func (j *JS) Execute(source string, sandbox *PipelineRunner) error {
 		Loader:    api.LoaderTS,
 		Format:    api.FormatCommonJS,
 		Target:    api.ES2015,
-		Sourcemap: api.SourceMapNone,
+		Sourcemap: api.SourceMapInline,
 		Platform:  api.PlatformNeutral,
 	})
 
