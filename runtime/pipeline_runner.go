@@ -10,16 +10,16 @@ import (
 	"github.com/jtarchie/ci/orchestra"
 )
 
-type Sandbox struct {
+type PipelineRunner struct {
 	log    *slog.Logger
 	client orchestra.Orchestrator
 }
 
-func NewSandbox(
+func NewPipelineRunner(
 	client orchestra.Orchestrator,
-) *Sandbox {
-	return &Sandbox{
-		log:    slog.Default().WithGroup("sandbox"),
+) *PipelineRunner {
+	return &PipelineRunner{
+		log:    slog.Default().WithGroup("pipeline.runner"),
 		client: client,
 	}
 }
@@ -37,7 +37,7 @@ type RunInput struct {
 	Name    string   `json:"name" js:"name"`
 }
 
-func (c *Sandbox) Run(input RunInput) *Result {
+func (c *PipelineRunner) Run(input RunInput) *Result {
 	ctx := context.Background()
 
 	id, err := uuid.NewV7()

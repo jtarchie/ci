@@ -15,7 +15,7 @@ func NewJS() *JS {
 	return &JS{}
 }
 
-func (j *JS) Execute(source string, sandbox *Sandbox) error {
+func (j *JS) Execute(source string, sandbox *PipelineRunner) error {
 	// this is setup to build the pipeline in a goja vm
 	vm := goja.New()
 	vm.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))

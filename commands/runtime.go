@@ -31,7 +31,7 @@ func (c *Runtime) Run() error {
 	}
 
 	js := runtime.NewJS()
-	err = js.Execute(string(contents), runtime.NewSandbox(client))
+	err = js.Execute(string(contents), runtime.NewPipelineRunner(client))
 	if err != nil {
 		return fmt.Errorf("could not execute pipeline: %w", err)
 	}
