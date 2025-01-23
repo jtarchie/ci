@@ -113,7 +113,7 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	gvisor.dev/gvisor v0.0.0-20250122201608-ddfbe0457b15 // indirect
+	gvisor.dev/gvisor v0.0.0-20250122222524-c238e15234fe // indirect
 )
 
 replace gvisor.dev/gvisor => gvisor.dev/gvisor v0.0.0-20230927004350-cbd86285d259
