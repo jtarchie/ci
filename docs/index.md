@@ -11,3 +11,6 @@ This is a development repository for CI/CD system.
     runtime be populated for tests, different orchestrators, and then for builds
     (like in a true CI/CD system).
   - Added typescript support with a node module to support the type definition.
+- 23-01-2025:
+  - Added `assert` into the runtime, which will stop the runtime when something
+    does not work. TODO: Print to the stdout/stderr of the pipeline.

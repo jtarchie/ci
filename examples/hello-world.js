@@ -4,7 +4,7 @@ const pipeline = () => {
     image: "alpine",
     command: ["echo", "Hello, World!"],
   });
-  console.log(JSON.stringify(result, null, 2));
+  assert.containsString("Hello, World!", result.stdout);
 };
 
 export { pipeline };

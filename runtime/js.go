@@ -22,8 +22,12 @@ func (j *JS) Execute(source string, sandbox *PipelineRunner) error {
 
 	new(require.Registry).Enable(vm)
 	console.Enable(vm)
+	err := vm.Set("assert", NewAssert(vm))
+	if err != nil {
+		return fmt.Errorf("could not set assert: %w", err)
+	}
 
-	err := vm.Set("run", sandbox.Run)
+	err = vm.Set("run", sandbox.Run)
 	if err != nil {
 		return fmt.Errorf("could not set run: %w", err)
 	}
