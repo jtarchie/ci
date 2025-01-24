@@ -1,18 +1,18 @@
 declare global {
-  interface Task {
+  interface RunTaskConfig {
     name: string;
     image: string;
     command: string[];
   }
 
-  interface TaskResult {
+  interface RunTaskResult {
     stdout: string;
     stderr: string;
     error: string;
     code: number;
   }
 
-  function run(task: Task): TaskResult;
+  function run(task: RunTaskConfig): RunTaskResult;
 
   namespace assert {
     function containsElement(
@@ -28,6 +28,39 @@ declare global {
     function equal(expected: any, actual: any, message?: string): void;
     function notEqual(expected: any, actual: any, message?: string): void;
     function truthy(value: any, message?: string): void;
+  }
+
+  interface TaskConfig {
+    platform?: string;
+    image_resource: {
+      type: string;
+      source: { [key: string]: string };
+    };
+    run: {
+      path: string;
+      args: string[];
+    };
+  }
+
+  interface Task {
+    task: string;
+    config: TaskConfig;
+    assert: {
+      stdout: string;
+      stderr: string;
+      code: number | null;
+    };
+  }
+
+  type Step = Task;
+
+  interface Job {
+    name: string;
+    plan: Step[];
+  }
+
+  interface PipelineConfig {
+    jobs: Job[];
   }
 }
 

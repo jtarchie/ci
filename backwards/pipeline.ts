@@ -1,22 +1,32 @@
 /// <reference path="../packages/ci/src/global.d.ts" />
 
-function createPipeline(config) {
+function createPipeline(config: PipelineConfig) {
   assert.truthy(
     config.jobs.length > 0,
     "Pipeline must have at least one job",
   );
 
   assert.truthy(
-    config.jobs.every((job) => job.steps.length > 0),
+    config.jobs.every((job) => job.plan.length > 0),
     "Every job must have at least one step",
   );
 
   return () => {
-    const task = config.jobs.steps[0];
-    run({
-      name: task.name,
-      image: task.image,
-      command: task.command,
+    const task = config.jobs[0].plan[0];
+    const result = run({
+      name: task.task,
+      image: task.config.image_resource.source.repository,
+      command: [task.config.run.path].concat(task.config.run.args),
     });
+    console.log(JSON.stringify(result, null, 2));
+    if (task.assert.stdout != "") {
+      assert.containsString(task.assert.stdout, result.stdout);
+    }
+    if (task.assert.stderr != "") {
+      assert.containsString(task.assert.stderr, result.stderr);
+    }
+    if (task.assert.code !== null) {
+      assert.equal(task.assert.code, result.code);
+    }
   };
 }

@@ -4,6 +4,9 @@ jobs:
     public: true
     plan:
       - task: simple-task
+        assert:
+          stdout: Hello world!
+          code: 0
         config:
           platform: linux
           image_resource:

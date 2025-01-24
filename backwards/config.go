@@ -18,7 +18,12 @@ type TaskConfig struct {
 }
 
 type Step struct {
-	Task   string     `yaml:"task" json:"task"`
+	Task   string `yaml:"task" json:"task"`
+	Assert struct {
+		Stdout string `yaml:"stdout" json:"stdout"`
+		Stderr string `yaml:"stderr" json:"stderr"`
+		Code   *int   `yaml:"code" json:"code"`
+	} `yaml:"assert" json:"assert"`
 	Config TaskConfig `yaml:"config" json:"config"`
 }
 
