@@ -15,11 +15,19 @@ declare global {
   function run(task: Task): TaskResult;
 
   namespace assert {
-    function fail(message: string): void;
-    function equal(expected: any, actual: any): void;
-    function notEqual(expected: any, actual: any): void;
-    function containsString(substr: string, str: string): void;
-    function containsElement(element: any, array: any[]): void;
+    function containsElement(
+      element: any,
+      array: any[],
+      message?: string,
+    ): void;
+    function containsString(
+      substr: string,
+      str: string,
+      message?: string,
+    ): void;
+    function equal(expected: any, actual: any, message?: string): void;
+    function notEqual(expected: any, actual: any, message?: string): void;
+    function truthy(value: any, message?: string): void;
   }
 }
 

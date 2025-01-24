@@ -15,41 +15,57 @@ func NewAssert(vm *goja.Runtime) *Assert {
 	return &Assert{vm: vm}
 }
 
-func (a *Assert) Fail(message string) {
+func (a *Assert) fail(message string) {
 	a.vm.Interrupt(fmt.Errorf("Assertion failed: %s", message))
 }
 
-func (a *Assert) Equal(expected, actual interface{}) {
+func (a *Assert) Equal(expected, actual interface{}, message ...string) {
 	if expected != actual {
-		a.Fail(fmt.Sprintf("expected %v, but got %v", expected, actual))
+		msg := fmt.Sprintf("expected %v, but got %v", expected, actual)
+		if len(message) > 0 {
+			msg = message[0]
+		}
+		a.fail(msg)
 	}
 }
 
-func (a *Assert) NotEqual(expected, actual interface{}) {
+func (a *Assert) NotEqual(expected, actual interface{}, message ...string) {
 	if expected == actual {
-		a.Fail(fmt.Sprintf("expected not %v, but got %v", expected, actual))
+		msg := fmt.Sprintf("expected not %v, but got %v", expected, actual)
+		if len(message) > 0 {
+			msg = message[0]
+		}
+		a.fail(msg)
 	}
 }
 
-func (a *Assert) ContainsString(substr, str string) {
+func (a *Assert) ContainsString(substr, str string, message ...string) {
 	re, err := regexp.Compile(substr)
 	if err != nil {
-		a.Fail(fmt.Sprintf("invalid regular expression: %s", err))
+		a.fail(fmt.Sprintf("invalid regular expression: %s", err))
 		return
 	}
 
 	if !re.MatchString(str) {
-		a.Fail(fmt.Sprintf("expected %q to contain %q", str, substr))
+		msg := fmt.Sprintf("expected %q to contain %q", str, substr)
+		if len(message) > 0 {
+			msg = message[0]
+		}
+		a.fail(msg)
 	}
 }
 
-func (a *Assert) Truthy(value interface{}) {
+func (a *Assert) Truthy(value interface{}, message ...string) {
 	if value == false {
-		a.Fail(fmt.Sprintf("expected %v to be truthy", value))
+		msg := fmt.Sprintf("expected %v to be truthy", value)
+		if len(message) > 0 {
+			msg = message[0]
+		}
+		a.fail(msg)
 	}
 }
 
-func (a *Assert) ContainsElement(element interface{}, array []interface{}) {
+func (a *Assert) ContainsElement(element interface{}, array []interface{}, message ...string) {
 	found := false
 	for _, item := range array {
 		if item == element {
@@ -58,6 +74,10 @@ func (a *Assert) ContainsElement(element interface{}, array []interface{}) {
 		}
 	}
 	if !found {
-		a.Fail(fmt.Sprintf("expected array to contain %v", element))
+		msg := fmt.Sprintf("expected array to contain %v", element)
+		if len(message) > 0 {
+			msg = message[0]
+		}
+		a.fail(msg)
 	}
 }

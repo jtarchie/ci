@@ -4,6 +4,7 @@ go 1.23.4
 
 require (
 	github.com/alecthomas/kong v1.6.1
+	github.com/bmatcuk/doublestar/v4 v4.8.0
 	github.com/docker/docker v27.5.1+incompatible
 	github.com/dop251/goja v0.0.0-20250114131315-46d383d606d3
 	github.com/dop251/goja_nodejs v0.0.0-20240728170619-29b559befffc
@@ -13,6 +14,7 @@ require (
 	github.com/superfly/fly-go v0.1.39
 	github.com/superfly/flyctl v0.3.67
 	go.uber.org/ratelimit v0.3.1
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -27,7 +29,6 @@ require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/azazeal/pause v1.3.0 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
-	github.com/bmatcuk/doublestar/v4 v4.8.0 // indirect
 	github.com/briandowns/spinner v1.23.2 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cli/safeexec v1.0.1 // indirect
@@ -112,7 +113,6 @@ require (
 	golang.zx2c4.com/wireguard v0.0.0-20231211153847-12269c276173 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gvisor.dev/gvisor v0.0.0-20250122222524-c238e15234fe // indirect
 )
 

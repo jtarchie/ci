@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/evanw/esbuild/pkg/api"
+	"github.com/jtarchie/ci/backwards"
 	"github.com/jtarchie/ci/orchestra"
 	"github.com/jtarchie/ci/runtime"
 )
@@ -16,19 +17,30 @@ type Runner struct {
 }
 
 func (c *Runner) Run() error {
-	result := api.Build(api.BuildOptions{
-		EntryPoints:      []string{c.Pipeline.Name()},
-		Bundle:           true,
-		Sourcemap:        api.SourceMapInline,
-		Platform:         api.PlatformNeutral,
-		PreserveSymlinks: true,
-		AbsWorkingDir:    filepath.Dir(c.Pipeline.Name()),
-	})
-	if len(result.Errors) > 0 {
-		return fmt.Errorf("could not bundle pipeline: %s", result.Errors[0].Text)
-	}
+	var pipeline string
 
-	contents := result.OutputFiles[0].Contents
+	extension := filepath.Ext(c.Pipeline.Name())
+	if extension == ".yml" || extension == ".yaml" {
+		var err error
+		pipeline, err = backwards.NewPipeline(c.Pipeline.Name())
+		if err != nil {
+			return fmt.Errorf("could not create pipeline from YAML: %w", err)
+		}
+	} else {
+		result := api.Build(api.BuildOptions{
+			EntryPoints:      []string{c.Pipeline.Name()},
+			Bundle:           true,
+			Sourcemap:        api.SourceMapInline,
+			Platform:         api.PlatformNeutral,
+			PreserveSymlinks: true,
+			AbsWorkingDir:    filepath.Dir(c.Pipeline.Name()),
+		})
+		if len(result.Errors) > 0 {
+			return fmt.Errorf("could not bundle pipeline: %s", result.Errors[0].Text)
+		}
+
+		pipeline = string(result.OutputFiles[0].Contents)
+	}
 
 	orchestrator, found := orchestra.Get(c.Orchestrator)
 	if !found {
@@ -41,7 +53,7 @@ func (c *Runner) Run() error {
 	}
 
 	js := runtime.NewJS()
-	err = js.Execute(string(contents), runtime.NewPipelineRunner(client))
+	err = js.Execute(pipeline, runtime.NewPipelineRunner(client))
 	if err != nil {
 		return fmt.Errorf("could not execute pipeline: %w", err)
 	}

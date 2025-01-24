@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/bmatcuk/doublestar/v4"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
 )
@@ -18,7 +19,7 @@ func TestExamples(t *testing.T) {
 	path, err := gexec.Build("github.com/jtarchie/ci")
 	assert.Expect(err).ToNot(HaveOccurred())
 
-	matches, err := filepath.Glob("examples/*.[jt]s")
+	matches, err := doublestar.FilepathGlob("examples/*.{js,ts,yml,yaml}")
 	assert.Expect(err).ToNot(HaveOccurred())
 
 	drivers := []string{"docker", "native"}
