@@ -14,3 +14,6 @@ This is a development repository for CI/CD system.
 - 23-01-2025:
   - Added `assert` into the runtime, which will stop the runtime when something
     does not work. TODO: Print to the stdout/stderr of the pipeline.
+- 24-01-2025:
+  - Add task support from a pipeline YAML. An `assert` can also be used to help
+    with testing. Will probably not be useful in production environments.
