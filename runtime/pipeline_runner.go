@@ -25,22 +25,22 @@ func NewPipelineRunner(
 }
 
 type Result struct {
-	Code   int    `json:"code" js:"code"`
-	Error  string `json:"error" js:"error"`
-	Stderr string `json:"stderr" js:"stderr"`
-	Stdout string `json:"stdout" js:"stdout"`
+	Code   int    `js:"code"   json:"code"`
+	Error  string `js:"error"  json:"error"`
+	Stderr string `js:"stderr" json:"stderr"`
+	Stdout string `js:"stdout" json:"stdout"`
 }
 
 type RunInput struct {
-	Command []string `json:"command" js:"command"`
-	Image   string   `json:"image" js:"image"`
-	Name    string   `json:"name" js:"name"`
+	Command []string `js:"command" json:"command"`
+	Image   string   `js:"image"   json:"image"`
+	Name    string   `js:"name"    json:"name"`
 }
 
 func (c *PipelineRunner) Run(input RunInput) *Result {
 	ctx := context.Background()
 
-	id, err := uuid.NewV7()
+	taskID, err := uuid.NewV7()
 	if err != nil {
 		return &Result{
 			Code:  1,
@@ -48,14 +48,14 @@ func (c *PipelineRunner) Run(input RunInput) *Result {
 		}
 	}
 
-	logger := c.log.With("id", id, "orchestrator", c.client.Name())
+	logger := c.log.With("id", taskID, "orchestrator", c.client.Name())
 
 	logger.Info("container.run", "input", input)
 
 	container, err := c.client.RunContainer(
 		ctx,
 		orchestra.Task{
-			ID:      fmt.Sprintf("%s-%s", input.Name, id.String()),
+			ID:      fmt.Sprintf("%s-%s", input.Name, taskID.String()),
 			Image:   input.Image,
 			Command: input.Command,
 		},
@@ -95,6 +95,7 @@ func (c *PipelineRunner) Run(input RunInput) *Result {
 	}()
 
 	stdout, stderr := &strings.Builder{}, &strings.Builder{}
+
 	err = container.Logs(ctx, stdout, stderr)
 	if err != nil {
 		logger.Error("container.logs", "err", err)

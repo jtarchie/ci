@@ -2,7 +2,6 @@ package orchestra_test
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -16,7 +15,7 @@ func TestDrivers(t *testing.T) {
 	t.Parallel()
 
 	orchestra.Each(func(name string, init orchestra.InitFunc) {
-		t.Run(fmt.Sprintf("%s exit code failed", name), func(t *testing.T) {
+		t.Run(name+" exit code failed", func(t *testing.T) {
 			t.Parallel()
 
 			assert := NewGomegaWithT(t)
@@ -24,13 +23,13 @@ func TestDrivers(t *testing.T) {
 			client, err := init("test")
 			assert.Expect(err).NotTo(HaveOccurred())
 
-			id, err := uuid.NewV7()
+			taskID, err := uuid.NewV7()
 			assert.Expect(err).NotTo(HaveOccurred())
 
 			container, err := client.RunContainer(
 				context.Background(),
 				orchestra.Task{
-					ID:      id.String(),
+					ID:      taskID.String(),
 					Image:   "alpine",
 					Command: []string{"sh", "-c", "exit 1"},
 				},
@@ -53,19 +52,19 @@ func TestDrivers(t *testing.T) {
 			}).Should(BeTrue())
 		})
 
-		t.Run(fmt.Sprintf("%s happy path", name), func(t *testing.T) {
+		t.Run(name+" happy path", func(t *testing.T) {
 			assert := NewGomegaWithT(t)
 
 			client, err := init("test")
 			assert.Expect(err).NotTo(HaveOccurred())
 
-			id, err := uuid.NewV7()
+			taskID, err := uuid.NewV7()
 			assert.Expect(err).NotTo(HaveOccurred())
 
 			container, err := client.RunContainer(
 				context.Background(),
 				orchestra.Task{
-					ID:      id.String(),
+					ID:      taskID.String(),
 					Image:   "alpine",
 					Command: []string{"echo", "hello"},
 				},
@@ -95,7 +94,7 @@ func TestDrivers(t *testing.T) {
 			container, err = client.RunContainer(
 				context.Background(),
 				orchestra.Task{
-					ID:      id.String(),
+					ID:      taskID.String(),
 					Image:   "alpine",
 					Command: []string{"echo", "hello"},
 				},
@@ -113,6 +112,7 @@ func TestDrivers(t *testing.T) {
 				stdout, stderr := &strings.Builder{}, &strings.Builder{}
 				err := container.Logs(context.Background(), stdout, stderr)
 				assert.Expect(err).NotTo(HaveOccurred())
+
 				return strings.Contains(stdout.String(), "hello")
 			}).Should(BeTrue())
 

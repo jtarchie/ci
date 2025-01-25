@@ -16,5 +16,6 @@ func Each(f func(string, InitFunc)) {
 
 func Get(driverName string) (InitFunc, bool) {
 	init, ok := drivers[driverName]
+
 	return init, ok
 }

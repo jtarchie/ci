@@ -2,16 +2,15 @@ run:
   timeout: 5m
 
 linters:
-  enable:
-    - errcheck
-    - gocritic
-    - goimports
-    - gosec
-    - gosimple
-    - govet
-    - ineffassign
-    - misspell
-    - staticcheck
-    - typecheck
-    - unconvert
-    - unused
+  enable-all: true
+  disable:
+    - depguard
+    - exhaustruct
+    - exportloopref
+    - funlen
+    - gochecknoglobals
+    - gochecknoinits
+    - gomoddirectives
+    - ireturn
+    - revive
+    - tagliatelle

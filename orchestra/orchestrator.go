@@ -21,14 +21,20 @@ type Orchestrator interface {
 	Name() string
 }
 
-var _ Orchestrator = &Docker{}
-var _ Container = &DockerContainer{}
-var _ ContainerStatus = &DockerContainerStatus{}
+var (
+	_ Orchestrator    = &Docker{}
+	_ Container       = &DockerContainer{}
+	_ ContainerStatus = &DockerContainerStatus{}
+)
 
-var _ Orchestrator = &Fly{}
-var _ Container = &FlyContainer{}
-var _ ContainerStatus = &FlyContainerStatus{}
+var (
+	_ Orchestrator    = &Fly{}
+	_ Container       = &FlyContainer{}
+	_ ContainerStatus = &FlyContainerStatus{}
+)
 
-var _ Orchestrator = &Native{}
-var _ Container = &NativeContainer{}
-var _ ContainerStatus = &NativeStatus{}
+var (
+	_ Orchestrator    = &Native{}
+	_ Container       = &NativeContainer{}
+	_ ContainerStatus = &NativeStatus{}
+)

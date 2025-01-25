@@ -2,6 +2,7 @@ package orchestra
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -20,7 +21,9 @@ type Fly struct {
 	namespace   string
 }
 
-var limiter = ratelimit.New(3)
+const maxRequestsPerSecond = 1
+
+var limiter = ratelimit.New(maxRequestsPerSecond)
 
 func NewFly(namespace string) (Orchestrator, error) {
 	accessToken, appName, err := getFlyDetails()
@@ -102,6 +105,7 @@ func (f *Fly) RunContainer(ctx context.Context, task Task) (Container, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to launch container: %w", err)
 	}
+
 	return &FlyContainer{
 		flapsClient: f.flapsClient,
 		flyClient:   f.flyClient,
@@ -134,6 +138,7 @@ func (f *FlyContainer) Logs(ctx context.Context, stdout io.Writer, stderr io.Wri
 	}
 
 	out := make(chan logs.LogEntry)
+
 	var outErr error
 
 	go func() {
@@ -230,16 +235,18 @@ func (a *logAdapter) Debugf(format string, v ...interface{}) {
 func getFlyDetails() (string, string, error) {
 	accessToken := os.Getenv("FLY_ACCESS_TOKEN")
 	if accessToken == "" {
-		return "", "", fmt.Errorf("FLY_ACCESS_TOKEN must be set")
+		return "", "", fmt.Errorf("FLY_ACCESS_TOKEN must be set: %w", ErrFlyEnvVar)
 	}
 
 	appName := os.Getenv("FLY_APP_NAME")
 	if appName == "" {
-		return "", "", fmt.Errorf("FLY_APP_NAME must be set")
+		return "", "", fmt.Errorf("FLY_APP_NAME must be set: %w", ErrFlyEnvVar)
 	}
 
 	return accessToken, appName, nil
 }
+
+var ErrFlyEnvVar = errors.New("missing environment variable for fly")
 
 func init() {
 	Add("fly", NewFly)

@@ -2,6 +2,7 @@ package orchestra
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -67,26 +68,25 @@ func (d *Docker) RunContainer(ctx context.Context, task Task) (Container, error)
 		nil, nil, nil,
 		containerName,
 	)
-	if err != nil {
-		if errdefs.IsConflict(err) {
-			filter := filters.NewArgs()
-			filter.Add("name", containerName)
+	if err != nil && errdefs.IsConflict(err) {
+		filter := filters.NewArgs()
+		filter.Add("name", containerName)
 
-			containers, err := d.client.ContainerList(ctx, container.ListOptions{Filters: filter, All: true})
-			if err != nil {
-				return nil, fmt.Errorf("failed to list containers: %w", err)
-			}
-
-			if len(containers) == 0 {
-				return nil, fmt.Errorf("failed to find container by name %s", containerName)
-			}
-
-			return &DockerContainer{
-				id:     containers[0].ID,
-				client: d.client,
-				task:   task,
-			}, nil
+		containers, err := d.client.ContainerList(ctx, container.ListOptions{Filters: filter, All: true})
+		if err != nil {
+			return nil, fmt.Errorf("failed to list containers: %w", err)
 		}
+
+		if len(containers) == 0 {
+			return nil, fmt.Errorf("failed to find container by name %s: %w", containerName, ErrContainerNotFound)
+		}
+
+		return &DockerContainer{
+			id:     containers[0].ID,
+			client: d.client,
+			task:   task,
+		}, nil
+	} else if err != nil {
 		return nil, fmt.Errorf("failed to create container: %w", err)
 	}
 
@@ -153,6 +153,8 @@ func (s *DockerContainerStatus) IsDone() bool {
 func (s *DockerContainerStatus) ExitCode() int {
 	return s.state.ExitCode
 }
+
+var ErrContainerNotFound = errors.New("container not found")
 
 func init() {
 	Add("docker", NewDocker)

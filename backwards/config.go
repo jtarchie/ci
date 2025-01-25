@@ -2,41 +2,41 @@ package backwards
 
 // https://github.com/concourse/concourse/blob/master/atc/config.go
 type ImageResource struct {
-	Type   string                 `yaml:"type" json:"type"`
-	Source map[string]interface{} `yaml:"source" json:"source"`
+	Type   string                 `json:"type"   yaml:"type"`
+	Source map[string]interface{} `json:"source" yaml:"source"`
 }
 
 type TaskConfigRun struct {
-	Path string   `yaml:"path" json:"path"`
-	Args []string `yaml:"args" json:"args"`
+	Path string   `json:"path" yaml:"path"`
+	Args []string `json:"args" yaml:"args"`
 }
 
 type TaskConfig struct {
-	Platform      string        `yaml:"platform" json:"platform"`
-	ImageResource ImageResource `yaml:"image_resource" json:"image_resource"`
-	Run           TaskConfigRun `yaml:"run" json:"run"`
+	Platform      string        `json:"platform"       yaml:"platform"`
+	ImageResource ImageResource `json:"image_resource" yaml:"image_resource"`
+	Run           TaskConfigRun `json:"run"            yaml:"run"`
 }
 
 type Step struct {
-	Task   string `yaml:"task" json:"task"`
+	Task   string `json:"task" yaml:"task"`
 	Assert struct {
-		Stdout string `yaml:"stdout" json:"stdout"`
-		Stderr string `yaml:"stderr" json:"stderr"`
-		Code   *int   `yaml:"code" json:"code"`
+		Stdout string `json:"stdout" yaml:"stdout"`
+		Stderr string `json:"stderr" yaml:"stderr"`
+		Code   *int   `json:"code"   yaml:"code"`
 	} `yaml:"assert" json:"assert"`
-	Config TaskConfig `yaml:"config" json:"config"`
+	Config TaskConfig `json:"config" yaml:"config"`
 }
 
 type Steps []Step
 
 type Job struct {
-	Name   string `yaml:"name" json:"name"`
-	Public bool   `yaml:"public" json:"public"`
-	Plan   Steps  `yaml:"plan" json:"plan"`
+	Name   string `json:"name"   yaml:"name"`
+	Public bool   `json:"public" yaml:"public"`
+	Plan   Steps  `json:"plan"   yaml:"plan"`
 }
 
 type Jobs []Job
 
 type Config struct {
-	Jobs Jobs `yaml:"jobs" json:"jobs"`
+	Jobs Jobs `json:"jobs" yaml:"jobs"`
 }

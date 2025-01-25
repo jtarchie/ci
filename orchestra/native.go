@@ -59,7 +59,7 @@ func (n *NativeStatus) IsDone() bool {
 func (n *NativeContainer) Status(ctx context.Context) (ContainerStatus, error) {
 	select {
 	case <-ctx.Done():
-		return nil, fmt.Errorf("context cancelled could not get status")
+		return nil, fmt.Errorf("failed to get status: %w", context.Canceled)
 	case err := <-n.errChan:
 		if err != nil {
 			var exitErr *exec.ExitError
@@ -68,6 +68,7 @@ func (n *NativeContainer) Status(ctx context.Context) (ContainerStatus, error) {
 				return nil, fmt.Errorf("failed to get status: %w", err)
 			}
 		}
+
 		defer func() { n.errChan <- err }()
 
 		return &NativeStatus{
@@ -92,7 +93,7 @@ func (n *Native) RunContainer(ctx context.Context, task Task) (Container, error)
 
 	errChan := make(chan error, 1)
 
-	// nolint:gosec
+	//nolint:gosec
 	command := exec.CommandContext(ctx, task.Command[0], task.Command[1:]...)
 
 	command.Dir = dir
@@ -106,6 +107,7 @@ func (n *Native) RunContainer(ctx context.Context, task Task) (Container, error)
 		err := command.Run()
 		if err != nil {
 			errChan <- fmt.Errorf("failed to run command: %w", err)
+
 			return
 		}
 

@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,8 +13,8 @@ import (
 )
 
 type Runner struct {
-	Pipeline     *os.File `arg:"" help:"Path to pipeline javascript file"`
-	Orchestrator string   `help:"orchestrator runtime to use" default:"native"`
+	Pipeline     *os.File `arg:""           help:"Path to pipeline javascript file"`
+	Orchestrator string   `default:"native" help:"orchestrator runtime to use"`
 }
 
 func (c *Runner) Run() error {
@@ -22,6 +23,7 @@ func (c *Runner) Run() error {
 	extension := filepath.Ext(c.Pipeline.Name())
 	if extension == ".yml" || extension == ".yaml" {
 		var err error
+
 		pipeline, err = backwards.NewPipeline(c.Pipeline.Name())
 		if err != nil {
 			return fmt.Errorf("could not create pipeline from YAML: %w", err)
@@ -36,7 +38,7 @@ func (c *Runner) Run() error {
 			AbsWorkingDir:    filepath.Dir(c.Pipeline.Name()),
 		})
 		if len(result.Errors) > 0 {
-			return fmt.Errorf("could not bundle pipeline: %s", result.Errors[0].Text)
+			return fmt.Errorf("%w: %s", ErrCouldNotBundle, result.Errors[0].Text)
 		}
 
 		pipeline = string(result.OutputFiles[0].Contents)
@@ -44,7 +46,7 @@ func (c *Runner) Run() error {
 
 	orchestrator, found := orchestra.Get(c.Orchestrator)
 	if !found {
-		return fmt.Errorf("could not get orchestrator: %s", c.Orchestrator)
+		return fmt.Errorf("could not get orchestrator (%q): %w", c.Orchestrator, ErrOrchestratorNotFound)
 	}
 
 	client, err := orchestrator("ci")
@@ -53,6 +55,7 @@ func (c *Runner) Run() error {
 	}
 
 	js := runtime.NewJS()
+
 	err = js.Execute(pipeline, runtime.NewPipelineRunner(client))
 	if err != nil {
 		return fmt.Errorf("could not execute pipeline: %w", err)
@@ -60,3 +63,8 @@ func (c *Runner) Run() error {
 
 	return nil
 }
+
+var (
+	ErrCouldNotBundle       = errors.New("could not bundle pipeline")
+	ErrOrchestratorNotFound = errors.New("orchestrator not found")
+)

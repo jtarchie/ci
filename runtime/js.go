@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dop251/goja"
@@ -16,18 +17,19 @@ func NewJS() *JS {
 }
 
 func (j *JS) Execute(source string, sandbox *PipelineRunner) error {
-	// this is setup to build the pipeline in a goja vm
-	vm := goja.New()
-	vm.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
+	// this is setup to build the pipeline in a goja jsVM
+	jsVM := goja.New()
+	jsVM.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
 
-	new(require.Registry).Enable(vm)
-	console.Enable(vm)
-	err := vm.Set("assert", NewAssert(vm))
+	new(require.Registry).Enable(jsVM)
+	console.Enable(jsVM)
+
+	err := jsVM.Set("assert", NewAssert(jsVM))
 	if err != nil {
 		return fmt.Errorf("could not set assert: %w", err)
 	}
 
-	err = vm.Set("run", sandbox.Run)
+	err = jsVM.Set("run", sandbox.Run)
 	if err != nil {
 		return fmt.Errorf("could not set run: %w", err)
 	}
@@ -57,9 +59,9 @@ func (j *JS) Execute(source string, sandbox *PipelineRunner) error {
 		return fmt.Errorf("could not compile: %w", err)
 	}
 
-	pipeline, err := vm.RunProgram(program)
+	pipeline, err := jsVM.RunProgram(program)
 	if err != nil {
-		defer vm.ClearInterrupt()
+		defer jsVM.ClearInterrupt()
 
 		return fmt.Errorf("could not run program: %w", err)
 	}
@@ -67,7 +69,7 @@ func (j *JS) Execute(source string, sandbox *PipelineRunner) error {
 	// let's run the pipeline
 	pipelineFunc, ok := goja.AssertFunction(pipeline)
 	if !ok {
-		return fmt.Errorf("pipeline is not a function")
+		return ErrPipelineNotFunction
 	}
 
 	_, err = pipelineFunc(goja.Undefined())
@@ -77,3 +79,5 @@ func (j *JS) Execute(source string, sandbox *PipelineRunner) error {
 
 	return nil
 }
+
+var ErrPipelineNotFunction = errors.New("pipeline is not a function")
