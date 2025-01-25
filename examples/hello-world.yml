@@ -4,6 +4,8 @@ jobs:
     public: true
     plan:
       - task: simple-task
+        # this is here for testing purposes
+        # probably not for production usage
         assert:
           stdout: Hello world!
           code: 0
