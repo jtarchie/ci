@@ -1,1 +1,1 @@
-brew 'task'
+brew 'go-task'

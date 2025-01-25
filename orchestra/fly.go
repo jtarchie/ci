@@ -139,6 +139,8 @@ func (f *FlyContainer) Logs(ctx context.Context, stdout io.Writer, stderr io.Wri
 	go func() {
 		defer close(out)
 
+		_ = limiter.Take()
+
 		outErr = logs.Poll(ctx, out, f.flyClient, &logs.LogOptions{
 			AppName: appName,
 			VMID:    f.id,

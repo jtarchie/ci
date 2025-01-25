@@ -12,8 +12,8 @@ but runs container platforms -- docker, docker swarm, and fly.io.
 
 ## Testing
 
-This is relying on strict integration testing at the moment.
-I'd like to keep the interfaces the same, but change underlying implementation.
+This is relying on strict integration testing at the moment. I'd like to keep
+the interfaces the same, but change underlying implementation.
 
 Right now, only the platforms of `docker` and `native` are tested against.
 Primarily because `fly.io` requires a cost, eventually it will be added.
