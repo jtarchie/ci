@@ -4,9 +4,9 @@ go 1.23.4
 
 require (
 	github.com/alecthomas/kong v1.6.1
-	github.com/bmatcuk/doublestar/v4 v4.8.0
+	github.com/bmatcuk/doublestar/v4 v4.8.1
 	github.com/docker/docker v27.5.1+incompatible
-	github.com/dop251/goja v0.0.0-20250114131315-46d383d606d3
+	github.com/dop251/goja v0.0.0-20250125213203-5ef83b82af17
 	github.com/dop251/goja_nodejs v0.0.0-20240728170619-29b559befffc
 	github.com/evanw/esbuild v0.24.2
 	github.com/google/uuid v1.6.0
@@ -79,7 +79,7 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/sagikazarmark/locafero v0.7.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
-	github.com/samber/lo v1.47.0 // indirect
+	github.com/samber/lo v1.49.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.12.0 // indirect
