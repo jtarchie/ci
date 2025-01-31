@@ -1,4 +1,4 @@
-package orchestra
+package native
 
 import (
 	"context"
@@ -8,13 +8,15 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/jtarchie/ci/orchestra"
 )
 
 type Native struct {
 	namespace string
 }
 
-func NewNative(namespace string) (Orchestrator, error) {
+func NewNative(namespace string) (orchestra.Orchestrator, error) {
 	return &Native{
 		namespace: namespace,
 	}, nil
@@ -56,7 +58,7 @@ func (n *NativeStatus) IsDone() bool {
 	return n.isDone
 }
 
-func (n *NativeContainer) Status(ctx context.Context) (ContainerStatus, error) {
+func (n *NativeContainer) Status(ctx context.Context) (orchestra.ContainerStatus, error) {
 	select {
 	case <-ctx.Done():
 		return nil, fmt.Errorf("failed to get status: %w", context.Canceled)
@@ -83,7 +85,7 @@ func (n *NativeContainer) Status(ctx context.Context) (ContainerStatus, error) {
 	}
 }
 
-func (n *Native) RunContainer(ctx context.Context, task Task) (Container, error) {
+func (n *Native) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.Container, error) {
 	containerName := fmt.Sprintf("%s-%s", n.namespace, task.ID)
 
 	dir, err := os.MkdirTemp("", containerName)
@@ -122,5 +124,11 @@ func (n *Native) RunContainer(ctx context.Context, task Task) (Container, error)
 }
 
 func init() {
-	Add("native", NewNative)
+	orchestra.Add("native", NewNative)
 }
+
+var (
+	_ orchestra.Orchestrator    = &Native{}
+	_ orchestra.Container       = &NativeContainer{}
+	_ orchestra.ContainerStatus = &NativeStatus{}
+)

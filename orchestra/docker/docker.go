@@ -1,4 +1,4 @@
-package orchestra
+package docker
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/errdefs"
 	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/jtarchie/ci/orchestra"
 )
 
 type Docker struct {
@@ -23,14 +24,14 @@ type Docker struct {
 type DockerContainer struct {
 	id     string
 	client *client.Client
-	task   Task
+	task   orchestra.Task
 }
 
 type DockerContainerStatus struct {
 	state *types.ContainerState
 }
 
-func NewDocker(namespace string) (Orchestrator, error) {
+func NewDocker(namespace string) (orchestra.Orchestrator, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create docker client: %w", err)
@@ -46,7 +47,7 @@ func (d *Docker) Name() string {
 	return "docker"
 }
 
-func (d *Docker) RunContainer(ctx context.Context, task Task) (Container, error) {
+func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.Container, error) {
 	reader, err := d.client.ImagePull(ctx, task.Image, image.PullOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initiate pull image: %w", err)
@@ -102,7 +103,7 @@ func (d *Docker) RunContainer(ctx context.Context, task Task) (Container, error)
 	}, nil
 }
 
-func (d *DockerContainer) Status(ctx context.Context) (ContainerStatus, error) {
+func (d *DockerContainer) Status(ctx context.Context) (orchestra.ContainerStatus, error) {
 	// doc: https://docs.docker.com/reference/api/engine/version/v1.43/#tag/Container/operation/ContainerInspect
 	inspection, err := d.client.ContainerInspect(ctx, d.id)
 	if err != nil {
@@ -157,5 +158,11 @@ func (s *DockerContainerStatus) ExitCode() int {
 var ErrContainerNotFound = errors.New("container not found")
 
 func init() {
-	Add("docker", NewDocker)
+	orchestra.Add("docker", NewDocker)
 }
+
+var (
+	_ orchestra.Orchestrator    = &Docker{}
+	_ orchestra.Container       = &DockerContainer{}
+	_ orchestra.ContainerStatus = &DockerContainerStatus{}
+)

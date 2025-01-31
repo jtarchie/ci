@@ -1,4 +1,4 @@
-package orchestra
+package fly
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/jtarchie/ci/orchestra"
 	"github.com/superfly/fly-go"
 	"github.com/superfly/fly-go/flaps"
 	"github.com/superfly/fly-go/tokens"
@@ -25,7 +26,7 @@ const maxRequestsPerSecond = 1
 
 var limiter = ratelimit.New(maxRequestsPerSecond)
 
-func NewFly(namespace string) (Orchestrator, error) {
+func NewFly(namespace string) (orchestra.Orchestrator, error) {
 	accessToken, appName, err := getFlyDetails()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get fly details: %w", err)
@@ -59,14 +60,14 @@ type FlyContainer struct {
 	flyClient   *fly.Client
 	id          string
 	instanceID  string
-	task        Task
+	task        orchestra.Task
 }
 
 func (f *Fly) Name() string {
 	return "fly"
 }
 
-func (f *Fly) RunContainer(ctx context.Context, task Task) (Container, error) {
+func (f *Fly) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.Container, error) {
 	containerName := fmt.Sprintf("%s-%s", f.namespace, task.ID)
 
 	_ = limiter.Take()
@@ -165,7 +166,7 @@ func (f *FlyContainer) Logs(ctx context.Context, stdout io.Writer, stderr io.Wri
 }
 
 // Status implements Container.
-func (f *FlyContainer) Status(ctx context.Context) (ContainerStatus, error) {
+func (f *FlyContainer) Status(ctx context.Context) (orchestra.ContainerStatus, error) {
 	_ = limiter.Take()
 
 	machine, err := f.flapsClient.Get(ctx, f.id)
@@ -249,5 +250,11 @@ func getFlyDetails() (string, string, error) {
 var ErrFlyEnvVar = errors.New("missing environment variable for fly")
 
 func init() {
-	Add("fly", NewFly)
+	orchestra.Add("fly", NewFly)
 }
+
+var (
+	_ orchestra.Orchestrator    = &Fly{}
+	_ orchestra.Container       = &FlyContainer{}
+	_ orchestra.ContainerStatus = &FlyContainerStatus{}
+)
