@@ -16,7 +16,12 @@ type Container interface {
 	Status(ctx context.Context) (ContainerStatus, error)
 }
 
-type Orchestrator interface {
+type Volume interface {
+	Cleanup(ctx context.Context) error
+}
+
+type Driver interface {
 	RunContainer(ctx context.Context, task Task) (Container, error)
+	CreateVolume(ctx context.Context, name string, size int) (Volume, error)
 	Name() string
 }

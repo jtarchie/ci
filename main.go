@@ -7,7 +7,6 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/jtarchie/ci/commands"
 	_ "github.com/jtarchie/ci/orchestra/docker"
-	_ "github.com/jtarchie/ci/orchestra/fly"
 	_ "github.com/jtarchie/ci/orchestra/native"
 )
 

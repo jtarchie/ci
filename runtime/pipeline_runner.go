@@ -12,11 +12,11 @@ import (
 
 type PipelineRunner struct {
 	log    *slog.Logger
-	client orchestra.Orchestrator
+	client orchestra.Driver
 }
 
 func NewPipelineRunner(
-	client orchestra.Orchestrator,
+	client orchestra.Driver,
 ) *PipelineRunner {
 	return &PipelineRunner{
 		log:    slog.Default().WithGroup("pipeline.runner"),

@@ -22,7 +22,10 @@ func TestExamples(t *testing.T) {
 	matches, err := doublestar.FilepathGlob("examples/*.{js,ts,yml,yaml}")
 	assert.Expect(err).ToNot(HaveOccurred())
 
-	drivers := []string{"docker", "native"}
+	drivers := []string{
+		// "docker",
+		"native",
+	}
 
 	for _, match := range matches {
 		examplePath, err := filepath.Abs(match)

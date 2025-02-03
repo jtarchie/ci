@@ -1,6 +1,6 @@
 package orchestra
 
-type InitFunc func(string) (Orchestrator, error)
+type InitFunc func(string) (Driver, error)
 
 var drivers = map[string]InitFunc{}
 

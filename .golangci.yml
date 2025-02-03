@@ -4,6 +4,7 @@ run:
 linters:
   enable-all: true
   disable:
+    - cyclop
     - depguard
     - exhaustruct
     - exportloopref
@@ -12,5 +13,6 @@ linters:
     - gochecknoinits
     - gomoddirectives
     - ireturn
+    - paralleltest
     - revive
     - tagliatelle

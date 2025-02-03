@@ -8,16 +8,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jtarchie/ci/orchestra"
+	_ "github.com/jtarchie/ci/orchestra/docker"
+	_ "github.com/jtarchie/ci/orchestra/native"
 	. "github.com/onsi/gomega"
 )
 
 func TestDrivers(t *testing.T) {
-	t.Parallel()
-
 	orchestra.Each(func(name string, init orchestra.InitFunc) {
 		t.Run(name+" exit code failed", func(t *testing.T) {
-			t.Parallel()
-
 			assert := NewGomegaWithT(t)
 
 			client, err := init("test")
@@ -118,6 +116,68 @@ func TestDrivers(t *testing.T) {
 
 			err = container.Cleanup(context.Background())
 			assert.Expect(err).NotTo(HaveOccurred())
+		})
+
+		t.Run(name+" volume", func(t *testing.T) {
+			assert := NewGomegaWithT(t)
+
+			client, err := init("test")
+			assert.Expect(err).NotTo(HaveOccurred())
+
+			taskID, err := uuid.NewV7()
+			assert.Expect(err).NotTo(HaveOccurred())
+
+			container, err := client.RunContainer(
+				context.Background(),
+				orchestra.Task{
+					ID:      taskID.String(),
+					Image:   "alpine",
+					Command: []string{"sh", "-c", "echo world > ./test/hello"},
+					Mounts: orchestra.Mounts{
+						{Name: "test", Path: "/test"},
+					},
+				},
+			)
+			assert.Expect(err).NotTo(HaveOccurred())
+			defer func(container orchestra.Container) { _ = container.Cleanup(context.Background()) }(container)
+
+			assert.Eventually(func() bool {
+				status, err := container.Status(context.Background())
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				return status.IsDone() && status.ExitCode() == 0
+			}, "10s").Should(BeTrue())
+
+			container, err = client.RunContainer(
+				context.Background(),
+				orchestra.Task{
+					ID:      taskID.String() + "-2",
+					Image:   "alpine",
+					Command: []string{"cat", "./test/hello"},
+					Mounts: orchestra.Mounts{
+						{Name: "test", Path: "/test"},
+					},
+				},
+			)
+			assert.Expect(err).NotTo(HaveOccurred())
+			defer func(container orchestra.Container) { _ = container.Cleanup(context.Background()) }(container)
+
+			assert.Eventually(func() bool {
+				status, err := container.Status(context.Background())
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				return status.IsDone() && status.ExitCode() == 0
+			}, "10s").Should(BeTrue())
+
+			assert.Eventually(func() bool {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+				defer cancel()
+
+				stdout, stderr := &strings.Builder{}, &strings.Builder{}
+				_ = container.Logs(ctx, stdout, stderr)
+
+				return strings.Contains(stdout.String(), "world")
+			}, "10s").Should(BeTrue())
 		})
 	})
 }

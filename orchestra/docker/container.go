@@ -93,6 +93,7 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 
 	mounts := []mount.Mount{}
 
+	//nolint:varnamelen
 	for _, m := range task.Mounts {
 		volume, err := d.CreateVolume(ctx, m.Name, 0)
 		if err != nil {
@@ -102,7 +103,7 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 		dockerVolume, _ := volume.(*DockerVolume)
 
 		mounts = append(mounts, mount.Mount{
-			Type: "volume",
+			Type:   "volume",
 			Source: dockerVolume.volume.Name,
 			Target: m.Path,
 		})

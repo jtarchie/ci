@@ -18,6 +18,7 @@ require (
 )
 
 require (
+	al.essio.dev/pkg/shellescape v1.5.1 // indirect
 	github.com/AlecAivazis/survey/v2 v2.3.7 // indirect
 	github.com/Khan/genqlient v0.7.1-0.20240819060157-4466fc10e4f3 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect

@@ -16,3 +16,8 @@ This is a development repository for CI/CD system.
 - 24-01-2025: Add task support from a pipeline YAML. An `assert` can also be
   used to help with testing. Will probably not be useful in production
   environments.
+- 31-01-2025: Added support for volumes on the native driver
+- 01-02-2025:
+  - Added support for volumes on the docker driver
+  - Drop support for fly driver
+  - TODO: cleanup volumes on test runs

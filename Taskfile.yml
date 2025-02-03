@@ -9,5 +9,5 @@ tasks:
       - go test -race ./...
   cleanup:
     cmds:
-      - fly machines ls -a $FLY_APP_NAME --json | jq .[].id -r | xargs -I {} fly machines destroy -f -a $FLY_APP_NAME {}
       - docker ps -aq | xargs -I {} docker rm -f {}
+      - docker volume ls -q | xargs -r docker volume rm -f
