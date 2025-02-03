@@ -6,7 +6,7 @@ tasks:
       - deno fmt .
       - gofmt -w .
       - golangci-lint run ./... --fix
-      - go test -race ./...
+      - go test -race ./... -count=1
   cleanup:
     cmds:
       - docker ps -aq | xargs -I {} docker rm -f {}

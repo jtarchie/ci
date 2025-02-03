@@ -27,6 +27,9 @@ func (d *DockerVolume) Cleanup(ctx context.Context) error {
 func (d *Docker) CreateVolume(ctx context.Context, name string, size int) (orchestra.Volume, error) {
 	volume, err := d.client.VolumeCreate(ctx, volume.CreateOptions{
 		Name: fmt.Sprintf("%s-%s", d.namespace, name),
+		Labels: map[string]string{
+			"orchestra.namespace": d.namespace,
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not create volume: %w", err)

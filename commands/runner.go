@@ -53,6 +53,7 @@ func (c *Runner) Run() error {
 	if err != nil {
 		return fmt.Errorf("could not create docker client: %w", err)
 	}
+	defer client.Close()
 
 	js := runtime.NewJS()
 

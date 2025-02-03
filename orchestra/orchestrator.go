@@ -21,7 +21,8 @@ type Volume interface {
 }
 
 type Driver interface {
-	RunContainer(ctx context.Context, task Task) (Container, error)
+	Close() error
 	CreateVolume(ctx context.Context, name string, size int) (Volume, error)
 	Name() string
+	RunContainer(ctx context.Context, task Task) (Container, error)
 }

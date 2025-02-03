@@ -20,6 +20,7 @@ func TestDrivers(t *testing.T) {
 
 			client, err := init("test")
 			assert.Expect(err).NotTo(HaveOccurred())
+			defer client.Close()
 
 			taskID, err := uuid.NewV7()
 			assert.Expect(err).NotTo(HaveOccurred())
@@ -48,6 +49,9 @@ func TestDrivers(t *testing.T) {
 
 				return status.IsDone() && status.ExitCode() == 1
 			}).Should(BeTrue())
+
+			err = client.Close()
+			assert.Expect(err).NotTo(HaveOccurred())
 		})
 
 		t.Run(name+" happy path", func(t *testing.T) {
@@ -55,6 +59,7 @@ func TestDrivers(t *testing.T) {
 
 			client, err := init("test")
 			assert.Expect(err).NotTo(HaveOccurred())
+			defer client.Close()
 
 			taskID, err := uuid.NewV7()
 			assert.Expect(err).NotTo(HaveOccurred())
@@ -116,6 +121,9 @@ func TestDrivers(t *testing.T) {
 
 			err = container.Cleanup(context.Background())
 			assert.Expect(err).NotTo(HaveOccurred())
+
+			err = client.Close()
+			assert.Expect(err).NotTo(HaveOccurred())
 		})
 
 		t.Run(name+" volume", func(t *testing.T) {
@@ -123,6 +131,7 @@ func TestDrivers(t *testing.T) {
 
 			client, err := init("test")
 			assert.Expect(err).NotTo(HaveOccurred())
+			defer client.Close()
 
 			taskID, err := uuid.NewV7()
 			assert.Expect(err).NotTo(HaveOccurred())
@@ -178,6 +187,9 @@ func TestDrivers(t *testing.T) {
 
 				return strings.Contains(stdout.String(), "world")
 			}, "10s").Should(BeTrue())
+
+			err = client.Close()
+			assert.Expect(err).NotTo(HaveOccurred())
 		})
 	})
 }

@@ -114,6 +114,9 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 		&container.Config{
 			Image: task.Image,
 			Cmd:   task.Command,
+			Labels: map[string]string{
+				"orchestra.namespace": d.namespace,
+			},
 		},
 		&container.HostConfig{
 			Mounts: mounts,
