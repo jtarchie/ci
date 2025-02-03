@@ -12,9 +12,9 @@ type TaskConfigRun struct {
 }
 
 type TaskConfig struct {
-	Platform      string        `json:"platform"       validate:"oneof='linux'" yaml:"platform"`
+	Platform      string        `json:"platform"       validate:"oneof='linux' 'darwin' 'windows'" yaml:"platform"`
 	ImageResource ImageResource `json:"image_resource" yaml:"image_resource"`
-	Run           TaskConfigRun `json:"run"            validate:"required"      yaml:"run"`
+	Run           TaskConfigRun `json:"run"            validate:"required"                         yaml:"run"`
 }
 
 type Step struct {
