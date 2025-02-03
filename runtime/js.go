@@ -17,23 +17,6 @@ func NewJS() *JS {
 }
 
 func (j *JS) Execute(source string, sandbox *PipelineRunner) error {
-	// this is setup to build the pipeline in a goja jsVM
-	jsVM := goja.New()
-	jsVM.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
-
-	new(require.Registry).Enable(jsVM)
-	console.Enable(jsVM)
-
-	err := jsVM.Set("assert", NewAssert(jsVM))
-	if err != nil {
-		return fmt.Errorf("could not set assert: %w", err)
-	}
-
-	err = jsVM.Set("run", sandbox.Run)
-	if err != nil {
-		return fmt.Errorf("could not set run: %w", err)
-	}
-
 	result := api.Transform(source, api.TransformOptions{
 		Loader:    api.LoaderTS,
 		Format:    api.FormatCommonJS,
@@ -57,6 +40,23 @@ func (j *JS) Execute(source string, sandbox *PipelineRunner) error {
 	)
 	if err != nil {
 		return fmt.Errorf("could not compile: %w", err)
+	}
+
+	// this is setup to build the pipeline in a goja jsVM
+	jsVM := goja.New()
+	jsVM.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
+
+	new(require.Registry).Enable(jsVM)
+	console.Enable(jsVM)
+
+	err = jsVM.Set("assert", NewAssert(jsVM))
+	if err != nil {
+		return fmt.Errorf("could not set assert: %w", err)
+	}
+
+	err = jsVM.Set("run", sandbox.Run)
+	if err != nil {
+		return fmt.Errorf("could not set run: %w", err)
 	}
 
 	pipeline, err := jsVM.RunProgram(program)
