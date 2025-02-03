@@ -20,4 +20,5 @@ This is a development repository for CI/CD system.
 - 01-02-2025:
   - Added support for volumes on the docker driver
   - Drop support for fly driver
-  - TODO: cleanup volumes on test runs
+  - cleanup volumes on test runs
+- 02-02-2025: Added validations to the YAML format.

@@ -7,14 +7,14 @@ type ImageResource struct {
 }
 
 type TaskConfigRun struct {
-	Path string   `json:"path" yaml:"path"`
+	Path string   `json:"path" validate:"required" yaml:"path"`
 	Args []string `json:"args" yaml:"args"`
 }
 
 type TaskConfig struct {
-	Platform      string        `json:"platform"       yaml:"platform"`
+	Platform      string        `json:"platform"       validate:"oneof='linux'" yaml:"platform"`
 	ImageResource ImageResource `json:"image_resource" yaml:"image_resource"`
-	Run           TaskConfigRun `json:"run"            yaml:"run"`
+	Run           TaskConfigRun `json:"run"            validate:"required"      yaml:"run"`
 }
 
 type Step struct {
@@ -24,19 +24,19 @@ type Step struct {
 		Stderr string `json:"stderr" yaml:"stderr"`
 		Code   *int   `json:"code"   yaml:"code"`
 	} `yaml:"assert" json:"assert"`
-	Config TaskConfig `json:"config" yaml:"config"`
+	Config TaskConfig `json:"config" validate:"required_with=Task" yaml:"config"`
 }
 
 type Steps []Step
 
 type Job struct {
-	Name   string `json:"name"   yaml:"name"`
+	Name   string `json:"name"   validate:"required,min=5"      yaml:"name"`
 	Public bool   `json:"public" yaml:"public"`
-	Plan   Steps  `json:"plan"   yaml:"plan"`
+	Plan   Steps  `json:"plan"   validate:"required,min=1,dive" yaml:"plan"`
 }
 
 type Jobs []Job
 
 type Config struct {
-	Jobs Jobs `json:"jobs" yaml:"jobs"`
+	Jobs Jobs `json:"jobs" validate:"required,min=1,dive" yaml:"jobs"`
 }

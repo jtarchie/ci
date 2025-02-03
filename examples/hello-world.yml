@@ -1,6 +1,6 @@
 ---
 jobs:
-  - name: job
+  - name: some-job
     public: true
     plan:
       - task: simple-task

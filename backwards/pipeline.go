@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/go-playground/validator/v10"
 	"gopkg.in/yaml.v3"
 )
 
@@ -24,6 +25,13 @@ func NewPipeline(filename string) (string, error) {
 	err = yaml.Unmarshal(contents, &config)
 	if err != nil {
 		return "", fmt.Errorf("could not unmarshal pipeline: %w", err)
+	}
+
+	validate := validator.New(validator.WithRequiredStructEnabled())
+
+	err = validate.Struct(config)
+	if err != nil {
+		return "", fmt.Errorf("could not validate pipeline: %w", err)
 	}
 
 	contents, err = json.Marshal(config)
