@@ -11,14 +11,14 @@ function createPipeline(config: PipelineConfig) {
     "Every job must have at least one step",
   );
 
-  return () => {
+  return async () => {
     const task = config.jobs[0].plan[0];
-    const result = run({
+    const result = await run({
       name: task.task,
       image: task.config.image_resource.source.repository,
       command: [task.config.run.path].concat(task.config.run.args),
     });
-    console.log(JSON.stringify(result, null, 2));
+
     if (task.assert.stdout != "") {
       assert.containsString(task.assert.stdout, result.stdout);
     }

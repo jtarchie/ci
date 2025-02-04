@@ -12,7 +12,7 @@ declare global {
     code: number;
   }
 
-  function run(task: RunTaskConfig): RunTaskResult;
+  function run(task: RunTaskConfig): Promise<RunTaskResult>;
 
   namespace assert {
     function containsElement(
