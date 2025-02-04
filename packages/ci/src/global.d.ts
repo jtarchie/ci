@@ -1,3 +1,4 @@
+// types for the pipeline
 declare global {
   interface RunTaskConfig {
     name: string;
@@ -29,7 +30,10 @@ declare global {
     function notEqual(expected: any, actual: any, message?: string): void;
     function truthy(value: any, message?: string): void;
   }
+}
 
+// types for backwards compatibility
+declare global {
   interface TaskConfig {
     platform?: string;
     image_resource: {
