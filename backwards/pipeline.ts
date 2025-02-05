@@ -1,5 +1,6 @@
 /// <reference path="../packages/ci/src/global.d.ts" />
 
+// deno-lint-ignore no-unused-vars
 function createPipeline(config: PipelineConfig) {
   assert.truthy(
     config.jobs.length > 0,

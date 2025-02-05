@@ -18,9 +18,9 @@ declare global {
   }
 
   namespace assert {
-    function containsElement(
-      element: any,
-      array: any[],
+    function containsElement<T>(
+      element: T,
+      array: T[],
       message?: string,
     ): void;
     function containsString(
@@ -28,9 +28,9 @@ declare global {
       str: string,
       message?: string,
     ): void;
-    function equal(expected: any, actual: any, message?: string): void;
-    function notEqual(expected: any, actual: any, message?: string): void;
-    function truthy(value: any, message?: string): void;
+    function equal<T>(expected: T, actual: T, message?: string): void;
+    function notEqual<T>(expected: T, actual: T, message?: string): void;
+    function truthy(value: unknown, message?: string): void;
   }
 }
 
