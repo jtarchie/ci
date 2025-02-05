@@ -8,7 +8,6 @@ import (
 	"github.com/dop251/goja_nodejs/console"
 	"github.com/dop251/goja_nodejs/require"
 	"github.com/evanw/esbuild/pkg/api"
-	"golang.org/x/sync/errgroup"
 )
 
 type JS struct{}
@@ -55,33 +54,11 @@ func (j *JS) Execute(source string, sandbox *PipelineRunner) error {
 		return fmt.Errorf("could not set assert: %w", err)
 	}
 
-	promises := errgroup.Group{}
-	promises.SetLimit(1)
+	runtime := NewRuntime(jsVM, sandbox)
 
-	err = jsVM.Set("run", func(input RunInput) *goja.Promise {
-		promise, resolve, reject := jsVM.NewPromise()
-
-		promises.Go(func() error {
-			result := sandbox.Run(input)
-			if err != nil {
-				err = reject(result)
-				if err != nil {
-					return fmt.Errorf("could not reject: %w", err)
-				}
-			} else {
-				err = resolve(result)
-				if err != nil {
-					return fmt.Errorf("could not resolve: %w", err)
-				}
-			}
-
-			return nil
-		})
-
-		return promise
-	})
+	err = jsVM.Set("runtime", runtime)
 	if err != nil {
-		return fmt.Errorf("could not set run: %w", err)
+		return fmt.Errorf("could not set runtime: %w", err)
 	}
 
 	pipeline, err := jsVM.RunProgram(program)
@@ -102,7 +79,7 @@ func (j *JS) Execute(source string, sandbox *PipelineRunner) error {
 		return fmt.Errorf("could not run pipeline: %w", err)
 	}
 
-	err = promises.Wait()
+	err = runtime.Wait()
 	if err != nil {
 		return fmt.Errorf("could not wait for promises: %w", err)
 	}

@@ -13,7 +13,7 @@ function createPipeline(config: PipelineConfig) {
 
   return async () => {
     const task = config.jobs[0].plan[0];
-    const result = await run({
+    const result = await runtime.run({
       name: task.task,
       image: task.config.image_resource.source.repository,
       command: [task.config.run.path].concat(task.config.run.args),
