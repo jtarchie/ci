@@ -13,7 +13,9 @@ declare global {
     code: number;
   }
 
-  function run(task: RunTaskConfig): Promise<RunTaskResult>;
+  namespace runtime {
+    function run(task: RunTaskConfig): Promise<RunTaskResult>;
+  }
 
   namespace assert {
     function containsElement(

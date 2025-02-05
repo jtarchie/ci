@@ -1,5 +1,5 @@
 const pipeline = async () => {
-  const result = await run({
+  const result = await runtime.run({
     name: "simple-task",
     image: "alpine",
     command: ["echo", "Hello, World!"],
