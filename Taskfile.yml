@@ -4,6 +4,7 @@ tasks:
   default:
     cmds:
       - deno fmt .
+      - deno lint .
       - gofmt -w .
       - golangci-lint run ./... --fix
       - go test -race ./... -count=1
