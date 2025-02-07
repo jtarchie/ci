@@ -19,38 +19,77 @@ func NewPipelineRunner(
 	client orchestra.Driver,
 ) *PipelineRunner {
 	return &PipelineRunner{
-		log:    slog.Default().WithGroup("pipeline.runner"),
+		log:    slog.Default().WithGroup("pipeline.runner").With("orchestrator", client.Name()),
 		client: client,
 	}
 }
 
-type Result struct {
-	Code   int    `js:"code"   json:"code"`
-	Error  string `js:"error"  json:"error"`
-	Stderr string `js:"stderr" json:"stderr"`
-	Stdout string `js:"stdout" json:"stdout"`
+type VolumeInput struct {
+	Name string `json:"name"`
+	Size int    `json:"size"`
+}
+
+type VolumeResult struct {
+	orchestra.Volume
+	Error string `json:"error"`
+}
+
+func (c *PipelineRunner) CreateVolume(input VolumeInput) *VolumeResult {
+	ctx := context.Background()
+
+	logger := c.log
+	logger.Info("volume.create", "input", input)
+
+	volume, err := c.client.CreateVolume(ctx, input.Name, input.Size)
+	if err != nil {
+		return &VolumeResult{
+			Error: fmt.Sprintf("could not create volume: %s", err),
+		}
+	}
+
+	return &VolumeResult{
+		Volume: volume,
+	}
+}
+
+type RunResult struct {
+	Code   int    `json:"code"`
+	Error  string `json:"error"`
+	Stderr string `json:"stderr"`
+	Stdout string `json:"stdout"`
 }
 
 type RunInput struct {
-	Command []string `js:"command" json:"command"`
-	Image   string   `js:"image"   json:"image"`
-	Name    string   `js:"name"    json:"name"`
+	Command []string                `json:"command"`
+	Image   string                  `json:"image"`
+	Name    string                  `json:"name"`
+	Mounts  map[string]VolumeResult `json:"mounts"`
 }
 
-func (c *PipelineRunner) Run(input RunInput) *Result {
+func (c *PipelineRunner) Run(input RunInput) *RunResult {
 	ctx := context.Background()
 
 	taskID, err := uuid.NewV7()
 	if err != nil {
-		return &Result{
+		return &RunResult{
 			Code:  1,
 			Error: fmt.Sprintf("could not generate uuid: %s", err),
 		}
 	}
 
-	logger := c.log.With("id", taskID, "orchestrator", c.client.Name())
+	logger := c.log.With("id", taskID)
 
 	logger.Info("container.run", "input", input)
+
+	var mounts orchestra.Mounts
+	for path, volume := range input.Mounts {
+		mounts = append(mounts, orchestra.Mount{
+			Name: volume.Name(),
+			Path: path,
+		})
+	}
+
+	logger.Info("container.run", "mounts", mounts)
 
 	container, err := c.client.RunContainer(
 		ctx,
@@ -58,10 +97,13 @@ func (c *PipelineRunner) Run(input RunInput) *Result {
 			ID:      fmt.Sprintf("%s-%s", input.Name, taskID.String()),
 			Image:   input.Image,
 			Command: input.Command,
+			Mounts:  mounts,
 		},
 	)
 	if err != nil {
-		return &Result{
+		logger.Error("container.run", "err", err)
+
+		return &RunResult{
 			Code:  1,
 			Error: fmt.Sprintf("could not run container: %s", err),
 		}
@@ -74,7 +116,7 @@ func (c *PipelineRunner) Run(input RunInput) *Result {
 
 		status, err = container.Status(ctx)
 		if err != nil {
-			return &Result{
+			return &RunResult{
 				Code:  1,
 				Error: fmt.Sprintf("could not get container status: %s", err),
 			}
@@ -90,7 +132,7 @@ func (c *PipelineRunner) Run(input RunInput) *Result {
 	defer func() {
 		err := container.Cleanup(ctx)
 		if err != nil {
-			slog.Error("container.cleanup", "err", err)
+			logger.Error("container.cleanup", "err", err)
 		}
 	}()
 
@@ -100,13 +142,13 @@ func (c *PipelineRunner) Run(input RunInput) *Result {
 	if err != nil {
 		logger.Error("container.logs", "err", err)
 
-		return &Result{
+		return &RunResult{
 			Code:  status.ExitCode(),
 			Error: fmt.Sprintf("could not get container logs: %s", err),
 		}
 	}
 
-	return &Result{
+	return &RunResult{
 		Stdout: stdout.String(),
 		Stderr: stderr.String(),
 		Code:   status.ExitCode(),

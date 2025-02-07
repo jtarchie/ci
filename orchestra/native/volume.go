@@ -13,6 +13,12 @@ import (
 
 type NativeVolume struct {
 	path string
+	name string
+}
+
+// Name implements orchestra.Volume.
+func (n *NativeVolume) Name() string {
+	return n.name
 }
 
 // Cleanup implements orchestra.Volume.
@@ -38,6 +44,7 @@ func (n *Native) CreateVolume(ctx context.Context, name string, size int) (orche
 	}
 
 	return &NativeVolume{
+		name: name,
 		path: path,
 	}, nil
 }

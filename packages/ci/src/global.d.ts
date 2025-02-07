@@ -4,6 +4,7 @@ declare global {
     name: string;
     image: string;
     command: string[];
+    mounts?: { [key: string]: VolumeResult };
   }
 
   interface RunTaskResult {
@@ -13,8 +14,18 @@ declare global {
     code: number;
   }
 
+  interface VolumeConfig {
+    name?: string;
+    size?: number;
+  }
+
+  interface VolumeResult {
+    error: string;
+  }
+
   namespace runtime {
     function run(task: RunTaskConfig): Promise<RunTaskResult>;
+    function createVolume(volume?: VolumeConfig): Promise<VolumeResult>;
   }
 
   namespace assert {
