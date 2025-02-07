@@ -8,7 +8,7 @@ import (
 	"os"
 
 	"github.com/go-playground/validator/v10"
-	"gopkg.in/yaml.v3"
+	"github.com/goccy/go-yaml"
 )
 
 //go:embed pipeline.ts
@@ -22,7 +22,7 @@ func NewPipeline(filename string) (string, error) {
 		return "", fmt.Errorf("could not read pipeline: %w", err)
 	}
 
-	err = yaml.Unmarshal(contents, &config)
+	err = yaml.UnmarshalWithOptions(contents, &config, yaml.Strict())
 	if err != nil {
 		return "", fmt.Errorf("could not unmarshal pipeline: %w", err)
 	}
