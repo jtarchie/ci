@@ -10,10 +10,10 @@ require (
 	github.com/dop251/goja_nodejs v0.0.0-20240728170619-29b559befffc
 	github.com/evanw/esbuild v0.24.2
 	github.com/go-playground/validator/v10 v10.24.0
+	github.com/goccy/go-yaml v1.15.17
 	github.com/google/uuid v1.6.0
 	github.com/onsi/gomega v1.36.2
 	golang.org/x/sync v0.10.0
-	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -57,6 +57,7 @@ require (
 	golang.org/x/time v0.9.0 // indirect
 	golang.org/x/tools v0.29.0 // indirect
 	google.golang.org/grpc v1.70.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gotest.tools/v3 v3.4.0 // indirect
 )
 
