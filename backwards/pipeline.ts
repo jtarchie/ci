@@ -20,13 +20,13 @@ function createPipeline(config: PipelineConfig) {
       command: [task.config.run.path].concat(task.config.run.args),
     });
 
-    if (task.assert.stdout != "") {
+    if (task.assert.stdout && task.assert.stdout.trim() !== "") {
       assert.containsString(task.assert.stdout, result.stdout);
     }
-    if (task.assert.stderr != "") {
+    if (task.assert.stderr && task.assert.stderr.trim() !== "") {
       assert.containsString(task.assert.stderr, result.stderr);
     }
-    if (task.assert.code !== null) {
+    if (typeof task.assert.code === "number") {
       assert.equal(task.assert.code, result.code);
     }
   };
