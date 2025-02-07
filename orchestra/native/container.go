@@ -88,7 +88,7 @@ func (n *Native) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 
 		nativeVolume, _ := volume.(*NativeVolume)
 
-		err = os.Symlink(nativeVolume.path, filepath.Join(dir, mount.Name))
+		err = os.Symlink(nativeVolume.path, filepath.Join(dir, mount.Path))
 		if err != nil {
 			return nil, fmt.Errorf("failed to create symlink: %w", err)
 		}

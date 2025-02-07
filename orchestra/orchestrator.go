@@ -18,6 +18,7 @@ type Container interface {
 
 type Volume interface {
 	Cleanup(ctx context.Context) error
+	Name() string
 }
 
 type Driver interface {

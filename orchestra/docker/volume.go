@@ -10,8 +10,9 @@ import (
 )
 
 type DockerVolume struct {
-	client *client.Client
-	volume volume.Volume
+	client     *client.Client
+	volume     volume.Volume
+	volumeName string
 }
 
 // Cleanup implements orchestra.Volume.
@@ -36,7 +37,12 @@ func (d *Docker) CreateVolume(ctx context.Context, name string, size int) (orche
 	}
 
 	return &DockerVolume{
-		client: d.client,
-		volume: volume,
+		client:     d.client,
+		volume:     volume,
+		volumeName: name,
 	}, nil
+}
+
+func (d *DockerVolume) Name() string {
+	return d.volumeName
 }
