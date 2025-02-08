@@ -23,3 +23,5 @@ This is a development repository for CI/CD system.
   - cleanup volumes on test runs
 - 02-02-2025: Added validations to the YAML format.
 - 03-02-2025: Added promise support for running multiple containers.
+- 07-02-2025: Added volume support for containers and native. It scopes things
+  into a `/tmp` directory.
