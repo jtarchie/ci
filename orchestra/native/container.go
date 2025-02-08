@@ -100,7 +100,13 @@ func (n *Native) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 	command := exec.CommandContext(ctx, task.Command[0], task.Command[1:]...)
 
 	command.Dir = dir
-	command.Env = []string{}
+
+	env := []string{}
+	for k, v := range task.Env {
+		env = append(env, k+"="+v)
+	}
+
+	command.Env = env
 
 	stdout := &strings.Builder{}
 	command.Stderr = stdout

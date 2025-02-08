@@ -1,6 +1,6 @@
 ---
 jobs:
-  - name: some-job
+  - name: hello-world
     public: true
     plan:
       - task: simple-task
@@ -17,3 +17,21 @@ jobs:
           run:
             path: echo
             args: ["Hello world!"]
+  - name: show-env
+    public: true
+    plan:
+      - task: simple-task
+        # this is here for testing purposes
+        # probably not for production usage
+        assert:
+          stdout: "FOO=bar"
+          code: 0
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: { repository: busybox }
+          run:
+            path: env
+          env:
+            FOO: bar
