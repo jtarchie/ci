@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/evanw/esbuild/pkg/api"
+	"github.com/google/uuid"
 	"github.com/jtarchie/ci/backwards"
 	"github.com/jtarchie/ci/orchestra"
 	"github.com/jtarchie/ci/runtime"
@@ -49,7 +50,7 @@ func (c *Runner) Run() error {
 		return fmt.Errorf("could not get orchestrator (%q): %w", c.Orchestrator, ErrOrchestratorNotFound)
 	}
 
-	client, err := orchestrator("ci")
+	client, err := orchestrator("ci-" + uuid.New().String())
 	if err != nil {
 		return fmt.Errorf("could not create docker client: %w", err)
 	}
