@@ -23,7 +23,7 @@ func TestExamples(t *testing.T) {
 	assert.Expect(err).ToNot(HaveOccurred())
 
 	drivers := []string{
-		// "docker",
+		"docker",
 		"native",
 	}
 

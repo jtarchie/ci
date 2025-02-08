@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path/filepath"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -105,7 +106,7 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 		mounts = append(mounts, mount.Mount{
 			Type:   "volume",
 			Source: dockerVolume.volume.Name,
-			Target: m.Path,
+			Target: filepath.Join("/tmp", containerName, m.Path),
 		})
 	}
 
@@ -117,6 +118,7 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 			Labels: map[string]string{
 				"orchestra.namespace": d.namespace,
 			},
+			WorkingDir: filepath.Join("/tmp", containerName),
 		},
 		&container.HostConfig{
 			Mounts: mounts,
