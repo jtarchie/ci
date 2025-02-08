@@ -14,11 +14,15 @@ import (
 )
 
 func TestDrivers(t *testing.T) {
+	t.Parallel()
+
 	orchestra.Each(func(name string, init orchestra.InitFunc) {
 		t.Run(name+" exit code failed", func(t *testing.T) {
+			t.Parallel()
+
 			assert := NewGomegaWithT(t)
 
-			client, err := init("test")
+			client, err := init("test-" + uuid.NewString())
 			assert.Expect(err).NotTo(HaveOccurred())
 			defer client.Close()
 
@@ -55,9 +59,11 @@ func TestDrivers(t *testing.T) {
 		})
 
 		t.Run(name+" happy path", func(t *testing.T) {
+			t.Parallel()
+
 			assert := NewGomegaWithT(t)
 
-			client, err := init("test")
+			client, err := init("test-" + uuid.NewString())
 			assert.Expect(err).NotTo(HaveOccurred())
 			defer client.Close()
 
@@ -127,9 +133,11 @@ func TestDrivers(t *testing.T) {
 		})
 
 		t.Run(name+" volume", func(t *testing.T) {
+			t.Parallel()
+
 			assert := NewGomegaWithT(t)
 
-			client, err := init("test")
+			client, err := init("test-" + uuid.NewString())
 			assert.Expect(err).NotTo(HaveOccurred())
 			defer client.Close()
 
