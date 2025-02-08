@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/errdefs"
 	"github.com/jtarchie/ci/orchestra"
 )
 
@@ -19,11 +21,24 @@ type Docker struct {
 // Close implements orchestra.Driver.
 func (d *Docker) Close() error {
 	// find all containers in the namespace and remove them
-	_, err := d.client.ContainersPrune(context.Background(), filters.NewArgs(
-		filters.Arg("label", "orchestra.namespace="+d.namespace),
-	))
-	if err != nil {
-		return fmt.Errorf("failed to prune containers: %w", err)
+	attempts := 3
+	for currentAttempt := range attempts {
+		_, err := d.client.ContainersPrune(context.Background(), filters.NewArgs(
+			filters.Arg("label", "orchestra.namespace="+d.namespace),
+		))
+		if err == nil {
+			break
+		}
+
+		if !errdefs.IsConflict(err) {
+			return fmt.Errorf("failed to prune containers: %w", err)
+		}
+
+		if currentAttempt < attempts-1 {
+			time.Sleep(time.Duration(currentAttempt+1) * time.Second) // jitter sleep
+		} else {
+			return fmt.Errorf("failed to prune containers after %d attempts: %w", attempts, err)
+		}
 	}
 
 	// find all volumes in the namespace and remove them

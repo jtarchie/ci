@@ -8,7 +8,14 @@ tasks:
       - gofmt -w .
       - golangci-lint run ./... --fix
       - go test -race ./... -count=1
-  cleanup:
-    cmds:
-      - docker ps -aq | xargs -I {} docker rm -f {}
-      - docker volume ls -q | xargs -r docker volume rm -f
+      - task: cleanup
+  cleanup: |
+    removed_containers=$(docker ps -aq | xargs -I {} docker rm -f {} | wc -l)
+    removed_volumes=$(docker volume ls -q | xargs -r docker volume rm -f | wc -l)
+    if [ "$removed_containers" -eq 0 ] && [ "$removed_volumes" -eq 0 ]; then
+      exit 0
+    else
+      docker ps -aq | xargs -I {} docker rm -f {}
+      docker volume ls -q | xargs -r docker volume rm -f
+      exit 1
+    fi
