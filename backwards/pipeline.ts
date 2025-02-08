@@ -13,21 +13,36 @@ function createPipeline(config: PipelineConfig) {
   );
 
   return async () => {
-    const task = config.jobs[0].plan[0];
-    const result = await runtime.run({
-      name: task.task,
-      image: task.config.image_resource.source.repository,
-      command: [task.config.run.path].concat(task.config.run.args),
-    });
+    const knownMounts: { [key: string]: VolumeResult } = {};
 
-    if (task.assert.stdout && task.assert.stdout.trim() !== "") {
-      assert.containsString(task.assert.stdout, result.stdout);
-    }
-    if (task.assert.stderr && task.assert.stderr.trim() !== "") {
-      assert.containsString(task.assert.stderr, result.stderr);
-    }
-    if (typeof task.assert.code === "number") {
-      assert.equal(task.assert.code, result.code);
+    for (const task of config.jobs[0].plan) {
+      const mounts: { [key: string]: VolumeResult } = {};
+
+      for (const mount of task.config.inputs ?? []) {
+        knownMounts[mount.name] ||= await runtime.createVolume();
+        mounts[mount.name] = knownMounts[mount.name];
+      }
+      for (const mount of task.config.outputs ?? []) {
+        knownMounts[mount.name] ||= await runtime.createVolume();
+        mounts[mount.name] = knownMounts[mount.name];
+      }
+
+      const result = await runtime.run({
+        name: task.task,
+        image: task.config.image_resource.source.repository,
+        command: [task.config.run.path].concat(task.config.run.args),
+        mounts: mounts,
+      });
+
+      if (task.assert.stdout && task.assert.stdout.trim() !== "") {
+        assert.containsString(task.assert.stdout, result.stdout);
+      }
+      if (task.assert.stderr && task.assert.stderr.trim() !== "") {
+        assert.containsString(task.assert.stderr, result.stderr);
+      }
+      if (typeof task.assert.code === "number") {
+        assert.equal(task.assert.code, result.code);
+      }
     }
   };
 }

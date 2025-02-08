@@ -1,5 +1,7 @@
 package backwards
 
+import "encoding/json"
+
 // https://github.com/concourse/concourse/blob/master/atc/config.go
 type ImageResource struct {
 	Type   string                 `json:"type"   yaml:"type"`
@@ -11,8 +13,40 @@ type TaskConfigRun struct {
 	Args []string `json:"args" yaml:"args"`
 }
 
+type Input struct {
+	Name string `json:"name" validate:"required" yaml:"name"`
+}
+
+type Output struct {
+	Name string `json:"name" validate:"required" yaml:"name"`
+}
+
+type Inputs []Input
+
+func (i Inputs) MarshalJSON() ([]byte, error) {
+	if len(i) == 0 {
+		return []byte("[]"), nil
+	}
+
+	//nolint: wrapcheck
+	return json.Marshal([]Input(i))
+}
+
+type Outputs []Output
+
+func (o Outputs) MarshalJSON() ([]byte, error) {
+	if len(o) == 0 {
+		return []byte("[]"), nil
+	}
+
+	//nolint: wrapcheck
+	return json.Marshal([]Output(o))
+}
+
 type TaskConfig struct {
 	Platform      string        `json:"platform"       validate:"oneof='linux' 'darwin' 'windows'" yaml:"platform"`
+	Inputs        Inputs        `json:"inputs"         yaml:"inputs"`
+	Outputs       Outputs       `json:"outputs"        yaml:"outputs"`
 	ImageResource ImageResource `json:"image_resource" yaml:"image_resource"`
 	Run           TaskConfigRun `json:"run"            validate:"required"                         yaml:"run"`
 }
