@@ -38,7 +38,6 @@ func TestDrivers(t *testing.T) {
 				},
 			)
 			assert.Expect(err).NotTo(HaveOccurred())
-			defer func(container orchestra.Container) { _ = container.Cleanup(context.Background()) }(container)
 
 			assert.Eventually(func() bool {
 				status, err := container.Status(context.Background())
@@ -79,7 +78,6 @@ func TestDrivers(t *testing.T) {
 				},
 			)
 			assert.Expect(err).NotTo(HaveOccurred())
-			defer func(container orchestra.Container) { _ = container.Cleanup(context.Background()) }(container)
 
 			assert.Eventually(func() bool {
 				status, err := container.Status(context.Background())
@@ -156,7 +154,6 @@ func TestDrivers(t *testing.T) {
 				},
 			)
 			assert.Expect(err).NotTo(HaveOccurred())
-			defer func(container orchestra.Container) { _ = container.Cleanup(context.Background()) }(container)
 
 			assert.Eventually(func() bool {
 				status, err := container.Status(context.Background())
@@ -177,7 +174,6 @@ func TestDrivers(t *testing.T) {
 				},
 			)
 			assert.Expect(err).NotTo(HaveOccurred())
-			defer func(container orchestra.Container) { _ = container.Cleanup(context.Background()) }(container)
 
 			assert.Eventually(func() bool {
 				status, err := container.Status(context.Background())
