@@ -4,13 +4,13 @@ import "encoding/json"
 
 // https://github.com/concourse/concourse/blob/master/atc/config.go
 type ImageResource struct {
-	Type   string                 `json:"type"   yaml:"type"`
 	Source map[string]interface{} `json:"source" yaml:"source"`
+	Type   string                 `json:"type"   yaml:"type"`
 }
 
 type TaskConfigRun struct {
-	Path string   `json:"path" validate:"required" yaml:"path"`
 	Args []string `json:"args" yaml:"args"`
+	Path string   `json:"path" validate:"required" yaml:"path"`
 }
 
 type Input struct {
@@ -44,29 +44,30 @@ func (o Outputs) MarshalJSON() ([]byte, error) {
 }
 
 type TaskConfig struct {
-	Platform      string        `json:"platform"       validate:"oneof='linux' 'darwin' 'windows'" yaml:"platform"`
-	Inputs        Inputs        `json:"inputs"         yaml:"inputs"`
-	Outputs       Outputs       `json:"outputs"        yaml:"outputs"`
-	ImageResource ImageResource `json:"image_resource" yaml:"image_resource"`
-	Run           TaskConfigRun `json:"run"            validate:"required"                         yaml:"run"`
+	Env           map[string]string `json:"env"            yaml:"env"`
+	ImageResource ImageResource     `json:"image_resource" yaml:"image_resource"`
+	Inputs        Inputs            `json:"inputs"         yaml:"inputs"`
+	Outputs       Outputs           `json:"outputs"        yaml:"outputs"`
+	Platform      string            `json:"platform"       validate:"oneof='linux' 'darwin' 'windows'" yaml:"platform"`
+	Run           TaskConfigRun     `json:"run"            validate:"required"                         yaml:"run"`
 }
 
 type Step struct {
-	Task   string `json:"task" yaml:"task"`
 	Assert struct {
-		Stdout string `json:"stdout" yaml:"stdout"`
-		Stderr string `json:"stderr" yaml:"stderr"`
 		Code   *int   `json:"code"   yaml:"code"`
-	} `yaml:"assert" json:"assert"`
+		Stderr string `json:"stderr" yaml:"stderr"`
+		Stdout string `json:"stdout" yaml:"stdout"`
+	} `json:"assert" yaml:"assert"`
 	Config TaskConfig `json:"config" validate:"required_with=Task" yaml:"config"`
+	Task   string     `json:"task"   yaml:"task"`
 }
 
 type Steps []Step
 
 type Job struct {
 	Name   string `json:"name"   validate:"required,min=5"      yaml:"name"`
-	Public bool   `json:"public" yaml:"public"`
 	Plan   Steps  `json:"plan"   validate:"required,min=1,dive" yaml:"plan"`
+	Public bool   `json:"public" yaml:"public"`
 }
 
 type Jobs []Job

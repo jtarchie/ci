@@ -61,9 +61,10 @@ type RunResult struct {
 
 type RunInput struct {
 	Command []string                `json:"command"`
+	Env     map[string]string       `json:"env"`
 	Image   string                  `json:"image"`
-	Name    string                  `json:"name"`
 	Mounts  map[string]VolumeResult `json:"mounts"`
+	Name    string                  `json:"name"`
 }
 
 func (c *PipelineRunner) Run(input RunInput) *RunResult {
@@ -94,9 +95,10 @@ func (c *PipelineRunner) Run(input RunInput) *RunResult {
 	container, err := c.client.RunContainer(
 		ctx,
 		orchestra.Task{
+			Command: input.Command,
+			Env:     input.Env,
 			ID:      fmt.Sprintf("%s-%s", input.Name, taskID.String()),
 			Image:   input.Image,
-			Command: input.Command,
 			Mounts:  mounts,
 		},
 	)

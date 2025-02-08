@@ -5,6 +5,7 @@ declare global {
     image: string;
     command: string[];
     mounts?: { [key: string]: VolumeResult };
+    env?: { [key: string]: string };
   }
 
   interface RunTaskResult {
@@ -57,8 +58,9 @@ declare global {
     outputs?: { name: string }[];
     run: {
       path: string;
-      args: string[];
+      args?: string[];
     };
+    params?: { [key: string]: string };
   }
 
   interface Task {

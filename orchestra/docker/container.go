@@ -110,6 +110,11 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 		})
 	}
 
+	env := []string{}
+	for k, v := range task.Env {
+		env = append(env, k+"="+v)
+	}
+
 	response, err := d.client.ContainerCreate(
 		ctx,
 		&container.Config{
@@ -118,6 +123,7 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 			Labels: map[string]string{
 				"orchestra.namespace": d.namespace,
 			},
+			Env:        env,
 			WorkingDir: filepath.Join("/tmp", containerName),
 		},
 		&container.HostConfig{
