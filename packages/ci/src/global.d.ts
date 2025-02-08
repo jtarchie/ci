@@ -53,6 +53,8 @@ declare global {
       type: string;
       source: { [key: string]: string };
     };
+    inputs?: { name: string }[];
+    outputs?: { name: string }[];
     run: {
       path: string;
       args: string[];

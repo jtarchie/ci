@@ -18,8 +18,11 @@ func NewRuntime(
 	jsVM *goja.Runtime,
 	sandbox *PipelineRunner,
 ) *Runtime {
+	promises := &errgroup.Group{}
+	// promises.SetLimit(1)
+
 	return &Runtime{
-		promises: &errgroup.Group{},
+		promises: promises,
 		sandbox:  sandbox,
 		jsVM:     jsVM,
 	}

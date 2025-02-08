@@ -4,7 +4,6 @@
 
 "@jtarchie/ci@file:../packages/ci":
   version "1.0.0"
-  resolved "file:../packages/ci"
 
 typescript@^5.7.3:
   version "5.7.3"
