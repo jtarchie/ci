@@ -13,6 +13,5 @@ linters:
     - gochecknoinits
     - gomoddirectives
     - ireturn
-    - paralleltest
     - revive
     - tagliatelle
