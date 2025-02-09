@@ -25,3 +25,7 @@ This is a development repository for CI/CD system.
 - 03-02-2025: Added promise support for running multiple containers.
 - 07-02-2025: Added volume support for containers and native. It scopes things
   into a `/tmp` directory.
+- 08-02-2025:
+  - fix: cleanup for docker namespaces needed to retry when multiple runs prunes
+    were happening
+  - feat: added support for environment variables
