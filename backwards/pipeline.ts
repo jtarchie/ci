@@ -30,7 +30,7 @@ function createPipeline(config: PipelineConfig) {
       const result = await runtime.run({
         name: task.task,
         image: task.config.image_resource.source.repository,
-        command: [task.config.run.path].concat(task.config.run.args),
+        command: [task.config.run.path].concat(task.config.run.args ?? []),
         mounts: mounts,
       });
 

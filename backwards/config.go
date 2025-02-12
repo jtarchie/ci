@@ -72,6 +72,24 @@ type Job struct {
 
 type Jobs []Job
 
+type ResourceType struct {
+	Name   string                 `json:"name" validate:"required" yaml:"name"`
+	Source map[string]interface{} `json:"source" yaml:"source"`
+	Type   string                 `json:"type"   yaml:"type" validate:"required"`
+}
+
+type ResourceTypes []ResourceType
+
+type Resource struct {
+	Name   string                 `json:"name" validate:"required" yaml:"name"`
+	Source map[string]interface{} `json:"source" yaml:"source"`
+	Type   string                 `json:"type"   yaml:"type" validate:"required"`
+}
+
+type Resources []Resource
+
 type Config struct {
-	Jobs Jobs `json:"jobs" validate:"required,min=1,dive" yaml:"jobs"`
+	Jobs          Jobs          `json:"jobs" validate:"required,min=1,dive" yaml:"jobs"`
+	Resources     Resources     `json:"resources" yaml:"resources"`
+	ResourceTypes ResourceTypes `json:"resource_types" yaml:"resource_types"`
 }
