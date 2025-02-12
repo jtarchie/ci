@@ -80,7 +80,21 @@ declare global {
     plan: Step[];
   }
 
+  interface Resource {
+    name: string;
+    type: string;
+    source: { [key: string]: string };
+  }
+
+  interface ResourceType {
+    name: string;
+    type: string;
+    source: { [key: string]: string };
+  }
+
   interface PipelineConfig {
+    resource_types: ResourceType[];
+    resources: Resource[];
     jobs: Job[];
   }
 }

@@ -1,0 +1,25 @@
+resource_types:
+- name: time
+  type: docker-image
+  source:
+    repository: concourse/time-resource
+resources:
+- name: every-30s
+  type: time
+  source:
+    interval: 30s
+jobs:
+- name: job
+  public: true
+  plan:
+  - get: every-30s
+    trigger: true
+  - task: simple-task
+    config:
+      platform: linux
+      image_resource:
+        type: registry-image
+        source: { repository: busybox }
+      run:
+        path: echo
+        args: ["Hello, world!"]
