@@ -35,7 +35,7 @@ func (d *Docker) Close() error {
 		}
 
 		if currentAttempt < attempts-1 {
-			time.Sleep(time.Duration(currentAttempt+1) * time.Second) // jitter sleep
+			time.Sleep(time.Duration(1<<currentAttempt) * time.Second) // exponential backoff
 		} else {
 			return fmt.Errorf("failed to prune containers after %d attempts: %w", attempts, err)
 		}
