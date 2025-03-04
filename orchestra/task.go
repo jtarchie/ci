@@ -1,5 +1,7 @@
 package orchestra
 
+import "io"
+
 type Mount struct {
 	Name string
 	Path string
@@ -13,4 +15,5 @@ type Task struct {
 	ID      string
 	Image   string
 	Mounts  Mounts
+	Stdin   io.Reader
 }

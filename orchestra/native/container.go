@@ -112,6 +112,10 @@ func (n *Native) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 	command.Stderr = stdout
 	command.Stdout = stdout
 
+	if task.Stdin != nil {
+		command.Stdin = task.Stdin
+	}
+
 	go func() {
 		err := command.Run()
 		if err != nil {
