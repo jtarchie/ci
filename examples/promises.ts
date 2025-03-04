@@ -1,11 +1,11 @@
 const pipeline = async () => {
   const results = await Promise.all([
-    run({
+    runtime.run({
       name: "simple-task",
       image: "alpine",
       command: ["echo", "Hello, World!"],
     }),
-    run({
+    runtime.run({
       name: "simple-task",
       image: "alpine",
       command: ["echo", "Hello, Bob!"],
