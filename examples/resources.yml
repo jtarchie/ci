@@ -9,11 +9,11 @@ resources:
     source:
       interval: 30s
 jobs:
-  - name: job
+  - name: some-job
     public: true
     plan:
-      - get: every-30s
-        trigger: true
+      # - get: every-30s
+      #   trigger: true
       - task: simple-task
         config:
           platform: linux

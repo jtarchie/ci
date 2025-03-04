@@ -52,6 +52,14 @@ type TaskConfig struct {
 	Run           TaskConfigRun     `json:"run"            validate:"required"                         yaml:"run"`
 }
 
+type GetConfig struct {
+	Resource string            `json:"resource" yaml:"resource"`
+	Passed   []string          `json:"passed"   yaml:"passed"`
+	Params   map[string]string `json:"params"   yaml:"params"`
+	Trigger  bool              `json:"trigger"  yaml:"trigger"`
+	Version  string            `json:"version"  yaml:"version"`
+}
+
 type Step struct {
 	Assert struct {
 		Code   *int   `json:"code"   yaml:"code"`
@@ -60,14 +68,10 @@ type Step struct {
 	} `json:"assert" yaml:"assert"`
 
 	Task       string     `json:"task"   yaml:"task"`
-	TaskConfig TaskConfig `json:"config" validate:"required_with=Task" yaml:"config"`
+	TaskConfig TaskConfig `json:"config" validate:"required_if=Task ''" yaml:"config"`
 
-	Get      string            `json:"get"      yaml:"get"`
-	Resource string            `json:"resource" validate:"required_with=Get" yaml:"resource"`
-	Passed   []string          `json:"passed"   validate:"required_with=Get" yaml:"passed"`
-	Params   map[string]string `json:"params"   validate:"required_with=Get" yaml:"params"`
-	Trigger  bool              `json:"trigger"  validate:"required_with=Get" yaml:"trigger"`
-	Version  string            `json:"version"  validate:"required_with=Get" yaml:"version"`
+	Get       string `json:"get"                     yaml:"get"`
+	GetConfig `validated:"required_if=Get ''" yaml:",inline"`
 }
 
 type Steps []Step
