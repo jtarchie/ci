@@ -16,7 +16,49 @@ import (
 func TestDrivers(t *testing.T) {
 	orchestra.Each(func(name string, init orchestra.InitFunc) {
 		t.Run(name, func(t *testing.T) {
-			t.Run(" exit code failed", func(t *testing.T) {
+			t.Run("with stdin", func(t *testing.T) {
+				assert := NewGomegaWithT(t)
+
+				client, err := init("test-" + uuid.NewString())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer client.Close()
+
+				taskID, err := uuid.NewV7()
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				container, err := client.RunContainer(
+					context.Background(),
+					orchestra.Task{
+						ID:      taskID.String(),
+						Image:   "alpine",
+						Command: []string{"sh", "-c", "cat < /dev/stdin"},
+						Stdin:   strings.NewReader("hello"),
+					},
+				)
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				assert.Eventually(func() bool {
+					status, err := container.Status(context.Background())
+					assert.Expect(err).NotTo(HaveOccurred())
+
+					return status.IsDone() && status.ExitCode() == 0
+				}, "10s").Should(BeTrue())
+
+				assert.Eventually(func() bool {
+					ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+					defer cancel()
+
+					stdout, stderr := &strings.Builder{}, &strings.Builder{}
+					_ = container.Logs(ctx, stdout, stderr)
+
+					return strings.Contains(stdout.String(), "hello")
+				}, "10s").Should(BeTrue())
+
+				err = client.Close()
+				assert.Expect(err).NotTo(HaveOccurred())
+			})
+
+			t.Run("exit code failed", func(t *testing.T) {
 				assert := NewGomegaWithT(t)
 
 				client, err := init("test-" + uuid.NewString())
@@ -90,7 +132,7 @@ func TestDrivers(t *testing.T) {
 					// assert.Expect(err).NotTo(HaveOccurred())
 
 					return strings.Contains(stdout.String(), "hello")
-				}, "90s").Should(BeTrue())
+				}, "10s").Should(BeTrue())
 
 				// running a container should be deterministic and idempotent
 				container, err = client.RunContainer(

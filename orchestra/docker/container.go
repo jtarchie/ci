@@ -115,6 +115,8 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 		env = append(env, k+"="+v)
 	}
 
+	enabledStdin := task.Stdin != nil
+
 	response, err := d.client.ContainerCreate(
 		ctx,
 		&container.Config{
@@ -125,6 +127,8 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 			},
 			Env:        env,
 			WorkingDir: filepath.Join("/tmp", containerName),
+			OpenStdin:  enabledStdin,
+			StdinOnce:  enabledStdin,
 		},
 		&container.HostConfig{
 			Mounts: mounts,
@@ -151,6 +155,26 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 		}, nil
 	} else if err != nil {
 		return nil, fmt.Errorf("failed to create container: %w", err)
+	}
+
+	if enabledStdin {
+		// Attach to the container's STDIN
+		attachOptions := container.AttachOptions{
+			Stream: true,
+			Stdin:  true,
+		}
+
+		conn, err := d.client.ContainerAttach(ctx, response.ID, attachOptions)
+		if err != nil {
+			return nil, fmt.Errorf("failed to attach to container: %w", err)
+		}
+		defer conn.Close()
+
+		// Send the STDIN string to the container
+		_, err = io.Copy(conn.Conn, task.Stdin)
+		if err != nil {
+			return nil, fmt.Errorf("failed to write to container stdin: %w", err)
+		}
 	}
 
 	err = d.client.ContainerStart(ctx, response.ID, container.StartOptions{})
