@@ -15,218 +15,220 @@ import (
 
 func TestDrivers(t *testing.T) {
 	orchestra.Each(func(name string, init orchestra.InitFunc) {
-		t.Run(name+" exit code failed", func(t *testing.T) {
-			assert := NewGomegaWithT(t)
+		t.Run(name, func(t *testing.T) {
+			t.Run(" exit code failed", func(t *testing.T) {
+				assert := NewGomegaWithT(t)
 
-			client, err := init("test-" + uuid.NewString())
-			assert.Expect(err).NotTo(HaveOccurred())
-			defer client.Close()
+				client, err := init("test-" + uuid.NewString())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer client.Close()
 
-			taskID, err := uuid.NewV7()
-			assert.Expect(err).NotTo(HaveOccurred())
-
-			container, err := client.RunContainer(
-				context.Background(),
-				orchestra.Task{
-					ID:      taskID.String(),
-					Image:   "alpine",
-					Command: []string{"sh", "-c", "exit 1"},
-				},
-			)
-			assert.Expect(err).NotTo(HaveOccurred())
-
-			assert.Eventually(func() bool {
-				status, err := container.Status(context.Background())
+				taskID, err := uuid.NewV7()
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				return status.IsDone() && status.ExitCode() == 1
-			}, "10s").Should(BeTrue())
-
-			assert.Consistently(func() bool {
-				status, err := container.Status(context.Background())
-				assert.Expect(err).NotTo(HaveOccurred())
-
-				return status.IsDone() && status.ExitCode() == 1
-			}).Should(BeTrue())
-
-			err = client.Close()
-			assert.Expect(err).NotTo(HaveOccurred())
-		})
-
-		t.Run(name+" happy path", func(t *testing.T) {
-			assert := NewGomegaWithT(t)
-
-			client, err := init("test-" + uuid.NewString())
-			assert.Expect(err).NotTo(HaveOccurred())
-			defer client.Close()
-
-			taskID, err := uuid.NewV7()
-			assert.Expect(err).NotTo(HaveOccurred())
-
-			container, err := client.RunContainer(
-				context.Background(),
-				orchestra.Task{
-					ID:      taskID.String(),
-					Image:   "alpine",
-					Command: []string{"echo", "hello"},
-				},
-			)
-			assert.Expect(err).NotTo(HaveOccurred())
-
-			assert.Eventually(func() bool {
-				status, err := container.Status(context.Background())
-				assert.Expect(err).NotTo(HaveOccurred())
-
-				return status.IsDone() && status.ExitCode() == 0
-			}, "10s").Should(BeTrue())
-
-			assert.Eventually(func() bool {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-				defer cancel()
-
-				stdout, stderr := &strings.Builder{}, &strings.Builder{}
-				_ = container.Logs(ctx, stdout, stderr)
-				// assert.Expect(err).NotTo(HaveOccurred())
-
-				return strings.Contains(stdout.String(), "hello")
-			}, "90s").Should(BeTrue())
-
-			// running a container should be deterministic and idempotent
-			container, err = client.RunContainer(
-				context.Background(),
-				orchestra.Task{
-					ID:      taskID.String(),
-					Image:   "alpine",
-					Command: []string{"echo", "hello"},
-				},
-			)
-			assert.Expect(err).NotTo(HaveOccurred())
-
-			assert.Eventually(func() bool {
-				status, err := container.Status(context.Background())
-				assert.Expect(err).NotTo(HaveOccurred())
-
-				return status.IsDone() && status.ExitCode() == 0
-			}).Should(BeTrue())
-
-			assert.Eventually(func() bool {
-				stdout, stderr := &strings.Builder{}, &strings.Builder{}
-				err := container.Logs(context.Background(), stdout, stderr)
-				assert.Expect(err).NotTo(HaveOccurred())
-
-				return strings.Contains(stdout.String(), "hello")
-			}).Should(BeTrue())
-
-			err = container.Cleanup(context.Background())
-			assert.Expect(err).NotTo(HaveOccurred())
-
-			err = client.Close()
-			assert.Expect(err).NotTo(HaveOccurred())
-		})
-
-		t.Run(name+" volume", func(t *testing.T) {
-			assert := NewGomegaWithT(t)
-
-			client, err := init("test-" + uuid.NewString())
-			assert.Expect(err).NotTo(HaveOccurred())
-			defer client.Close()
-
-			taskID, err := uuid.NewV7()
-			assert.Expect(err).NotTo(HaveOccurred())
-
-			container, err := client.RunContainer(
-				context.Background(),
-				orchestra.Task{
-					ID:      taskID.String(),
-					Image:   "alpine",
-					Command: []string{"sh", "-c", "echo world > ./test/hello"},
-					Mounts: orchestra.Mounts{
-						{Name: "test", Path: "/test"},
+				container, err := client.RunContainer(
+					context.Background(),
+					orchestra.Task{
+						ID:      taskID.String(),
+						Image:   "alpine",
+						Command: []string{"sh", "-c", "exit 1"},
 					},
-				},
-			)
-			assert.Expect(err).NotTo(HaveOccurred())
-
-			assert.Eventually(func() bool {
-				status, err := container.Status(context.Background())
+				)
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				return status.IsDone() && status.ExitCode() == 0
-			}, "10s").Should(BeTrue())
+				assert.Eventually(func() bool {
+					status, err := container.Status(context.Background())
+					assert.Expect(err).NotTo(HaveOccurred())
 
-			container, err = client.RunContainer(
-				context.Background(),
-				orchestra.Task{
-					ID:      taskID.String() + "-2",
-					Image:   "alpine",
-					Command: []string{"cat", "./test/hello"},
-					Mounts: orchestra.Mounts{
-						{Name: "test", Path: "/test"},
+					return status.IsDone() && status.ExitCode() == 1
+				}, "10s").Should(BeTrue())
+
+				assert.Consistently(func() bool {
+					status, err := container.Status(context.Background())
+					assert.Expect(err).NotTo(HaveOccurred())
+
+					return status.IsDone() && status.ExitCode() == 1
+				}).Should(BeTrue())
+
+				err = client.Close()
+				assert.Expect(err).NotTo(HaveOccurred())
+			})
+
+			t.Run("happy path", func(t *testing.T) {
+				assert := NewGomegaWithT(t)
+
+				client, err := init("test-" + uuid.NewString())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer client.Close()
+
+				taskID, err := uuid.NewV7()
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				container, err := client.RunContainer(
+					context.Background(),
+					orchestra.Task{
+						ID:      taskID.String(),
+						Image:   "alpine",
+						Command: []string{"echo", "hello"},
 					},
-				},
-			)
-			assert.Expect(err).NotTo(HaveOccurred())
-
-			assert.Eventually(func() bool {
-				status, err := container.Status(context.Background())
+				)
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				return status.IsDone() && status.ExitCode() == 0
-			}, "10s").Should(BeTrue())
+				assert.Eventually(func() bool {
+					status, err := container.Status(context.Background())
+					assert.Expect(err).NotTo(HaveOccurred())
 
-			assert.Eventually(func() bool {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-				defer cancel()
+					return status.IsDone() && status.ExitCode() == 0
+				}, "10s").Should(BeTrue())
 
-				stdout, stderr := &strings.Builder{}, &strings.Builder{}
-				_ = container.Logs(ctx, stdout, stderr)
+				assert.Eventually(func() bool {
+					ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+					defer cancel()
 
-				return strings.Contains(stdout.String(), "world")
-			}, "10s").Should(BeTrue())
+					stdout, stderr := &strings.Builder{}, &strings.Builder{}
+					_ = container.Logs(ctx, stdout, stderr)
+					// assert.Expect(err).NotTo(HaveOccurred())
 
-			err = client.Close()
-			assert.Expect(err).NotTo(HaveOccurred())
-		})
+					return strings.Contains(stdout.String(), "hello")
+				}, "90s").Should(BeTrue())
 
-		t.Run(name+" environment variables", func(t *testing.T) {
-			t.Setenv("IGNORE", "ME")
-
-			assert := NewGomegaWithT(t)
-
-			client, err := init("test-" + uuid.NewString())
-			assert.Expect(err).NotTo(HaveOccurred())
-			defer client.Close()
-
-			taskID, err := uuid.NewV7()
-			assert.Expect(err).NotTo(HaveOccurred())
-
-			container, err := client.RunContainer(
-				context.Background(),
-				orchestra.Task{
-					ID:      taskID.String(),
-					Image:   "alpine",
-					Command: []string{"env"},
-					Env:     map[string]string{"HELLO": "WORLD"},
-				},
-			)
-			assert.Expect(err).NotTo(HaveOccurred())
-
-			assert.Eventually(func() bool {
-				status, err := container.Status(context.Background())
+				// running a container should be deterministic and idempotent
+				container, err = client.RunContainer(
+					context.Background(),
+					orchestra.Task{
+						ID:      taskID.String(),
+						Image:   "alpine",
+						Command: []string{"echo", "hello"},
+					},
+				)
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				return status.IsDone() && status.ExitCode() == 0
-			}, "10s").Should(BeTrue())
+				assert.Eventually(func() bool {
+					status, err := container.Status(context.Background())
+					assert.Expect(err).NotTo(HaveOccurred())
 
-			assert.Eventually(func() bool {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-				defer cancel()
+					return status.IsDone() && status.ExitCode() == 0
+				}).Should(BeTrue())
 
-				stdout, stderr := &strings.Builder{}, &strings.Builder{}
-				_ = container.Logs(ctx, stdout, stderr)
+				assert.Eventually(func() bool {
+					stdout, stderr := &strings.Builder{}, &strings.Builder{}
+					err := container.Logs(context.Background(), stdout, stderr)
+					assert.Expect(err).NotTo(HaveOccurred())
 
-				return strings.Contains(stdout.String(), "HELLO=WORLD\n") && !strings.Contains(stdout.String(), "IGNORE")
-			}, "10s").Should(BeTrue())
+					return strings.Contains(stdout.String(), "hello")
+				}).Should(BeTrue())
+
+				err = container.Cleanup(context.Background())
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				err = client.Close()
+				assert.Expect(err).NotTo(HaveOccurred())
+			})
+
+			t.Run("volume", func(t *testing.T) {
+				assert := NewGomegaWithT(t)
+
+				client, err := init("test-" + uuid.NewString())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer client.Close()
+
+				taskID, err := uuid.NewV7()
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				container, err := client.RunContainer(
+					context.Background(),
+					orchestra.Task{
+						ID:      taskID.String(),
+						Image:   "alpine",
+						Command: []string{"sh", "-c", "echo world > ./test/hello"},
+						Mounts: orchestra.Mounts{
+							{Name: "test", Path: "/test"},
+						},
+					},
+				)
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				assert.Eventually(func() bool {
+					status, err := container.Status(context.Background())
+					assert.Expect(err).NotTo(HaveOccurred())
+
+					return status.IsDone() && status.ExitCode() == 0
+				}, "10s").Should(BeTrue())
+
+				container, err = client.RunContainer(
+					context.Background(),
+					orchestra.Task{
+						ID:      taskID.String() + "-2",
+						Image:   "alpine",
+						Command: []string{"cat", "./test/hello"},
+						Mounts: orchestra.Mounts{
+							{Name: "test", Path: "/test"},
+						},
+					},
+				)
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				assert.Eventually(func() bool {
+					status, err := container.Status(context.Background())
+					assert.Expect(err).NotTo(HaveOccurred())
+
+					return status.IsDone() && status.ExitCode() == 0
+				}, "10s").Should(BeTrue())
+
+				assert.Eventually(func() bool {
+					ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+					defer cancel()
+
+					stdout, stderr := &strings.Builder{}, &strings.Builder{}
+					_ = container.Logs(ctx, stdout, stderr)
+
+					return strings.Contains(stdout.String(), "world")
+				}, "10s").Should(BeTrue())
+
+				err = client.Close()
+				assert.Expect(err).NotTo(HaveOccurred())
+			})
+
+			t.Run("environment variables", func(t *testing.T) {
+				t.Setenv("IGNORE", "ME")
+
+				assert := NewGomegaWithT(t)
+
+				client, err := init("test-" + uuid.NewString())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer client.Close()
+
+				taskID, err := uuid.NewV7()
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				container, err := client.RunContainer(
+					context.Background(),
+					orchestra.Task{
+						ID:      taskID.String(),
+						Image:   "alpine",
+						Command: []string{"env"},
+						Env:     map[string]string{"HELLO": "WORLD"},
+					},
+				)
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				assert.Eventually(func() bool {
+					status, err := container.Status(context.Background())
+					assert.Expect(err).NotTo(HaveOccurred())
+
+					return status.IsDone() && status.ExitCode() == 0
+				}, "10s").Should(BeTrue())
+
+				assert.Eventually(func() bool {
+					ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+					defer cancel()
+
+					stdout, stderr := &strings.Builder{}, &strings.Builder{}
+					_ = container.Logs(ctx, stdout, stderr)
+
+					return strings.Contains(stdout.String(), "HELLO=WORLD\n") && !strings.Contains(stdout.String(), "IGNORE")
+				}, "10s").Should(BeTrue())
+			})
 		})
 	})
 }
