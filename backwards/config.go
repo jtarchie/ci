@@ -58,8 +58,16 @@ type Step struct {
 		Stderr string `json:"stderr" yaml:"stderr"`
 		Stdout string `json:"stdout" yaml:"stdout"`
 	} `json:"assert" yaml:"assert"`
-	Config TaskConfig `json:"config" validate:"required_with=Task" yaml:"config"`
-	Task   string     `json:"task"   yaml:"task"`
+
+	Task       string     `json:"task"   yaml:"task"`
+	TaskConfig TaskConfig `json:"config" validate:"required_with=Task" yaml:"config"`
+
+	Get      string            `json:"get"      yaml:"get"`
+	Resource string            `json:"resource" validate:"required_with=Get" yaml:"resource"`
+	Passed   []string          `json:"passed"   validate:"required_with=Get" yaml:"passed"`
+	Params   map[string]string `json:"params"   validate:"required_with=Get" yaml:"params"`
+	Trigger  bool              `json:"trigger"  validate:"required_with=Get" yaml:"trigger"`
+	Version  string            `json:"version"  validate:"required_with=Get" yaml:"version"`
 }
 
 type Steps []Step
