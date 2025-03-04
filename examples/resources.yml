@@ -1,6 +1,6 @@
 resource_types:
   - name: time
-    type: docker-image
+    type: registry-image
     source:
       repository: concourse/time-resource
 resources:
@@ -12,14 +12,18 @@ jobs:
   - name: some-job
     public: true
     plan:
-      # - get: every-30s
-      #   trigger: true
+      - get: every-30s
+        trigger: true
       - task: simple-task
         config:
           platform: linux
+          inputs:
+            - name: every-30s
           image_resource:
             type: registry-image
             source: { repository: busybox }
           run:
-            path: echo
-            args: ["Hello, world!"]
+            path: sh
+            args: ["-c", "cat ./every-30s/timestamp"]
+        assert:
+          stdout: "2025"

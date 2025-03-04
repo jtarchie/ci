@@ -61,17 +61,17 @@ type GetConfig struct {
 }
 
 type Step struct {
-	Assert struct {
+	Assert *struct {
 		Code   *int   `json:"code"   yaml:"code"`
 		Stderr string `json:"stderr" yaml:"stderr"`
 		Stdout string `json:"stdout" yaml:"stdout"`
-	} `json:"assert" yaml:"assert"`
+	} `json:"assert,omitempty" yaml:"assert"`
 
-	Task       string     `json:"task"   yaml:"task"`
-	TaskConfig TaskConfig `json:"config" validate:"required_if=Task ''" yaml:"config"`
+	Task       string      `json:"task,omitempty" yaml:"task"`
+	TaskConfig *TaskConfig `json:"config"         validate:"required_with=Task" yaml:"config"`
 
-	Get       string `json:"get"                     yaml:"get"`
-	GetConfig `validated:"required_if=Get ''" yaml:",inline"`
+	Get        string `json:"get,omitempty"          yaml:"get"`
+	*GetConfig `validated:"required_with=Get" yaml:",inline"`
 }
 
 type Steps []Step
@@ -92,6 +92,15 @@ type ResourceType struct {
 
 type ResourceTypes []ResourceType
 
+func (r ResourceTypes) MarshalJSON() ([]byte, error) {
+	if len(r) == 0 {
+		return []byte("[]"), nil
+	}
+
+	//nolint: wrapcheck
+	return json.Marshal([]ResourceType(r))
+}
+
 type Resource struct {
 	Name   string                 `json:"name"   validate:"required" yaml:"name"`
 	Source map[string]interface{} `json:"source" yaml:"source"`
@@ -99,6 +108,15 @@ type Resource struct {
 }
 
 type Resources []Resource
+
+func (r Resources) MarshalJSON() ([]byte, error) {
+	if len(r) == 0 {
+		return []byte("[]"), nil
+	}
+
+	//nolint: wrapcheck
+	return json.Marshal([]Resource(r))
+}
 
 type Config struct {
 	Jobs          Jobs          `json:"jobs"           validate:"required,min=1,dive" yaml:"jobs"`

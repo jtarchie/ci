@@ -65,6 +65,7 @@ type RunInput struct {
 	Image   string                  `json:"image"`
 	Mounts  map[string]VolumeResult `json:"mounts"`
 	Name    string                  `json:"name"`
+	Stdin   string                  `json:"stdin"`
 }
 
 func (c *PipelineRunner) Run(input RunInput) *RunResult {
@@ -100,6 +101,7 @@ func (c *PipelineRunner) Run(input RunInput) *RunResult {
 			ID:      fmt.Sprintf("%s-%s", input.Name, taskID.String()),
 			Image:   input.Image,
 			Mounts:  mounts,
+			Stdin:   strings.NewReader(input.Stdin),
 		},
 	)
 	if err != nil {
