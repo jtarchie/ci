@@ -1,18 +1,19 @@
 // types for the pipeline
 declare global {
   interface RunTaskConfig {
-    name: string;
-    image: string;
     command: string[];
-    mounts?: { [key: string]: VolumeResult };
     env?: { [key: string]: string };
+    image: string;
+    mounts?: { [key: string]: VolumeResult };
+    name: string;
+    stdin?: string;
   }
 
   interface RunTaskResult {
-    stdout: string;
-    stderr: string;
-    error: string;
     code: number;
+    error: string;
+    stderr: string;
+    stdout: string;
   }
 
   interface VolumeConfig {
@@ -25,8 +26,8 @@ declare global {
   }
 
   namespace runtime {
-    function run(task: RunTaskConfig): Promise<RunTaskResult>;
     function createVolume(volume?: VolumeConfig): Promise<VolumeResult>;
+    function run(task: RunTaskConfig): Promise<RunTaskResult>;
   }
 
   namespace assert {
@@ -67,13 +68,21 @@ declare global {
     task: string;
     config: TaskConfig;
     assert: {
-      stdout: string;
-      stderr: string;
-      code: number | null;
+      stdout?: string;
+      stderr?: string;
+      code?: number | null;
     };
   }
 
-  type Step = Task;
+  interface Get {
+    get: string;
+    resource: string;
+    params: { [key: string]: string };
+    trigger: boolean;
+    version: string;
+  }
+
+  type Step = Task | Get;
 
   interface Job {
     name: string;

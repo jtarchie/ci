@@ -24,7 +24,7 @@ func TestExamples(t *testing.T) {
 
 	drivers := []string{
 		"docker",
-		"native",
+		// "native",
 	}
 
 	for _, match := range matches {

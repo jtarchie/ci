@@ -31,6 +31,8 @@ func NewPipeline(filename string) (string, error) {
 
 	err = validate.Struct(config)
 	if err != nil {
+		slog.Info("pipeline", "config", config)
+
 		return "", fmt.Errorf("could not validate pipeline: %w", err)
 	}
 
