@@ -74,14 +74,32 @@ func (j *JS) Execute(source string, sandbox *PipelineRunner) error {
 		return ErrPipelineNotFunction
 	}
 
-	_, err = pipelineFunc(goja.Undefined())
+	value, err := pipelineFunc(goja.Undefined())
 	if err != nil {
 		return fmt.Errorf("could not run pipeline: %w", err)
+	}
+
+	promise, ok := value.Export().(*goja.Promise)
+	if !ok {
+		return fmt.Errorf("pipeline did not return a promise: %w", ErrPipelineNotFunction)
 	}
 
 	err = runtime.Wait()
 	if err != nil {
 		return fmt.Errorf("could not wait for promises: %w", err)
+	}
+
+	if promise.State() == goja.PromiseStateRejected {
+		res := promise.Result()
+		if resObj, ok := res.(*goja.Object); ok {
+			if stack := resObj.Get("stack"); stack != nil {
+				//nolint: err113
+				return fmt.Errorf("pipeline promise rejected: %v\n%v", res, stack)
+			}
+		}
+
+		//nolint: err113
+		return fmt.Errorf("pipeline promise rejected: %v", res)
 	}
 
 	return nil

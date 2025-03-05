@@ -21,3 +21,19 @@ func TestBrokenJS(t *testing.T) {
 	`, nil)
 	assert.Expect(err).To(HaveOccurred())
 }
+
+func TestAwaitPromise(t *testing.T) {
+	t.Parallel()
+
+	assert := NewGomegaWithT(t)
+
+	js := runtime.NewJS()
+	err := js.Execute(`
+		async function pipeline() {
+			await Promise.reject(400);
+		};
+
+		export { pipeline };
+	`, nil)
+	assert.Expect(err).To(HaveOccurred())
+}
