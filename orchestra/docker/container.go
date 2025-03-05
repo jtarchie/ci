@@ -6,7 +6,6 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
@@ -24,7 +23,7 @@ type DockerContainer struct {
 }
 
 type DockerContainerStatus struct {
-	state *types.ContainerState
+	state *container.State
 }
 
 func (d *DockerContainer) Status(ctx context.Context) (orchestra.ContainerStatus, error) {

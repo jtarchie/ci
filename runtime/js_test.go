@@ -1,6 +1,7 @@
 package runtime_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/jtarchie/ci/runtime"
@@ -13,13 +14,14 @@ func TestBrokenJS(t *testing.T) {
 	assert := NewGomegaWithT(t)
 
 	js := runtime.NewJS()
-	err := js.Execute(`
+	err := js.Execute(strings.TrimSpace(`
 		export function pipeline() {
 			const array = [];
 			return array[1].asdf;
 		};
-	`, nil)
+	`), nil)
 	assert.Expect(err).To(HaveOccurred())
+	assert.Expect(err.Error()).To(ContainSubstring("main.js:3"))
 }
 
 func TestAwaitPromise(t *testing.T) {
