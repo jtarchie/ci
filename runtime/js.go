@@ -3,6 +3,7 @@ package runtime
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/dop251/goja"
 	"github.com/dop251/goja_nodejs/console"
@@ -18,11 +19,12 @@ func NewJS() *JS {
 
 func (j *JS) Execute(source string, sandbox *PipelineRunner) error {
 	result := api.Transform(source, api.TransformOptions{
-		Loader:    api.LoaderTS,
-		Format:    api.FormatCommonJS,
-		Target:    api.ES2015,
-		Sourcemap: api.SourceMapInline,
-		Platform:  api.PlatformNeutral,
+		Loader:     api.LoaderTS,
+		Format:     api.FormatCommonJS,
+		Target:     api.ES2015,
+		Sourcemap:  api.SourceMapInline,
+		Platform:   api.PlatformNeutral,
+		Sourcefile: "main.js",
 	})
 
 	if len(result.Errors) > 0 {
@@ -33,9 +35,18 @@ func (j *JS) Execute(source string, sandbox *PipelineRunner) error {
 		}
 	}
 
+	// split lines
+	lines := strings.Split(strings.TrimSpace(string(result.Code)), "\n")
+
+	var sourceMap string
+	sourceMap, lines = lines[len(lines)-1], lines[:len(lines)-1]
+	finalSource := "{(function() { const module = {}; " + strings.Join(lines, "\n") +
+		"; return module.exports.pipeline;}).apply(undefined)}\n" +
+		sourceMap
+
 	program, err := goja.Compile(
 		"main.js",
-		"{(function() { const module = {}; "+string(result.Code)+"; return module.exports.pipeline;}).apply(undefined)}",
+		finalSource,
 		true,
 	)
 	if err != nil {
