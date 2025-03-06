@@ -44,7 +44,7 @@ func TestExamples(t *testing.T) {
 						examplePath,
 					), os.Stderr, os.Stderr)
 				assert.Expect(err).ToNot(HaveOccurred())
-				assert.Eventually(session, "5s").Should(gexec.Exit(0))
+				assert.Eventually(session, "10s").Should(gexec.Exit(0))
 			})
 		}
 	}

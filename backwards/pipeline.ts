@@ -10,6 +10,8 @@ function createPipeline(config: PipelineConfig) {
     for (const step of config.jobs[0].plan) {
       if ("get" in step) {
         await processGetStep(step, config, knownMounts);
+      } else if ("put" in step) {
+        await processPutStep(step, config, knownMounts);
       } else if ("task" in step) {
         await runTask(step, knownMounts);
       }
@@ -56,6 +58,47 @@ function validateResources(config: PipelineConfig): void {
   );
 }
 
+async function processPutStep(
+  step: Put,
+  config: PipelineConfig,
+  knownMounts: { [key: string]: VolumeResult },
+): Promise<void> {
+  const resource = findResource(config, step.put);
+  const resourceType = findResourceType(config, resource?.type);
+
+  const putResponse = await runTask(
+    {
+      task: `put-${resource?.name}`,
+      config: {
+        image_resource: {
+          type: "registry-image",
+          source: {
+            repository: resourceType?.source.repository!,
+          },
+        },
+        outputs: [
+          { name: resource?.name! },
+        ],
+        run: {
+          path: "/opt/resource/out",
+          args: [`./${resource?.name}`],
+        },
+      },
+      assert: {
+        code: 0,
+      },
+    },
+    knownMounts,
+    JSON.stringify({
+      source: resource?.source,
+      params: step.params,
+    }),
+  );
+
+  const putPayload = JSON.parse(putResponse.stdout);
+  await runResourceGet(resource, resourceType, putPayload.version, knownMounts);
+}
+
 async function processGetStep(
   step: Get,
   config: PipelineConfig,
@@ -70,9 +113,8 @@ async function processGetStep(
     knownMounts,
   );
   const checkPayload = JSON.parse(checkResult.stdout);
-  console.log(checkResult.stdout);
 
-  await runResourceGet(resource, resourceType, checkPayload, knownMounts);
+  await runResourceGet(resource, resourceType, checkPayload[0], knownMounts);
 }
 
 function findResource(config: PipelineConfig, resourceName: string) {
@@ -122,7 +164,7 @@ async function runResourceCheck(
 async function runResourceGet(
   resource: Resource,
   resourceType: ResourceType,
-  checkPayload: unknown[],
+  version: unknown,
   knownMounts: { [key: string]: VolumeResult },
 ) {
   return await runTask(
@@ -150,7 +192,7 @@ async function runResourceGet(
     knownMounts,
     JSON.stringify({
       source: resource?.source,
-      version: checkPayload[0],
+      version: version,
     }),
   );
 }
@@ -204,6 +246,8 @@ function validateTaskResult(step: Task, result: RunTaskResult): void {
   }
 
   if (typeof step.assert.code === "number") {
+    console.log(result.stdout);
+    console.log(result.stderr);
     assert.equal(step.assert.code, result.code);
   }
 }

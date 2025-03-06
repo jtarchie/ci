@@ -26,3 +26,18 @@ jobs:
             args: ["-c", "cat ./test-resource/version"]
         assert:
           stdout: "2025"
+      - put: test-resource
+        params: { version: 2026 }
+      - task: simple-task
+        config:
+          platform: linux
+          inputs:
+            - name: test-resource
+          image_resource:
+            type: registry-image
+            source: { repository: busybox }
+          run:
+            path: sh
+            args: ["-c", "cat ./test-resource/version"]
+        assert:
+          stdout: "2026"
