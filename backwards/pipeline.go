@@ -2,9 +2,7 @@ package backwards
 
 import (
 	_ "embed"
-	"encoding/json"
 	"fmt"
-	"log/slog"
 	"os"
 
 	"github.com/go-playground/validator/v10"
@@ -31,17 +29,14 @@ func NewPipeline(filename string) (string, error) {
 
 	err = validate.Struct(config)
 	if err != nil {
-		slog.Info("pipeline", "config", config)
-
 		return "", fmt.Errorf("could not validate pipeline: %w", err)
 	}
 
-	contents, err = json.Marshal(config)
+	contents, err = yaml.MarshalWithOptions(config, yaml.JSON())
 	if err != nil {
 		return "", fmt.Errorf("could not marshal pipeline: %w", err)
 	}
 
-	slog.Info("pipeline", "contents", string(contents))
 	pipeline := "const config = " + string(contents) + ";\n" +
 		pipelineJS +
 		"\n; const pipeline = createPipeline(config); export { pipeline };"

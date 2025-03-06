@@ -82,7 +82,13 @@ declare global {
     version: string;
   }
 
-  type Step = Task | Get;
+  interface Put {
+    put: string;
+    resource: string;
+    params: { [key: string]: string };
+  }
+
+  type Step = Task | Get | Put;
 
   interface Job {
     name: string;

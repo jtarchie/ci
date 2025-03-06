@@ -1,125 +1,98 @@
 package backwards
 
-import "encoding/json"
-
 // https://github.com/concourse/concourse/blob/master/atc/config.go
 type ImageResource struct {
-	Source map[string]interface{} `json:"source" yaml:"source"`
-	Type   string                 `json:"type"   yaml:"type"`
+	Source map[string]interface{} `yaml:"source,omitempty"`
+	Type   string                 `yaml:"type,omitempty"`
 }
 
 type TaskConfigRun struct {
-	Args []string `json:"args" yaml:"args"`
-	Path string   `json:"path" validate:"required" yaml:"path"`
+	Args []string `yaml:"args,omitempty"`
+	Path string   `validate:"required"   yaml:"path,omitempty"`
 }
 
 type Input struct {
-	Name string `json:"name" validate:"required" yaml:"name"`
+	Name string `validate:"required" yaml:"name,omitempty"`
 }
 
 type Output struct {
-	Name string `json:"name" validate:"required" yaml:"name"`
+	Name string `validate:"required" yaml:"name,omitempty"`
 }
 
 type Inputs []Input
 
-func (i Inputs) MarshalJSON() ([]byte, error) {
-	if len(i) == 0 {
-		return []byte("[]"), nil
-	}
-
-	//nolint: wrapcheck
-	return json.Marshal([]Input(i))
-}
-
 type Outputs []Output
 
-func (o Outputs) MarshalJSON() ([]byte, error) {
-	if len(o) == 0 {
-		return []byte("[]"), nil
-	}
-
-	//nolint: wrapcheck
-	return json.Marshal([]Output(o))
-}
-
 type TaskConfig struct {
-	Env           map[string]string `json:"env"            yaml:"env"`
-	ImageResource ImageResource     `json:"image_resource" yaml:"image_resource"`
-	Inputs        Inputs            `json:"inputs"         yaml:"inputs"`
-	Outputs       Outputs           `json:"outputs"        yaml:"outputs"`
-	Platform      string            `json:"platform"       validate:"oneof='linux' 'darwin' 'windows'" yaml:"platform"`
-	Run           TaskConfigRun     `json:"run"            validate:"required"                         yaml:"run"`
+	Env           map[string]string `yaml:"env,omitempty"`
+	ImageResource ImageResource     `yaml:"image_resource,omitempty"`
+	Inputs        Inputs            `yaml:"inputs,omitempty"`
+	Outputs       Outputs           `yaml:"outputs,omitempty"`
+	Platform      string            `validate:"oneof='linux' 'darwin' 'windows'" yaml:"platform,omitempty"`
+	Run           TaskConfigRun     `validate:"required"                         yaml:"run,omitempty"`
 }
 
 type GetConfig struct {
-	Resource string            `json:"resource" yaml:"resource"`
-	Passed   []string          `json:"passed"   yaml:"passed"`
-	Params   map[string]string `json:"params"   yaml:"params"`
-	Trigger  bool              `json:"trigger"  yaml:"trigger"`
-	Version  string            `json:"version"  yaml:"version"`
+	Resource string            `yaml:"resource,omitempty"`
+	Passed   []string          `yaml:"passed,omitempty"`
+	Params   map[string]string `yaml:"params,omitempty"`
+	Trigger  bool              `yaml:"trigger,omitempty"`
+	Version  string            `yaml:"version,omitempty"`
+}
+
+type PutConfig struct {
+	Resource  string            `yaml:"resource,omitempty"`
+	Params    map[string]string `yaml:"params,omitempty"`
+	GetParams map[string]string `yaml:"get_params,omitempty"`
+	Inputs    []string          `yaml:"inputs,omitempty"`
+	NoGet     bool              `yaml:"no_get,omitempty"`
 }
 
 type Step struct {
 	Assert *struct {
-		Code   *int   `json:"code"   yaml:"code"`
-		Stderr string `json:"stderr" yaml:"stderr"`
-		Stdout string `json:"stdout" yaml:"stdout"`
-	} `json:"assert,omitempty" yaml:"assert"`
+		Code   *int   `yaml:"code,omitempty"`
+		Stderr string `yaml:"stderr,omitempty"`
+		Stdout string `yaml:"stdout,omitempty"`
+	} `yaml:"assert,omitempty"`
 
-	Task       string      `json:"task,omitempty" yaml:"task"`
-	TaskConfig *TaskConfig `json:"config"         validate:"required_with=Task" yaml:"config"`
+	Task       string      `yaml:"task,omitempty"`
+	TaskConfig *TaskConfig `validate:"required_with=Task" yaml:"config,omitempty"`
 
-	Get        string `json:"get,omitempty"          yaml:"get"`
-	*GetConfig `validated:"required_with=Get" yaml:",inline"`
+	Get       string    `yaml:"get,omitempty"`
+	GetConfig GetConfig `validated:"required_with=Get" yaml:",inline,omitempty"`
+
+	Put       string     `yaml:"put,omitempty"`
+	PutConfig *PutConfig `validated:"required_with=Put" yaml:",inline,omitempty"`
 }
 
 type Steps []Step
 
 type Job struct {
-	Name   string `json:"name"   validate:"required,min=5"      yaml:"name"`
-	Plan   Steps  `json:"plan"   validate:"required,min=1,dive" yaml:"plan"`
-	Public bool   `json:"public" yaml:"public"`
+	Name   string `validate:"required,min=5"      yaml:"name,omitempty"`
+	Plan   Steps  `validate:"required,min=1,dive" yaml:"plan,omitempty"`
+	Public bool   `yaml:"public,omitempty"`
 }
 
 type Jobs []Job
 
 type ResourceType struct {
-	Name   string                 `json:"name"   validate:"required" yaml:"name"`
-	Source map[string]interface{} `json:"source" yaml:"source"`
-	Type   string                 `json:"type"   validate:"required" yaml:"type"`
+	Name   string                 `validate:"required"     yaml:"name,omitempty"`
+	Source map[string]interface{} `yaml:"source,omitempty"`
+	Type   string                 `validate:"required"     yaml:"type,omitempty"`
 }
 
 type ResourceTypes []ResourceType
 
-func (r ResourceTypes) MarshalJSON() ([]byte, error) {
-	if len(r) == 0 {
-		return []byte("[]"), nil
-	}
-
-	//nolint: wrapcheck
-	return json.Marshal([]ResourceType(r))
-}
-
 type Resource struct {
-	Name   string                 `json:"name"   validate:"required" yaml:"name"`
-	Source map[string]interface{} `json:"source" yaml:"source"`
-	Type   string                 `json:"type"   validate:"required" yaml:"type"`
+	Name   string                 `validate:"required"     yaml:"name,omitempty"`
+	Source map[string]interface{} `yaml:"source,omitempty"`
+	Type   string                 `validate:"required"     yaml:"type,omitempty"`
 }
 
 type Resources []Resource
 
-func (r Resources) MarshalJSON() ([]byte, error) {
-	if len(r) == 0 {
-		return []byte("[]"), nil
-	}
-
-	//nolint: wrapcheck
-	return json.Marshal([]Resource(r))
-}
-
 type Config struct {
-	Jobs          Jobs          `json:"jobs"           validate:"required,min=1,dive" yaml:"jobs"`
-	Resources     Resources     `json:"resources"      yaml:"resources"`
-	ResourceTypes ResourceTypes `json:"resource_types" yaml:"resource_types"`
+	Jobs          Jobs          `validate:"required,min=1,dive" yaml:"jobs"`
+	Resources     Resources     `yaml:"resources"`
+	ResourceTypes ResourceTypes `yaml:"resource_types"`
 }
