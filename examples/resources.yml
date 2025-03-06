@@ -1,29 +1,28 @@
 resource_types:
-  - name: time
+  - name: mock
     type: registry-image
     source:
-      repository: concourse/time-resource
+      repository: concourse/mock-resource
 resources:
-  - name: every-30s
-    type: time
+  - name: test-resource
+    type: mock
     source:
-      interval: 30s
+      force_version: "2025"
 jobs:
   - name: some-job
     public: true
     plan:
-      - get: every-30s
-        trigger: true
+      - get: test-resource
       - task: simple-task
         config:
           platform: linux
           inputs:
-            - name: every-30s
+            - name: test-resource
           image_resource:
             type: registry-image
             source: { repository: busybox }
           run:
             path: sh
-            args: ["-c", "cat ./every-30s/timestamp"]
+            args: ["-c", "cat ./test-resource/version"]
         assert:
           stdout: "2025"
