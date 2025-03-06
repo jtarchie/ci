@@ -11,7 +11,8 @@ import (
 )
 
 type CLI struct {
-	Runner commands.Runner `cmd:"" help:"Run a pipeline"`
+	Runner    commands.Runner    `cmd:"" help:"Run a pipeline"`
+	Transpile commands.Transpile `cmd:"" help:"Transpile a pipeline"`
 }
 
 func main() {
