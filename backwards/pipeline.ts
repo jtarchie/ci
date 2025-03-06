@@ -57,7 +57,7 @@ function validateResources(config: PipelineConfig): void {
 }
 
 async function processGetStep(
-  step: { get: string },
+  step: Get,
   config: PipelineConfig,
   knownMounts: { [key: string]: VolumeResult },
 ): Promise<void> {
