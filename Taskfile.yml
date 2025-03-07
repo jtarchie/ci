@@ -1,12 +1,15 @@
 version: 3
 
 tasks:
-  default:
+  fmt:
     cmds:
       - deno fmt .
       - deno lint .
       - gofmt -w .
       - golangci-lint run ./... --fix
+  default:
+    cmds:
+      - task: fmt
       - go test -race ./... -count=1
   cleanup: |
     removed_containers=$(docker ps -aq | xargs -I {} docker rm -f {} | wc -l)
