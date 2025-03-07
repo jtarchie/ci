@@ -1,6 +1,9 @@
-# Development notes
+# Documentation
 
-This is a development repository for CI/CD system.
+## Development Changelog
+
+This is a development repository for CI/CD system. These notes can probably be
+inferred from the `git` commit messages. I'm journaling for my own benefit.
 
 - 2025-03-05: Support for `put` in resource pipeline.
 - 2025-03-05: Support for `get` and `check` in resource pipeline.
