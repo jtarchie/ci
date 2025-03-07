@@ -8,15 +8,19 @@ function createPipeline(config: PipelineConfig) {
     const knownMounts: { [key: string]: VolumeResult } = {};
 
     for (const step of config.jobs[0].plan) {
-      if ("get" in step) {
-        await processGetStep(step, config, knownMounts);
-      } else if ("put" in step) {
-        await processPutStep(step, config, knownMounts);
-      } else if ("task" in step) {
-        await runTask(step, knownMounts);
-      }
+      await processStep(step, config, knownMounts);
     }
   };
+}
+
+async function processStep(step: Step, config: PipelineConfig, knownMounts: { [key: string]: VolumeResult; }) {
+  if ("get" in step) {
+    await processGetStep(step, config, knownMounts);
+  } else if ("put" in step) {
+    await processPutStep(step, config, knownMounts);
+  } else if ("task" in step) {
+    await runTask(step, config, knownMounts);
+  }
 }
 
 function validatePipelineConfig(config: PipelineConfig): void {
@@ -88,6 +92,7 @@ async function processPutStep(
         code: 0,
       },
     },
+    config,
     knownMounts,
     JSON.stringify({
       source: resource?.source,
@@ -96,78 +101,9 @@ async function processPutStep(
   );
 
   const putPayload = JSON.parse(putResponse.stdout);
-  await runResourceGet(resource, resourceType, putPayload.version, knownMounts);
-}
-
-async function processGetStep(
-  step: Get,
-  config: PipelineConfig,
-  knownMounts: { [key: string]: VolumeResult },
-): Promise<void> {
-  const resource = findResource(config, step.get);
-  const resourceType = findResourceType(config, resource?.type);
-
-  const checkResult = await runResourceCheck(
-    resource,
-    resourceType,
-    knownMounts,
-  );
-  const checkPayload = JSON.parse(checkResult.stdout);
-
-  await runResourceGet(resource, resourceType, checkPayload[0], knownMounts);
-}
-
-function findResource(config: PipelineConfig, resourceName: string) {
-  const resource = config.resources.find((resource) =>
-    resource.name === resourceName
-  );
-  return resource!;
-}
-
-function findResourceType(config: PipelineConfig, typeName?: string) {
-  const resourceType = config.resource_types.find((type) =>
-    type.name === typeName
-  );
-  return resourceType!;
-}
-
-async function runResourceCheck(
-  resource: Resource,
-  resourceType: ResourceType,
-  knownMounts: { [key: string]: VolumeResult },
-) {
-  return await runTask(
-    {
-      task: `check-${resource?.name}`,
-      config: {
-        image_resource: {
-          type: "registry-image",
-          source: {
-            repository: resourceType?.source.repository!,
-          },
-        },
-        run: {
-          path: "/opt/resource/check",
-        },
-      },
-      assert: {
-        code: 0,
-      },
-    },
-    knownMounts,
-    JSON.stringify({
-      source: resource?.source,
-    }),
-  );
-}
-
-async function runResourceGet(
-  resource: Resource,
-  resourceType: ResourceType,
-  version: unknown,
-  knownMounts: { [key: string]: VolumeResult },
-) {
-  return await runTask(
+  const version = putPayload.version;
+  
+  await runTask(
     {
       task: `get-${resource?.name}`,
       config: {
@@ -188,7 +124,10 @@ async function runResourceGet(
       assert: {
         code: 0,
       },
+      on_success: step.on_success,
+      on_failure: step.on_failure,
     },
+    config,
     knownMounts,
     JSON.stringify({
       source: resource?.source,
@@ -197,8 +136,94 @@ async function runResourceGet(
   );
 }
 
+async function processGetStep(
+  step: Get,
+  config: PipelineConfig,
+  knownMounts: { [key: string]: VolumeResult },
+): Promise<void> {
+  const resource = findResource(config, step.get);
+  const resourceType = findResourceType(config, resource?.type);
+
+  const checkResult = await runTask(
+    {
+      task: `check-${resource?.name}`,
+      config: {
+        image_resource: {
+          type: "registry-image",
+          source: {
+            repository: resourceType?.source.repository!,
+          },
+        },
+        run: {
+          path: "/opt/resource/check",
+        },
+      },
+      assert: {
+        code: 0,
+      },
+      on_success: step.on_success,
+      on_failure: step.on_failure,
+    },
+    config,
+    knownMounts,
+    JSON.stringify({
+      source: resource?.source,
+    }),
+  );
+  const checkPayload = JSON.parse(checkResult.stdout);
+  const version = checkPayload[0];
+
+  await runTask(
+    {
+      task: `get-${resource?.name}`,
+      config: {
+        image_resource: {
+          type: "registry-image",
+          source: {
+            repository: resourceType?.source.repository!,
+          },
+        },
+        outputs: [
+          { name: resource?.name! },
+        ],
+        run: {
+          path: "/opt/resource/in",
+          args: [`./${resource?.name}`],
+        },
+      },
+      assert: {
+        code: 0,
+      },
+      on_success: step.on_success,
+      on_failure: step.on_failure,
+    },
+    config,
+    knownMounts,
+    JSON.stringify({
+      source: resource?.source,
+      version: version,
+    }),
+  );
+}
+
+function findResource(config: PipelineConfig, resourceName: string) {
+  const resource = config.resources.find((resource) =>
+    resource.name === resourceName
+  );
+  return resource!;
+}
+
+function findResourceType(config: PipelineConfig, typeName?: string) {
+  const resourceType = config.resource_types.find((type) =>
+    type.name === typeName
+  );
+  return resourceType!;
+}
+
+
 async function runTask(
   step: Task,
+  config: PipelineConfig,
   knownMounts: { [key: string]: VolumeResult },
   stdin?: string,
 ) {
@@ -214,6 +239,12 @@ async function runTask(
 
   validateTaskResult(step, result);
 
+  if (result.code === 0 && step.on_success) {
+    await processStep(step.on_success, config, knownMounts);
+  } else if (result.code !== 0 && step.on_failure) {
+    await processStep(step.on_failure, config, knownMounts);
+  }
+  
   return result;
 }
 

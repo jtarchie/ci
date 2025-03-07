@@ -28,7 +28,7 @@ jobs:
           stdout: "2025"
       - put: test-resource
         params: { version: 2026 }
-      - task: simple-task
+      - task: on_success
         config:
           platform: linux
           inputs:
@@ -41,3 +41,49 @@ jobs:
             args: ["-c", "cat ./test-resource/version"]
         assert:
           stdout: "2026"
+        on_success:
+          put: test-resource
+          params: { version: 2027 }
+      - task: assert-2027
+        config:
+          platform: linux
+          inputs:
+            - name: test-resource
+          image_resource:
+            type: registry-image
+            source: { repository: busybox }
+          run:
+            path: sh
+            args: ["-c", "cat ./test-resource/version"]
+        assert:
+          stdout: "2027"
+      - task: on_failure
+        config:
+          platform: linux
+          inputs:
+            - name: test-resource
+          image_resource:
+            type: registry-image
+            source: { repository: busybox }
+          run:
+            path: exit
+            args: [1]
+        assert:
+          code: 1
+        on_failure:
+          put: test-resource
+          params: { version: 2028 }
+      - task: assert-2028
+        config:
+          platform: linux
+          inputs:
+            - name: test-resource
+          image_resource:
+            type: registry-image
+            source: { repository: busybox }
+          run:
+            path: sh
+            args: ["-c", "cat ./test-resource/version"]
+        assert:
+          stdout: "2028"
+
