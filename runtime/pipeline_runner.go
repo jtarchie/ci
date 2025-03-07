@@ -31,7 +31,7 @@ type VolumeInput struct {
 
 type VolumeResult struct {
 	orchestra.Volume `json:"volume,omitempty"`
-	Error string `json:"error,omitempty"`
+	Error            string `json:"error,omitempty"`
 }
 
 func (c *PipelineRunner) CreateVolume(input VolumeInput) *VolumeResult {
