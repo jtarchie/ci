@@ -244,7 +244,7 @@ async function runTask(
   } else if (result.code !== 0 && step.on_failure) {
     await processStep(step.on_failure, config, knownMounts);
   }
-  
+
   return result;
 }
 
@@ -277,8 +277,6 @@ function validateTaskResult(step: Task, result: RunTaskResult): void {
   }
 
   if (typeof step.assert.code === "number") {
-    console.log(result.stdout);
-    console.log(result.stderr);
     assert.equal(step.assert.code, result.code);
   }
 }
