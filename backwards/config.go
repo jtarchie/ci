@@ -63,6 +63,9 @@ type Step struct {
 
 	Put       string     `yaml:"put,omitempty"`
 	PutConfig *PutConfig `validated:"required_with=Put" yaml:",inline,omitempty"`
+
+	OnSuccess *Step `yaml:"on_success,omitempty"`
+	OnFailure *Step `yaml:"on_failure,omitempty"`
 }
 
 type Steps []Step

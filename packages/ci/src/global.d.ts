@@ -72,6 +72,9 @@ declare global {
       stderr?: string;
       code?: number | null;
     };
+
+    on_success?: Step;
+    on_failure?: Step;
   }
 
   interface Get {
@@ -80,12 +83,18 @@ declare global {
     params: { [key: string]: string };
     trigger: boolean;
     version: string;
+
+    on_success?: Step;
+    on_failure?: Step;
   }
 
   interface Put {
     put: string;
     resource: string;
     params: { [key: string]: string };
+
+    on_success?: Step;
+    on_failure?: Step;
   }
 
   type Step = Task | Get | Put;
