@@ -1,11 +1,15 @@
 /// <reference path="../packages/ci/src/global.d.ts" />
 
+type KnownMounts = {
+  [key: string]: VolumeResult;
+};
+
 // deno-lint-ignore no-unused-vars
 function createPipeline(config: PipelineConfig) {
   validatePipelineConfig(config);
 
   return async () => {
-    const knownMounts: { [key: string]: VolumeResult } = {};
+    const knownMounts: KnownMounts = {};
 
     for (const step of config.jobs[0].plan) {
       await processStep(step, config, knownMounts);
@@ -13,7 +17,11 @@ function createPipeline(config: PipelineConfig) {
   };
 }
 
-async function processStep(step: Step, config: PipelineConfig, knownMounts: { [key: string]: VolumeResult; }) {
+async function processStep(
+  step: Step,
+  config: PipelineConfig,
+  knownMounts: KnownMounts,
+) {
   if ("get" in step) {
     await processGetStep(step, config, knownMounts);
   } else if ("put" in step) {
@@ -65,7 +73,7 @@ function validateResources(config: PipelineConfig): void {
 async function processPutStep(
   step: Put,
   config: PipelineConfig,
-  knownMounts: { [key: string]: VolumeResult },
+  knownMounts: KnownMounts,
 ): Promise<void> {
   const resource = findResource(config, step.put);
   const resourceType = findResourceType(config, resource?.type);
@@ -102,7 +110,7 @@ async function processPutStep(
 
   const putPayload = JSON.parse(putResponse.stdout);
   const version = putPayload.version;
-  
+
   await runTask(
     {
       task: `get-${resource?.name}`,
@@ -139,7 +147,7 @@ async function processPutStep(
 async function processGetStep(
   step: Get,
   config: PipelineConfig,
-  knownMounts: { [key: string]: VolumeResult },
+  knownMounts: KnownMounts,
 ): Promise<void> {
   const resource = findResource(config, step.get);
   const resourceType = findResourceType(config, resource?.type);
@@ -220,11 +228,10 @@ function findResourceType(config: PipelineConfig, typeName?: string) {
   return resourceType!;
 }
 
-
 async function runTask(
   step: Task,
   config: PipelineConfig,
-  knownMounts: { [key: string]: VolumeResult },
+  knownMounts: KnownMounts,
   stdin?: string,
 ) {
   const mounts = await prepareMounts(step, knownMounts);
@@ -250,9 +257,9 @@ async function runTask(
 
 async function prepareMounts(
   step: Task,
-  knownMounts: { [key: string]: VolumeResult },
-): Promise<{ [key: string]: VolumeResult }> {
-  const mounts: { [key: string]: VolumeResult } = {};
+  knownMounts: KnownMounts,
+): Promise<KnownMounts> {
+  const mounts: KnownMounts = {};
 
   for (const mount of step.config.inputs ?? []) {
     knownMounts[mount.name] ||= await runtime.createVolume();
