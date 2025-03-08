@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/dop251/goja"
 	"github.com/dop251/goja_nodejs/console"
@@ -61,6 +62,13 @@ func (j *JS) Execute(source string, sandbox *PipelineRunner) error {
 	// this is setup to build the pipeline in a goja jsVM
 	jsVM := goja.New()
 	jsVM.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
+
+	if timeout, ok := j.ctx.Deadline(); ok {
+		// https://github.com/dop251/goja?tab=readme-ov-file#interrupting
+		time.AfterFunc(time.Until(timeout), func() {
+			jsVM.Interrupt("context deadline exceeded")
+		})
+	}
 
 	new(require.Registry).Enable(jsVM)
 	console.Enable(jsVM)

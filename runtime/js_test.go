@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jtarchie/ci/runtime"
 	. "github.com/onsi/gomega"
@@ -34,6 +35,25 @@ func TestAwaitPromise(t *testing.T) {
 	err := js.Execute(`
 		async function pipeline() {
 			await Promise.reject(400);
+		};
+
+		export { pipeline };
+	`, nil)
+	assert.Expect(err).To(HaveOccurred())
+}
+
+func TestUseContext(t *testing.T) {
+	t.Parallel()
+
+	assert := NewGomegaWithT(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
+	defer cancel()
+
+	js := runtime.NewJS(ctx)
+	err := js.Execute(`
+		function pipeline() {
+			for (; true; ) {}
 		};
 
 		export { pipeline };
