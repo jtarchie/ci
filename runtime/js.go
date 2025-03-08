@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -11,10 +12,14 @@ import (
 	"github.com/evanw/esbuild/pkg/api"
 )
 
-type JS struct{}
+type JS struct {
+	ctx context.Context
+}
 
-func NewJS() *JS {
-	return &JS{}
+func NewJS(ctx context.Context) *JS {
+	return &JS{
+		ctx: ctx,
+	}
 }
 
 func (j *JS) Execute(source string, sandbox *PipelineRunner) error {

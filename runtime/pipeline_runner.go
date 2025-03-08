@@ -11,16 +11,19 @@ import (
 )
 
 type PipelineRunner struct {
-	log    *slog.Logger
 	client orchestra.Driver
+	ctx    context.Context
+	log    *slog.Logger
 }
 
 func NewPipelineRunner(
 	client orchestra.Driver,
+	ctx context.Context,
 ) *PipelineRunner {
 	return &PipelineRunner{
-		log:    slog.Default().WithGroup("pipeline.runner").With("orchestrator", client.Name()),
 		client: client,
+		ctx:    ctx,
+		log:    slog.Default().WithGroup("pipeline.runner").With("orchestrator", client.Name()),
 	}
 }
 
@@ -35,12 +38,10 @@ type VolumeResult struct {
 }
 
 func (c *PipelineRunner) CreateVolume(input VolumeInput) *VolumeResult {
-	ctx := context.Background()
-
 	logger := c.log
 	logger.Info("volume.create", "input", input)
 
-	volume, err := c.client.CreateVolume(ctx, input.Name, input.Size)
+	volume, err := c.client.CreateVolume(c.ctx, input.Name, input.Size)
 	if err != nil {
 		return &VolumeResult{
 			Error: fmt.Sprintf("could not create volume: %s", err),
@@ -69,8 +70,6 @@ type RunInput struct {
 }
 
 func (c *PipelineRunner) Run(input RunInput) *RunResult {
-	ctx := context.Background()
-
 	taskID, err := uuid.NewV7()
 	if err != nil {
 		return &RunResult{
@@ -94,7 +93,7 @@ func (c *PipelineRunner) Run(input RunInput) *RunResult {
 	logger.Info("container.run", "mounts", mounts)
 
 	container, err := c.client.RunContainer(
-		ctx,
+		c.ctx,
 		orchestra.Task{
 			Command: input.Command,
 			Env:     input.Env,
@@ -118,7 +117,7 @@ func (c *PipelineRunner) Run(input RunInput) *RunResult {
 	for {
 		var err error
 
-		status, err = container.Status(ctx)
+		status, err = container.Status(c.ctx)
 		if err != nil {
 			return &RunResult{
 				Code:  1,
@@ -134,7 +133,7 @@ func (c *PipelineRunner) Run(input RunInput) *RunResult {
 	logger.Info("container.status", "exitCode", status.ExitCode())
 
 	defer func() {
-		err := container.Cleanup(ctx)
+		err := container.Cleanup(c.ctx)
 		if err != nil {
 			logger.Error("container.cleanup", "err", err)
 		}
@@ -142,7 +141,7 @@ func (c *PipelineRunner) Run(input RunInput) *RunResult {
 
 	stdout, stderr := &strings.Builder{}, &strings.Builder{}
 
-	err = container.Logs(ctx, stdout, stderr)
+	err = container.Logs(c.ctx, stdout, stderr)
 	if err != nil {
 		logger.Error("container.logs", "err", err)
 

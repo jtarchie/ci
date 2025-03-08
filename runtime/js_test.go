@@ -1,6 +1,7 @@
 package runtime_test
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -13,7 +14,7 @@ func TestBrokenJS(t *testing.T) {
 
 	assert := NewGomegaWithT(t)
 
-	js := runtime.NewJS()
+	js := runtime.NewJS(context.Background())
 	err := js.Execute(strings.TrimSpace(`
 		export function pipeline() {
 			const array = [];
@@ -29,7 +30,7 @@ func TestAwaitPromise(t *testing.T) {
 
 	assert := NewGomegaWithT(t)
 
-	js := runtime.NewJS()
+	js := runtime.NewJS(context.Background())
 	err := js.Execute(`
 		async function pipeline() {
 			await Promise.reject(400);

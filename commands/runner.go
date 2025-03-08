@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -19,6 +20,8 @@ type Runner struct {
 }
 
 func (c *Runner) Run() error {
+	ctx := context.Background()
+
 	var pipeline string
 
 	extension := filepath.Ext(c.Pipeline.Name())
@@ -56,9 +59,9 @@ func (c *Runner) Run() error {
 	}
 	defer client.Close()
 
-	js := runtime.NewJS()
+	js := runtime.NewJS(ctx)
 
-	err = js.Execute(pipeline, runtime.NewPipelineRunner(client))
+	err = js.Execute(pipeline, runtime.NewPipelineRunner(client, ctx))
 	if err != nil {
 		return fmt.Errorf("could not execute pipeline: %w", err)
 	}
