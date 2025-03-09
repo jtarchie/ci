@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/evanw/esbuild/pkg/api"
@@ -15,8 +14,8 @@ import (
 )
 
 type Runner struct {
-	Pipeline     *os.File `arg:""           help:"Path to pipeline javascript file"`
-	Orchestrator string   `default:"native" help:"orchestrator runtime to use"`
+	Pipeline     string `arg:""           help:"Path to pipeline javascript file" type:"existingfile"`
+	Orchestrator string `default:"native" help:"orchestrator runtime to use"`
 }
 
 func (c *Runner) Run() error {
@@ -24,22 +23,22 @@ func (c *Runner) Run() error {
 
 	var pipeline string
 
-	extension := filepath.Ext(c.Pipeline.Name())
+	extension := filepath.Ext(c.Pipeline)
 	if extension == ".yml" || extension == ".yaml" {
 		var err error
 
-		pipeline, err = backwards.NewPipeline(c.Pipeline.Name())
+		pipeline, err = backwards.NewPipeline(c.Pipeline)
 		if err != nil {
 			return fmt.Errorf("could not create pipeline from YAML: %w", err)
 		}
 	} else {
 		result := api.Build(api.BuildOptions{
-			EntryPoints:      []string{c.Pipeline.Name()},
+			EntryPoints:      []string{c.Pipeline},
 			Bundle:           true,
 			Sourcemap:        api.SourceMapInline,
 			Platform:         api.PlatformNeutral,
 			PreserveSymlinks: true,
-			AbsWorkingDir:    filepath.Dir(c.Pipeline.Name()),
+			AbsWorkingDir:    filepath.Dir(c.Pipeline),
 		})
 		if len(result.Errors) > 0 {
 			return fmt.Errorf("%w: %s", ErrCouldNotBundle, result.Errors[0].Text)
