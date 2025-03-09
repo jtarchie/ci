@@ -108,6 +108,14 @@ declare global {
     on_failure?: Step;
   }
 
+  interface Try {
+    try: Step[];
+
+    ensure?: Step;
+    on_success?: Step;
+    on_failure?: Step;
+  }
+
   type Step = Task | Get | Put | Do;
 
   interface Job {

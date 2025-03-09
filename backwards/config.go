@@ -68,6 +68,7 @@ type Step struct {
 	Ensure    *Step `yaml:"ensure,omitempty"`
 	OnSuccess *Step `yaml:"on_success,omitempty"`
 	OnFailure *Step `yaml:"on_failure,omitempty"`
+	Try       Steps `yaml:"try,omitempty"`
 }
 
 type Steps []Step

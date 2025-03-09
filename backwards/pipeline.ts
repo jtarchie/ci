@@ -70,16 +70,27 @@ class PipelineRunner {
       await this.processDoStep(step);
     } else if ("put" in step) {
       await this.processPutStep(step);
+    } else if ("try" in step) {
+      await this.processTryStep(step);
     } else if ("task" in step) {
       await this.runTask(step);
     }
   }
 
-  private async processDoStep(step: Do): Promise<void> {
+  private async processTryStep(step: Try): Promise<void> {
+    try {
+      await this.processDoStep(step);
+    } catch (_err) {
+      // do nothing
+    }
+  }
+
+  private async processDoStep(step: Do | Try): Promise<void> {
     let failure: undefined | Error = undefined;
 
     try {
-      for (const subStep of step.do) {
+      const steps = "do" in step ? step.do : step.try;
+      for (const subStep of steps) {
         await this.processStep(subStep);
       }
     } catch (error) {
