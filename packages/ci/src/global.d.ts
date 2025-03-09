@@ -114,7 +114,7 @@ declare global {
     name: string;
     plan: Step[];
     assert: {
-      outputs?: string[];
+      execution?: string[];
     };
   }
 

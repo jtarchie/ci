@@ -41,7 +41,3 @@ jobs:
             args: ["-c", "cat ./test-resource/version"]
         assert:
           stdout: "2026"
-    assert:
-      outputs:
-        - 2025
-        - 2026

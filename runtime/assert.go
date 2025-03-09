@@ -3,9 +3,11 @@ package runtime
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"regexp"
 
 	"github.com/dop251/goja"
+	"github.com/onsi/gomega/format"
 )
 
 type Assert struct {
@@ -23,8 +25,9 @@ func (a *Assert) fail(message string) {
 }
 
 func (a *Assert) Equal(expected, actual interface{}, message ...string) {
-	if expected != actual {
-		msg := fmt.Sprintf("expected %v, but got %v", expected, actual)
+	if !reflect.DeepEqual(actual, expected) {
+		msg := format.Message(actual, "to be equivalent to", expected)
+
 		if len(message) > 0 {
 			msg = message[0]
 		}

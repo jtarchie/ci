@@ -10,7 +10,7 @@ jobs:
               repository: busybox
           run:
             path: sh
-            args: ["-c", "exit 1"]
+            args: ["-c", "echo failing-task && exit 1"]
         assert:
           code: 1
         on_failure:
@@ -27,3 +27,7 @@ jobs:
           assert:
             stdout: "on-failure-task"
             code: 0
+    assert:
+      execution:
+        - "failing-task"
+        - "on-failure-task"

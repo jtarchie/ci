@@ -26,3 +26,7 @@ jobs:
               args: ["-c", "exit 1"]
           assert:
             code: 1
+    assert:
+      execution:
+        - "success-task"
+        - "ensure-task"
