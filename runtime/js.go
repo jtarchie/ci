@@ -76,7 +76,7 @@ func (j *JS) Execute(source string, sandbox *PipelineRunner) error {
 	new(require.Registry).Enable(jsVM)
 	console.Enable(jsVM)
 
-	err = jsVM.Set("assert", NewAssert(jsVM))
+	err = jsVM.Set("assert", NewAssert(jsVM, j.logger))
 	if err != nil {
 		return fmt.Errorf("could not set assert: %w", err)
 	}
