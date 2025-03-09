@@ -11,7 +11,7 @@ import (
 	"github.com/onsi/gomega/gexec"
 )
 
-func TestExamples(t *testing.T) {
+func TestExamplesDocker(t *testing.T) {
 	t.Parallel()
 
 	assert := NewGomegaWithT(t)
@@ -19,12 +19,48 @@ func TestExamples(t *testing.T) {
 	path, err := gexec.Build("github.com/jtarchie/ci")
 	assert.Expect(err).ToNot(HaveOccurred())
 
-	matches, err := doublestar.FilepathGlob("examples/*.{js,ts,yml,yaml}")
+	matches, err := doublestar.FilepathGlob("examples/docker/*.{js,ts,yml,yaml}")
+	assert.Expect(err).ToNot(HaveOccurred())
+
+	drivers := []string{"docker"}
+
+	for _, match := range matches {
+		examplePath, err := filepath.Abs(match)
+		assert.Expect(err).ToNot(HaveOccurred())
+
+		for _, driver := range drivers {
+			t.Run(driver+": "+match, func(t *testing.T) {
+				t.Parallel()
+
+				assert := NewGomegaWithT(t)
+
+				session, err := gexec.Start(
+					exec.Command(
+						path, "runner",
+						"--orchestrator", driver,
+						examplePath,
+					), os.Stderr, os.Stderr)
+				assert.Expect(err).ToNot(HaveOccurred())
+				assert.Eventually(session, "15s").Should(gexec.Exit(0))
+			})
+		}
+	}
+}
+
+func TestExamplesAll(t *testing.T) {
+	t.Parallel()
+
+	assert := NewGomegaWithT(t)
+
+	path, err := gexec.Build("github.com/jtarchie/ci")
+	assert.Expect(err).ToNot(HaveOccurred())
+
+	matches, err := doublestar.FilepathGlob("examples/both/*.{js,ts,yml,yaml}")
 	assert.Expect(err).ToNot(HaveOccurred())
 
 	drivers := []string{
 		"docker",
-		// "native",
+		"native",
 	}
 
 	for _, match := range matches {
