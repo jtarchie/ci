@@ -13,17 +13,18 @@ import (
 type PipelineRunner struct {
 	client orchestra.Driver
 	ctx    context.Context
-	log    *slog.Logger
+	logger *slog.Logger
 }
 
 func NewPipelineRunner(
 	client orchestra.Driver,
 	ctx context.Context,
+	logger *slog.Logger,
 ) *PipelineRunner {
 	return &PipelineRunner{
 		client: client,
 		ctx:    ctx,
-		log:    slog.Default().WithGroup("pipeline.runner").With("orchestrator", client.Name()),
+		logger: logger.WithGroup("pipeline.runner"),
 	}
 }
 
@@ -38,8 +39,8 @@ type VolumeResult struct {
 }
 
 func (c *PipelineRunner) CreateVolume(input VolumeInput) *VolumeResult {
-	logger := c.log
-	logger.Info("volume.create", "input", input)
+	logger := c.logger
+	logger.Debug("volume.create", "input", input)
 
 	volume, err := c.client.CreateVolume(c.ctx, input.Name, input.Size)
 	if err != nil {
@@ -78,9 +79,9 @@ func (c *PipelineRunner) Run(input RunInput) *RunResult {
 		}
 	}
 
-	logger := c.log.With("id", taskID)
+	logger := c.logger.With("taskID", taskID)
 
-	logger.Info("container.run", "input", input)
+	logger.Debug("container.run", "input", input)
 
 	var mounts orchestra.Mounts
 	for path, volume := range input.Mounts {
@@ -90,7 +91,7 @@ func (c *PipelineRunner) Run(input RunInput) *RunResult {
 		})
 	}
 
-	logger.Info("container.run", "mounts", mounts)
+	logger.Debug("container.run", "mounts", mounts)
 
 	container, err := c.client.RunContainer(
 		c.ctx,
@@ -130,7 +131,7 @@ func (c *PipelineRunner) Run(input RunInput) *RunResult {
 		}
 	}
 
-	logger.Info("container.status", "exitCode", status.ExitCode())
+	logger.Debug("container.status", "exitCode", status.ExitCode())
 
 	defer func() {
 		err := container.Cleanup(c.ctx)
