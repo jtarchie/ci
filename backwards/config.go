@@ -48,12 +48,14 @@ type PutConfig struct {
 	NoGet     bool              `yaml:"no_get,omitempty"`
 }
 
+type Assert struct {
+	Code   *int   `yaml:"code,omitempty"`
+	Stderr string `yaml:"stderr,omitempty"`
+	Stdout string `yaml:"stdout,omitempty"`
+}
+
 type Step struct {
-	Assert *struct {
-		Code   *int   `yaml:"code,omitempty"`
-		Stderr string `yaml:"stderr,omitempty"`
-		Stdout string `yaml:"stdout,omitempty"`
-	} `yaml:"assert,omitempty"`
+	Assert *Assert `yaml:"assert,omitempty"`
 
 	Task       string      `yaml:"task,omitempty"`
 	TaskConfig *TaskConfig `validate:"required_with=Task" yaml:"config,omitempty"`
