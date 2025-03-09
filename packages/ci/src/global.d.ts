@@ -73,6 +73,7 @@ declare global {
       code?: number | null;
     };
 
+    ensure?: Step;
     on_success?: Step;
     on_failure?: Step;
   }
@@ -84,6 +85,7 @@ declare global {
     trigger: boolean;
     version: string;
 
+    ensure?: Step;
     on_success?: Step;
     on_failure?: Step;
   }
@@ -93,6 +95,7 @@ declare global {
     resource: string;
     params: { [key: string]: string };
 
+    ensure?: Step;
     on_success?: Step;
     on_failure?: Step;
   }
