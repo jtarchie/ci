@@ -99,6 +99,9 @@ async function processPutStep(
       assert: {
         code: 0,
       },
+      ensure: step.ensure,
+      on_success: step.on_success,
+      on_failure: step.on_failure,
     },
     config,
     knownMounts,
@@ -132,6 +135,7 @@ async function processPutStep(
       assert: {
         code: 0,
       },
+      ensure: step.ensure,
       on_success: step.on_success,
       on_failure: step.on_failure,
     },
@@ -169,6 +173,7 @@ async function processGetStep(
       assert: {
         code: 0,
       },
+      ensure: step.ensure,
       on_success: step.on_success,
       on_failure: step.on_failure,
     },
@@ -202,6 +207,7 @@ async function processGetStep(
       assert: {
         code: 0,
       },
+      ensure: step.ensure,
       on_success: step.on_success,
       on_failure: step.on_failure,
     },
@@ -228,6 +234,15 @@ function findResourceType(config: PipelineConfig, typeName?: string) {
   return resourceType!;
 }
 
+class CustomError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = this.constructor.name;
+  }
+}
+
+class TaskFailure extends CustomError {}
+
 async function runTask(
   step: Task,
   config: PipelineConfig,
@@ -250,6 +265,14 @@ async function runTask(
     await processStep(step.on_success, config, knownMounts);
   } else if (result.code !== 0 && step.on_failure) {
     await processStep(step.on_failure, config, knownMounts);
+  }
+
+  if (step.ensure) {
+    await processStep(step.ensure, config, knownMounts);
+  }
+
+  if (result.code !== 0) {
+    throw new TaskFailure(`Task ${step.task} failed with code ${result.code}`);
   }
 
   return result;

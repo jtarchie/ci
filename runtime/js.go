@@ -110,7 +110,7 @@ func (j *JS) Execute(source string, sandbox *PipelineRunner) error {
 
 	err = runtime.Wait()
 	if err != nil {
-		return fmt.Errorf("could not wait for promises: %w", err)
+		return fmt.Errorf("pipeline did not successfully execute: %w", err)
 	}
 
 	if promise.State() == goja.PromiseStateRejected {
