@@ -13,7 +13,6 @@ require (
 	github.com/goccy/go-yaml v1.15.23
 	github.com/google/uuid v1.6.0
 	github.com/onsi/gomega v1.36.2
-	golang.org/x/sync v0.12.0
 )
 
 require (
