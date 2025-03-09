@@ -23,6 +23,12 @@ type Runner struct {
 }
 
 func (c *Runner) Run() error {
+	logger := slog.Default().WithGroup("runner").With(
+		"id", uuid.New().String(),
+		"pipeline", c.Pipeline,
+		"orchestrator", c.Orchestrator,
+	)
+
 	// Create a context with cancellation
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -34,7 +40,7 @@ func (c *Runner) Run() error {
 	// Handle signals in a separate goroutine
 	go func() {
 		sig := <-sigs
-		slog.Info("cancel", "signal", sig)
+		logger.Debug("execution.canceled", "signal", sig)
 		cancel() // Cancel the context when signal is received
 	}()
 
@@ -75,9 +81,10 @@ func (c *Runner) Run() error {
 	}
 	defer client.Close()
 
-	js := runtime.NewJS(ctx)
+	js := runtime.NewJS(ctx, logger)
+	pipelineRunner := runtime.NewPipelineRunner(client, ctx, logger)
 
-	err = js.Execute(pipeline, runtime.NewPipelineRunner(client, ctx))
+	err = js.Execute(pipeline, pipelineRunner)
 	if err != nil {
 		// Check if the error was due to context cancellation
 		if errors.Is(err, context.Canceled) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -14,12 +15,14 @@ import (
 )
 
 type JS struct {
-	ctx context.Context
+	ctx    context.Context
+	logger *slog.Logger
 }
 
-func NewJS(ctx context.Context) *JS {
+func NewJS(ctx context.Context, logger *slog.Logger) *JS {
 	return &JS{
-		ctx: ctx,
+		ctx:    ctx,
+		logger: logger.WithGroup("js"),
 	}
 }
 

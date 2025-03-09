@@ -2,6 +2,7 @@ package runtime_test
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -15,7 +16,7 @@ func TestBrokenJS(t *testing.T) {
 
 	assert := NewGomegaWithT(t)
 
-	js := runtime.NewJS(context.Background())
+	js := runtime.NewJS(context.Background(), slog.Default())
 	err := js.Execute(strings.TrimSpace(`
 		export function pipeline() {
 			const array = [];
@@ -31,7 +32,7 @@ func TestAwaitPromise(t *testing.T) {
 
 	assert := NewGomegaWithT(t)
 
-	js := runtime.NewJS(context.Background())
+	js := runtime.NewJS(context.Background(), slog.Default())
 	err := js.Execute(`
 		async function pipeline() {
 			await Promise.reject(400);
@@ -50,7 +51,7 @@ func TestUseContext(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
 	defer cancel()
 
-	js := runtime.NewJS(ctx)
+	js := runtime.NewJS(ctx, slog.Default())
 	err := js.Execute(`
 		function pipeline() {
 			for (; true; ) {}
