@@ -4,7 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
+	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	"github.com/evanw/esbuild/pkg/api"
 	"github.com/google/uuid"
@@ -19,7 +23,20 @@ type Runner struct {
 }
 
 func (c *Runner) Run() error {
-	ctx := context.Background()
+	// Create a context with cancellation
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Set up signal handling
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
+	// Handle signals in a separate goroutine
+	go func() {
+		sig := <-sigs
+		slog.Info("cancel", "signal", sig)
+		cancel() // Cancel the context when signal is received
+	}()
 
 	var pipeline string
 
@@ -62,6 +79,11 @@ func (c *Runner) Run() error {
 
 	err = js.Execute(pipeline, runtime.NewPipelineRunner(client, ctx))
 	if err != nil {
+		// Check if the error was due to context cancellation
+		if errors.Is(err, context.Canceled) {
+			return fmt.Errorf("execution cancelled: %w", err)
+		}
+
 		return fmt.Errorf("could not execute pipeline: %w", err)
 	}
 
