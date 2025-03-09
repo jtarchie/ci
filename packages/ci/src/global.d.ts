@@ -116,7 +116,7 @@ declare global {
     on_failure?: Step;
   }
 
-  type Step = Task | Get | Put | Do;
+  type Step = Task | Get | Put | Do | Try;
 
   interface Job {
     name: string;
