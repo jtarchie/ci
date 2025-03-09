@@ -10,6 +10,7 @@ tasks:
   default:
     cmds:
       - task: fmt
+      - deno check backwards/pipeline.ts
       - go test -race ./... -count=1
   cleanup: |
     removed_containers=$(docker ps -aq | xargs -I {} docker rm -f {} | wc -l)
