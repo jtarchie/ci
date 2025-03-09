@@ -72,4 +72,16 @@ func TestBackwardsCompatibility(t *testing.T) {
 		err := runner.Run()
 		assert.Expect(err).ToNot(HaveOccurred())
 	})
+
+	t.Run("all", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		runner := commands.Runner{
+			Pipeline:     "examples/fixtures/all.yml",
+			Orchestrator: "native",
+		}
+		err := runner.Run()
+		assert.Expect(err).ToNot(HaveOccurred())
+	})
 }

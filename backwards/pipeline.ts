@@ -312,15 +312,15 @@ class PipelineRunner {
   }
 
   private validateTaskResult(step: Task, result: RunTaskResult): void {
-    if (step.assert.stdout && step.assert.stdout.trim() !== "") {
+    if (step.assert?.stdout && step.assert.stdout.trim() !== "") {
       assert.containsString(step.assert.stdout, result.stdout);
     }
 
-    if (step.assert.stderr && step.assert.stderr.trim() !== "") {
+    if (step.assert?.stderr && step.assert.stderr.trim() !== "") {
       assert.containsString(step.assert.stderr, result.stderr);
     }
 
-    if (typeof step.assert.code === "number") {
+    if (typeof step.assert?.code === "number") {
       assert.equal(step.assert.code, result.code);
     }
   }
