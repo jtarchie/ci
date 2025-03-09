@@ -86,7 +86,7 @@ class PipelineRunner {
   }
 
   private async processDoStep(step: Do | Try): Promise<void> {
-    let failure: undefined | Error = undefined;
+    let failure: unknown = undefined;
 
     try {
       const steps = "do" in step ? step.do : step.try;
