@@ -4,271 +4,311 @@ type KnownMounts = {
   [key: string]: VolumeResult;
 };
 
-// deno-lint-ignore no-unused-vars
-function createPipeline(config: PipelineConfig) {
-  validatePipelineConfig(config);
+class PipelineRunner {
+  private knownMounts: KnownMounts = {};
 
-  return async () => {
-    const knownMounts: KnownMounts = {};
+  constructor(private config: PipelineConfig) {
+    this.validatePipelineConfig();
+  }
 
-    for (const step of config.jobs[0].plan) {
-      await processStep(step, config, knownMounts);
+  private validatePipelineConfig(): void {
+    assert.truthy(
+      this.config.jobs.length > 0,
+      "Pipeline must have at least one job",
+    );
+
+    assert.truthy(
+      this.config.jobs.every((job) => job.plan.length > 0),
+      "Every job must have at least one step",
+    );
+
+    if (this.config.resources.length > 0) {
+      this.validateResources();
     }
-  };
-}
-
-async function processStep(
-  step: Step,
-  config: PipelineConfig,
-  knownMounts: KnownMounts,
-) {
-  if ("get" in step) {
-    await processGetStep(step, config, knownMounts);
-  } else if ("do" in step) {
-    await processDoStep(step, config, knownMounts);
-  } else if ("put" in step) {
-    await processPutStep(step, config, knownMounts);
-  } else if ("task" in step) {
-    await runTask(step, config, knownMounts);
   }
-}
 
-function validatePipelineConfig(config: PipelineConfig): void {
-  assert.truthy(
-    config.jobs.length > 0,
-    "Pipeline must have at least one job",
-  );
+  private validateResources(): void {
+    assert.truthy(
+      this.config.resources.every((resource) =>
+        this.config.resource_types.some((type) => type.name === resource.type)
+      ),
+      "Every resource must have a valid resource type",
+    );
 
-  assert.truthy(
-    config.jobs.every((job) => job.plan.length > 0),
-    "Every job must have at least one step",
-  );
-
-  if (config.resources.length > 0) {
-    validateResources(config);
+    assert.truthy(
+      this.config.jobs.every((job) =>
+        job.plan.every((step) => {
+          if ("get" in step) {
+            return this.config.resources.some((resource) =>
+              resource.name === step.get
+            );
+          }
+          return true; // not a resource step, ignore lookup
+        })
+      ),
+      "Every get must have a resource reference",
+    );
   }
-}
 
-function validateResources(config: PipelineConfig): void {
-  assert.truthy(
-    config.resources.every((resource) =>
-      config.resource_types.some((type) => type.name === resource.type)
-    ),
-    "Every resource must have a valid resource type",
-  );
-
-  assert.truthy(
-    config.jobs.every((job) =>
-      job.plan.every((step) => {
-        if ("get" in step) {
-          return config.resources.some((resource) =>
-            resource.name === step.get
-          );
-        }
-        return true; // not a resource step, ignore lookup
-      })
-    ),
-    "Every get must have a resource reference",
-  );
-}
-
-async function processDoStep(
-  step: Do,
-  config: PipelineConfig,
-  knownMounts: KnownMounts,
-): Promise<void> {
-  let failure: undefined | Error = undefined;
-
-  try {
-    for (const subStep of step.do) {
-      await processStep(subStep, config, knownMounts);
+  async run(): Promise<void> {
+    for (const step of this.config.jobs[0].plan) {
+      await this.processStep(step);
     }
-  } catch (error) {
-    failure = error;
   }
 
-  if (failure == undefined && step.on_success) {
-    await processStep(step.on_success, config, knownMounts);
-  } else if (failure && step.on_failure) {
-    await processStep(step.on_failure, config, knownMounts);
+  private async processStep(step: Step): Promise<void> {
+    if ("get" in step) {
+      await this.processGetStep(step);
+    } else if ("do" in step) {
+      await this.processDoStep(step);
+    } else if ("put" in step) {
+      await this.processPutStep(step);
+    } else if ("task" in step) {
+      await this.runTask(step);
+    }
   }
 
-  if (step.ensure) {
-    await processStep(step.ensure, config, knownMounts);
+  private async processDoStep(step: Do): Promise<void> {
+    let failure: undefined | Error = undefined;
+
+    try {
+      for (const subStep of step.do) {
+        await this.processStep(subStep);
+      }
+    } catch (error) {
+      failure = error;
+    }
+
+    if (failure == undefined && step.on_success) {
+      await this.processStep(step.on_success);
+    } else if (failure && step.on_failure) {
+      await this.processStep(step.on_failure);
+    }
+
+    if (step.ensure) {
+      await this.processStep(step.ensure);
+    }
+
+    if (failure) {
+      // this only gets thrown if all others pass successfully
+      throw failure;
+    }
   }
 
-  if (failure) {
-    // this only get's thrown if all others pass successfully
-    throw failure;
+  private async processPutStep(step: Put): Promise<void> {
+    const resource = this.findResource(step.put);
+    const resourceType = this.findResourceType(resource?.type);
+
+    const putResponse = await this.runTask(
+      {
+        task: `put-${resource?.name}`,
+        config: {
+          image_resource: {
+            type: "registry-image",
+            source: {
+              repository: resourceType?.source.repository!,
+            },
+          },
+          outputs: [
+            { name: resource?.name! },
+          ],
+          run: {
+            path: "/opt/resource/out",
+            args: [`./${resource?.name}`],
+          },
+        },
+        assert: {
+          code: 0,
+        },
+        ensure: step.ensure,
+        on_success: step.on_success,
+        on_failure: step.on_failure,
+      },
+      JSON.stringify({
+        source: resource?.source,
+        params: step.params,
+      }),
+    );
+
+    const putPayload = JSON.parse(putResponse.stdout);
+    const version = putPayload.version;
+
+    await this.runTask(
+      {
+        task: `get-${resource?.name}`,
+        config: {
+          image_resource: {
+            type: "registry-image",
+            source: {
+              repository: resourceType?.source.repository!,
+            },
+          },
+          outputs: [
+            { name: resource?.name! },
+          ],
+          run: {
+            path: "/opt/resource/in",
+            args: [`./${resource?.name}`],
+          },
+        },
+        assert: {
+          code: 0,
+        },
+        ensure: step.ensure,
+        on_success: step.on_success,
+        on_failure: step.on_failure,
+      },
+      JSON.stringify({
+        source: resource?.source,
+        version: version,
+      }),
+    );
   }
-}
 
-async function processPutStep(
-  step: Put,
-  config: PipelineConfig,
-  knownMounts: KnownMounts,
-): Promise<void> {
-  const resource = findResource(config, step.put);
-  const resourceType = findResourceType(config, resource?.type);
+  private async processGetStep(step: Get): Promise<void> {
+    const resource = this.findResource(step.get);
+    const resourceType = this.findResourceType(resource?.type);
 
-  const putResponse = await runTask(
-    {
-      task: `put-${resource?.name}`,
-      config: {
-        image_resource: {
-          type: "registry-image",
-          source: {
-            repository: resourceType?.source.repository!,
+    const checkResult = await this.runTask(
+      {
+        task: `check-${resource?.name}`,
+        config: {
+          image_resource: {
+            type: "registry-image",
+            source: {
+              repository: resourceType?.source.repository!,
+            },
+          },
+          run: {
+            path: "/opt/resource/check",
           },
         },
-        outputs: [
-          { name: resource?.name! },
-        ],
-        run: {
-          path: "/opt/resource/out",
-          args: [`./${resource?.name}`],
+        assert: {
+          code: 0,
         },
+        ensure: step.ensure,
+        on_success: step.on_success,
+        on_failure: step.on_failure,
       },
-      assert: {
-        code: 0,
-      },
-      ensure: step.ensure,
-      on_success: step.on_success,
-      on_failure: step.on_failure,
-    },
-    config,
-    knownMounts,
-    JSON.stringify({
-      source: resource?.source,
-      params: step.params,
-    }),
-  );
+      JSON.stringify({
+        source: resource?.source,
+      }),
+    );
 
-  const putPayload = JSON.parse(putResponse.stdout);
-  const version = putPayload.version;
+    const checkPayload = JSON.parse(checkResult.stdout);
+    const version = checkPayload[0];
 
-  await runTask(
-    {
-      task: `get-${resource?.name}`,
-      config: {
-        image_resource: {
-          type: "registry-image",
-          source: {
-            repository: resourceType?.source.repository!,
+    await this.runTask(
+      {
+        task: `get-${resource?.name}`,
+        config: {
+          image_resource: {
+            type: "registry-image",
+            source: {
+              repository: resourceType?.source.repository!,
+            },
+          },
+          outputs: [
+            { name: resource?.name! },
+          ],
+          run: {
+            path: "/opt/resource/in",
+            args: [`./${resource?.name}`],
           },
         },
-        outputs: [
-          { name: resource?.name! },
-        ],
-        run: {
-          path: "/opt/resource/in",
-          args: [`./${resource?.name}`],
+        assert: {
+          code: 0,
         },
+        ensure: step.ensure,
+        on_success: step.on_success,
+        on_failure: step.on_failure,
       },
-      assert: {
-        code: 0,
-      },
-      ensure: step.ensure,
-      on_success: step.on_success,
-      on_failure: step.on_failure,
-    },
-    config,
-    knownMounts,
-    JSON.stringify({
-      source: resource?.source,
-      version: version,
-    }),
-  );
-}
+      JSON.stringify({
+        source: resource?.source,
+        version: version,
+      }),
+    );
+  }
 
-async function processGetStep(
-  step: Get,
-  config: PipelineConfig,
-  knownMounts: KnownMounts,
-): Promise<void> {
-  const resource = findResource(config, step.get);
-  const resourceType = findResourceType(config, resource?.type);
+  private findResource(resourceName: string) {
+    const resource = this.config.resources.find((resource) =>
+      resource.name === resourceName
+    );
+    return resource!;
+  }
 
-  const checkResult = await runTask(
-    {
-      task: `check-${resource?.name}`,
-      config: {
-        image_resource: {
-          type: "registry-image",
-          source: {
-            repository: resourceType?.source.repository!,
-          },
-        },
-        run: {
-          path: "/opt/resource/check",
-        },
-      },
-      assert: {
-        code: 0,
-      },
-      ensure: step.ensure,
-      on_success: step.on_success,
-      on_failure: step.on_failure,
-    },
-    config,
-    knownMounts,
-    JSON.stringify({
-      source: resource?.source,
-    }),
-  );
-  const checkPayload = JSON.parse(checkResult.stdout);
-  const version = checkPayload[0];
+  private findResourceType(typeName?: string) {
+    const resourceType = this.config.resource_types.find((type) =>
+      type.name === typeName
+    );
+    return resourceType!;
+  }
 
-  await runTask(
-    {
-      task: `get-${resource?.name}`,
-      config: {
-        image_resource: {
-          type: "registry-image",
-          source: {
-            repository: resourceType?.source.repository!,
-          },
-        },
-        outputs: [
-          { name: resource?.name! },
-        ],
-        run: {
-          path: "/opt/resource/in",
-          args: [`./${resource?.name}`],
-        },
-      },
-      assert: {
-        code: 0,
-      },
-      ensure: step.ensure,
-      on_success: step.on_success,
-      on_failure: step.on_failure,
-    },
-    config,
-    knownMounts,
-    JSON.stringify({
-      source: resource?.source,
-      version: version,
-    }),
-  );
-}
+  private async runTask(step: Task, stdin?: string): Promise<RunTaskResult> {
+    const mounts = await this.prepareMounts(step);
 
-function findResource(config: PipelineConfig, resourceName: string) {
-  const resource = config.resources.find((resource) =>
-    resource.name === resourceName
-  );
-  return resource!;
-}
+    const result = await runtime.run({
+      name: step.task,
+      image: step.config.image_resource.source.repository,
+      command: [step.config.run.path].concat(step.config.run.args ?? []),
+      mounts: mounts,
+      stdin: stdin ?? "",
+    });
 
-function findResourceType(config: PipelineConfig, typeName?: string) {
-  const resourceType = config.resource_types.find((type) =>
-    type.name === typeName
-  );
-  return resourceType!;
+    this.validateTaskResult(step, result);
+
+    if (result.code === 0 && step.on_success) {
+      await this.processStep(step.on_success);
+    } else if (result.code !== 0 && step.on_failure) {
+      await this.processStep(step.on_failure);
+    }
+
+    if (step.ensure) {
+      await this.processStep(step.ensure);
+    }
+
+    if (result.code !== 0) {
+      throw new TaskFailure(
+        `Task ${step.task} failed with code ${result.code}`,
+      );
+    }
+
+    return result;
+  }
+
+  private async prepareMounts(step: Task): Promise<KnownMounts> {
+    const mounts: KnownMounts = {};
+
+    for (const mount of step.config.inputs ?? []) {
+      this.knownMounts[mount.name] ||= await runtime.createVolume();
+      mounts[mount.name] = this.knownMounts[mount.name];
+    }
+
+    for (const mount of step.config.outputs ?? []) {
+      this.knownMounts[mount.name] ||= await runtime.createVolume();
+      mounts[mount.name] = this.knownMounts[mount.name];
+    }
+
+    return mounts;
+  }
+
+  private validateTaskResult(step: Task, result: RunTaskResult): void {
+    if (step.assert.stdout && step.assert.stdout.trim() !== "") {
+      assert.containsString(step.assert.stdout, result.stdout);
+    }
+
+    if (step.assert.stderr && step.assert.stderr.trim() !== "") {
+      assert.containsString(step.assert.stderr, result.stderr);
+    }
+
+    if (typeof step.assert.code === "number") {
+      assert.equal(step.assert.code, result.code);
+    }
+  }
 }
 
 class CustomError extends Error {
-  constructor(message) {
+  constructor(message: string) {
     super(message);
     this.name = this.constructor.name;
   }
@@ -276,70 +316,8 @@ class CustomError extends Error {
 
 class TaskFailure extends CustomError {}
 
-async function runTask(
-  step: Task,
-  config: PipelineConfig,
-  knownMounts: KnownMounts,
-  stdin?: string,
-) {
-  const mounts = await prepareMounts(step, knownMounts);
-
-  const result = await runtime.run({
-    name: step.task,
-    image: step.config.image_resource.source.repository,
-    command: [step.config.run.path].concat(step.config.run.args ?? []),
-    mounts: mounts,
-    stdin: stdin ?? "",
-  });
-
-  validateTaskResult(step, result);
-
-  if (result.code === 0 && step.on_success) {
-    await processStep(step.on_success, config, knownMounts);
-  } else if (result.code !== 0 && step.on_failure) {
-    await processStep(step.on_failure, config, knownMounts);
-  }
-
-  if (step.ensure) {
-    await processStep(step.ensure, config, knownMounts);
-  }
-
-  if (result.code !== 0) {
-    throw new TaskFailure(`Task ${step.task} failed with code ${result.code}`);
-  }
-
-  return result;
-}
-
-async function prepareMounts(
-  step: Task,
-  knownMounts: KnownMounts,
-): Promise<KnownMounts> {
-  const mounts: KnownMounts = {};
-
-  for (const mount of step.config.inputs ?? []) {
-    knownMounts[mount.name] ||= await runtime.createVolume();
-    mounts[mount.name] = knownMounts[mount.name];
-  }
-
-  for (const mount of step.config.outputs ?? []) {
-    knownMounts[mount.name] ||= await runtime.createVolume();
-    mounts[mount.name] = knownMounts[mount.name];
-  }
-
-  return mounts;
-}
-
-function validateTaskResult(step: Task, result: RunTaskResult): void {
-  if (step.assert.stdout && step.assert.stdout.trim() !== "") {
-    assert.containsString(step.assert.stdout, result.stdout);
-  }
-
-  if (step.assert.stderr && step.assert.stderr.trim() !== "") {
-    assert.containsString(step.assert.stderr, result.stderr);
-  }
-
-  if (typeof step.assert.code === "number") {
-    assert.equal(step.assert.code, result.code);
-  }
+// Public API function
+export function createPipeline(config: PipelineConfig) {
+  const runner = new PipelineRunner(config);
+  return () => runner.run();
 }
