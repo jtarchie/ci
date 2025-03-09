@@ -13,13 +13,17 @@ import (
 type CLI struct {
 	Runner    commands.Runner    `cmd:"" help:"Run a pipeline"`
 	Transpile commands.Transpile `cmd:"" help:"Transpile a pipeline"`
+
+	LogLevel slog.Level `default:"info" help:"Set the log level (debug, info, warn, error)"`
 }
 
 func main() {
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, nil)))
-
 	cli := &CLI{}
 	ctx := kong.Parse(cli)
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+		Level: cli.LogLevel,
+	})))
+
 	err := ctx.Run()
 	ctx.FatalIfErrorf(err)
 }
