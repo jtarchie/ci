@@ -24,6 +24,8 @@ async function processStep(
 ) {
   if ("get" in step) {
     await processGetStep(step, config, knownMounts);
+  } else if ("do" in step) {
+    await processDoStep(step, config, knownMounts);
   } else if ("put" in step) {
     await processPutStep(step, config, knownMounts);
   } else if ("task" in step) {
@@ -68,6 +70,37 @@ function validateResources(config: PipelineConfig): void {
     ),
     "Every get must have a resource reference",
   );
+}
+
+async function processDoStep(
+  step: Do,
+  config: PipelineConfig,
+  knownMounts: KnownMounts,
+): Promise<void> {
+  let failure: undefined | Error = undefined;
+
+  try {
+    for (const subStep of step.do) {
+      await processStep(subStep, config, knownMounts);
+    }
+  } catch (error) {
+    failure = error;
+  }
+
+  if (failure == undefined && step.on_success) {
+    await processStep(step.on_success, config, knownMounts);
+  } else if (failure && step.on_failure) {
+    await processStep(step.on_failure, config, knownMounts);
+  }
+
+  if (step.ensure) {
+    await processStep(step.ensure, config, knownMounts);
+  }
+
+  if (failure) {
+    // this only get's thrown if all others pass successfully
+    throw failure;
+  }
 }
 
 async function processPutStep(
