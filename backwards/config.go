@@ -48,14 +48,12 @@ type PutConfig struct {
 	NoGet     bool              `yaml:"no_get,omitempty"`
 }
 
-type Assert struct {
-	Code   *int   `yaml:"code,omitempty"`
-	Stderr string `yaml:"stderr,omitempty"`
-	Stdout string `yaml:"stdout,omitempty"`
-}
-
 type Step struct {
-	Assert *Assert `yaml:"assert,omitempty"`
+	Assert *struct {
+		Code   *int   `yaml:"code,omitempty"`
+		Stderr string `yaml:"stderr,omitempty"`
+		Stdout string `yaml:"stdout,omitempty"`
+	} `yaml:"assert,omitempty"`
 
 	Task       string      `yaml:"task,omitempty"`
 	TaskConfig *TaskConfig `validate:"required_with=Task" yaml:"config,omitempty"`
@@ -75,6 +73,10 @@ type Step struct {
 type Steps []Step
 
 type Job struct {
+	Assert *struct {
+		Outputs []string `yaml:"outputs,omitempty"`
+	} `yaml:"assert,omitempty"`
+
 	Name   string `validate:"required,min=5"      yaml:"name,omitempty"`
 	Plan   Steps  `validate:"required,min=1,dive" yaml:"plan,omitempty"`
 	Public bool   `yaml:"public,omitempty"`

@@ -113,6 +113,9 @@ declare global {
   interface Job {
     name: string;
     plan: Step[];
+    assert: {
+      outputs?: string[];
+    };
   }
 
   interface Resource {
