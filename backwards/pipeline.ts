@@ -6,7 +6,7 @@ type KnownMounts = {
 
 class PipelineRunner {
   private knownMounts: KnownMounts = {};
-  private outputs: string[] = [];
+  private taskNames: string[] = [];
 
   constructor(private config: PipelineConfig) {
     this.validatePipelineConfig();
@@ -57,24 +57,9 @@ class PipelineRunner {
       await this.processStep(step);
     }
 
-    if (job.assert?.outputs) {
+    if (job.assert?.execution) {
       // this assures that the outputs are in the same order as the job
-      assert.truthy(
-        job.assert.outputs.every((needle) => {
-          for (let i = 0; i < this.outputs.length; i++) {
-            const output = this.outputs[i];
-            if (output.includes(needle)) {
-              this.outputs.splice(i, 1);
-              return true;
-            }
-          }
-
-          return false;
-        }),
-        `All outputs must be present, could not find ${
-          job.assert.outputs.join(", ")
-        }`,
-      );
+      assert.equal(this.taskNames, job.assert.execution);
     }
   }
 
@@ -278,7 +263,7 @@ class PipelineRunner {
     });
 
     this.validateTaskResult(step, result);
-    this.outputs.push(result.stdout);
+    this.taskNames.push(step.task);
 
     if (result.code === 0 && step.on_success) {
       await this.processStep(step.on_success);

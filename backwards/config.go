@@ -74,7 +74,7 @@ type Steps []Step
 
 type Job struct {
 	Assert *struct {
-		Outputs []string `yaml:"outputs,omitempty"`
+		Execution []string `yaml:"execution,omitempty"`
 	} `yaml:"assert,omitempty"`
 
 	Name   string `validate:"required,min=5"      yaml:"name,omitempty"`
