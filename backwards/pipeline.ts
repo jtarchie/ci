@@ -278,10 +278,10 @@ class PipelineRunner {
     this.validateTaskResult(step, result);
     this.taskNames.push(step.task);
 
-    if (result.code === 0 && result.status == "completed" && step.on_success) {
+    if (result.code === 0 && result.status == "complete" && step.on_success) {
       await this.processStep(step.on_success);
     } else if (
-      result.code !== 0 && result.status == "completed" && step.on_failure
+      result.code !== 0 && result.status == "complete" && step.on_failure
     ) {
       await this.processStep(step.on_failure);
     } else if (result.status == "error" && step.on_error) {

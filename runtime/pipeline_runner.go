@@ -156,7 +156,7 @@ func (c *PipelineRunner) Run(input RunInput) *RunResult {
 	}
 
 	return &RunResult{
-		Status: "completed",
+		Status: "complete",
 		Stdout: stdout.String(),
 		Stderr: stderr.String(),
 		Code:   status.ExitCode(),
