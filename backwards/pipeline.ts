@@ -1,8 +1,10 @@
 /// <reference path="../packages/ci/src/global.d.ts" />
 
-type KnownMounts = {
-  [key: string]: VolumeResult;
-};
+type KnownMounts = Record<string, VolumeResult>;
+
+// = {
+//   [key: string]: VolumeResult;
+// };
 
 class PipelineRunner {
   private knownMounts: KnownMounts = {};
@@ -334,12 +336,15 @@ class PipelineRunner {
   private async prepareMounts(step: Task): Promise<KnownMounts> {
     const mounts: KnownMounts = {};
 
-    for (const mount of step.config.inputs ?? []) {
+    step.config.inputs ||= [];
+    step.config.outputs ||= [];
+
+    for (const mount of step.config.inputs) {
       this.knownMounts[mount.name] ||= await runtime.createVolume();
       mounts[mount.name] = this.knownMounts[mount.name];
     }
 
-    for (const mount of step.config.outputs ?? []) {
+    for (const mount of step.config.outputs) {
       this.knownMounts[mount.name] ||= await runtime.createVolume();
       mounts[mount.name] = this.knownMounts[mount.name];
     }

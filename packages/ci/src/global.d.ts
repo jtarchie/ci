@@ -4,7 +4,7 @@ declare global {
     command: string[];
     env?: { [key: string]: string };
     image: string;
-    mounts?: { [key: string]: VolumeResult };
+    mounts?: Record<string, VolumeResult>;
     name: string;
     stdin?: string;
     timeout?: string;
