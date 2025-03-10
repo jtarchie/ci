@@ -44,7 +44,7 @@ func init() {
 
 var (
 	_ orchestra.Driver          = &Native{}
-	_ orchestra.Container       = &NativeContainer{}
-	_ orchestra.ContainerStatus = &NativeStatus{}
-	_ orchestra.Volume          = &NativeVolume{}
+	_ orchestra.Container       = &Container{}
+	_ orchestra.ContainerStatus = &Status{}
+	_ orchestra.Volume          = &Volume{}
 )

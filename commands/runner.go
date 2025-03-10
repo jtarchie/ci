@@ -90,7 +90,7 @@ func (c *Runner) Run() error {
 	defer client.Close()
 
 	js := runtime.NewJS(ctx, logger)
-	pipelineRunner := runtime.NewPipelineRunner(client, ctx, logger)
+	pipelineRunner := runtime.NewPipelineRunner(ctx, client, logger)
 
 	err = js.Execute(pipeline, pipelineRunner)
 	if err != nil {

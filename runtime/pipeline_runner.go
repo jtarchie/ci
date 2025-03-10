@@ -19,8 +19,8 @@ type PipelineRunner struct {
 }
 
 func NewPipelineRunner(
-	client orchestra.Driver,
 	ctx context.Context,
+	client orchestra.Driver,
 	logger *slog.Logger,
 ) *PipelineRunner {
 	return &PipelineRunner{

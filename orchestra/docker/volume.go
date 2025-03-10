@@ -9,14 +9,14 @@ import (
 	"github.com/jtarchie/ci/orchestra"
 )
 
-type DockerVolume struct {
+type Volume struct {
 	client     *client.Client
 	volume     volume.Volume
 	volumeName string
 }
 
 // Cleanup implements orchestra.Volume.
-func (d *DockerVolume) Cleanup(ctx context.Context) error {
+func (d *Volume) Cleanup(ctx context.Context) error {
 	err := d.client.VolumeRemove(ctx, d.volume.Name, true)
 	if err != nil {
 		return fmt.Errorf("could not destroy volume: %w", err)
@@ -25,7 +25,7 @@ func (d *DockerVolume) Cleanup(ctx context.Context) error {
 	return nil
 }
 
-func (d *Docker) CreateVolume(ctx context.Context, name string, size int) (orchestra.Volume, error) {
+func (d *Docker) CreateVolume(ctx context.Context, name string, _ int) (orchestra.Volume, error) {
 	volume, err := d.client.VolumeCreate(ctx, volume.CreateOptions{
 		Name: fmt.Sprintf("%s-%s", d.namespace, name),
 		Labels: map[string]string{
@@ -36,13 +36,13 @@ func (d *Docker) CreateVolume(ctx context.Context, name string, size int) (orche
 		return nil, fmt.Errorf("could not create volume: %w", err)
 	}
 
-	return &DockerVolume{
+	return &Volume{
 		client:     d.client,
 		volume:     volume,
 		volumeName: name,
 	}, nil
 }
 
-func (d *DockerVolume) Name() string {
+func (d *Volume) Name() string {
 	return d.volumeName
 }
