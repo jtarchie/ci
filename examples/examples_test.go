@@ -7,6 +7,9 @@ import (
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/jtarchie/ci/commands"
 	. "github.com/onsi/gomega"
+
+	_ "github.com/jtarchie/ci/orchestra/docker"
+	_ "github.com/jtarchie/ci/orchestra/native"
 )
 
 func TestExamplesDocker(t *testing.T) {
@@ -14,7 +17,7 @@ func TestExamplesDocker(t *testing.T) {
 
 	assert := NewGomegaWithT(t)
 
-	matches, err := doublestar.FilepathGlob("examples/docker/*.{js,ts,yml,yaml}")
+	matches, err := doublestar.FilepathGlob("docker/*.{js,ts,yml,yaml}")
 	assert.Expect(err).ToNot(HaveOccurred())
 
 	drivers := []string{"docker"}
@@ -44,7 +47,7 @@ func TestExamplesAll(t *testing.T) {
 
 	assert := NewGomegaWithT(t)
 
-	matches, err := doublestar.FilepathGlob("examples/both/*.{js,ts,yml,yaml}")
+	matches, err := doublestar.FilepathGlob("both/*.{js,ts,yml,yaml}")
 	assert.Expect(err).ToNot(HaveOccurred())
 
 	drivers := []string{
