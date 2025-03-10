@@ -6,14 +6,14 @@ linters:
     - containedctx
     - cyclop
     - depguard
-    - exhaustruct
-    - exportloopref
+    - exhaustruct # allow zero values for
     - funlen
     - gochecknoglobals
     - gochecknoinits
     - gomoddirectives
     - ireturn
-    - lll
-    - maintidx
-    - revive      # too many rules
+    - lll # too long of line
+    - maintidx # complexity rule
+    - revive # too many rules
     - tagliatelle # disable because pipeline yaml uses underscores
+    - tenv
