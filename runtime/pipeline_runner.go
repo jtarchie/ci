@@ -2,9 +2,11 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jtarchie/ci/orchestra"
@@ -39,10 +41,12 @@ type VolumeResult struct {
 }
 
 func (c *PipelineRunner) CreateVolume(input VolumeInput) *VolumeResult {
+	ctx := c.ctx
+
 	logger := c.logger
 	logger.Debug("volume.create", "input", input)
 
-	volume, err := c.client.CreateVolume(c.ctx, input.Name, input.Size)
+	volume, err := c.client.CreateVolume(ctx, input.Name, input.Size)
 	if err != nil {
 		return &VolumeResult{
 			Error: fmt.Sprintf("could not create volume: %s", err),
@@ -59,8 +63,8 @@ type RunResult struct {
 	Stderr string `json:"stderr"`
 	Stdout string `json:"stdout"`
 
-	Message string `json:"error"`
-	Status  string `json:"status"`
+	Message string    `json:"message"`
+	Status  RunStatus `json:"status"`
 }
 
 type RunInput struct {
@@ -70,13 +74,43 @@ type RunInput struct {
 	Mounts  map[string]VolumeResult `json:"mounts"`
 	Name    string                  `json:"name"`
 	Stdin   string                  `json:"stdin"`
+	// has to be string because goja doesn't support string -> time.Duration
+	Timeout string `json:"timeout"`
 }
 
+type RunStatus string
+
+const (
+	RunError    RunStatus = "error"
+	RunAbort    RunStatus = "abort"
+	RunComplete RunStatus = "complete"
+)
+
 func (c *PipelineRunner) Run(input RunInput) *RunResult {
+	ctx := c.ctx
+
+	slog.Info("pipeline.run", "input", input)
+
+	if input.Timeout != "" {
+		timeout, err := time.ParseDuration(input.Timeout)
+		if err != nil {
+			return &RunResult{
+				Status:  RunError,
+				Message: fmt.Sprintf("could not parse timeout: %s", err),
+			}
+		}
+
+		if timeout > 0 {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, timeout)
+			defer cancel()
+		}
+	}
+
 	taskID, err := uuid.NewV7()
 	if err != nil {
 		return &RunResult{
-			Status:  "error",
+			Status:  RunError,
 			Message: fmt.Sprintf("could not generate uuid: %s", err),
 		}
 	}
@@ -96,7 +130,7 @@ func (c *PipelineRunner) Run(input RunInput) *RunResult {
 	logger.Debug("container.run", "mounts", mounts)
 
 	container, err := c.client.RunContainer(
-		c.ctx,
+		ctx,
 		orchestra.Task{
 			Command: input.Command,
 			Env:     input.Env,
@@ -107,36 +141,48 @@ func (c *PipelineRunner) Run(input RunInput) *RunResult {
 		},
 	)
 	if err != nil {
+		status := RunError
+
 		logger.Error("container.run", "err", err)
 
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			status = RunAbort
+		}
+
 		return &RunResult{
-			Status:  "error",
+			Status:  status,
 			Message: fmt.Sprintf("could not run container: %s", err),
 		}
 	}
 
-	var status orchestra.ContainerStatus
+	var containerStatus orchestra.ContainerStatus
 
 	for {
 		var err error
 
-		status, err = container.Status(c.ctx)
+		containerStatus, err = container.Status(ctx)
 		if err != nil {
+			status := RunError
+
+			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+				status = RunAbort
+			}
+
 			return &RunResult{
-				Status:  "error",
+				Status:  status,
 				Message: fmt.Sprintf("could not get container status: %s", err),
 			}
 		}
 
-		if status.IsDone() {
+		if containerStatus.IsDone() {
 			break
 		}
 	}
 
-	logger.Debug("container.status", "exitCode", status.ExitCode())
+	logger.Debug("container.status", "exitCode", containerStatus.ExitCode())
 
 	defer func() {
-		err := container.Cleanup(c.ctx)
+		err := container.Cleanup(ctx)
 		if err != nil {
 			logger.Error("container.cleanup", "err", err)
 		}
@@ -144,21 +190,26 @@ func (c *PipelineRunner) Run(input RunInput) *RunResult {
 
 	stdout, stderr := &strings.Builder{}, &strings.Builder{}
 
-	err = container.Logs(c.ctx, stdout, stderr)
+	err = container.Logs(ctx, stdout, stderr)
 	if err != nil {
 		logger.Error("container.logs", "err", err)
 
+		status := RunError
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			status = RunAbort
+		}
+
 		return &RunResult{
-			Code:    status.ExitCode(),
-			Status:  "error",
+			Code:    containerStatus.ExitCode(),
+			Status:  status,
 			Message: fmt.Sprintf("could not get container logs: %s", err),
 		}
 	}
 
 	return &RunResult{
-		Status: "complete",
+		Status: RunComplete,
 		Stdout: stdout.String(),
 		Stderr: stderr.String(),
-		Code:   status.ExitCode(),
+		Code:   containerStatus.ExitCode(),
 	}
 }

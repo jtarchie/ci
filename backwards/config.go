@@ -1,5 +1,7 @@
 package backwards
 
+import "time"
+
 // https://github.com/concourse/concourse/blob/master/atc/config.go
 type ImageResource struct {
 	Source map[string]interface{} `yaml:"source,omitempty"`
@@ -66,10 +68,13 @@ type Step struct {
 
 	Do        Steps `yaml:"do,omitempty"`
 	Ensure    *Step `yaml:"ensure,omitempty"`
+	OnAbort   *Step `yaml:"on_abort,omitempty"`
 	OnError   *Step `yaml:"on_error,omitempty"`
 	OnSuccess *Step `yaml:"on_success,omitempty"`
 	OnFailure *Step `yaml:"on_failure,omitempty"`
 	Try       Steps `yaml:"try,omitempty"`
+
+	Timeout time.Duration `yaml:"timeout,omitempty"`
 }
 
 type Steps []Step
