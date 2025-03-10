@@ -103,6 +103,8 @@ class PipelineRunner {
       await this.processStep(step.on_failure);
     } else if (failure instanceof TaskErrored && step.on_error) {
       await this.processStep(step.on_error);
+    } else if (failure instanceof TaskAbort && step.on_abort) {
+      await this.processStep(step.on_abort);
     }
 
     if (step.ensure) {

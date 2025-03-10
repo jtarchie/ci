@@ -23,7 +23,7 @@ jobs:
         ensure:
           task: ensure-do-task
           config: *success
-      - try:
+      - try: #on_failure
           - task: try-fail-task-1
             config: *success
           - task: try-fail-task-2
@@ -61,7 +61,7 @@ jobs:
         ensure:
           task: ensure-try-fail-task
           config: *success
-      - try:
+      - try: #on_error
           - task: try-error-task-1
             config: *success
           - task: try-error-task-2
@@ -101,6 +101,54 @@ jobs:
         ensure:
           task: ensure-try-error-task
           config: *success
+      - try: #on_abort
+          - task: try-abort-task-1
+            config: *success
+          - task: try-abort-task-2
+            config: *success
+          - do:
+              - task: do-abort-task
+                timeout: 1ms
+                config:
+                  platform: linux
+                  image_resource:
+                    type: docker-image
+                    source:
+                      repository: alpine
+                      tag: latest
+                  run:
+                    path: sh
+                    args: ["-c", "sleep 10"]
+            on_failure: # should never be called
+              task: failure-do-abort-task
+              config: *success
+            on_error: # should never be called
+              task: error-do-abort-task
+              config: *success
+            on_abort:
+              task: abort-do-abort-task
+              config: *success
+            on_success: # should never be called
+              task: success-do-abort-task
+              config: *success
+            ensure:
+              task: ensure-do-abort-task
+              config: *success
+        on_failure: # should never be called
+          task: failure-try-abort-task
+          config: *success
+        on_error: # should never be called
+          task: error-try-abort-task
+          config: *success
+        on_abort:
+          task: abort-try-abort-task
+          config: *success
+        on_success: # should never be called
+          task: success-try-abort-task
+          config: *success
+        ensure:
+          task: ensure-try-abort-task
+          config: *success
     assert:
       # this is the expected order of the tasks to run in
       # ensuring some tasks don't actually run
@@ -124,3 +172,10 @@ jobs:
         - "ensure-do-error-task"
         - "error-try-error-task"
         - "ensure-try-error-task"
+        - "try-abort-task-1"
+        - "try-abort-task-2"
+        - "do-abort-task"
+        - "abort-do-abort-task"
+        - "ensure-do-abort-task"
+        - "abort-try-abort-task"
+        - "ensure-try-abort-task"
