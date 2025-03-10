@@ -7,6 +7,7 @@ declare global {
     mounts?: { [key: string]: VolumeResult };
     name: string;
     stdin?: string;
+    timeout?: string;
   }
 
   interface RunTaskResult {
@@ -14,7 +15,7 @@ declare global {
     stderr: string;
     stdout: string;
 
-    status: "complete" | "error";
+    status: "complete" | "error" | "abort";
     message: string;
   }
 
@@ -76,9 +77,11 @@ declare global {
     };
 
     ensure?: Step;
+    on_abort?: Step;
     on_error?: Step;
     on_success?: Step;
     on_failure?: Step;
+    timeout?: string;
   }
 
   interface Get {
@@ -89,9 +92,11 @@ declare global {
     version: string;
 
     ensure?: Step;
+    on_abort?: Step;
     on_error?: Step;
     on_success?: Step;
     on_failure?: Step;
+    timeout?: string;
   }
 
   interface Put {
@@ -100,27 +105,33 @@ declare global {
     params: { [key: string]: string };
 
     ensure?: Step;
+    on_abort?: Step;
     on_error?: Step;
     on_success?: Step;
     on_failure?: Step;
+    timeout?: string;
   }
 
   interface Do {
     do: Step[];
 
     ensure?: Step;
+    on_abort?: Step;
     on_error?: Step;
     on_success?: Step;
     on_failure?: Step;
+    timeout?: string;
   }
 
   interface Try {
     try: Step[];
 
     ensure?: Step;
+    on_abort?: Step;
     on_error?: Step;
     on_success?: Step;
     on_failure?: Step;
+    timeout?: string;
   }
 
   type Step = Task | Get | Put | Do | Try;

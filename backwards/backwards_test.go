@@ -98,4 +98,17 @@ func TestBackwardsCompatibility(t *testing.T) {
 		assert.Expect(err).To(HaveOccurred())
 		assert.Expect(err.Error()).To(ContainSubstring("Task erroring-task errored"))
 	})
+
+	t.Run("on_abort", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		runner := commands.Runner{
+			Pipeline:     "fixtures/on_abort.yml",
+			Orchestrator: "native",
+		}
+		err := runner.Run()
+		assert.Expect(err).To(HaveOccurred())
+		assert.Expect(err.Error()).To(ContainSubstring("Task abort-task aborted"))
+	})
 }

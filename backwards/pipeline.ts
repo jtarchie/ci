@@ -143,6 +143,7 @@ class PipelineRunner {
         ensure: step.ensure,
         on_success: step.on_success,
         on_failure: step.on_failure,
+        timeout: step.timeout,
       },
       JSON.stringify({
         source: resource?.source,
@@ -177,6 +178,7 @@ class PipelineRunner {
         ensure: step.ensure,
         on_success: step.on_success,
         on_failure: step.on_failure,
+        timeout: step.timeout,
       },
       JSON.stringify({
         source: resource?.source,
@@ -209,6 +211,7 @@ class PipelineRunner {
         ensure: step.ensure,
         on_success: step.on_success,
         on_failure: step.on_failure,
+        timeout: step.timeout,
       },
       JSON.stringify({
         source: resource?.source,
@@ -242,6 +245,7 @@ class PipelineRunner {
         ensure: step.ensure,
         on_success: step.on_success,
         on_failure: step.on_failure,
+        timeout: step.timeout,
       },
       JSON.stringify({
         source: resource?.source,
@@ -273,6 +277,7 @@ class PipelineRunner {
       command: [step.config.run.path].concat(step.config.run.args ?? []),
       mounts: mounts,
       stdin: stdin ?? "",
+      timeout: step.timeout,
     });
 
     this.validateTaskResult(step, result);
@@ -286,6 +291,8 @@ class PipelineRunner {
       await this.processStep(step.on_failure);
     } else if (result.status == "error" && step.on_error) {
       await this.processStep(step.on_error);
+    } else if (result.status == "abort" && step.on_abort) {
+      await this.processStep(step.on_abort);
     }
 
     if (step.ensure) {
@@ -296,10 +303,14 @@ class PipelineRunner {
       throw new TaskFailure(
         `Task ${step.task} failed with code ${result.code}`,
       );
-    }
-
-    if (result.status == "error") {
-      throw new TaskErrored(`Task ${step.task} errored`);
+    } else if (result.status == "error") {
+      throw new TaskErrored(
+        `Task ${step.task} errored with message ${result.message}`,
+      );
+    } else if (result.status == "abort") {
+      throw new TaskAbort(
+        `Task ${step.task} aborted with message ${result.message}`,
+      );
     }
 
     return result;
@@ -345,6 +356,7 @@ class CustomError extends Error {
 
 class TaskFailure extends CustomError {}
 class TaskErrored extends CustomError {}
+class TaskAbort extends CustomError {}
 
 // Public API function
 export function createPipeline(config: PipelineConfig) {
