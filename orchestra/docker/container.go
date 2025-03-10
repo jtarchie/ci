@@ -16,29 +16,29 @@ import (
 	"github.com/jtarchie/ci/orchestra"
 )
 
-type DockerContainer struct {
+type Container struct {
 	id     string
 	client *client.Client
 	task   orchestra.Task
 }
 
-type DockerContainerStatus struct {
+type ContainerStatus struct {
 	state *container.State
 }
 
-func (d *DockerContainer) Status(ctx context.Context) (orchestra.ContainerStatus, error) {
+func (d *Container) Status(ctx context.Context) (orchestra.ContainerStatus, error) {
 	// doc: https://docs.docker.com/reference/api/engine/version/v1.43/#tag/Container/operation/ContainerInspect
 	inspection, err := d.client.ContainerInspect(ctx, d.id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to inspect container: %w", err)
 	}
 
-	return &DockerContainerStatus{
+	return &ContainerStatus{
 		state: inspection.State,
 	}, nil
 }
 
-func (d *DockerContainer) Logs(ctx context.Context, stdout, stderr io.Writer) error {
+func (d *Container) Logs(ctx context.Context, stdout, stderr io.Writer) error {
 	options := container.LogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
@@ -57,7 +57,7 @@ func (d *DockerContainer) Logs(ctx context.Context, stdout, stderr io.Writer) er
 	return nil
 }
 
-func (d *DockerContainer) Cleanup(ctx context.Context) error {
+func (d *Container) Cleanup(ctx context.Context) error {
 	err := d.client.ContainerRemove(ctx, d.id, container.RemoveOptions{
 		Force:         true,
 		RemoveLinks:   false,
@@ -70,11 +70,11 @@ func (d *DockerContainer) Cleanup(ctx context.Context) error {
 	return nil
 }
 
-func (s *DockerContainerStatus) IsDone() bool {
+func (s *ContainerStatus) IsDone() bool {
 	return s.state.Status == "exited"
 }
 
-func (s *DockerContainerStatus) ExitCode() int {
+func (s *ContainerStatus) ExitCode() int {
 	return s.state.ExitCode
 }
 
@@ -100,7 +100,7 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 			return nil, fmt.Errorf("failed to create volume: %w", err)
 		}
 
-		dockerVolume, _ := volume.(*DockerVolume)
+		dockerVolume, _ := volume.(*Volume)
 
 		mounts = append(mounts, mount.Mount{
 			Type:   "volume",
@@ -147,7 +147,7 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 			return nil, fmt.Errorf("failed to find container by name %s: %w", containerName, ErrContainerNotFound)
 		}
 
-		return &DockerContainer{
+		return &Container{
 			id:     containers[0].ID,
 			client: d.client,
 			task:   task,
@@ -181,7 +181,7 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 		return nil, fmt.Errorf("failed to start container: %w", err)
 	}
 
-	return &DockerContainer{
+	return &Container{
 		id:     response.ID,
 		client: d.client,
 		task:   task,

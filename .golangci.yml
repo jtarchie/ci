@@ -1,6 +1,5 @@
 run:
   timeout: 5m
-
 linters:
   enable-all: true
   disable:
@@ -16,5 +15,5 @@ linters:
     - ireturn
     - lll
     - maintidx
-    - revive
-    - tagliatelle
+    - revive      # too many rules
+    - tagliatelle # disable because pipeline yaml uses underscores

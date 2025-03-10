@@ -13,17 +13,17 @@ import (
 	"github.com/jtarchie/ci/orchestra"
 )
 
-type NativeContainer struct {
+type Container struct {
 	command *exec.Cmd
 	stdout  *strings.Builder
 	errChan chan error
 }
 
-func (n *NativeContainer) Cleanup(ctx context.Context) error {
+func (n *Container) Cleanup(_ context.Context) error {
 	return nil
 }
 
-func (n *NativeContainer) Logs(ctx context.Context, stdout io.Writer, stderr io.Writer) error {
+func (n *Container) Logs(_ context.Context, stdout io.Writer, _ io.Writer) error {
 	_, err := io.WriteString(stdout, n.stdout.String())
 	if err != nil {
 		return fmt.Errorf("failed to copy stdout: %w", err)
@@ -32,20 +32,20 @@ func (n *NativeContainer) Logs(ctx context.Context, stdout io.Writer, stderr io.
 	return nil
 }
 
-type NativeStatus struct {
+type Status struct {
 	exitCode int
 	isDone   bool
 }
 
-func (n *NativeStatus) ExitCode() int {
+func (n *Status) ExitCode() int {
 	return n.exitCode
 }
 
-func (n *NativeStatus) IsDone() bool {
+func (n *Status) IsDone() bool {
 	return n.isDone
 }
 
-func (n *NativeContainer) Status(ctx context.Context) (orchestra.ContainerStatus, error) {
+func (n *Container) Status(ctx context.Context) (orchestra.ContainerStatus, error) {
 	select {
 	case <-ctx.Done():
 		return nil, fmt.Errorf("failed to get status: %w", context.Canceled)
@@ -60,12 +60,12 @@ func (n *NativeContainer) Status(ctx context.Context) (orchestra.ContainerStatus
 
 		defer func() { n.errChan <- err }()
 
-		return &NativeStatus{
+		return &Status{
 			exitCode: n.command.ProcessState.ExitCode(),
 			isDone:   n.command.ProcessState.Exited(),
 		}, nil
 	default:
-		return &NativeStatus{
+		return &Status{
 			exitCode: -1,
 			isDone:   false,
 		}, nil
@@ -86,7 +86,7 @@ func (n *Native) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 			return nil, fmt.Errorf("failed to create volume: %w", err)
 		}
 
-		nativeVolume, _ := volume.(*NativeVolume)
+		nativeVolume, _ := volume.(*Volume)
 
 		err = os.Symlink(nativeVolume.path, filepath.Join(dir, mount.Path))
 		if err != nil {
@@ -127,7 +127,7 @@ func (n *Native) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 		errChan <- nil
 	}()
 
-	return &NativeContainer{
+	return &Container{
 		command: command,
 		errChan: errChan,
 		stdout:  stdout,

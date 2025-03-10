@@ -11,24 +11,24 @@ import (
 	"github.com/jtarchie/ci/orchestra"
 )
 
-type NativeVolume struct {
+type Volume struct {
 	path string
 	name string
 }
 
 // Name implements orchestra.Volume.
-func (n *NativeVolume) Name() string {
+func (n *Volume) Name() string {
 	return n.name
 }
 
 // Cleanup implements orchestra.Volume.
-func (n *NativeVolume) Cleanup(ctx context.Context) error {
+func (n *Volume) Cleanup(_ context.Context) error {
 	return nil
 }
 
 var ErrInvalidPath = errors.New("path is not in the container directory")
 
-func (n *Native) CreateVolume(ctx context.Context, name string, size int) (orchestra.Volume, error) {
+func (n *Native) CreateVolume(_ context.Context, name string, _ int) (orchestra.Volume, error) {
 	path, err := filepath.Abs(filepath.Join(n.path, name))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get absolute path: %w", err)
@@ -43,7 +43,7 @@ func (n *Native) CreateVolume(ctx context.Context, name string, size int) (orche
 		return nil, fmt.Errorf("failed to create path: %w", err)
 	}
 
-	return &NativeVolume{
+	return &Volume{
 		name: name,
 		path: path,
 	}, nil

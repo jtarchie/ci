@@ -84,7 +84,7 @@ func init() {
 
 var (
 	_ orchestra.Driver          = &Docker{}
-	_ orchestra.Container       = &DockerContainer{}
-	_ orchestra.ContainerStatus = &DockerContainerStatus{}
-	_ orchestra.Volume          = &DockerVolume{}
+	_ orchestra.Container       = &Container{}
+	_ orchestra.ContainerStatus = &ContainerStatus{}
+	_ orchestra.Volume          = &Volume{}
 )
