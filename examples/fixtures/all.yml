@@ -24,9 +24,9 @@ jobs:
           task: ensure-do-task
           config: *success
       - try:
-          - task: try-task-1
+          - task: try-fail-task-1
             config: *success
-          - task: try-task-2
+          - task: try-fail-task-2
             config: *success
           - do:
               - task: do-fail-task
@@ -41,22 +41,65 @@ jobs:
                     path: sh
                     args: ["-c", "exit 1"]
             on_failure:
-              task: failure-do-task
+              task: failure-do-fail-task
               config: *success
             on_success: # should never be called
-              task: success-do-task
+              task: success-do-fail-task
               config: *success
             ensure:
-              task: ensure-do-task
+              task: ensure-do-fail-task
               config: *success
         on_failure:
-          task: failure-try-task
+          task: failure-try-fail-task
           config: *success
-        on_success: #should never be called
-          task: success-try-task
+        on_error: # should never be called
+          task: error-try-fail-task
+          config: *success
+        on_success: # should never be called
+          task: success-try-fail-task
           config: *success
         ensure:
-          task: ensure-try-task
+          task: ensure-try-fail-task
+          config: *success
+      - try:
+          - task: try-error-task-1
+            config: *success
+          - task: try-error-task-2
+            config: *success
+          - do:
+              - task: do-error-task
+                config: &failure
+                  platform: linux
+                  image_resource:
+                    type: docker-image
+                    source:
+                      repository: alpine
+                      tag: latest
+                  run:
+                    path: this-doesnt-exist-please-no-image
+            on_failure: # should never be called
+              task: failure-do-error-task
+              config: *success
+            on_error:
+              task: error-do-error-task
+              config: *success
+            on_success: # should never be called
+              task: success-do-error-task
+              config: *success
+            ensure:
+              task: ensure-do-error-task
+              config: *success
+        on_failure: # should never be called
+          task: failure-try-error-task
+          config: *success
+        on_error:
+          task: error-try-error-task
+          config: *success
+        on_success: #should never be called
+          task: success-try-error-task
+          config: *success
+        ensure:
+          task: ensure-try-error-task
           config: *success
     assert:
       # this is the expected order of the tasks to run in
@@ -67,10 +110,17 @@ jobs:
         - "do-task-2"
         - "success-do-task"
         - "ensure-do-task"
-        - "try-task-1"
-        - "try-task-2"
+        - "try-fail-task-1"
+        - "try-fail-task-2"
         - "do-fail-task"
-        - "failure-do-task"
-        - "ensure-do-task"
-        - "failure-try-task"
-        - "ensure-try-task"
+        - "failure-do-fail-task"
+        - "ensure-do-fail-task"
+        - "failure-try-fail-task"
+        - "ensure-try-fail-task"
+        - "try-error-task-1"
+        - "try-error-task-2"
+        - "do-error-task"
+        - "error-do-error-task"
+        - "ensure-do-error-task"
+        - "error-try-error-task"
+        - "ensure-try-error-task"

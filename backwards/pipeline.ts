@@ -99,8 +99,10 @@ class PipelineRunner {
 
     if (failure == undefined && step.on_success) {
       await this.processStep(step.on_success);
-    } else if (failure && step.on_failure) {
+    } else if (failure instanceof TaskFailure && step.on_failure) {
       await this.processStep(step.on_failure);
+    } else if (failure instanceof TaskErrored && step.on_error) {
+      await this.processStep(step.on_error);
     }
 
     if (step.ensure) {
@@ -276,20 +278,28 @@ class PipelineRunner {
     this.validateTaskResult(step, result);
     this.taskNames.push(step.task);
 
-    if (result.code === 0 && step.on_success) {
+    if (result.code === 0 && result.status == "completed" && step.on_success) {
       await this.processStep(step.on_success);
-    } else if (result.code !== 0 && step.on_failure) {
+    } else if (
+      result.code !== 0 && result.status == "completed" && step.on_failure
+    ) {
       await this.processStep(step.on_failure);
+    } else if (result.status == "error" && step.on_error) {
+      await this.processStep(step.on_error);
     }
 
     if (step.ensure) {
       await this.processStep(step.ensure);
     }
 
-    if (result.code !== 0) {
+    if (result.code > 0) {
       throw new TaskFailure(
         `Task ${step.task} failed with code ${result.code}`,
       );
+    }
+
+    if (result.status == "error") {
+      throw new TaskErrored(`Task ${step.task} errored`);
     }
 
     return result;
@@ -334,6 +344,7 @@ class CustomError extends Error {
 }
 
 class TaskFailure extends CustomError {}
+class TaskErrored extends CustomError {}
 
 // Public API function
 export function createPipeline(config: PipelineConfig) {
