@@ -18,4 +18,3 @@ linters:
     - maintidx
     - revive
     - tagliatelle
-    - varnamelen

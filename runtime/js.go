@@ -96,7 +96,7 @@ func (j *JS) Execute(source string, sandbox *PipelineRunner) error {
 	}
 
 	// let's run the pipeline
-	pipelineFunc, ok := goja.AssertFunction(pipeline)
+	pipelineFunc, ok := goja.AssertFunction(pipeline) //nolint: varnamelen
 	if !ok {
 		return ErrPipelineNotFunction
 	}
