@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/evanw/esbuild/pkg/api"
 	"github.com/google/uuid"
@@ -18,8 +19,9 @@ import (
 )
 
 type Runner struct {
-	Pipeline     string `arg:""           help:"Path to pipeline javascript file" type:"existingfile"`
-	Orchestrator string `default:"native" help:"orchestrator runtime to use"`
+	Pipeline     string        `arg:""                                                        help:"Path to pipeline javascript file" type:"existingfile"`
+	Orchestrator string        `default:"native"                                              help:"orchestrator runtime to use"`
+	Timeout      time.Duration `help:"timeout for the pipeline, will cause abort if exceeded"`
 }
 
 func (c *Runner) Run() error {
@@ -32,6 +34,12 @@ func (c *Runner) Run() error {
 	// Create a context with cancellation
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	if c.Timeout > 0 {
+		// Create a context with timeout
+		ctx, cancel = context.WithTimeout(ctx, c.Timeout)
+		defer cancel()
+	}
 
 	// Set up signal handling
 	sigs := make(chan os.Signal, 1)
