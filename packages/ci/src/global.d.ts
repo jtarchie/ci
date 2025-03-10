@@ -120,7 +120,20 @@ declare global {
     on_error?: Step;
     on_success?: Step;
     on_failure?: Step;
-    timeout?: string;
+  }
+
+  interface InParallel {
+    in_parallel: {
+      steps: Step[];
+      limit?: number;
+      fail_fast?: boolean;
+    };
+
+    ensure?: Step;
+    on_abort?: Step;
+    on_error?: Step;
+    on_success?: Step;
+    on_failure?: Step;
   }
 
   interface Try {
@@ -131,10 +144,9 @@ declare global {
     on_error?: Step;
     on_success?: Step;
     on_failure?: Step;
-    timeout?: string;
   }
 
-  type Step = Task | Get | Put | Do | Try;
+  type Step = Task | Get | Put | Do | Try | InParallel;
 
   interface Job {
     name: string;

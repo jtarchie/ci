@@ -74,7 +74,13 @@ class PipelineRunner {
       await this.processTryStep(step);
     } else if ("task" in step) {
       await this.runTask(step);
+    } else if ("in_parallel" in step) {
+      await this.runParallelSteps(step);
     }
+  }
+
+  private async runParallelSteps(step: InParallel): Promise<void> {
+    await this.processDoStep(step);
   }
 
   private async processTryStep(step: Try): Promise<void> {
@@ -85,11 +91,18 @@ class PipelineRunner {
     }
   }
 
-  private async processDoStep(step: Do | Try): Promise<void> {
+  private async processDoStep(step: Do | Try | InParallel): Promise<void> {
     let failure: unknown = undefined;
 
     try {
-      const steps = "do" in step ? step.do : step.try;
+      let steps: Step[] = [];
+      if ("in_parallel" in step) {
+        steps = step.in_parallel.steps;
+      } else if ("do" in step) {
+        steps = step.do;
+      } else if ("try" in step) {
+        steps = step.try;
+      }
       for (const subStep of steps) {
         await this.processStep(subStep);
       }

@@ -74,6 +74,12 @@ type Step struct {
 	OnFailure *Step `yaml:"on_failure,omitempty"`
 	Try       Steps `yaml:"try,omitempty"`
 
+	InParallel struct {
+		Steps    Steps `yaml:"steps,omitempty"`
+		Limit    int   `yaml:"limit,omitempty"`
+		FailFast bool  `yaml:"fail_fast,omitempty"`
+	} `yaml:"in_parallel,omitempty"`
+
 	Timeout time.Duration `yaml:"timeout,omitempty"`
 }
 

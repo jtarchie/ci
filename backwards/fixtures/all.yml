@@ -12,6 +12,12 @@ jobs:
           run:
             path: sh
             args: ["-c", "exit 0"]
+      - in_parallel:
+          steps:
+            - task: parallel-task-2
+              config: *success
+            - task: parallel-task-3
+              config: *success
       - do:
           - task: do-task-1
             config: *success
@@ -154,6 +160,8 @@ jobs:
       # ensuring some tasks don't actually run
       execution:
         - "task-1"
+        - "parallel-task-2"
+        - "parallel-task-3"
         - "do-task-1"
         - "do-task-2"
         - "success-do-task"
