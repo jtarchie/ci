@@ -1,9 +1,10 @@
-package main_test
+package backwards_test
 
 import (
 	"testing"
 
 	"github.com/jtarchie/ci/commands"
+	_ "github.com/jtarchie/ci/orchestra/native"
 	. "github.com/onsi/gomega"
 )
 
@@ -15,7 +16,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 
 		assert := NewGomegaWithT(t)
 		runner := commands.Runner{
-			Pipeline:     "examples/fixtures/on_failure.yml",
+			Pipeline:     "fixtures/on_failure.yml",
 			Orchestrator: "native",
 		}
 		err := runner.Run()
@@ -28,7 +29,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 
 		assert := NewGomegaWithT(t)
 		runner := commands.Runner{
-			Pipeline:     "examples/fixtures/on_success.yml",
+			Pipeline:     "fixtures/on_success.yml",
 			Orchestrator: "native",
 		}
 		err := runner.Run()
@@ -40,7 +41,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 
 		assert := NewGomegaWithT(t)
 		runner := commands.Runner{
-			Pipeline:     "examples/fixtures/ensure.yml",
+			Pipeline:     "fixtures/ensure.yml",
 			Orchestrator: "native",
 		}
 		err := runner.Run()
@@ -53,7 +54,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 
 		assert := NewGomegaWithT(t)
 		runner := commands.Runner{
-			Pipeline:     "examples/fixtures/do.yml",
+			Pipeline:     "fixtures/do.yml",
 			Orchestrator: "native",
 		}
 		err := runner.Run()
@@ -66,7 +67,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 
 		assert := NewGomegaWithT(t)
 		runner := commands.Runner{
-			Pipeline:     "examples/fixtures/try.yml",
+			Pipeline:     "fixtures/try.yml",
 			Orchestrator: "native",
 		}
 		err := runner.Run()
@@ -78,7 +79,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 
 		assert := NewGomegaWithT(t)
 		runner := commands.Runner{
-			Pipeline:     "examples/fixtures/all.yml",
+			Pipeline:     "fixtures/all.yml",
 			Orchestrator: "native",
 		}
 		err := runner.Run()
@@ -90,7 +91,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 
 		assert := NewGomegaWithT(t)
 		runner := commands.Runner{
-			Pipeline:     "examples/fixtures/on_error.yml",
+			Pipeline:     "fixtures/on_error.yml",
 			Orchestrator: "native",
 		}
 		err := runner.Run()
