@@ -14,7 +14,7 @@ import (
 
 type PipelineRunner struct {
 	client orchestra.Driver
-	ctx    context.Context
+	ctx    context.Context //nolint: containedctx
 	logger *slog.Logger
 }
 

@@ -89,10 +89,10 @@ func (c *Runner) Run() error {
 	}
 	defer client.Close()
 
-	js := runtime.NewJS(ctx, logger)
+	js := runtime.NewJS(logger)
 	pipelineRunner := runtime.NewPipelineRunner(ctx, client, logger)
 
-	err = js.Execute(pipeline, pipelineRunner)
+	err = js.Execute(ctx, pipeline, pipelineRunner)
 	if err != nil {
 		// Check if the error was due to context cancellation
 		if errors.Is(err, context.Canceled) {
