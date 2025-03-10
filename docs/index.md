@@ -5,6 +5,10 @@
 This is a development repository for CI/CD system. These notes can probably be
 inferred from the `git` commit messages. I'm journaling for my own benefit.
 
+- 2025-03-10:
+  - Support for task level `on_success`, `on_failure`, `on_error`, and
+    `on_abort`.
+  - Added `try`, `do`, and `in_parallel`.
 - 2025-03-05: Support for `put` in resource pipeline.
 - 2025-03-05: Support for `get` and `check` in resource pipeline.
 - 2025-02-08:
