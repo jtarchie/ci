@@ -2,7 +2,7 @@ const pipeline = async () => {
   const volume = await runtime.createVolume();
   let result = await runtime.run({
     name: "simple-task",
-    image: "alpine",
+    image: "busybox",
     command: ["sh", "-c", "echo Hello, World! > ./mounted-volume/hello.txt"],
     mounts: {
       "mounted-volume": volume,
@@ -13,7 +13,7 @@ const pipeline = async () => {
 
   result = await runtime.run({
     name: "simple-task",
-    image: "alpine",
+    image: "busybox",
     command: ["cat", "./mounted-volume/hello.txt"],
     mounts: {
       "mounted-volume": volume,

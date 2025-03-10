@@ -30,7 +30,7 @@ func TestDrivers(t *testing.T) {
 					context.Background(),
 					orchestra.Task{
 						ID:      taskID.String(),
-						Image:   "alpine",
+						Image:   "busybox",
 						Command: []string{"sh", "-c", "cat < /dev/stdin"},
 						Stdin:   strings.NewReader("hello"),
 					},
@@ -72,7 +72,7 @@ func TestDrivers(t *testing.T) {
 					context.Background(),
 					orchestra.Task{
 						ID:      taskID.String(),
-						Image:   "alpine",
+						Image:   "busybox",
 						Command: []string{"sh", "-c", "exit 1"},
 					},
 				)
@@ -110,7 +110,7 @@ func TestDrivers(t *testing.T) {
 					context.Background(),
 					orchestra.Task{
 						ID:      taskID.String(),
-						Image:   "alpine",
+						Image:   "busybox",
 						Command: []string{"echo", "hello"},
 					},
 				)
@@ -139,7 +139,7 @@ func TestDrivers(t *testing.T) {
 					context.Background(),
 					orchestra.Task{
 						ID:      taskID.String(),
-						Image:   "alpine",
+						Image:   "busybox",
 						Command: []string{"echo", "hello"},
 					},
 				)
@@ -181,7 +181,7 @@ func TestDrivers(t *testing.T) {
 					context.Background(),
 					orchestra.Task{
 						ID:      taskID.String(),
-						Image:   "alpine",
+						Image:   "busybox",
 						Command: []string{"sh", "-c", "echo world > ./test/hello"},
 						Mounts: orchestra.Mounts{
 							{Name: "test", Path: "/test"},
@@ -201,7 +201,7 @@ func TestDrivers(t *testing.T) {
 					context.Background(),
 					orchestra.Task{
 						ID:      taskID.String() + "-2",
-						Image:   "alpine",
+						Image:   "busybox",
 						Command: []string{"cat", "./test/hello"},
 						Mounts: orchestra.Mounts{
 							{Name: "test", Path: "/test"},
@@ -247,7 +247,7 @@ func TestDrivers(t *testing.T) {
 					context.Background(),
 					orchestra.Task{
 						ID:      taskID.String(),
-						Image:   "alpine",
+						Image:   "busybox",
 						Command: []string{"env"},
 						Env:     map[string]string{"HELLO": "WORLD"},
 					},

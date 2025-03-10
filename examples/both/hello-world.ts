@@ -1,14 +1,14 @@
 const pipeline = async () => {
   let result = await runtime.run({
     name: "simple-task",
-    image: "alpine",
+    image: "busybox",
     command: ["echo", "Hello, World!"],
   });
   assert.containsString("Hello, World!", result.stdout);
 
   result = await runtime.run({
     name: "show-env",
-    image: "alpine",
+    image: "busybox",
     command: ["env"],
     env: {
       FOO: "bar",
