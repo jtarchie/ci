@@ -56,9 +56,11 @@ func (c *PipelineRunner) CreateVolume(input VolumeInput) *VolumeResult {
 
 type RunResult struct {
 	Code   int    `json:"code"`
-	Error  string `json:"error"`
 	Stderr string `json:"stderr"`
 	Stdout string `json:"stdout"`
+
+	Message string `json:"error"`
+	Status  string `json:"status"`
 }
 
 type RunInput struct {
@@ -74,8 +76,8 @@ func (c *PipelineRunner) Run(input RunInput) *RunResult {
 	taskID, err := uuid.NewV7()
 	if err != nil {
 		return &RunResult{
-			Code:  1,
-			Error: fmt.Sprintf("could not generate uuid: %s", err),
+			Status:  "error",
+			Message: fmt.Sprintf("could not generate uuid: %s", err),
 		}
 	}
 
@@ -108,8 +110,8 @@ func (c *PipelineRunner) Run(input RunInput) *RunResult {
 		logger.Error("container.run", "err", err)
 
 		return &RunResult{
-			Code:  1,
-			Error: fmt.Sprintf("could not run container: %s", err),
+			Status:  "error",
+			Message: fmt.Sprintf("could not run container: %s", err),
 		}
 	}
 
@@ -121,8 +123,8 @@ func (c *PipelineRunner) Run(input RunInput) *RunResult {
 		status, err = container.Status(c.ctx)
 		if err != nil {
 			return &RunResult{
-				Code:  1,
-				Error: fmt.Sprintf("could not get container status: %s", err),
+				Status:  "error",
+				Message: fmt.Sprintf("could not get container status: %s", err),
 			}
 		}
 
@@ -147,12 +149,14 @@ func (c *PipelineRunner) Run(input RunInput) *RunResult {
 		logger.Error("container.logs", "err", err)
 
 		return &RunResult{
-			Code:  status.ExitCode(),
-			Error: fmt.Sprintf("could not get container logs: %s", err),
+			Code:    status.ExitCode(),
+			Status:  "error",
+			Message: fmt.Sprintf("could not get container logs: %s", err),
 		}
 	}
 
 	return &RunResult{
+		Status: "completed",
 		Stdout: stdout.String(),
 		Stderr: stderr.String(),
 		Code:   status.ExitCode(),

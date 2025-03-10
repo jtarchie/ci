@@ -11,9 +11,11 @@ declare global {
 
   interface RunTaskResult {
     code: number;
-    error: string;
     stderr: string;
     stdout: string;
+
+    status: "completed" | "error";
+    message: string;
   }
 
   interface VolumeConfig {
@@ -74,6 +76,7 @@ declare global {
     };
 
     ensure?: Step;
+    on_error?: Step;
     on_success?: Step;
     on_failure?: Step;
   }
@@ -86,6 +89,7 @@ declare global {
     version: string;
 
     ensure?: Step;
+    on_error?: Step;
     on_success?: Step;
     on_failure?: Step;
   }
@@ -96,6 +100,7 @@ declare global {
     params: { [key: string]: string };
 
     ensure?: Step;
+    on_error?: Step;
     on_success?: Step;
     on_failure?: Step;
   }
@@ -104,6 +109,7 @@ declare global {
     do: Step[];
 
     ensure?: Step;
+    on_error?: Step;
     on_success?: Step;
     on_failure?: Step;
   }
@@ -112,6 +118,7 @@ declare global {
     try: Step[];
 
     ensure?: Step;
+    on_error?: Step;
     on_success?: Step;
     on_failure?: Step;
   }

@@ -20,5 +20,4 @@ tasks:
     else
       docker ps -aq | xargs -I {} docker rm -f {}
       docker volume ls -q | xargs -r docker volume rm -f
-      exit 1
     fi
