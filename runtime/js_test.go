@@ -16,8 +16,8 @@ func TestBrokenJS(t *testing.T) {
 
 	assert := NewGomegaWithT(t)
 
-	js := runtime.NewJS(context.Background(), slog.Default())
-	err := js.Execute(strings.TrimSpace(`
+	js := runtime.NewJS(slog.Default())
+	err := js.Execute(context.Background(), strings.TrimSpace(`
 		export function pipeline() {
 			const array = [];
 			return array[1].asdf;
@@ -32,8 +32,8 @@ func TestAwaitPromise(t *testing.T) {
 
 	assert := NewGomegaWithT(t)
 
-	js := runtime.NewJS(context.Background(), slog.Default())
-	err := js.Execute(`
+	js := runtime.NewJS(slog.Default())
+	err := js.Execute(context.Background(), `
 		async function pipeline() {
 			await Promise.reject(400);
 		};
@@ -51,8 +51,8 @@ func TestUseContext(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
 	defer cancel()
 
-	js := runtime.NewJS(ctx, slog.Default())
-	err := js.Execute(`
+	js := runtime.NewJS(slog.Default())
+	err := js.Execute(ctx, `
 		function pipeline() {
 			for (; true; ) {}
 		};

@@ -15,18 +15,16 @@ import (
 )
 
 type JS struct {
-	ctx    context.Context
 	logger *slog.Logger
 }
 
-func NewJS(ctx context.Context, logger *slog.Logger) *JS {
+func NewJS(logger *slog.Logger) *JS {
 	return &JS{
-		ctx:    ctx,
 		logger: logger.WithGroup("js"),
 	}
 }
 
-func (j *JS) Execute(source string, sandbox *PipelineRunner) error {
+func (j *JS) Execute(ctx context.Context, source string, sandbox *PipelineRunner) error {
 	result := api.Transform(source, api.TransformOptions{
 		Loader:     api.LoaderTS,
 		Format:     api.FormatCommonJS,
@@ -66,7 +64,7 @@ func (j *JS) Execute(source string, sandbox *PipelineRunner) error {
 	jsVM := goja.New()
 	jsVM.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
 
-	if timeout, ok := j.ctx.Deadline(); ok {
+	if timeout, ok := ctx.Deadline(); ok {
 		// https://github.com/dop251/goja?tab=readme-ov-file#interrupting
 		time.AfterFunc(time.Until(timeout), func() {
 			jsVM.Interrupt("context deadline exceeded")
