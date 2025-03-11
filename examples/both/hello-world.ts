@@ -4,7 +4,7 @@ const pipeline = async () => {
     image: "busybox",
     command: ["echo", "Hello, World!"],
   });
-  assert.containsString("Hello, World!", result.stdout);
+  assert.containsString(result.stdout, "Hello, World!");
 
   result = await runtime.run({
     name: "show-env",
@@ -14,7 +14,7 @@ const pipeline = async () => {
       FOO: "bar",
     },
   });
-  assert.containsString("FOO=bar", result.stdout);
+  assert.containsString(result.stdout, "FOO=bar");
 };
 
 export { pipeline };

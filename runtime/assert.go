@@ -63,7 +63,7 @@ func (a *Assert) NotEqual(expected, actual interface{}, message ...string) {
 	}
 }
 
-func (a *Assert) ContainsString(substr, str string, message ...string) {
+func (a *Assert) ContainsString(str, substr string, message ...string) {
 	// Redact potentially sensitive string data in logs
 	a.logger.Debug("contain_substring",
 		"pattern_length", len(substr),
@@ -87,10 +87,10 @@ func (a *Assert) ContainsString(substr, str string, message ...string) {
 	}
 }
 
-func (a *Assert) Truthy(value interface{}, message ...string) {
+func (a *Assert) Truthy(value bool, message ...string) {
 	a.logger.Debug("truthy", "value_type", fmt.Sprintf("%T", value))
 
-	if value == false {
+	if !value {
 		msg := fmt.Sprintf("expected %v to be truthy", value)
 		if len(message) > 0 {
 			msg = message[0]
@@ -100,7 +100,7 @@ func (a *Assert) Truthy(value interface{}, message ...string) {
 	}
 }
 
-func (a *Assert) ContainsElement(element interface{}, array []interface{}, message ...string) {
+func (a *Assert) ContainsElement(array []interface{}, element interface{}, message ...string) {
 	a.logger.Debug("contains_element",
 		"element_type", fmt.Sprintf("%T", element),
 		"array_length", len(array))

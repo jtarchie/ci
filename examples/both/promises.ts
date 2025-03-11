@@ -11,8 +11,8 @@ const pipeline = async () => {
       command: ["echo", "Hello, Bob!"],
     }),
   ]);
-  assert.containsString("Hello, World!", results[0].stdout);
-  assert.containsString("Hello, Bob!", results[1].stdout);
+  assert.containsString(results[0].stdout, "Hello, World!");
+  assert.containsString(results[1].stdout, "Hello, Bob!");
 };
 
 export { pipeline };
