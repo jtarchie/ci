@@ -1,11 +1,5 @@
 /// <reference path="../packages/ci/src/global.d.ts" />
 
-type KnownMounts = Record<string, VolumeResult>;
-
-// = {
-//   [key: string]: VolumeResult;
-// };
-
 class PipelineRunner {
   private knownMounts: KnownMounts = {};
   private taskNames: string[] = [];
@@ -75,13 +69,71 @@ class PipelineRunner {
     } else if ("try" in step) {
       await this.processTryStep(step);
     } else if ("task" in step) {
-      await this.runTask(step);
+      await this.processTaskStep(step);
     } else if ("in_parallel" in step) {
-      await this.runParallelSteps(step);
+      await this.processParallelSteps(step);
     }
   }
 
-  private async runParallelSteps(step: InParallel): Promise<void> {
+  private async getFile(file: string): Promise<string> {
+    const mountName = file.split("/")[0];
+    // check if mount exists
+    if (!this.knownMounts[mountName]) {
+      throw new Error(`Mount ${mountName} does not exist`);
+    }
+
+    const result = await this.runTask(
+      {
+        task: `get-file-${file}`,
+        config: {
+          image_resource: {
+            type: "registry-image",
+            source: {
+              repository: "busbox",
+            },
+          },
+          inputs: [
+            { name: mountName },
+          ],
+          run: {
+            path: "sh",
+            args: ["-c", `cat ${file}`],
+          },
+        },
+        assert: {
+          code: 0,
+        },
+      },
+    );
+
+    if (result.code !== 0) {
+      throw new Error(`Failed to get file ${file}`);
+    }
+
+    return result.stdout;
+  }
+
+  private async processTaskStep(step: Task): Promise<void> {
+    if ("file" in step) {
+      const contents = await this.getFile(step.file!);
+      const taskConfig = YAML.parse(contents) as TaskConfig;
+      await this.runTask({
+        task: step.task,
+        config: taskConfig,
+        assert: step.assert,
+        ensure: step.ensure,
+        on_success: step.on_success,
+        on_failure: step.on_failure,
+        on_error: step.on_error,
+        on_abort: step.on_abort,
+        timeout: step.timeout,
+      });
+    } else {
+      await this.runTask(step);
+    }
+  }
+
+  private async processParallelSteps(step: InParallel): Promise<void> {
     await this.processDoStep(step);
   }
 
@@ -290,8 +342,8 @@ class PipelineRunner {
 
     const result = await runtime.run({
       name: step.task,
-      image: step.config.image_resource.source.repository,
-      command: [step.config.run.path].concat(step.config.run.args ?? []),
+      image: step.config?.image_resource.source.repository!,
+      command: [step.config?.run.path!].concat(step.config?.run.args ?? []),
       mounts: mounts,
       stdin: stdin ?? "",
       timeout: step.timeout,
@@ -336,15 +388,15 @@ class PipelineRunner {
   private async prepareMounts(step: Task): Promise<KnownMounts> {
     const mounts: KnownMounts = {};
 
-    step.config.inputs ||= [];
-    step.config.outputs ||= [];
+    const inputs = step.config.inputs || [];
+    const outputs = step.config.outputs || [];
 
-    for (const mount of step.config.inputs) {
+    for (const mount of inputs) {
       this.knownMounts[mount.name] ||= await runtime.createVolume();
       mounts[mount.name] = this.knownMounts[mount.name];
     }
 
-    for (const mount of step.config.outputs) {
+    for (const mount of outputs) {
       this.knownMounts[mount.name] ||= await runtime.createVolume();
       mounts[mount.name] = this.knownMounts[mount.name];
     }

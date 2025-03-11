@@ -2,6 +2,7 @@ package native
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
@@ -73,7 +74,7 @@ func (n *Container) Status(ctx context.Context) (orchestra.ContainerStatus, erro
 }
 
 func (n *Native) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.Container, error) {
-	containerName := fmt.Sprintf("%s-%s", n.namespace, task.ID)
+	containerName := fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("%s-%s", n.namespace, task.ID))))
 
 	dir, err := os.MkdirTemp(n.path, containerName)
 	if err != nil {

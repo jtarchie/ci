@@ -89,7 +89,7 @@ const (
 func (c *PipelineRunner) Run(input RunInput) *RunResult {
 	ctx := c.ctx
 
-	slog.Info("pipeline.run", "input", input)
+	slog.Debug("pipeline.run", "input", input)
 
 	if input.Timeout != "" {
 		timeout, err := time.ParseDuration(input.Timeout)

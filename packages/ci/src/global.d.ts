@@ -4,7 +4,7 @@ declare global {
     command: string[];
     env?: { [key: string]: string };
     image: string;
-    mounts?: Record<string, VolumeResult>;
+    mounts?: KnownMounts;
     name: string;
     stdin?: string;
     timeout?: string;
@@ -48,6 +48,11 @@ declare global {
     function notEqual<T>(expected: T, actual: T, message?: string): void;
     function truthy(value: unknown, message?: string): void;
   }
+
+  namespace YAML {
+    function parse(text: string): object;
+    function stringify(obj: object): string;
+  }
 }
 
 // types for backwards compatibility
@@ -70,7 +75,9 @@ declare global {
   interface Task {
     task: string;
     config: TaskConfig;
-    assert: {
+    file?: string;
+
+    assert?: {
       stdout?: string;
       stderr?: string;
       code?: number | null;
@@ -173,6 +180,8 @@ declare global {
     resources: Resource[];
     jobs: Job[];
   }
+
+  type KnownMounts = Record<string, VolumeResult>;
 }
 
 export {};
