@@ -79,7 +79,7 @@ func (j *JS) Execute(ctx context.Context, source string, sandbox *PipelineRunner
 		return fmt.Errorf("could not set assert: %w", err)
 	}
 
-	err = jsVM.Set("YAML", NewYAML(j.logger))
+	err = jsVM.Set("YAML", NewYAML(jsVM, j.logger))
 	if err != nil {
 		return fmt.Errorf("could not set YAML: %w", err)
 	}
