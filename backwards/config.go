@@ -58,13 +58,14 @@ type Step struct {
 	} `yaml:"assert,omitempty"`
 
 	Task       string      `yaml:"task,omitempty"`
-	TaskConfig *TaskConfig `validate:"required_with=Task" yaml:"config,omitempty"`
+	TaskConfig *TaskConfig `yaml:"config,omitempty"`
+	File       string      `yaml:"file,omitempty"`
 
 	Get       string    `yaml:"get,omitempty"`
-	GetConfig GetConfig `validated:"required_with=Get" yaml:",inline,omitempty"`
+	GetConfig GetConfig `yaml:",inline,omitempty"`
 
 	Put       string     `yaml:"put,omitempty"`
-	PutConfig *PutConfig `validated:"required_with=Put" yaml:",inline,omitempty"`
+	PutConfig *PutConfig `yaml:",inline,omitempty"`
 
 	Do        Steps `yaml:"do,omitempty"`
 	Ensure    *Step `yaml:"ensure,omitempty"`

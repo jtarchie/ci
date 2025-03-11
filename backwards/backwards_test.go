@@ -111,4 +111,16 @@ func TestBackwardsCompatibility(t *testing.T) {
 		assert.Expect(err).To(HaveOccurred())
 		assert.Expect(err.Error()).To(ContainSubstring("Task abort-task aborted"))
 	})
+
+	t.Run("task/file", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		runner := commands.Runner{
+			Pipeline:     "fixtures/task_file.yml",
+			Orchestrator: "native",
+		}
+		err := runner.Run()
+		assert.Expect(err).ToNot(HaveOccurred())
+	})
 }
