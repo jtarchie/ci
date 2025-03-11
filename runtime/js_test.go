@@ -53,11 +53,28 @@ func TestUseContext(t *testing.T) {
 
 	js := runtime.NewJS(slog.Default())
 	err := js.Execute(ctx, `
-		function pipeline() {
+		async function pipeline() {
 			for (; true; ) {}
 		};
 
 		export { pipeline };
 	`, nil)
 	assert.Expect(err).To(HaveOccurred())
+}
+
+func TestYAMLAndAssert(t *testing.T) {
+	t.Parallel()
+
+	assert := NewGomegaWithT(t)
+
+	js := runtime.NewJS(slog.Default())
+	err := js.Execute(context.Background(), `
+		async function pipeline() {
+			const payload = YAML.parse("foo: bar");
+			assert.equal(payload.foo, "bar");
+		};
+
+		export { pipeline };
+	`, nil)
+	assert.Expect(err).ToNot(HaveOccurred())
 }
