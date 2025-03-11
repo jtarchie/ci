@@ -21,7 +21,7 @@ const pipeline = async () => {
   });
   console.log(JSON.stringify(result));
   assert.equal(result.code, 0);
-  assert.containsString("Hello, World!", result.stdout);
+  assert.containsString(result.stdout, "Hello, World!");
 };
 
 export { pipeline };

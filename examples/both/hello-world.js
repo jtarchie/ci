@@ -8,7 +8,7 @@ const pipeline = async () => {
     image: "busybox",
     command: ["echo", "Hello, World!"],
   });
-  assert.containsString("Hello, World!", result.stdout);
+  assert.containsString(result.stdout, "Hello, World!");
 };
 
 export { pipeline };
