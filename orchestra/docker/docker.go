@@ -4,8 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"os"
+	"strings"
 	"time"
 
+	"github.com/docker/cli/cli/connhelper"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
@@ -61,7 +65,33 @@ func (d *Docker) Close() error {
 }
 
 func NewDocker(namespace string) (orchestra.Driver, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	var clientOpts []client.Opt
+
+	dockerHost := os.Getenv("DOCKER_HOST")
+	if strings.HasPrefix(dockerHost, "ssh://") {
+		// https://gist.github.com/agbaraka/654a218f8ea13b3da8a47d47595f5d05
+		helper, err := connhelper.GetConnectionHelper(dockerHost)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get connection helper: %w", err)
+		}
+
+		httpClient := &http.Client{
+			Transport: &http.Transport{
+				DialContext: helper.Dialer,
+			},
+		}
+
+		clientOpts = append(clientOpts,
+			client.WithHTTPClient(httpClient),
+			client.WithHost(helper.Host),
+			client.WithDialContext(helper.Dialer),
+			client.WithAPIVersionNegotiation(),
+		)
+	} else {
+		clientOpts = append(clientOpts, client.FromEnv, client.WithAPIVersionNegotiation())
+	}
+
+	cli, err := client.NewClientWithOpts(clientOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create docker client: %w", err)
 	}
