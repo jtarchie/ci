@@ -8,7 +8,7 @@ require (
 	github.com/docker/cli v28.0.1+incompatible
 	github.com/docker/docker v28.0.1+incompatible
 	github.com/dop251/goja v0.0.0-20250309171923-bcd7cc6bf64c
-	github.com/dop251/goja_nodejs v0.0.0-20250313154628-ba888e424a3a
+	github.com/dop251/goja_nodejs v0.0.0-20250314160716-c55ecee183c0
 	github.com/evanw/esbuild v0.25.1
 	github.com/go-playground/validator/v10 v10.25.0
 	github.com/goccy/go-yaml v1.15.23
