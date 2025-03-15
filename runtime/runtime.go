@@ -31,15 +31,24 @@ func NewRuntime(
 }
 
 func (r *Runtime) Run(input RunInput) *goja.Promise {
-	promise, resolve, _ := r.jsVM.NewPromise()
+	promise, resolve, reject := r.jsVM.NewPromise()
 
 	r.promises.Add(1)
 
 	go func() {
-		result := r.sandbox.Run(input)
+		result, err := r.sandbox.Run(input)
 
 		r.tasks <- func() error {
 			defer r.promises.Done()
+
+			if err != nil {
+				err = reject(err)
+				if err != nil {
+					return fmt.Errorf("could not reject run: %w", err)
+				}
+
+				return nil
+			}
 
 			err := resolve(result)
 			if err != nil {
@@ -58,15 +67,24 @@ func (r *Runtime) CreateVolume(input VolumeInput) *goja.Promise {
 		input.Name = uuid.New().String()
 	}
 
-	promise, resolve, _ := r.jsVM.NewPromise()
+	promise, resolve, reject := r.jsVM.NewPromise()
 
 	r.promises.Add(1)
 
 	go func() {
-		result := r.sandbox.CreateVolume(input)
+		result, err := r.sandbox.CreateVolume(input)
 
 		r.tasks <- func() error {
 			defer r.promises.Done()
+
+			if err != nil {
+				err = reject(err)
+				if err != nil {
+					return fmt.Errorf("could not reject run: %w", err)
+				}
+
+				return nil
+			}
 
 			err := resolve(result)
 			if err != nil {

@@ -340,41 +340,48 @@ class PipelineRunner {
   private async runTask(step: Task, stdin?: string): Promise<RunTaskResult> {
     const mounts = await this.prepareMounts(step);
 
-    const result = await runtime.run({
-      name: step.task,
-      image: step.config?.image_resource.source.repository!,
-      command: [step.config?.run.path!].concat(step.config?.run.args ?? []),
-      mounts: mounts,
-      stdin: stdin ?? "",
-      timeout: step.timeout,
-    });
-
-    this.validateTaskResult(step, result);
     this.taskNames.push(step.task);
 
-    if (result.code === 0 && result.status == "complete" && step.on_success) {
-      await this.processStep(step.on_success);
-    } else if (
-      result.code !== 0 && result.status == "complete" && step.on_failure
-    ) {
-      await this.processStep(step.on_failure);
-    } else if (result.status == "error" && step.on_error) {
-      await this.processStep(step.on_error);
-    } else if (result.status == "abort" && step.on_abort) {
-      await this.processStep(step.on_abort);
-    }
+    let result: RunTaskResult;
 
-    if (step.ensure) {
-      await this.processStep(step.ensure);
+    try {
+      result = await runtime.run({
+        name: step.task,
+        image: step.config?.image_resource.source.repository!,
+        command: [step.config?.run.path!].concat(step.config?.run.args ?? []),
+        mounts: mounts,
+        stdin: stdin ?? "",
+        timeout: step.timeout,
+      });
+
+      this.validateTaskResult(step, result);
+
+      if (result.code === 0 && result.status == "complete" && step.on_success) {
+        await this.processStep(step.on_success);
+      } else if (
+        result.code !== 0 && result.status == "complete" && step.on_failure
+      ) {
+        await this.processStep(step.on_failure);
+      } else if (result.status == "abort" && step.on_abort) {
+        await this.processStep(step.on_abort);
+      }
+
+      if (step.ensure) {
+        await this.processStep(step.ensure);
+      }
+    } catch (error) {
+      if (step.on_error) {
+        await this.processStep(step.on_error);
+      }
+
+      throw new TaskErrored(
+        `Task ${step.task} errored with message ${error}`,
+      );
     }
 
     if (result.code > 0) {
       throw new TaskFailure(
         `Task ${step.task} failed with code ${result.code}`,
-      );
-    } else if (result.status == "error") {
-      throw new TaskErrored(
-        `Task ${step.task} errored with message ${result.message}`,
       );
     } else if (result.status == "abort") {
       throw new TaskAbort(
