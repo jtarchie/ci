@@ -48,6 +48,11 @@ func (j *JS) Execute(ctx context.Context, source string, client orchestra.Driver
 	// split lines
 	lines := strings.Split(strings.TrimSpace(string(result.Code)), "\n")
 
+	if len(lines) == 0 {
+		//nolint: err113
+		return errors.New("could not find source map")
+	}
+
 	var sourceMap string
 	sourceMap, lines = lines[len(lines)-1], lines[:len(lines)-1]
 	finalSource := "{(function() { const module = {}; " + strings.Join(lines, "\n") +
@@ -112,6 +117,10 @@ func (j *JS) Execute(ctx context.Context, source string, client orchestra.Driver
 		return fmt.Errorf("could not run pipeline: %w", err)
 	}
 
+	if value == nil {
+		return fmt.Errorf("pipeline returned nil: %w", ErrPipelineReturnedNonPromise)
+	}
+
 	promise, ok := value.Export().(*goja.Promise)
 	if !ok {
 		return fmt.Errorf("pipeline did not return a promise: %w", ErrPipelineNotFunction)
@@ -138,4 +147,7 @@ func (j *JS) Execute(ctx context.Context, source string, client orchestra.Driver
 	return nil
 }
 
-var ErrPipelineNotFunction = errors.New("pipeline is not a function")
+var (
+	ErrPipelineNotFunction        = errors.New("pipeline is not a function")
+	ErrPipelineReturnedNonPromise = errors.New("pipeline did not return a promise")
+)
