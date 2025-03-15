@@ -6,7 +6,7 @@ set -euo pipefail
 SSH_KEY_NAME="docker-droplet-key"
 SSH_KEY_PATH="$HOME/.ssh/$SSH_KEY_NAME"
 DROPLET_NAME="docker"
-DROPLET_SIZE="s-4vcpu-8gb"
+DROPLET_SIZE="s-1vcpu-1gb"
 DROPLET_IMAGE="docker-20-04"
 # Get current external IP address
 IP_WHITELIST=$(curl -s https://api.ipify.org || curl -s https://ifconfig.me || curl -s https://icanhazip.com)
@@ -31,11 +31,20 @@ else
   DO_SSH_KEY_ID=$EXISTING_KEY_ID
 fi
 
+# Create user-data script
+USER_DATA=$(cat <<EOF
+#!/bin/bash
+sudo ufw insert 1 allow from ${IP_WHITELIST} to any port 22
+sudo ufw --force enable
+EOF
+)
+
 echo "Creating Digital Ocean droplet..."
 DROPLET_DATA=$(doctl compute droplet create "$DROPLET_NAME" \
   --image "$DROPLET_IMAGE" \
   --size "$DROPLET_SIZE" \
   --ssh-keys "$DO_SSH_KEY_ID" \
+  --user-data "$USER_DATA" \
   --format ID,PublicIPv4 \
   --no-header \
   --wait)
@@ -54,15 +63,9 @@ until ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 "root@$DROPLET_IP" ech
   sleep 5
 done
 
-echo "Setting up firewall rules..."
-ssh -o StrictHostKeyChecking=no "root@$DROPLET_IP" "sudo ufw insert 1 allow from $IP_WHITELIST to any port 22 && sudo ufw --force enable"
-
 echo "Setting up Docker host environment..."
 export DOCKER_HOST="ssh://root@$DROPLET_IP"
 echo "Docker host set to: $DOCKER_HOST"
 
 echo "Running tests..."
-task
-
-echo "Done! To clean up the droplet when finished, run:"
-echo "doctl compute droplet delete $DROPLET_ID"
+task; doctl compute droplet delete "$DROPLET_ID"
