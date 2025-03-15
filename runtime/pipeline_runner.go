@@ -48,6 +48,8 @@ func (c *PipelineRunner) CreateVolume(input VolumeInput) *VolumeResult {
 
 	volume, err := c.client.CreateVolume(ctx, input.Name, input.Size)
 	if err != nil {
+		slog.Error("volume.create", "err", err)
+
 		return &VolumeResult{
 			Error: fmt.Sprintf("could not create volume: %s", err),
 		}

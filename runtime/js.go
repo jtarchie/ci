@@ -12,6 +12,7 @@ import (
 	"github.com/dop251/goja_nodejs/console"
 	"github.com/dop251/goja_nodejs/require"
 	"github.com/evanw/esbuild/pkg/api"
+	"github.com/jtarchie/ci/orchestra"
 )
 
 type JS struct {
@@ -24,7 +25,9 @@ func NewJS(logger *slog.Logger) *JS {
 	}
 }
 
-func (j *JS) Execute(ctx context.Context, source string, sandbox *PipelineRunner) error {
+func (j *JS) Execute(ctx context.Context, source string, client orchestra.Driver) error {
+	sandbox := NewPipelineRunner(ctx, client, j.logger)
+
 	result := api.Transform(source, api.TransformOptions{
 		Loader:     api.LoaderTS,
 		Format:     api.FormatCommonJS,
