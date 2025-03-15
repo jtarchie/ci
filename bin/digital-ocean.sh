@@ -12,6 +12,17 @@ DROPLET_IMAGE="docker-20-04"
 IP_WHITELIST=$(curl -s https://api.ipify.org || curl -s https://ifconfig.me || curl -s https://icanhazip.com)
 echo "Detected external IP: $IP_WHITELIST"
 
+# Function to clean up droplet
+cleanup() {
+  if [[ -n "${DROPLET_ID:-}" ]]; then
+    echo "Cleaning up droplet with ID: $DROPLET_ID"
+    doctl compute droplet delete "$DROPLET_ID" --force
+  fi
+}
+
+# Set trap to ensure cleanup runs on exit
+trap cleanup EXIT
+
 # Check if SSH key exists locally
 if [ ! -f "$SSH_KEY_PATH" ]; then
   echo "Generating SSH key..."
@@ -55,17 +66,25 @@ DROPLET_IP=$(echo "$DROPLET_DATA" | awk '{print $2}')
 echo "Droplet created with IP: $DROPLET_IP"
 
 echo "Adding SSH key to agent..."
-ssh-add -l | grep -q "$SSH_KEY_PATH" || ssh-add "$SSH_KEY_PATH"
+ssh-add "$SSH_KEY_PATH"
+
+sleep 10
 
 echo "Waiting for SSH to be available..."
 until ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 "root@$DROPLET_IP" echo "SSH is up"; do
   echo "Waiting for SSH connection..."
-  sleep 5
+  sleep 10
 done
 
 echo "Setting up Docker host environment..."
 export DOCKER_HOST="ssh://root@$DROPLET_IP"
 echo "Docker host set to: $DOCKER_HOST"
 
+echo "Running Docker commands..."
+until docker ps -a > /dev/null; do
+  echo "Waiting for Docker to be available..."
+  sleep 10
+done
+
 echo "Running tests..."
-task; doctl compute droplet delete "$DROPLET_ID"
+task
