@@ -37,10 +37,9 @@ type VolumeInput struct {
 
 type VolumeResult struct {
 	orchestra.Volume `json:"volume,omitempty"`
-	Error            string `json:"error,omitempty"`
 }
 
-func (c *PipelineRunner) CreateVolume(input VolumeInput) *VolumeResult {
+func (c *PipelineRunner) CreateVolume(input VolumeInput) (*VolumeResult, error) {
 	ctx := c.ctx
 
 	logger := c.logger
@@ -48,16 +47,14 @@ func (c *PipelineRunner) CreateVolume(input VolumeInput) *VolumeResult {
 
 	volume, err := c.client.CreateVolume(ctx, input.Name, input.Size)
 	if err != nil {
-		slog.Error("volume.create", "err", err)
+		logger.Error("volume.create", "err", err)
 
-		return &VolumeResult{
-			Error: fmt.Sprintf("could not create volume: %s", err),
-		}
+		return nil, fmt.Errorf("could not create volume: %w", err)
 	}
 
 	return &VolumeResult{
 		Volume: volume,
-	}
+	}, nil
 }
 
 type RunResult struct {
@@ -65,8 +62,7 @@ type RunResult struct {
 	Stderr string `json:"stderr"`
 	Stdout string `json:"stdout"`
 
-	Message string    `json:"message"`
-	Status  RunStatus `json:"status"`
+	Status RunStatus `json:"status"`
 }
 
 type RunInput struct {
@@ -83,12 +79,11 @@ type RunInput struct {
 type RunStatus string
 
 const (
-	RunError    RunStatus = "error"
 	RunAbort    RunStatus = "abort"
 	RunComplete RunStatus = "complete"
 )
 
-func (c *PipelineRunner) Run(input RunInput) *RunResult {
+func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 	ctx := c.ctx
 
 	slog.Debug("pipeline.run", "input", input)
@@ -96,10 +91,7 @@ func (c *PipelineRunner) Run(input RunInput) *RunResult {
 	if input.Timeout != "" {
 		timeout, err := time.ParseDuration(input.Timeout)
 		if err != nil {
-			return &RunResult{
-				Status:  RunError,
-				Message: fmt.Sprintf("could not parse timeout: %s", err),
-			}
+			return nil, fmt.Errorf("could not parse timeout: %w", err)
 		}
 
 		if timeout > 0 {
@@ -111,10 +103,7 @@ func (c *PipelineRunner) Run(input RunInput) *RunResult {
 
 	taskID, err := uuid.NewV7()
 	if err != nil {
-		return &RunResult{
-			Status:  RunError,
-			Message: fmt.Sprintf("could not generate uuid: %s", err),
-		}
+		return nil, fmt.Errorf("could not generate uuid: %w", err)
 	}
 
 	logger := c.logger.With("taskID", taskID)
@@ -143,18 +132,13 @@ func (c *PipelineRunner) Run(input RunInput) *RunResult {
 		},
 	)
 	if err != nil {
-		status := RunError
-
 		logger.Error("container.run", "err", err)
 
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
-			status = RunAbort
+			return &RunResult{Status: RunAbort}, nil
 		}
 
-		return &RunResult{
-			Status:  status,
-			Message: fmt.Sprintf("could not run container: %s", err),
-		}
+		return nil, fmt.Errorf("could not run container: %w", err)
 	}
 
 	var containerStatus orchestra.ContainerStatus
@@ -164,16 +148,11 @@ func (c *PipelineRunner) Run(input RunInput) *RunResult {
 
 		containerStatus, err = container.Status(ctx)
 		if err != nil {
-			status := RunError
-
 			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
-				status = RunAbort
+				return &RunResult{Status: RunAbort}, nil
 			}
 
-			return &RunResult{
-				Status:  status,
-				Message: fmt.Sprintf("could not get container status: %s", err),
-			}
+			return nil, fmt.Errorf("could not get container status: %w", err)
 		}
 
 		if containerStatus.IsDone() {
@@ -196,16 +175,11 @@ func (c *PipelineRunner) Run(input RunInput) *RunResult {
 	if err != nil {
 		logger.Error("container.logs", "err", err)
 
-		status := RunError
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
-			status = RunAbort
+			return &RunResult{Status: RunAbort}, nil
 		}
 
-		return &RunResult{
-			Code:    containerStatus.ExitCode(),
-			Status:  status,
-			Message: fmt.Sprintf("could not get container logs: %s", err),
-		}
+		return nil, fmt.Errorf("could not get container logs: %w", err)
 	}
 
 	return &RunResult{
@@ -213,5 +187,5 @@ func (c *PipelineRunner) Run(input RunInput) *RunResult {
 		Stdout: stdout.String(),
 		Stderr: stderr.String(),
 		Code:   containerStatus.ExitCode(),
-	}
+	}, nil
 }
