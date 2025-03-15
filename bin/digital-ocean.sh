@@ -46,7 +46,7 @@ fi
 USER_DATA=$(cat <<EOF
 #!/bin/bash
 sudo ufw insert 1 allow from ${IP_WHITELIST} to any port 22
-sudo ufw --force enable
+sudo ufw reload
 EOF
 )
 
