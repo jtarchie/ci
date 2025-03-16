@@ -1,5 +1,10 @@
 # CI
 
+Design principles:
+
+- Designed to be local first.
+- Runtime is accessible, not abstracted away.
+
 <!-- deno-fmt-ignore-start -->
 > [!IMPORTANT]
 > This is a work in progress. It will change.
