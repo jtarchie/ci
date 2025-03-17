@@ -6,7 +6,10 @@ const pipeline = async () => {
   const result = await runtime.run({
     name: "simple-task",
     image: "busybox",
-    command: ["echo", "Hello, World!"],
+    command: {
+      path: "echo",
+      args: ["Hello, World!"],
+    },
   });
   assert.containsString(result.stdout, "Hello, World!");
 };

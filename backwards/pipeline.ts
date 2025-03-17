@@ -348,7 +348,10 @@ class PipelineRunner {
       result = await runtime.run({
         name: step.task,
         image: step.config?.image_resource.source.repository!,
-        command: [step.config?.run.path!].concat(step.config?.run.args ?? []),
+        command: {
+          path: step.config.run.path,
+          args: step.config.run.args || [],
+        },
         mounts: mounts,
         stdin: stdin ?? "",
         timeout: step.timeout,

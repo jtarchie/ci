@@ -66,12 +66,15 @@ type RunResult struct {
 }
 
 type RunInput struct {
-	Command []string                `json:"command"`
-	Env     map[string]string       `json:"env"`
-	Image   string                  `json:"image"`
-	Mounts  map[string]VolumeResult `json:"mounts"`
-	Name    string                  `json:"name"`
-	Stdin   string                  `json:"stdin"`
+	Command struct {
+		Path string   `json:"path"`
+		Args []string `json:"args"`
+	} `json:"command"`
+	Env    map[string]string       `json:"env"`
+	Image  string                  `json:"image"`
+	Mounts map[string]VolumeResult `json:"mounts"`
+	Name   string                  `json:"name"`
+	Stdin  string                  `json:"stdin"`
 	// has to be string because goja doesn't support string -> time.Duration
 	Timeout string `json:"timeout"`
 }
@@ -120,10 +123,13 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 
 	logger.Debug("container.run", "mounts", mounts)
 
+	command := []string{input.Command.Path}
+	command = append(command, input.Command.Args...)
+
 	container, err := c.client.RunContainer(
 		ctx,
 		orchestra.Task{
-			Command: input.Command,
+			Command: command,
 			Env:     input.Env,
 			ID:      fmt.Sprintf("%s-%s", input.Name, taskID.String()),
 			Image:   input.Image,
