@@ -2,6 +2,7 @@ package orchestra_test
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -14,9 +15,15 @@ import (
 )
 
 func TestDrivers(t *testing.T) {
+	t.Parallel()
+
 	orchestra.Each(func(name string, init orchestra.InitFunc) {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			t.Run("with stdin", func(t *testing.T) {
+				t.Parallel()
+
 				assert := NewGomegaWithT(t)
 
 				client, err := init("test-" + uuid.NewString())
@@ -59,6 +66,8 @@ func TestDrivers(t *testing.T) {
 			})
 
 			t.Run("exit code failed", func(t *testing.T) {
+				t.Parallel()
+
 				assert := NewGomegaWithT(t)
 
 				client, err := init("test-" + uuid.NewString())
@@ -97,6 +106,8 @@ func TestDrivers(t *testing.T) {
 			})
 
 			t.Run("happy path", func(t *testing.T) {
+				t.Parallel()
+
 				assert := NewGomegaWithT(t)
 
 				client, err := init("test-" + uuid.NewString())
@@ -168,6 +179,8 @@ func TestDrivers(t *testing.T) {
 			})
 
 			t.Run("volume", func(t *testing.T) {
+				t.Parallel()
+
 				assert := NewGomegaWithT(t)
 
 				client, err := init("test-" + uuid.NewString())
@@ -232,7 +245,9 @@ func TestDrivers(t *testing.T) {
 			})
 
 			t.Run("environment variables", func(t *testing.T) {
-				t.Setenv("IGNORE", "ME")
+				t.Parallel()
+
+				os.Setenv("IGNORE", "ME") //nolint: usetesting
 
 				assert := NewGomegaWithT(t)
 
