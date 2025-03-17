@@ -85,14 +85,14 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 
 	reader, err := d.client.ImagePull(ctx, task.Image, image.PullOptions{})
 	if err != nil {
-		logger.Error("image.pull", "image", task.Image, "error", err)
+		logger.Error("image.pull", "image", task.Image, "err", err)
 
 		return nil, fmt.Errorf("failed to initiate pull image: %w", err)
 	}
 
 	_, err = io.Copy(io.Discard, reader)
 	if err != nil {
-		logger.Error("image.pull", "image", task.Image, "error", err)
+		logger.Error("image.pull", "image", task.Image, "err", err)
 
 		return nil, fmt.Errorf("failed to pull image: %w", err)
 	}
@@ -105,7 +105,7 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 	for _, m := range task.Mounts {
 		volume, err := d.CreateVolume(ctx, m.Name, 0)
 		if err != nil {
-			logger.Error("volume.create", "name", m.Name, "error", err)
+			logger.Error("volume.create", "name", m.Name, "err", err)
 
 			return nil, fmt.Errorf("failed to create volume: %w", err)
 		}
@@ -146,14 +146,14 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 		containerName,
 	)
 	if err != nil && errdefs.IsConflict(err) {
-		logger.Error("container.create", "name", containerName, "error", err, "conflict", true)
+		logger.Error("container.create", "name", containerName, "err", err, "conflict", true)
 
 		filter := filters.NewArgs()
 		filter.Add("name", containerName)
 
 		containers, err := d.client.ContainerList(ctx, container.ListOptions{Filters: filter, All: true})
 		if err != nil {
-			logger.Error("container.list", "name", containerName, "error", err)
+			logger.Error("container.list", "name", containerName, "err", err)
 
 			return nil, fmt.Errorf("failed to list containers: %w", err)
 		}
@@ -168,7 +168,7 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 			task:   task,
 		}, nil
 	} else if err != nil {
-		logger.Error("container.create", "name", containerName, "error", err)
+		logger.Error("container.create", "name", containerName, "err", err)
 
 		return nil, fmt.Errorf("failed to create container: %w", err)
 	}
@@ -189,7 +189,7 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 
 		_, err = io.Copy(conn.Conn, task.Stdin)
 		if err != nil {
-			logger.Error("container.stdin", "name", containerName, "error", err)
+			logger.Error("container.stdin", "name", containerName, "err", err)
 
 			return nil, fmt.Errorf("failed to write to container stdin: %w", err)
 		}
@@ -197,7 +197,7 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 
 	err = d.client.ContainerStart(ctx, response.ID, container.StartOptions{})
 	if err != nil {
-		logger.Error("container.start", "name", containerName, "error", err)
+		logger.Error("container.start", "name", containerName, "err", err)
 
 		return nil, fmt.Errorf("failed to start container: %w", err)
 	}

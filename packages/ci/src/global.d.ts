@@ -18,7 +18,7 @@ declare global {
     stderr: string;
     stdout: string;
 
-    status: "complete" | "error" | "abort";
+    status: "complete" | "abort";
     message: string;
   }
 
