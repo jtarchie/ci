@@ -4,6 +4,7 @@ declare global {
     command: {
       path: string;
       args?: string[];
+      user?: string;
     };
     env?: { [key: string]: string };
     image: string;
@@ -71,6 +72,7 @@ declare global {
     run: {
       path: string;
       args?: string[];
+      user?: string;
     };
     params?: { [key: string]: string };
   }

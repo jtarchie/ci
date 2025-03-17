@@ -11,6 +11,7 @@ type ImageResource struct {
 type TaskConfigRun struct {
 	Args []string `yaml:"args,omitempty"`
 	Path string   `validate:"required"   yaml:"path,omitempty"`
+	User string   `yaml:"user,omitempty"`
 }
 
 type Input struct {
