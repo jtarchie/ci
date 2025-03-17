@@ -88,8 +88,7 @@ const (
 
 func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 	ctx := c.ctx
-
-	slog.Debug("pipeline.run", "input", input)
+	logger := c.logger
 
 	if input.Timeout != "" {
 		timeout, err := time.ParseDuration(input.Timeout)
@@ -109,9 +108,9 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 		return nil, fmt.Errorf("could not generate uuid: %w", err)
 	}
 
-	logger := c.logger.With("taskID", taskID)
+	logger = c.logger.With("taskID", taskID, "name", input.Name)
 
-	logger.Debug("container.run", "input", input)
+	logger.Debug("container.run")
 
 	var mounts orchestra.Mounts
 	for path, volume := range input.Mounts {
