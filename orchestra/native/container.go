@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -115,6 +116,14 @@ func (n *Native) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 
 	if task.Stdin != nil {
 		command.Stdin = task.Stdin
+	}
+
+	if task.Image != "" {
+		slog.Debug("orchestra.native", "warn", "image is not supported in native mode", "image", task.Image)
+	}
+
+	if task.User != "" {
+		slog.Debug("orchestra.native", "warn", "user is not supported in native mode", "user", task.User)
 	}
 
 	go func() {
