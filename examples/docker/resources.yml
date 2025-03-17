@@ -9,11 +9,11 @@ resources:
     source:
       force_version: "2025"
 jobs:
-  - name: some-job
+  - name: handle-resources
     public: true
     plan:
       - get: test-resource
-      - task: simple-task
+      - task: check-version
         config:
           platform: linux
           inputs:
@@ -41,3 +41,11 @@ jobs:
             args: ["-c", "cat ./test-resource/version"]
         assert:
           stdout: "2026"
+    assert:
+      execution:
+        - check-test-resource
+        - get-test-resource
+        - check-version
+        - put-test-resource
+        - get-test-resource
+        - check-updated-version
