@@ -1,0 +1,16 @@
+jobs:
+  - name: show-user
+    plan:
+      - task: show-user
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: busybox
+          run:
+            path: whoami
+            user: root
+        assert:
+          stdout: "root"
+          code: 0

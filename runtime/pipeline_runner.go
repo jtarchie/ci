@@ -69,6 +69,7 @@ type RunInput struct {
 	Command struct {
 		Path string   `json:"path"`
 		Args []string `json:"args"`
+		User string   `json:"user"`
 	} `json:"command"`
 	Env    map[string]string       `json:"env"`
 	Image  string                  `json:"image"`
@@ -134,6 +135,7 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 			Image:   input.Image,
 			Mounts:  mounts,
 			Stdin:   strings.NewReader(input.Stdin),
+			User:    input.Command.User,
 		},
 	)
 	if err != nil {
