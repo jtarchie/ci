@@ -28,7 +28,7 @@ func NewAssert(vm *goja.Runtime, logger *slog.Logger) *Assert {
 var ErrAssertion = errors.New("assertion failed")
 
 func (a *Assert) fail(message string) {
-	a.logger.Debug("assertion failed", "error", message)
+	a.logger.Debug("assertion failed", "err", message)
 	a.vm.Interrupt(fmt.Errorf("%w: %s", ErrAssertion, message))
 }
 
@@ -71,7 +71,7 @@ func (a *Assert) ContainsString(str, substr string, message ...string) {
 
 	matcher, err := regexp.Compile(substr)
 	if err != nil {
-		a.logger.Debug("invalid regular expression", "error", err)
+		a.logger.Debug("invalid regular expression", "err", err)
 		a.fail(fmt.Sprintf("invalid regular expression: %s", err))
 
 		return

@@ -24,7 +24,7 @@ func (y *YAML) Parse(source string) interface{} {
 
 	err := yaml.Unmarshal([]byte(source), &payload)
 	if err != nil {
-		y.logger.Debug("yaml.parse", "error", err)
+		y.logger.Debug("yaml.parse", "err", err)
 		y.vm.Interrupt(err)
 
 		return nil

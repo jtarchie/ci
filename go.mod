@@ -13,6 +13,7 @@ require (
 	github.com/go-playground/validator/v10 v10.25.0
 	github.com/goccy/go-yaml v1.15.23
 	github.com/google/uuid v1.6.0
+	github.com/lmittmann/tint v1.0.7
 	github.com/onsi/gomega v1.36.2
 )
 
