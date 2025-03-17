@@ -11,7 +11,7 @@ require (
 	github.com/dop251/goja_nodejs v0.0.0-20250314160716-c55ecee183c0
 	github.com/evanw/esbuild v0.25.1
 	github.com/go-playground/validator/v10 v10.25.0
-	github.com/goccy/go-yaml v1.15.23
+	github.com/goccy/go-yaml v1.16.0
 	github.com/google/uuid v1.6.0
 	github.com/lmittmann/tint v1.0.7
 	github.com/onsi/gomega v1.36.2
@@ -35,7 +35,7 @@ require (
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/pprof v0.0.0-20250315033105-103756e64e1d // indirect
+	github.com/google/pprof v0.0.0-20250317173921-a4b03ec1a45e // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/term v0.5.0 // indirect
