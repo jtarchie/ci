@@ -83,7 +83,7 @@ func (c *Runner) Run() error {
 		return fmt.Errorf("could not get orchestrator (%q): %w", c.Orchestrator, ErrOrchestratorNotFound)
 	}
 
-	client, err := orchestrator("ci-" + uuid.New().String())
+	client, err := orchestrator("ci-"+uuid.New().String(), logger)
 	if err != nil {
 		return fmt.Errorf("could not create docker client: %w", err)
 	}

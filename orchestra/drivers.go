@@ -1,6 +1,8 @@
 package orchestra
 
-type InitFunc func(string) (Driver, error)
+import "log/slog"
+
+type InitFunc func(string, *slog.Logger) (Driver, error)
 
 var drivers = map[string]InitFunc{}
 

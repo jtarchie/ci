@@ -2,12 +2,14 @@ package native
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/jtarchie/ci/orchestra"
 )
 
 type Native struct {
+	logger    *slog.Logger
 	namespace string
 	path      string
 }
@@ -22,13 +24,14 @@ func (n *Native) Close() error {
 	return nil
 }
 
-func NewNative(namespace string) (orchestra.Driver, error) {
+func NewNative(namespace string, logger *slog.Logger) (orchestra.Driver, error) {
 	path, err := os.MkdirTemp("", namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp dir: %w", err)
 	}
 
 	return &Native{
+		logger:    logger,
 		namespace: namespace,
 		path:      path,
 	}, nil
