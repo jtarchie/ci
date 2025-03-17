@@ -3,7 +3,10 @@ const pipeline = async () => {
   let result = await runtime.run({
     name: "simple-task",
     image: "busybox",
-    command: ["sh", "-c", "echo Hello, World! > ./mounted-volume/hello.txt"],
+    command: {
+      path: "sh",
+      args: ["-c", "echo Hello, World! > ./mounted-volume/hello.txt"],
+    },
     mounts: {
       "mounted-volume": volume,
     },
@@ -14,7 +17,10 @@ const pipeline = async () => {
   result = await runtime.run({
     name: "simple-task",
     image: "busybox",
-    command: ["cat", "./mounted-volume/hello.txt"],
+    command: {
+      path: "cat",
+      args: ["./mounted-volume/hello.txt"],
+    },
     mounts: {
       "mounted-volume": volume,
     },

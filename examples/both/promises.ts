@@ -3,12 +3,18 @@ const pipeline = async () => {
     runtime.run({
       name: "simple-task",
       image: "busybox",
-      command: ["echo", "Hello, World!"],
+      command: {
+        path: "echo",
+        args: ["Hello, World!"],
+      },
     }),
     runtime.run({
       name: "simple-task",
       image: "busybox",
-      command: ["echo", "Hello, Bob!"],
+      command: {
+        path: "echo",
+        args: ["Hello, Bob!"],
+      },
     }),
   ]);
   assert.containsString(results[0].stdout, "Hello, World!");

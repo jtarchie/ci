@@ -1,7 +1,10 @@
 // types for the pipeline
 declare global {
   interface RunTaskConfig {
-    command: string[];
+    command: {
+      path: string;
+      args?: string[];
+    };
     env?: { [key: string]: string };
     image: string;
     mounts?: KnownMounts;
