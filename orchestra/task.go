@@ -9,6 +9,7 @@ type Mount struct {
 
 type Mounts []Mount
 
+// across all drivers.
 type Task struct {
 	Command []string
 	Env     map[string]string
@@ -16,4 +17,5 @@ type Task struct {
 	Image   string
 	Mounts  Mounts
 	Stdin   io.Reader
+	User    string
 }

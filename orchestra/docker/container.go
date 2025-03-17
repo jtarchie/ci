@@ -128,6 +128,7 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 			WorkingDir: filepath.Join("/tmp", containerName),
 			OpenStdin:  enabledStdin,
 			StdinOnce:  enabledStdin,
+			User:       task.User,
 		},
 		&container.HostConfig{
 			Mounts: mounts,
