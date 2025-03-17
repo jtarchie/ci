@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -75,6 +74,8 @@ func (n *Container) Status(ctx context.Context) (orchestra.ContainerStatus, erro
 }
 
 func (n *Native) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.Container, error) {
+	logger := n.logger.With("taskID", task.ID)
+
 	containerName := fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("%s-%s", n.namespace, task.ID))))
 
 	dir, err := os.MkdirTemp(n.path, containerName)
@@ -85,6 +86,8 @@ func (n *Native) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 	for _, mount := range task.Mounts {
 		volume, err := n.CreateVolume(ctx, mount.Name, 0)
 		if err != nil {
+			logger.Error("volume.create", "name", mount.Name, "error", err)
+
 			return nil, fmt.Errorf("failed to create volume: %w", err)
 		}
 
@@ -92,6 +95,8 @@ func (n *Native) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 
 		err = os.Symlink(nativeVolume.path, filepath.Join(dir, mount.Path))
 		if err != nil {
+			logger.Error("volume.create", "name", mount.Name, "error", err)
+
 			return nil, fmt.Errorf("failed to create symlink: %w", err)
 		}
 	}
@@ -119,16 +124,17 @@ func (n *Native) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 	}
 
 	if task.Image != "" {
-		slog.Debug("orchestra.native", "warn", "image is not supported in native mode", "image", task.Image)
+		logger.Debug("orchestra.native", "warn", "image is not supported in native mode", "image", task.Image)
 	}
 
 	if task.User != "" {
-		slog.Debug("orchestra.native", "warn", "user is not supported in native mode", "user", task.User)
+		logger.Debug("orchestra.native", "warn", "user is not supported in native mode", "user", task.User)
 	}
 
 	go func() {
 		err := command.Run()
 		if err != nil {
+			logger.Error("orchestra.native", "error", err)
 			errChan <- fmt.Errorf("failed to run command: %w", err)
 
 			return
