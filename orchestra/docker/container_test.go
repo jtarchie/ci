@@ -2,6 +2,7 @@ package docker_test
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -20,7 +21,7 @@ func TestDocker(t *testing.T) {
 
 		assert := NewGomegaWithT(t)
 
-		client, err := docker.NewDocker("test-" + uuid.NewString())
+		client, err := docker.NewDocker("test-"+uuid.NewString(), slog.Default())
 		assert.Expect(err).NotTo(HaveOccurred())
 		defer client.Close()
 

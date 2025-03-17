@@ -2,6 +2,7 @@ package orchestra_test
 
 import (
 	"context"
+	"log/slog"
 	"os"
 	"strings"
 	"testing"
@@ -26,7 +27,7 @@ func TestDrivers(t *testing.T) {
 
 				assert := NewGomegaWithT(t)
 
-				client, err := init("test-" + uuid.NewString())
+				client, err := init("test-"+uuid.NewString(), slog.Default())
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer client.Close()
 
@@ -70,7 +71,7 @@ func TestDrivers(t *testing.T) {
 
 				assert := NewGomegaWithT(t)
 
-				client, err := init("test-" + uuid.NewString())
+				client, err := init("test-"+uuid.NewString(), slog.Default())
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer client.Close()
 
@@ -110,7 +111,7 @@ func TestDrivers(t *testing.T) {
 
 				assert := NewGomegaWithT(t)
 
-				client, err := init("test-" + uuid.NewString())
+				client, err := init("test-"+uuid.NewString(), slog.Default())
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer client.Close()
 
@@ -183,7 +184,7 @@ func TestDrivers(t *testing.T) {
 
 				assert := NewGomegaWithT(t)
 
-				client, err := init("test-" + uuid.NewString())
+				client, err := init("test-"+uuid.NewString(), slog.Default())
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer client.Close()
 
@@ -251,7 +252,7 @@ func TestDrivers(t *testing.T) {
 
 				assert := NewGomegaWithT(t)
 
-				client, err := init("test-" + uuid.NewString())
+				client, err := init("test-"+uuid.NewString(), slog.Default())
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer client.Close()
 

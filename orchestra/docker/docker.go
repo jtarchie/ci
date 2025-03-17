@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -19,6 +20,7 @@ import (
 
 type Docker struct {
 	client    *client.Client
+	logger    *slog.Logger
 	namespace string
 }
 
@@ -64,7 +66,7 @@ func (d *Docker) Close() error {
 	return nil
 }
 
-func NewDocker(namespace string) (orchestra.Driver, error) {
+func NewDocker(namespace string, logger *slog.Logger) (orchestra.Driver, error) {
 	var clientOpts []client.Opt
 
 	dockerHost := os.Getenv("DOCKER_HOST")
@@ -98,6 +100,7 @@ func NewDocker(namespace string) (orchestra.Driver, error) {
 
 	return &Docker{
 		client:    cli,
+		logger:    logger,
 		namespace: namespace,
 	}, nil
 }
