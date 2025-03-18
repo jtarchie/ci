@@ -10,6 +10,7 @@ declare global {
     image: string;
     mounts?: KnownMounts;
     name: string;
+    privileged?: boolean;
     stdin?: string;
     timeout?: string;
   }
@@ -81,6 +82,7 @@ declare global {
     task: string;
     config: TaskConfig;
     file?: string;
+    privileged?: boolean;
 
     assert?: {
       stdout?: string;

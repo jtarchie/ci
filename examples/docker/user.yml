@@ -14,3 +14,18 @@ jobs:
         assert:
           stdout: "root"
           code: 0
+      - task: show-privileged-user
+        privileged: true
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: busybox
+          run:
+            path: ls
+            args:
+              - -l
+              - /dev/kmsg
+        assert:
+          code: 0
