@@ -59,4 +59,38 @@ func TestDocker(t *testing.T) {
 		err = client.Close()
 		assert.Expect(err).NotTo(HaveOccurred())
 	})
+
+	t.Run("with privileged", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+
+		client, err := docker.NewDocker("test-"+uuid.NewString(), slog.Default())
+		assert.Expect(err).NotTo(HaveOccurred())
+		defer client.Close()
+
+		taskID, err := uuid.NewV7()
+		assert.Expect(err).NotTo(HaveOccurred())
+
+		container, err := client.RunContainer(
+			context.Background(),
+			orchestra.Task{
+				ID:         taskID.String(),
+				Image:      "busybox",
+				Command:    []string{"ls", "-l", "/dev/kmsg"},
+				Privileged: true,
+			},
+		)
+		assert.Expect(err).NotTo(HaveOccurred())
+
+		assert.Eventually(func() bool {
+			status, err := container.Status(context.Background())
+			assert.Expect(err).NotTo(HaveOccurred())
+
+			return status.IsDone() && status.ExitCode() == 0
+		}, "10s").Should(BeTrue())
+
+		err = client.Close()
+		assert.Expect(err).NotTo(HaveOccurred())
+	})
 }

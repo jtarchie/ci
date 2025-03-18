@@ -27,7 +27,7 @@ type Docker struct {
 // Close implements orchestra.Driver.
 func (d *Docker) Close() error {
 	// find all containers in the namespace and remove them
-	attempts := 3
+	attempts := 5
 	for currentAttempt := range attempts {
 		_, err := d.client.ContainersPrune(context.Background(), filters.NewArgs(
 			filters.Arg("label", "orchestra.namespace="+d.namespace),

@@ -141,7 +141,8 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 			User:       task.User,
 		},
 		&container.HostConfig{
-			Mounts: mounts,
+			Mounts:     mounts,
+			Privileged: task.Privileged,
 		}, nil, nil,
 		containerName,
 	)
