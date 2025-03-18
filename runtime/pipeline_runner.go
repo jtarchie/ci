@@ -71,11 +71,12 @@ type RunInput struct {
 		Args []string `json:"args"`
 		User string   `json:"user"`
 	} `json:"command"`
-	Env    map[string]string       `json:"env"`
-	Image  string                  `json:"image"`
-	Mounts map[string]VolumeResult `json:"mounts"`
-	Name   string                  `json:"name"`
-	Stdin  string                  `json:"stdin"`
+	Env        map[string]string       `json:"env"`
+	Image      string                  `json:"image"`
+	Mounts     map[string]VolumeResult `json:"mounts"`
+	Name       string                  `json:"name"`
+	Privileged bool                    `json:"privileged"`
+	Stdin      string                  `json:"stdin"`
 	// has to be string because goja doesn't support string -> time.Duration
 	Timeout string `json:"timeout"`
 }
@@ -109,7 +110,7 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 		return nil, fmt.Errorf("could not generate uuid: %w", err)
 	}
 
-	logger = c.logger.With("taskID", taskID, "name", input.Name)
+	logger = c.logger.With("taskID", taskID, "name", input.Name, "privileged", input.Privileged)
 
 	logger.Debug("container.run")
 
@@ -129,13 +130,14 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 	container, err := c.client.RunContainer(
 		ctx,
 		orchestra.Task{
-			Command: command,
-			Env:     input.Env,
-			ID:      fmt.Sprintf("%s-%s", input.Name, taskID.String()),
-			Image:   input.Image,
-			Mounts:  mounts,
-			Stdin:   strings.NewReader(input.Stdin),
-			User:    input.Command.User,
+			Command:    command,
+			Env:        input.Env,
+			ID:         fmt.Sprintf("%s-%s", input.Name, taskID.String()),
+			Image:      input.Image,
+			Mounts:     mounts,
+			Privileged: input.Privileged,
+			Stdin:      strings.NewReader(input.Stdin),
+			User:       input.Command.User,
 		},
 	)
 	if err != nil {

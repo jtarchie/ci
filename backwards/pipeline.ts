@@ -354,6 +354,7 @@ class PipelineRunner {
         image: step.config?.image_resource.source.repository!,
         name: step.task,
         mounts: mounts,
+        privileged: step.privileged ?? false,
         stdin: stdin ?? "",
         timeout: step.timeout,
       });

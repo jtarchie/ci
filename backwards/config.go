@@ -61,6 +61,7 @@ type Step struct {
 	Task       string      `yaml:"task,omitempty"`
 	TaskConfig *TaskConfig `yaml:"config,omitempty"`
 	File       string      `yaml:"file,omitempty"`
+	Privileged bool        `yaml:"privileged,omitempty"`
 
 	Get       string    `yaml:"get,omitempty"`
 	GetConfig GetConfig `yaml:",inline,omitempty"`
