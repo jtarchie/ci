@@ -131,6 +131,10 @@ func (n *Native) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 		logger.Debug("orchestra.native", "warn", "user is not supported in native mode", "user", task.User)
 	}
 
+	if task.Privileged {
+		logger.Debug("orchestra.native", "warn", "privileged is not supported in native mode")
+	}
+
 	go func() {
 		err := command.Run()
 		if err != nil {
