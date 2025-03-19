@@ -1,9 +1,6 @@
 /// <reference path="../packages/ci/src/global.d.ts" />
 
 class PipelineRunner {
-  private knownMounts: KnownMounts = {};
-  private taskNames: string[] = [];
-
   constructor(private config: PipelineConfig) {
     this.validatePipelineConfig();
   }
@@ -49,13 +46,33 @@ class PipelineRunner {
 
   async run(): Promise<void> {
     const job = this.config.jobs[0];
-    for (const step of job.plan) {
+    const jobRunner = new JobRunner(
+      job,
+      this.config.resources,
+      this.config.resource_types,
+    );
+    await jobRunner.run();
+  }
+}
+
+class JobRunner {
+  private knownMounts: KnownMounts = {};
+  private taskNames: string[] = [];
+
+  constructor(
+    private job: Job,
+    private resources: Resource[],
+    private resourceTypes: ResourceType[],
+  ) {}
+
+  async run(): Promise<void> {
+    for (const step of this.job.plan) {
       await this.processStep(step);
     }
 
-    if (job.assert?.execution) {
+    if (this.job.assert?.execution) {
       // this assures that the outputs are in the same order as the job
-      assert.equal(this.taskNames, job.assert.execution);
+      assert.equal(this.taskNames, this.job.assert.execution);
     }
   }
 
@@ -324,14 +341,14 @@ class PipelineRunner {
   }
 
   private findResource(resourceName: string) {
-    const resource = this.config.resources.find((resource) =>
+    const resource = this.resources.find((resource) =>
       resource.name === resourceName
     );
     return resource!;
   }
 
   private findResourceType(typeName?: string) {
-    const resourceType = this.config.resource_types.find((type) =>
+    const resourceType = this.resourceTypes.find((type) =>
       type.name === typeName
     );
     return resourceType!;
