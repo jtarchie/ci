@@ -124,15 +124,15 @@ func (n *Native) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 	}
 
 	if task.Image != "" {
-		logger.Debug("orchestra.native", "warn", "image is not supported in native mode", "image", task.Image)
+		logger.Warn("orchestra.native", "warn", "image is not supported in native mode", "image", task.Image)
 	}
 
 	if task.User != "" {
-		logger.Debug("orchestra.native", "warn", "user is not supported in native mode", "user", task.User)
+		logger.Warn("orchestra.native", "warn", "user is not supported in native mode", "user", task.User)
 	}
 
 	if task.Privileged {
-		logger.Debug("orchestra.native", "warn", "privileged is not supported in native mode")
+		logger.Warn("orchestra.native", "warn", "privileged is not supported in native mode")
 	}
 
 	go func() {
