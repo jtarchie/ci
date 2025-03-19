@@ -17,7 +17,7 @@ type Assert struct {
 }
 
 func NewAssert(vm *goja.Runtime, logger *slog.Logger) *Assert {
-	logger.Debug("creating new assertion handler")
+	logger.Debug("handler.created")
 
 	return &Assert{
 		logger: logger.WithGroup("assert"),
@@ -28,12 +28,12 @@ func NewAssert(vm *goja.Runtime, logger *slog.Logger) *Assert {
 var ErrAssertion = errors.New("assertion failed")
 
 func (a *Assert) fail(message string) {
-	a.logger.Debug("assertion failed", "err", message)
+	a.logger.Error("assertion.failed", "err", message)
 	a.vm.Interrupt(fmt.Errorf("%w: %s", ErrAssertion, message))
 }
 
 func (a *Assert) Equal(expected, actual interface{}, message ...string) {
-	a.logger.Debug("equal",
+	a.logger.Debug("equality.checking",
 		"expected_type", fmt.Sprintf("%T", expected),
 		"actual_type", fmt.Sprintf("%T", actual))
 
@@ -49,7 +49,7 @@ func (a *Assert) Equal(expected, actual interface{}, message ...string) {
 }
 
 func (a *Assert) NotEqual(expected, actual interface{}, message ...string) {
-	a.logger.Debug("not_equal",
+	a.logger.Debug("inequality.checking",
 		"expected_type", fmt.Sprintf("%T", expected),
 		"actual_type", fmt.Sprintf("%T", actual))
 
@@ -65,13 +65,13 @@ func (a *Assert) NotEqual(expected, actual interface{}, message ...string) {
 
 func (a *Assert) ContainsString(str, substr string, message ...string) {
 	// Redact potentially sensitive string data in logs
-	a.logger.Debug("contain_substring",
+	a.logger.Debug("substring.checking",
 		"pattern_length", len(substr),
 		"string_length", len(str))
 
 	matcher, err := regexp.Compile(substr)
 	if err != nil {
-		a.logger.Debug("invalid regular expression", "err", err)
+		a.logger.Debug("regex.failed", "err", err)
 		a.fail(fmt.Sprintf("invalid regular expression: %s", err))
 
 		return
@@ -88,7 +88,7 @@ func (a *Assert) ContainsString(str, substr string, message ...string) {
 }
 
 func (a *Assert) Truthy(value bool, message ...string) {
-	a.logger.Debug("truthy", "value_type", fmt.Sprintf("%T", value))
+	a.logger.Debug("truthiness.checking", "value_type", fmt.Sprintf("%T", value))
 
 	if !value {
 		msg := fmt.Sprintf("expected %v to be truthy", value)
@@ -101,7 +101,7 @@ func (a *Assert) Truthy(value bool, message ...string) {
 }
 
 func (a *Assert) ContainsElement(array []interface{}, element interface{}, message ...string) {
-	a.logger.Debug("contains_element",
+	a.logger.Debug("element.checking",
 		"element_type", fmt.Sprintf("%T", element),
 		"array_length", len(array))
 
