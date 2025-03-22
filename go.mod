@@ -5,8 +5,8 @@ go 1.23.4
 require (
 	github.com/alecthomas/kong v1.9.0
 	github.com/bmatcuk/doublestar/v4 v4.8.1
-	github.com/docker/cli v28.0.1+incompatible
-	github.com/docker/docker v28.0.1+incompatible
+	github.com/docker/cli v28.0.2+incompatible
+	github.com/docker/docker v28.0.2+incompatible
 	github.com/dop251/goja v0.0.0-20250309171923-bcd7cc6bf64c
 	github.com/dop251/goja_nodejs v0.0.0-20250314160716-c55ecee183c0
 	github.com/evanw/esbuild v0.25.1
@@ -14,7 +14,7 @@ require (
 	github.com/goccy/go-yaml v1.16.0
 	github.com/google/uuid v1.6.0
 	github.com/lmittmann/tint v1.0.7
-	github.com/onsi/gomega v1.36.2
+	github.com/onsi/gomega v1.36.3
 )
 
 require (
@@ -56,7 +56,6 @@ require (
 	golang.org/x/sys v0.31.0 // indirect
 	golang.org/x/text v0.23.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
-	golang.org/x/tools v0.29.0 // indirect
 	google.golang.org/grpc v1.70.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gotest.tools/v3 v3.4.0 // indirect
