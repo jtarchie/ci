@@ -5,8 +5,8 @@ go 1.23.4
 require (
 	github.com/alecthomas/kong v1.9.0
 	github.com/bmatcuk/doublestar/v4 v4.8.1
-	github.com/docker/cli v28.0.2+incompatible
-	github.com/docker/docker v28.0.2+incompatible
+	github.com/docker/cli v28.0.3+incompatible
+	github.com/docker/docker v28.0.3+incompatible
 	github.com/dop251/goja v0.0.0-20250309171923-bcd7cc6bf64c
 	github.com/dop251/goja_nodejs v0.0.0-20250314160716-c55ecee183c0
 	github.com/evanw/esbuild v0.25.1
