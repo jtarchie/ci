@@ -5,10 +5,10 @@ go 1.23.4
 require (
 	github.com/alecthomas/kong v1.9.0
 	github.com/bmatcuk/doublestar/v4 v4.8.1
-	github.com/docker/cli v28.0.3+incompatible
-	github.com/docker/docker v28.0.3+incompatible
+	github.com/docker/cli v28.0.4+incompatible
+	github.com/docker/docker v28.0.4+incompatible
 	github.com/dop251/goja v0.0.0-20250309171923-bcd7cc6bf64c
-	github.com/dop251/goja_nodejs v0.0.0-20250314160716-c55ecee183c0
+	github.com/dop251/goja_nodejs v0.0.0-20250325151027-56d2092bee9a
 	github.com/evanw/esbuild v0.25.1
 	github.com/go-playground/validator/v10 v10.25.0
 	github.com/goccy/go-yaml v1.16.0
