@@ -6,10 +6,9 @@ import (
 
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/jtarchie/ci/commands"
-	. "github.com/onsi/gomega"
-
 	_ "github.com/jtarchie/ci/orchestra/docker"
 	_ "github.com/jtarchie/ci/orchestra/native"
+	. "github.com/onsi/gomega"
 )
 
 func TestExamplesDocker(t *testing.T) {

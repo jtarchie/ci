@@ -1,18 +1,39 @@
-run:
-  timeout: 5m
+version: "2"
 linters:
-  enable-all: true
+  default: all
   disable:
     - cyclop
     - depguard
-    - exhaustruct # allow zero values for
+    - exhaustruct
     - funlen
     - gochecknoglobals
     - gochecknoinits
     - gomoddirectives
     - ireturn
-    - lll # too long of line
-    - maintidx # complexity rule
-    - revive # too many rules
-    - tagliatelle # disable because pipeline yaml uses underscores
-    - tenv
+    - lll
+    - maintidx
+    - revive
+    - tagliatelle
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
