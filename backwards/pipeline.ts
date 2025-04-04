@@ -368,6 +368,7 @@ class JobRunner {
           args: step.config.run.args || [],
           user: step.config.run.user,
         },
+        env: step.config.env,
         image: step.config?.image_resource.source.repository!,
         name: step.task,
         mounts: mounts,
