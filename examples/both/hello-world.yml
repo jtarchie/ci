@@ -17,10 +17,7 @@ jobs:
           run:
             path: echo
             args: ["Hello world!"]
-  - name: show-env
-    public: true
-    plan:
-      - task: simple-task
+      - task: show-env
         # this is here for testing purposes
         # probably not for production usage
         assert:

@@ -63,6 +63,7 @@ declare global {
 // types for backwards compatibility
 declare global {
   interface TaskConfig {
+    env?: { [key: string]: string };
     platform?: string;
     image_resource: {
       type: string;
