@@ -106,7 +106,7 @@ class JobRunner {
           image_resource: {
             type: "registry-image",
             source: {
-              repository: "busbox",
+              repository: "busybox",
             },
           },
           inputs: [
