@@ -2,6 +2,7 @@
 
 class PipelineRunner {
   private jobResults: Map<string, boolean> = new Map();
+  private executedJobs: string[] = [];
 
   constructor(private config: PipelineConfig) {
     this.validatePipelineConfig();
@@ -44,11 +45,6 @@ class PipelineRunner {
       this.config.jobs.every((job) =>
         job.plan.every((step) => {
           if ("get" in step && step.passed) {
-            console.log(
-              "passed",
-              JSON.stringify(step.passed),
-              JSON.stringify(Array.from(jobNames)),
-            );
             return step.passed.every((passedJob) => jobNames.has(passedJob));
           }
           return true;
@@ -141,30 +137,28 @@ class PipelineRunner {
     for (const job of jobsWithNoDeps) {
       await this.runJob(job);
     }
+
+    if (this.config.assert?.execution) {
+      // this assures that the outputs are in the same order as the job
+      assert.equal(this.executedJobs, this.config.assert.execution);
+    }
   }
 
   private findJobsWithNoDependencies(): Job[] {
-    // First find all jobs that are mentioned in passed constraints
-    const jobsInPassedConstraints = new Set<string>();
-
-    for (const job of this.config.jobs) {
-      for (const step of job.plan) {
-        if ("get" in step && step.passed && step.passed.length > 0) {
-          step.passed.forEach((jobName) =>
-            jobsInPassedConstraints.add(jobName)
-          );
+    return this.config.jobs.filter((job) => {
+      return !job.plan.some((step) => {
+        if ("get" in step && step.passed) {
+          return true;
         }
-      }
-    }
-
-    // Return jobs that don't appear in any passed constraints
-    return this.config.jobs.filter((job) =>
-      !jobsInPassedConstraints.has(job.name)
-    );
+        return false;
+      });
+    });
   }
 
   private async runJob(job: Job): Promise<void> {
     console.log(`Running job: ${job.name}`);
+
+    this.executedJobs.push(job.name);
 
     try {
       const jobRunner = new JobRunner(

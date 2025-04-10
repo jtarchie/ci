@@ -185,9 +185,12 @@ declare global {
   }
 
   interface PipelineConfig {
+    assert: {
+      execution?: string[];
+    };
+    jobs: Job[];
     resource_types: ResourceType[];
     resources: Resource[];
-    jobs: Job[];
   }
 
   type KnownMounts = Record<string, VolumeResult>;
