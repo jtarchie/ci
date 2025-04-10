@@ -26,7 +26,7 @@ func NewJS(logger *slog.Logger) *JS {
 }
 
 func (j *JS) Execute(ctx context.Context, source string, client orchestra.Driver) error {
-	sandbox := NewPipelineRunner(ctx, client, j.logger)
+	runner := NewPipelineRunner(ctx, client, j.logger)
 
 	result := api.Transform(source, api.TransformOptions{
 		Loader:     api.LoaderTS,
@@ -92,7 +92,7 @@ func (j *JS) Execute(ctx context.Context, source string, client orchestra.Driver
 		return fmt.Errorf("could not set YAML: %w", err)
 	}
 
-	runtime := NewRuntime(jsVM, sandbox)
+	runtime := NewRuntime(jsVM, runner)
 
 	err = jsVM.Set("runtime", runtime)
 	if err != nil {
