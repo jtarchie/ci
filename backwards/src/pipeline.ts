@@ -1,4 +1,4 @@
-/// <reference path="../packages/ci/src/global.d.ts" />
+/// <reference path="../../packages/ci/src/global.d.ts" />
 
 class PipelineRunner {
   private jobResults: Map<string, boolean> = new Map();

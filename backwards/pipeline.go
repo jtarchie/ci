@@ -9,7 +9,7 @@ import (
 	"github.com/goccy/go-yaml"
 )
 
-//go:embed pipeline.ts
+//go:embed src/pipeline.ts
 var pipelineJS string
 
 func NewPipeline(filename string) (string, error) {
