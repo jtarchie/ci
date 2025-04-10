@@ -105,6 +105,7 @@ declare global {
     params: { [key: string]: string };
     trigger: boolean;
     version: string;
+    passed?: string[];
 
     ensure?: Step;
     on_abort?: Step;

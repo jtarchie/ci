@@ -1,0 +1,98 @@
+resource_types:
+  - name: mock
+    type: registry-image
+    source:
+      repository: concourse/mock-resource
+
+resources:
+  - name: source-code
+    type: mock
+    source:
+      force_version: "1.0"
+
+jobs:
+  - name: build
+    plan:
+      - get: source-code
+      - task: compile
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: busybox
+          inputs:
+            - name: source-code
+          outputs:
+            - name: compiled-output
+          run:
+            path: sh
+            args: [
+              "-c",
+              "echo 'Building application' > compiled-output/build.txt",
+            ]
+        assert:
+          code: 0
+
+  - name: tests
+    plan:
+      - get: source-code
+        passed: [
+          build,
+        ] # This job will only run after "build" job completes successfully
+      - task: run-tests
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: busybox
+          inputs:
+            - name: source-code
+          run:
+            path: sh
+            args: ["-c", "echo 'Running tests'"]
+        assert:
+          code: 0
+
+  - name: deploy-staging
+    plan:
+      - get: source-code
+        passed: [
+          tests,
+        ] # This job will only run after "test" job completes successfully
+      - task: deploy
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: busybox
+          inputs:
+            - name: source-code
+          run:
+            path: sh
+            args: ["-c", "echo 'Deploying to staging'"]
+        assert:
+          code: 0
+
+  - name: deploy-production
+    plan:
+      - get: source-code
+        passed: [
+          deploy-staging,
+        ] # This job will only run after "deploy-staging" job completes successfully
+      - task: deploy
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: busybox
+          inputs:
+            - name: source-code
+          run:
+            path: sh
+            args: ["-c", "echo 'Deploying to production'"]
+        assert:
+          code: 0
