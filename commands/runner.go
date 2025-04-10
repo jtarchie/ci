@@ -2,6 +2,8 @@ package commands
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -12,7 +14,6 @@ import (
 	"time"
 
 	"github.com/evanw/esbuild/pkg/api"
-	"github.com/google/uuid"
 	"github.com/jtarchie/ci/backwards"
 	"github.com/jtarchie/ci/orchestra"
 	"github.com/jtarchie/ci/runtime"
@@ -26,9 +27,30 @@ type Runner struct {
 	Timeout      time.Duration `help:"timeout for the pipeline, will cause abort if exceeded"`
 }
 
+func youtubeIDStyle(input string) string {
+	hash := sha256.Sum256([]byte(input))
+
+	encoded := base64.RawURLEncoding.EncodeToString(hash[:])
+
+	const maxLength = 11
+
+	if len(encoded) > maxLength {
+		return encoded[:maxLength] // YouTube IDs are 11 chars
+	}
+
+	return encoded
+}
+
 func (c *Runner) Run() error {
+	pipelinePath, err := filepath.Abs(c.Pipeline)
+	if err != nil {
+		return fmt.Errorf("could not get absolute path to pipeline: %w", err)
+	}
+
+	runtimeID := youtubeIDStyle(pipelinePath)
+
 	logger := slog.Default().WithGroup("runner").With(
-		"id", uuid.New().String(),
+		"id", runtimeID,
 		"pipeline", c.Pipeline,
 		"orchestrator", c.Orchestrator,
 	)
@@ -56,22 +78,22 @@ func (c *Runner) Run() error {
 
 	var pipeline string
 
-	extension := filepath.Ext(c.Pipeline)
+	extension := filepath.Ext(pipelinePath)
 	if extension == ".yml" || extension == ".yaml" {
 		var err error
 
-		pipeline, err = backwards.NewPipeline(c.Pipeline)
+		pipeline, err = backwards.NewPipeline(pipelinePath)
 		if err != nil {
 			return fmt.Errorf("could not create pipeline from YAML: %w", err)
 		}
 	} else {
 		result := api.Build(api.BuildOptions{
-			EntryPoints:      []string{c.Pipeline},
+			EntryPoints:      []string{pipelinePath},
 			Bundle:           true,
 			Sourcemap:        api.SourceMapInline,
 			Platform:         api.PlatformNeutral,
 			PreserveSymlinks: true,
-			AbsWorkingDir:    filepath.Dir(c.Pipeline),
+			AbsWorkingDir:    filepath.Dir(pipelinePath),
 		})
 		if len(result.Errors) > 0 {
 			return fmt.Errorf("%w: %s", ErrCouldNotBundle, result.Errors[0].Text)
@@ -85,11 +107,9 @@ func (c *Runner) Run() error {
 		return fmt.Errorf("could not get orchestrator (%q): %w", c.Orchestrator, ErrOrchestratorNotFound)
 	}
 
-	runtimeID := uuid.NewString()
-
 	driver, err := orchestrator("ci-"+runtimeID, logger)
 	if err != nil {
-		return fmt.Errorf("could not create docker client: %w", err)
+		return fmt.Errorf("could not create orchestrator client: %w", err)
 	}
 	defer driver.Close()
 

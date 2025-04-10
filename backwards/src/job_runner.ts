@@ -1,5 +1,7 @@
 /// <reference path="../../packages/ci/src/global.d.ts" />
 
+const buildID = Date.now();
+
 export class JobRunner {
   private knownMounts: KnownMounts = {};
   private taskNames: string[] = [];
@@ -300,11 +302,13 @@ export class JobRunner {
   }
 
   private async runTask(step: Task, stdin?: string): Promise<RunTaskResult> {
+    const storageKey =
+      `/pipeline/${buildID}/jobs/${this.job.name}/tasks/${this.taskNames.length}/${step.task}`;
     const mounts = await this.prepareMounts(step);
     this.taskNames.push(step.task);
 
     storage.set(
-      `/pipeline/jobs/${this.job.name}/tasks/${this.taskNames.length}/${step.task}`,
+      storageKey,
       {
         status: "pending",
       },
@@ -329,7 +333,7 @@ export class JobRunner {
       });
 
       storage.set(
-        `/pipeline/jobs/${this.job.name}/tasks/${this.taskNames.length}/${step.task}`,
+        storageKey,
         {
           status: result.status,
           code: result.code,
