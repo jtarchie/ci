@@ -156,8 +156,6 @@ class PipelineRunner {
   }
 
   private async runJob(job: Job): Promise<void> {
-    console.log(`Running job: ${job.name}`);
-
     this.executedJobs.push(job.name);
 
     try {
@@ -170,7 +168,6 @@ class PipelineRunner {
 
       // Mark job as successful
       this.jobResults.set(job.name, true);
-      console.log(`Job completed successfully: ${job.name}`);
 
       // Find and run jobs that depend on this job
       await this.runDependentJobs(job.name);
