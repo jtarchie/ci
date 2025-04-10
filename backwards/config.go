@@ -117,6 +117,9 @@ type Resource struct {
 type Resources []Resource
 
 type Config struct {
+	Assert struct {
+		Execution []string `yaml:"execution,omitempty"`
+	} `yaml:"assert,omitempty"`
 	Jobs          Jobs          `validate:"required,min=1,dive" yaml:"jobs"`
 	Resources     Resources     `yaml:"resources"`
 	ResourceTypes ResourceTypes `yaml:"resource_types"`

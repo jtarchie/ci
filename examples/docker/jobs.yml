@@ -10,6 +10,13 @@ resources:
     source:
       force_version: "1.0"
 
+assert:
+  execution:
+    - build
+    - tests
+    - deploy-staging
+    - deploy-production
+
 jobs:
   - name: build
     plan:
