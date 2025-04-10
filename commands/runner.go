@@ -83,15 +83,15 @@ func (c *Runner) Run() error {
 		return fmt.Errorf("could not get orchestrator (%q): %w", c.Orchestrator, ErrOrchestratorNotFound)
 	}
 
-	client, err := orchestrator("ci-"+uuid.New().String(), logger)
+	driver, err := orchestrator("ci-"+uuid.New().String(), logger)
 	if err != nil {
 		return fmt.Errorf("could not create docker client: %w", err)
 	}
-	defer client.Close()
+	defer driver.Close()
 
 	js := runtime.NewJS(logger)
 
-	err = js.Execute(ctx, pipeline, client)
+	err = js.Execute(ctx, pipeline, driver)
 	if err != nil {
 		// Check if the error was due to context cancellation
 		if errors.Is(err, context.Canceled) {
