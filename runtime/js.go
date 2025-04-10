@@ -25,8 +25,8 @@ func NewJS(logger *slog.Logger) *JS {
 	}
 }
 
-func (j *JS) Execute(ctx context.Context, source string, client orchestra.Driver) error {
-	runner := NewPipelineRunner(ctx, client, j.logger)
+func (j *JS) Execute(ctx context.Context, source string, driver orchestra.Driver) error {
+	runner := NewPipelineRunner(ctx, driver, j.logger)
 
 	result := api.Transform(source, api.TransformOptions{
 		Loader:     api.LoaderTS,
