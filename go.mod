@@ -8,7 +8,7 @@ require (
 	github.com/docker/cli v28.0.4+incompatible
 	github.com/docker/docker v28.0.4+incompatible
 	github.com/dop251/goja v0.0.0-20250309171923-bcd7cc6bf64c
-	github.com/dop251/goja_nodejs v0.0.0-20250325151027-56d2092bee9a
+	github.com/dop251/goja_nodejs v0.0.0-20250409162600-f7acab6894b0
 	github.com/evanw/esbuild v0.25.2
 	github.com/go-playground/validator/v10 v10.26.0
 	github.com/goccy/go-yaml v1.17.1
@@ -51,10 +51,10 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.34.0 // indirect
 	go.opentelemetry.io/otel/metric v1.35.0 // indirect
 	go.opentelemetry.io/otel/trace v1.35.0 // indirect
-	golang.org/x/crypto v0.36.0 // indirect
-	golang.org/x/net v0.38.0 // indirect
-	golang.org/x/sys v0.31.0 // indirect
-	golang.org/x/text v0.23.0 // indirect
+	golang.org/x/crypto v0.37.0 // indirect
+	golang.org/x/net v0.39.0 // indirect
+	golang.org/x/sys v0.32.0 // indirect
+	golang.org/x/text v0.24.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
 	google.golang.org/grpc v1.70.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
