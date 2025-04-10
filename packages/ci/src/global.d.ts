@@ -33,6 +33,10 @@ declare global {
     error: string;
   }
 
+  namespace storage {
+    function set(key: string, value: any): Promise<void>;
+  }
+
   namespace runtime {
     function createVolume(volume?: VolumeConfig): Promise<VolumeResult>;
     function run(task: RunTaskConfig): Promise<RunTaskResult>;

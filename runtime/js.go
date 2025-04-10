@@ -13,6 +13,7 @@ import (
 	"github.com/dop251/goja_nodejs/require"
 	"github.com/evanw/esbuild/pkg/api"
 	"github.com/jtarchie/ci/orchestra"
+	"github.com/jtarchie/ci/storage"
 )
 
 type JS struct {
@@ -25,7 +26,7 @@ func NewJS(logger *slog.Logger) *JS {
 	}
 }
 
-func (j *JS) Execute(ctx context.Context, source string, driver orchestra.Driver) error {
+func (j *JS) Execute(ctx context.Context, source string, driver orchestra.Driver, storage storage.Driver) error {
 	runner := NewPipelineRunner(ctx, driver, j.logger)
 
 	result := api.Transform(source, api.TransformOptions{
@@ -97,6 +98,11 @@ func (j *JS) Execute(ctx context.Context, source string, driver orchestra.Driver
 	err = jsVM.Set("runtime", runtime)
 	if err != nil {
 		return fmt.Errorf("could not set runtime: %w", err)
+	}
+
+	err = jsVM.Set("storage", storage)
+	if err != nil {
+		return fmt.Errorf("could not set storage: %w", err)
 	}
 
 	pipeline, err := jsVM.RunProgram(program)

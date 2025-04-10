@@ -187,3 +187,4 @@ dist
 
 .env
 .envrc
+*.db
