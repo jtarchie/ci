@@ -22,7 +22,7 @@ func TestBrokenJS(t *testing.T) {
 			const array = [];
 			return array[1].asdf;
 		};
-	`), nil)
+	`), nil, nil)
 	assert.Expect(err).To(HaveOccurred())
 	assert.Expect(err.Error()).To(ContainSubstring("main.js:3"))
 }
@@ -39,7 +39,7 @@ func TestAwaitPromise(t *testing.T) {
 		};
 
 		export { pipeline };
-	`, nil)
+	`, nil, nil)
 	assert.Expect(err).To(HaveOccurred())
 }
 
@@ -58,7 +58,7 @@ func TestUseContext(t *testing.T) {
 		};
 
 		export { pipeline };
-	`, nil)
+	`, nil, nil)
 	assert.Expect(err).To(HaveOccurred())
 }
 
@@ -75,6 +75,6 @@ func TestYAMLAndAssert(t *testing.T) {
 		};
 
 		export { pipeline };
-	`, nil)
+	`, nil, nil)
 	assert.Expect(err).ToNot(HaveOccurred())
 }

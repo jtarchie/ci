@@ -1,3 +1,5 @@
+/// <reference path="../../packages/ci/src/global.d.ts" />
+
 import { JobRunner } from "./job_runner.ts";
 
 export class PipelineRunner {

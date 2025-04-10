@@ -16,9 +16,11 @@ import (
 	"github.com/jtarchie/ci/backwards"
 	"github.com/jtarchie/ci/orchestra"
 	"github.com/jtarchie/ci/runtime"
+	"github.com/jtarchie/ci/storage"
 )
 
 type Runner struct {
+	Storage      string        `default:":memory:"                                            help:"Path to storage file"`
 	Pipeline     string        `arg:""                                                        help:"Path to pipeline javascript file" type:"existingfile"`
 	Orchestrator string        `default:"native"                                              help:"orchestrator runtime to use"`
 	Timeout      time.Duration `help:"timeout for the pipeline, will cause abort if exceeded"`
@@ -83,15 +85,23 @@ func (c *Runner) Run() error {
 		return fmt.Errorf("could not get orchestrator (%q): %w", c.Orchestrator, ErrOrchestratorNotFound)
 	}
 
-	driver, err := orchestrator("ci-"+uuid.New().String(), logger)
+	runtimeID := uuid.NewString()
+
+	driver, err := orchestrator("ci-"+runtimeID, logger)
 	if err != nil {
 		return fmt.Errorf("could not create docker client: %w", err)
 	}
 	defer driver.Close()
 
+	storage, err := storage.NewSqlite(c.Storage, runtimeID)
+	if err != nil {
+		return fmt.Errorf("could not create sqlite client: %w", err)
+	}
+	defer storage.Close()
+
 	js := runtime.NewJS(logger)
 
-	err = js.Execute(ctx, pipeline, driver)
+	err = js.Execute(ctx, pipeline, driver, storage)
 	if err != nil {
 		// Check if the error was due to context cancellation
 		if errors.Is(err, context.Canceled) {
