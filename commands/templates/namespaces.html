@@ -1,0 +1,17 @@
+{{ block "header" . }}{{ end }}
+<div class="container mx-auto p-4">
+  <h1 class="text-3xl font-bold mb-4 text-gray-800 dark:text-white">
+    Namespaces
+  </h1>
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+    <ol>
+      {{ range $index, $result := .Results }}
+      <li class="text-xl font-semibold mb-4 dark:text-white">
+        <a href="/namespaces/{{ $result.Namespace }}"
+        >{{ $result.Namespace }}</a>
+      </li>
+      {{ end }}
+    </ol>
+  </div>
+</div>
+{{ block "footer" . }}{{ end }}
