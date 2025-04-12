@@ -12,6 +12,8 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"path/filepath"
+	"strings"
 
 	"github.com/georgysavva/scany/v2/sqlscan"
 	sprig "github.com/go-task/slim-sprig/v3"
@@ -70,7 +72,20 @@ func (c *Server) Run() error {
 	}
 	defer client.Close()
 
-	templates, err := template.New("templates").Funcs(sprig.FuncMap()).ParseFS(templatesFS, "templates/*")
+	templates, err := template.New("templates").
+		Funcs(sprig.FuncMap()).
+		Funcs(template.FuncMap{
+			"formatPath": func(path string) string {
+				path = strings.ReplaceAll(path, " ", "")
+				path = filepath.Clean(path)
+				if path[0] != '/' {
+					path = "/" + path
+				}
+
+				return strings.ReplaceAll(path, "/", " / ")
+			},
+		}).
+		ParseFS(templatesFS, "templates/*")
 	if err != nil {
 		return fmt.Errorf("could not parse templates: %w", err)
 	}
@@ -98,7 +113,7 @@ func (c *Server) Run() error {
 			&results,
 			`
 				SELECT
-					path, payload
+					path, json(payload) as payload
 				FROM
 					tasks
 				ORDER BY

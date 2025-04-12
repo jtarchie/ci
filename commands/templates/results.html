@@ -34,9 +34,11 @@
   </head>
   <body class="bg-gray-100 dark:bg-gray-900 min-h-screen">
     <div class="container mx-auto p-4">
-      <h1 class="text-3xl font-bold mb-4 dark:text-white">Pipeline Visualizer</h1>
-      
-      <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6" id="pipeline">
+      <h1 class="text-3xl font-bold mb-4 dark:text-white">Pipeline
+        Visualizer</h1>
+
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6"
+        id="pipeline">
         <div class="space-y-4" id="tasks-container">
           {{ template "renderPath" dict "Path" .Path "Depth" 0 }}
         </div>
@@ -164,30 +166,27 @@ border-pink-300 dark:border-pink-600
 {{- define "renderTask" -}}
 {{- $path := .Path -}}
 {{- $order := .Order -}}
-<div class="task-item {{ if eq $path.Value.status "pending" }}not-run{{ end }} {{ template "getStatusColor" $path }} border rounded-md p-3 transition-all dark:text-gray-200" tabindex="0">
+<div class="task-item 
+  {{ template "getStatusColor" $path }} border rounded-md p-3 transition-all
+  dark:text-gray-200" tabindex="0">
   <div class="flex items-center justify-between">
     <div class="flex items-center space-x-2">
       {{ template "getStatusIcon" $path }}
       <div class="flex items-center">
-        <span class="inline-flex items-center justify-center w-6 h-6 mr-2 text-xs font-semibold rounded-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 dark:text-gray-200">
+        <span
+          class="inline-flex items-center justify-center w-6 h-6 mr-2 text-xs font-semibold rounded-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 dark:text-gray-200">
           {{ $order }}
         </span>
-        <span class="font-medium">{{ $path.Name }}</span>
-        {{ if $path.Value.note }}
-        <span class="text-xs text-gray-500 dark:text-gray-400 ml-2">({{ $path.Value.note }})</span>
-        {{ end }}
+        <span class="font-medium">{{ $path.Name | formatPath }}</span>
       </div>
     </div>
-    <div class="flex items-center space-x-2">
-      <span class="text-xs px-2 py-1 rounded-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 dark:text-gray-300">
-        {{ $path.Value.type }}
-      </span>
-    </div>
   </div>
-  <div class="task-details mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+  <div
+    class="task-details mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
     <div class="grid grid-cols-2 gap-4 text-sm">
       <div>
-        <p class="font-semibold">Status: <span class="font-normal">{{ $path.Value.status }}</span></p>
+        <p class="font-semibold">Status: <span class="font-normal">{{
+            $path.Value.status }}</span></p>
       </div>
     </div>
   </div>
@@ -198,30 +197,50 @@ border-pink-300 dark:border-pink-600
 {{- define "renderGroup" -}}
 {{- $path := .Path -}}
 {{- $depth := .Depth -}}
-<div class="group-container border-l-4 pl-4 {{ template "getGroupColor" $depth }}">
-  <div class="font-medium text-gray-700 dark:text-gray-300 mb-2">{{ $path.Name }}</div>
+<div class="group-container border-l-4 pl-4 {{ template "getGroupColor" $depth
+  }}">
+  <div class="font-medium text-gray-700 dark:text-gray-300 mb-2">{{ $path.Name
+    | formatPath }}</div>
   <div class="space-y-2">
     {{/* Render children */}}
     {{ range $index, $child := $path.Children }}
-      {{ template "renderPath" dict "Path" $child "Depth" (add $depth 1) "Order" (add $index 1) }}
+    {{ template "renderPath" dict "Path" $child "Depth" (add $depth 1) "Order"
+    (add $index 1) }}
     {{ end }}
   </div>
 </div>
 {{- end -}}
 
-{{/* Main recursive path rendering */}}
+{{/* Main recursive path rendering - modified to handle single child paths */}}
 {{ define "renderPath" }}
-  {{ $path := .Path }}
-  {{ $depth := .Depth }}
-  {{ $order := .Order }}
-  
-  {{ if and $path.Children (gt (len $path.Children) 0) }}
-    {{ template "renderGroup" dict "Path" $path "Depth" $depth }}
-  {{ else if ne $path.Name "" }}
-    {{ template "renderTask" dict "Path" $path "Order" $order }}
-  {{ else }}
-    {{ range $index, $child := $path.Children }}
-      {{ template "renderPath" dict "Path" $child "Depth" $depth "Order" (add $index 1) }}
-    {{ end }}
-  {{ end }}
+{{ $path := .Path }}
+{{ $depth := .Depth }}
+{{ $order := .Order }}
+
+{{ if and $path.Children (gt (len $path.Children) 0) }}
+{{ if eq (len $path.Children) 1 }}
+{{/* Single child path - create breadcrumb and pass through */}}
+{{ $child := index $path.Children 0 }}
+{{ if $child.Children }}
+{{/* Create a combined path name for breadcrumbs */}}
+{{ template "renderPath" dict "Path" (dict "Name" (printf "%s / %s" $path.Name
+$child.Name) "Children" $child.Children "Value" $child.Value) "Depth" $depth
+"Order" $order }}
+{{ else }}
+{{/* Render the leaf task with combined name */}}
+{{ template "renderTask" dict "Path" (dict "Name" (printf "%s / %s" $path.Name
+$child.Name) "Value" $child.Value) "Order" $order }}
+{{ end }}
+{{ else }}
+{{/* Multiple children - render as normal group */}}
+{{ template "renderGroup" dict "Path" $path "Depth" $depth }}
+{{ end }}
+{{ else if ne $path.Name "" }}
+{{ template "renderTask" dict "Path" $path "Order" $order }}
+{{ else }}
+{{ range $index, $child := $path.Children }}
+{{ template "renderPath" dict "Path" $child "Depth" $depth "Order" (add $index
+1) }}
+{{ end }}
+{{ end }}
 {{ end }}
