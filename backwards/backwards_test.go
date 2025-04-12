@@ -1,6 +1,8 @@
 package backwards_test
 
 import (
+	"log/slog"
+	"strings"
 	"testing"
 
 	"github.com/jtarchie/ci/commands"
@@ -77,26 +79,40 @@ func TestBackwardsCompatibility(t *testing.T) {
 	t.Run("all", func(t *testing.T) {
 		t.Parallel()
 
+		logs := &strings.Builder{}
+		logger := slog.New(slog.NewTextHandler(logs, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		}))
+
 		assert := NewGomegaWithT(t)
 		runner := commands.Runner{
 			Pipeline:     "fixtures/all.yml",
 			Orchestrator: "native",
 		}
-		err := runner.Run()
+		err := runner.Run(logger)
 		assert.Expect(err).ToNot(HaveOccurred())
+		assert.Expect(logs.String()).To(ContainSubstring(`assert`))
+		assert.Expect(strings.Count(logs.String(), `assert`)).To(Equal(4))
 	})
 
 	t.Run("on_error", func(t *testing.T) {
 		t.Parallel()
+
+		logs := &strings.Builder{}
+		logger := slog.New(slog.NewTextHandler(logs, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		}))
 
 		assert := NewGomegaWithT(t)
 		runner := commands.Runner{
 			Pipeline:     "fixtures/on_error.yml",
 			Orchestrator: "native",
 		}
-		err := runner.Run()
+		err := runner.Run(logger)
 		assert.Expect(err).To(HaveOccurred())
 		assert.Expect(err.Error()).To(ContainSubstring("Task erroring-task errored"))
+		assert.Expect(logs.String()).To(ContainSubstring(`assert`))
+		assert.Expect(strings.Count(logs.String(), `assert`)).To(Equal(10))
 	})
 
 	t.Run("on_abort", func(t *testing.T) {
