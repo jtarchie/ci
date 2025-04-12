@@ -23,13 +23,17 @@ export class JobRunner {
   }
 
   async run(): Promise<void> {
-    for (const step of this.job.plan) {
-      await this.processStep(step);
-    }
+    try {
+      for (const step of this.job.plan) {
+        await this.processStep(step);
+      }
+    } catch (error) {
+      if (this.job.assert?.execution) {
+        // this assures that the outputs are in the same order as the job
+        assert.equal(this.taskNames, this.job.assert.execution);
+      }
 
-    if (this.job.assert?.execution) {
-      // this assures that the outputs are in the same order as the job
-      assert.equal(this.taskNames, this.job.assert.execution);
+      throw error;
     }
   }
 
@@ -287,9 +291,11 @@ export class JobRunner {
   }
 
   private async runTask(step: Task, stdin?: string): Promise<RunTaskResult> {
-    const result = await this.taskRunner.runTask(step, stdin);
+    let result: RunTaskResult;
 
     try {
+      result = await this.taskRunner.runTask(step, stdin);
+
       if (result.code === 0 && result.status == "complete" && step.on_success) {
         await this.processStep(step.on_success);
       } else if (
