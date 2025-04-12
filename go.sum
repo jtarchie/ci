@@ -142,10 +142,8 @@ github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec h1:W09IVJc94
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec/go.mod h1:qqbHyh8v60DhA7CoWK5oRCqLrMHRGoxYCSS9EjAz6Eo=
 github.com/rogpeppe/go-internal v1.13.1 h1:KvO1DLK/DRN07sQ1LQKScxyZJuNnedQ5/wKSR38lUII=
 github.com/rogpeppe/go-internal v1.13.1/go.mod h1:uMEvuHeurkdAXX61udpOXGD/AzZDWNMNyH2VO9fmH0o=
-github.com/samber/lo v1.49.1 h1:4BIFyVfuQSEpluc7Fua+j1NolZHiEHEpaSEKdsH0tew=
-github.com/samber/lo v1.49.1/go.mod h1:dO6KHFzUKXgP8LDhU0oI8d2hekjXnGOu0DB8Jecxd6o=
-github.com/samber/slog-echo v1.16.1 h1:5Q5IUROkFqKcu/qJM/13AP1d3gd1RS+Q/4EvKQU1fuo=
-github.com/samber/slog-echo v1.16.1/go.mod h1:f+B3WR06saRXcaGRZ/I/UPCECDPqTUqadRIf7TmyRhI=
+github.com/samber/slog-echo v1.1.0 h1:vroOnJRiunb8pMG/40NON6opDpJq0iXmMvy/TvK/32E=
+github.com/samber/slog-echo v1.1.0/go.mod h1:EgTuNAJ9oK1vv0TyIcfpvPHpkZELQvXBpoRPY9kumYQ=
 github.com/sirupsen/logrus v1.9.3 h1:dueUQJ1C2q9oE3F7wvmSGAaVtTmUizReu6fjN8uqzbQ=
 github.com/sirupsen/logrus v1.9.3/go.mod h1:naHLuLoDiP4jHNo9R0sCBMtWGeIprob74mVsIT4qYEQ=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
