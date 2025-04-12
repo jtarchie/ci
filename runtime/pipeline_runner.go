@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jtarchie/ci/orchestra"
+	gonanoid "github.com/matoous/go-nanoid/v2"
 )
 
 type PipelineRunner struct {
@@ -105,10 +105,7 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 		}
 	}
 
-	taskID, err := uuid.NewV7()
-	if err != nil {
-		return nil, fmt.Errorf("could not generate uuid: %w", err)
-	}
+	taskID := gonanoid.Must()
 
 	logger = c.logger.With("taskID", taskID, "name", input.Name, "privileged", input.Privileged)
 
@@ -132,7 +129,7 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 		orchestra.Task{
 			Command:    command,
 			Env:        input.Env,
-			ID:         fmt.Sprintf("%s-%s", input.Name, taskID.String()),
+			ID:         fmt.Sprintf("%s-%s", input.Name, taskID),
 			Image:      input.Image,
 			Mounts:     mounts,
 			Privileged: input.Privileged,

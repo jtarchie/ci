@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jtarchie/ci/orchestra"
 	_ "github.com/jtarchie/ci/orchestra/docker"
 	_ "github.com/jtarchie/ci/orchestra/native"
+	gonanoid "github.com/matoous/go-nanoid/v2"
 	. "github.com/onsi/gomega"
 )
 
@@ -27,17 +27,16 @@ func TestDrivers(t *testing.T) {
 
 				assert := NewGomegaWithT(t)
 
-				client, err := init("test-"+uuid.NewString(), slog.Default())
+				client, err := init("test-"+gonanoid.Must(), slog.Default())
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer client.Close()
 
-				taskID, err := uuid.NewV7()
-				assert.Expect(err).NotTo(HaveOccurred())
+				taskID := gonanoid.Must()
 
 				container, err := client.RunContainer(
 					context.Background(),
 					orchestra.Task{
-						ID:      taskID.String(),
+						ID:      taskID,
 						Image:   "busybox",
 						Command: []string{"sh", "-c", "cat < /dev/stdin"},
 						Stdin:   strings.NewReader("hello"),
@@ -71,17 +70,16 @@ func TestDrivers(t *testing.T) {
 
 				assert := NewGomegaWithT(t)
 
-				client, err := init("test-"+uuid.NewString(), slog.Default())
+				client, err := init("test-"+gonanoid.Must(), slog.Default())
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer client.Close()
 
-				taskID, err := uuid.NewV7()
-				assert.Expect(err).NotTo(HaveOccurred())
+				taskID := gonanoid.Must()
 
 				container, err := client.RunContainer(
 					context.Background(),
 					orchestra.Task{
-						ID:      taskID.String(),
+						ID:      taskID,
 						Image:   "busybox",
 						Command: []string{"sh", "-c", "exit 1"},
 					},
@@ -111,17 +109,16 @@ func TestDrivers(t *testing.T) {
 
 				assert := NewGomegaWithT(t)
 
-				client, err := init("test-"+uuid.NewString(), slog.Default())
+				client, err := init("test-"+gonanoid.Must(), slog.Default())
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer client.Close()
 
-				taskID, err := uuid.NewV7()
-				assert.Expect(err).NotTo(HaveOccurred())
+				taskID := gonanoid.Must()
 
 				container, err := client.RunContainer(
 					context.Background(),
 					orchestra.Task{
-						ID:      taskID.String(),
+						ID:      taskID,
 						Image:   "busybox",
 						Command: []string{"echo", "hello"},
 					},
@@ -150,7 +147,7 @@ func TestDrivers(t *testing.T) {
 				container, err = client.RunContainer(
 					context.Background(),
 					orchestra.Task{
-						ID:      taskID.String(),
+						ID:      taskID,
 						Image:   "busybox",
 						Command: []string{"echo", "hello"},
 					},
@@ -184,17 +181,16 @@ func TestDrivers(t *testing.T) {
 
 				assert := NewGomegaWithT(t)
 
-				client, err := init("test-"+uuid.NewString(), slog.Default())
+				client, err := init("test-"+gonanoid.Must(), slog.Default())
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer client.Close()
 
-				taskID, err := uuid.NewV7()
-				assert.Expect(err).NotTo(HaveOccurred())
+				taskID := gonanoid.Must()
 
 				container, err := client.RunContainer(
 					context.Background(),
 					orchestra.Task{
-						ID:      taskID.String(),
+						ID:      taskID,
 						Image:   "busybox",
 						Command: []string{"sh", "-c", "echo world > ./test/hello"},
 						Mounts: orchestra.Mounts{
@@ -214,7 +210,7 @@ func TestDrivers(t *testing.T) {
 				container, err = client.RunContainer(
 					context.Background(),
 					orchestra.Task{
-						ID:      taskID.String() + "-2",
+						ID:      taskID + "-2",
 						Image:   "busybox",
 						Command: []string{"cat", "./test/hello"},
 						Mounts: orchestra.Mounts{
@@ -252,17 +248,16 @@ func TestDrivers(t *testing.T) {
 
 				assert := NewGomegaWithT(t)
 
-				client, err := init("test-"+uuid.NewString(), slog.Default())
+				client, err := init("test-"+gonanoid.Must(), slog.Default())
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer client.Close()
 
-				taskID, err := uuid.NewV7()
-				assert.Expect(err).NotTo(HaveOccurred())
+				taskID := gonanoid.Must()
 
 				container, err := client.RunContainer(
 					context.Background(),
 					orchestra.Task{
-						ID:      taskID.String(),
+						ID:      taskID,
 						Image:   "busybox",
 						Command: []string{"env"},
 						Env:     map[string]string{"HELLO": "WORLD"},
