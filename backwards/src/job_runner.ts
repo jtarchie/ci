@@ -1,16 +1,26 @@
 /// <reference path="../../packages/ci/src/global.d.ts" />
 
+import {
+  TaskAbort,
+  TaskErrored,
+  TaskFailure,
+  TaskRunner,
+} from "./task_runner.ts";
+
 const buildID = Date.now();
 
 export class JobRunner {
-  private knownMounts: KnownMounts = {};
   private taskNames: string[] = [];
+  private taskRunner: TaskRunner;
 
   constructor(
     private job: Job,
     private resources: Resource[],
     private resourceTypes: ResourceType[],
-  ) {}
+  ) {
+    const storagePathPrefix = `/pipeline/${buildID}/jobs/${this.job.name}`;
+    this.taskRunner = new TaskRunner(job, storagePathPrefix, this.taskNames);
+  }
 
   async run(): Promise<void> {
     for (const step of this.job.plan) {
@@ -41,40 +51,7 @@ export class JobRunner {
 
   private async getFile(file: string): Promise<string> {
     const mountName = file.split("/")[0];
-    // check if mount exists
-    if (!this.knownMounts[mountName]) {
-      throw new Error(`Mount ${mountName} does not exist`);
-    }
-
-    const result = await this.runTask(
-      {
-        task: `get-file-${file}`,
-        config: {
-          image_resource: {
-            type: "registry-image",
-            source: {
-              repository: "busybox",
-            },
-          },
-          inputs: [
-            { name: mountName },
-          ],
-          run: {
-            path: "sh",
-            args: ["-c", `cat ${file}`],
-          },
-        },
-        assert: {
-          code: 0,
-        },
-      },
-    );
-
-    if (result.code !== 0) {
-      throw new Error(`Failed to get file ${file}`);
-    }
-
-    return result.stdout;
+    return await this.taskRunner.getFile(file, mountName);
   }
 
   private async processTaskStep(step: Task): Promise<void> {
@@ -302,48 +279,9 @@ export class JobRunner {
   }
 
   private async runTask(step: Task, stdin?: string): Promise<RunTaskResult> {
-    const storageKey =
-      `/pipeline/${buildID}/jobs/${this.job.name}/tasks/${step.task}`;
-    const mounts = await this.prepareMounts(step);
-    this.taskNames.push(step.task);
-
-    storage.set(
-      storageKey,
-      {
-        status: "pending",
-      },
-    );
-
-    let result: RunTaskResult;
+    const result = await this.taskRunner.runTask(step, stdin);
 
     try {
-      result = await runtime.run({
-        command: {
-          path: step.config.run.path,
-          args: step.config.run.args || [],
-          user: step.config.run.user,
-        },
-        env: step.config.env,
-        image: step.config?.image_resource.source.repository!,
-        name: step.task,
-        mounts: mounts,
-        privileged: step.privileged ?? false,
-        stdin: stdin ?? "",
-        timeout: step.timeout,
-      });
-
-      storage.set(
-        storageKey,
-        {
-          status: result.code === 0 ? "success" : "failure",
-          code: result.code,
-          stdout: result.stdout,
-          stderr: result.stderr,
-        },
-      );
-
-      this.validateTaskResult(step, result);
-
       if (result.code === 0 && result.status == "complete" && step.on_success) {
         await this.processStep(step.on_success);
       } else if (
@@ -379,48 +317,4 @@ export class JobRunner {
 
     return result;
   }
-
-  private async prepareMounts(step: Task): Promise<KnownMounts> {
-    const mounts: KnownMounts = {};
-
-    const inputs = step.config.inputs || [];
-    const outputs = step.config.outputs || [];
-
-    for (const mount of inputs) {
-      this.knownMounts[mount.name] ||= await runtime.createVolume();
-      mounts[mount.name] = this.knownMounts[mount.name];
-    }
-
-    for (const mount of outputs) {
-      this.knownMounts[mount.name] ||= await runtime.createVolume();
-      mounts[mount.name] = this.knownMounts[mount.name];
-    }
-
-    return mounts;
-  }
-
-  private validateTaskResult(step: Task, result: RunTaskResult): void {
-    if (step.assert?.stdout && step.assert.stdout.trim() !== "") {
-      assert.containsString(result.stdout, step.assert.stdout);
-    }
-
-    if (step.assert?.stderr && step.assert.stderr.trim() !== "") {
-      assert.containsString(result.stderr, step.assert.stderr);
-    }
-
-    if (typeof step.assert?.code === "number") {
-      assert.equal(step.assert.code, result.code);
-    }
-  }
 }
-
-class CustomError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = this.constructor.name;
-  }
-}
-
-class TaskFailure extends CustomError {}
-class TaskErrored extends CustomError {}
-class TaskAbort extends CustomError {}
