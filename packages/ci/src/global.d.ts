@@ -1,12 +1,30 @@
 // types for the pipeline
 declare global {
+  // Common base types
+  type SourceConfig = { [key: string]: string };
+  type EnvVars = { [key: string]: string };
+  type ParamsConfig = { [key: string]: string };
+
+  interface CommandConfig {
+    path: string;
+    args?: string[];
+    user?: string;
+  }
+
+  interface AssertionBase {
+    execution?: string[];
+  }
+
+  interface TaskAssertion {
+    stdout?: string;
+    stderr?: string;
+    code?: number | null;
+  }
+
+  // Runtime types
   interface RunTaskConfig {
-    command: {
-      path: string;
-      args?: string[];
-      user?: string;
-    };
-    env?: { [key: string]: string };
+    command: CommandConfig;
+    env?: EnvVars;
     image: string;
     mounts?: KnownMounts;
     name: string;
@@ -19,7 +37,6 @@ declare global {
     code: number;
     stderr: string;
     stdout: string;
-
     status: "complete" | "abort";
     message: string;
   }
@@ -33,6 +50,9 @@ declare global {
     error: string;
   }
 
+  type KnownMounts = Record<string, VolumeResult>;
+
+  // Utility namespaces
   namespace storage {
     function set(key: string, value: unknown): Promise<void>;
   }
@@ -66,138 +86,96 @@ declare global {
 
 // types for backwards compatibility
 declare global {
-  interface TaskConfig {
-    env?: { [key: string]: string };
-    platform?: string;
-    image_resource: {
-      type: string;
-      source: { [key: string]: string };
-    };
-    inputs?: { name: string }[];
-    outputs?: { name: string }[];
-    run: {
-      path: string;
-      args?: string[];
-      user?: string;
-    };
-    params?: { [key: string]: string };
+  // Common hook interfaces
+  interface StepHooks {
+    ensure?: Step;
+    on_abort?: Step;
+    on_error?: Step;
+    on_success?: Step;
+    on_failure?: Step;
+    timeout?: string;
   }
 
-  interface Task {
+  // Resource related interfaces
+  interface ResourceBase {
+    name: string;
+    type: string;
+    source: SourceConfig;
+  }
+
+  interface ImageResource {
+    type: string;
+    source: SourceConfig;
+  }
+
+  interface TaskConfig {
+    env?: EnvVars;
+    platform?: string;
+    image_resource: ImageResource;
+    inputs?: { name: string }[];
+    outputs?: { name: string }[];
+    run: CommandConfig;
+    params?: ParamsConfig;
+  }
+
+  // Step interfaces
+  interface Task extends StepHooks {
     task: string;
     config: TaskConfig;
     file?: string;
     privileged?: boolean;
-
-    assert?: {
-      stdout?: string;
-      stderr?: string;
-      code?: number | null;
-    };
-
-    ensure?: Step;
-    on_abort?: Step;
-    on_error?: Step;
-    on_success?: Step;
-    on_failure?: Step;
-    timeout?: string;
+    assert?: TaskAssertion;
   }
 
-  interface Get {
+  interface Get extends StepHooks {
     get: string;
     resource: string;
-    params: { [key: string]: string };
+    params: ParamsConfig;
     trigger: boolean;
     version: string;
     passed?: string[];
-
-    ensure?: Step;
-    on_abort?: Step;
-    on_error?: Step;
-    on_success?: Step;
-    on_failure?: Step;
-    timeout?: string;
   }
 
-  interface Put {
+  interface Put extends StepHooks {
     put: string;
     resource: string;
-    params: { [key: string]: string };
-
-    ensure?: Step;
-    on_abort?: Step;
-    on_error?: Step;
-    on_success?: Step;
-    on_failure?: Step;
-    timeout?: string;
+    params: ParamsConfig;
   }
 
-  interface Do {
+  interface Do extends StepHooks {
     do: Step[];
-
-    ensure?: Step;
-    on_abort?: Step;
-    on_error?: Step;
-    on_success?: Step;
-    on_failure?: Step;
   }
 
-  interface InParallel {
+  interface InParallel extends StepHooks {
     in_parallel: {
       steps: Step[];
       limit?: number;
       fail_fast?: boolean;
     };
-
-    ensure?: Step;
-    on_abort?: Step;
-    on_error?: Step;
-    on_success?: Step;
-    on_failure?: Step;
   }
 
-  interface Try {
+  interface Try extends StepHooks {
     try: Step[];
-
-    ensure?: Step;
-    on_abort?: Step;
-    on_error?: Step;
-    on_success?: Step;
-    on_failure?: Step;
   }
 
   type Step = Task | Get | Put | Do | Try | InParallel;
 
+  // Pipeline configuration
   interface Job {
     name: string;
     plan: Step[];
-    assert: {
-      execution?: string[];
-    };
+    assert: AssertionBase;
   }
 
-  interface Resource {
-    name: string;
-    type: string;
-    source: { [key: string]: string };
-  }
-
-  interface ResourceType {
-    name: string;
-    type: string;
-    source: { [key: string]: string };
-  }
+  type Resource = ResourceBase;
+  type ResourceType = ResourceBase;
 
   interface PipelineConfig {
-    assert: {
-      execution?: string[];
-    };
+    assert: AssertionBase;
     jobs: Job[];
     resource_types: ResourceType[];
     resources: Resource[];
   }
-
-  type KnownMounts = Record<string, VolumeResult>;
 }
 
 export {};
