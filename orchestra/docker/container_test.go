@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jtarchie/ci/orchestra"
 	"github.com/jtarchie/ci/orchestra/docker"
+	gonanoid "github.com/matoous/go-nanoid/v2"
 	. "github.com/onsi/gomega"
 )
 
@@ -21,17 +21,16 @@ func TestDocker(t *testing.T) {
 
 		assert := NewGomegaWithT(t)
 
-		client, err := docker.NewDocker("test-"+uuid.NewString(), slog.Default())
+		client, err := docker.NewDocker("test-"+gonanoid.Must(), slog.Default())
 		assert.Expect(err).NotTo(HaveOccurred())
 		defer client.Close()
 
-		taskID, err := uuid.NewV7()
-		assert.Expect(err).NotTo(HaveOccurred())
+		taskID := gonanoid.Must()
 
 		container, err := client.RunContainer(
 			context.Background(),
 			orchestra.Task{
-				ID:      taskID.String(),
+				ID:      taskID,
 				Image:   "busybox",
 				Command: []string{"whoami"},
 				User:    "nobody",
@@ -65,17 +64,16 @@ func TestDocker(t *testing.T) {
 
 		assert := NewGomegaWithT(t)
 
-		client, err := docker.NewDocker("test-"+uuid.NewString(), slog.Default())
+		client, err := docker.NewDocker("test-"+gonanoid.Must(), slog.Default())
 		assert.Expect(err).NotTo(HaveOccurred())
 		defer client.Close()
 
-		taskID, err := uuid.NewV7()
-		assert.Expect(err).NotTo(HaveOccurred())
+		taskID := gonanoid.Must()
 
 		container, err := client.RunContainer(
 			context.Background(),
 			orchestra.Task{
-				ID:         taskID.String(),
+				ID:         taskID,
 				Image:      "busybox",
 				Command:    []string{"ls", "-l", "/dev/kmsg"},
 				Privileged: true,

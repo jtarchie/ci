@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/dop251/goja"
-	"github.com/google/uuid"
+	gonanoid "github.com/matoous/go-nanoid/v2"
 )
 
 type Runtime struct {
@@ -64,7 +64,7 @@ func (r *Runtime) Run(input RunInput) *goja.Promise {
 
 func (r *Runtime) CreateVolume(input VolumeInput) *goja.Promise {
 	if input.Name == "" {
-		input.Name = uuid.New().String()
+		input.Name = gonanoid.Must()
 	}
 
 	promise, resolve, reject := r.jsVM.NewPromise()
