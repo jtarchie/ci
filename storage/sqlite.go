@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 
 	_ "modernc.org/sqlite"
 )
@@ -21,11 +22,9 @@ func NewSqlite(filename string, namespace string) (*Sqlite, error) {
 
 	_, err = client.Exec(`
 		CREATE TABLE IF NOT EXISTS tasks (
-			path TEXT NOT NULL,
+			path TEXT NOT NULL PRIMARY KEY,
 			payload BLOB,
-			created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-			namespace TEXT NOT NULL,
-			PRIMARY KEY (namespace, path)
+			created_at TEXT DEFAULT CURRENT_TIMESTAMP
 		) STRICT;
 	`)
 	if err != nil {
@@ -39,17 +38,19 @@ func NewSqlite(filename string, namespace string) (*Sqlite, error) {
 }
 
 func (s *Sqlite) Set(prefix string, payload any) error {
+	path := filepath.Clean("/" + s.namespace + "/" + prefix)
+
 	contents, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
 	_, err = s.client.Exec(`
-		INSERT INTO tasks (path, payload, namespace)
-		VALUES (?, ?, ?)
-		ON CONFLICT(namespace, path) DO UPDATE SET
-		payload = excluded.payload;
-	`, prefix, contents, s.namespace)
+		INSERT INTO tasks (path, payload)
+		VALUES (?, ?)
+		ON CONFLICT(path) DO UPDATE SET
+		payload = jsonb_patch(tasks.payload, excluded.payload);
+	`, path, contents, s.namespace)
 	if err != nil {
 		return fmt.Errorf("failed to insert task: %w", err)
 	}

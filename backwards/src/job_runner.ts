@@ -303,7 +303,7 @@ export class JobRunner {
 
   private async runTask(step: Task, stdin?: string): Promise<RunTaskResult> {
     const storageKey =
-      `/pipeline/${buildID}/jobs/${this.job.name}/tasks/${this.taskNames.length}/${step.task}`;
+      `/pipeline/${buildID}/jobs/${this.job.name}/tasks/${step.task}`;
     const mounts = await this.prepareMounts(step);
     this.taskNames.push(step.task);
 

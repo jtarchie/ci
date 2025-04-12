@@ -1,9 +1,12 @@
 package commands
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
@@ -12,6 +15,7 @@ import (
 
 	"github.com/georgysavva/scany/v2/sqlscan"
 	sprig "github.com/go-task/slim-sprig/v3"
+	"github.com/jtarchie/ci/server"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	slogecho "github.com/samber/slog-echo"
@@ -38,6 +42,27 @@ func (t *TemplateRender) Render(w io.Writer, name string, data interface{}, c ec
 	return nil
 }
 
+type Payload map[string]any
+
+// nolint: wrapcheck
+func (p *Payload) Value() (driver.Value, error) {
+	return json.Marshal(p)
+}
+
+// nolint: wrapcheck,err113
+func (p *Payload) Scan(value any) error {
+	switch x := value.(type) {
+	case string:
+		return json.NewDecoder(bytes.NewBufferString(x)).Decode(p)
+	case []byte:
+		return json.NewDecoder(bytes.NewBuffer(x)).Decode(p)
+	case nil:
+		return nil
+	default:
+		return fmt.Errorf("cannot scan type %T: %v", value, value)
+	}
+}
+
 func (c *Server) Run() error {
 	client, err := sql.Open("sqlite", c.Storage)
 	if err != nil {
@@ -54,14 +79,15 @@ func (c *Server) Run() error {
 		templates: templates,
 	}
 
-	server := echo.New()
-	server.Use(slogecho.New(slog.Default()))
-	server.Use(middleware.Recover())
-	server.Renderer = renderer
+	router := echo.New()
+	router.Use(slogecho.New(slog.Default()))
+	router.Use(middleware.Recover())
+	router.Renderer = renderer
 
-	server.GET("/", func(ctx echo.Context) error {
+	router.GET("/", func(ctx echo.Context) error {
 		type result struct {
-			Namespace string `db:"namespace"`
+			Path    string  `db:"path"`
+			Payload Payload `db:"payload"`
 		}
 
 		var results []result
@@ -72,24 +98,34 @@ func (c *Server) Run() error {
 			&results,
 			`
 				SELECT
-					DISTINCT namespace
-				FROM tasks
+					path, payload
+				FROM
+					tasks
+				ORDER BY
+					path
 			`,
 		)
 		if err != nil {
 			return fmt.Errorf("could not select: %w", err)
 		}
 
-		return ctx.Render(http.StatusOK, "namespaces.html", map[string]any{
-			"Results": results,
+		slog.Info("results", "results", len(results))
+
+		path := server.NewPath[Payload]()
+		for _, result := range results {
+			path.AddChild(result.Path, result.Payload)
+		}
+
+		return ctx.Render(http.StatusOK, "results.html", map[string]any{
+			"Path": path,
 		})
 	})
 
-	server.GET("/health", func(ctx echo.Context) error {
+	router.GET("/health", func(ctx echo.Context) error {
 		return ctx.String(http.StatusOK, "OK")
 	})
 
-	err = server.Start(fmt.Sprintf(":%d", c.Port))
+	err = router.Start(fmt.Sprintf(":%d", c.Port))
 	if err != nil {
 		return fmt.Errorf("could not start server: %w", err)
 	}

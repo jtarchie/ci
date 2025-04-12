@@ -34,7 +34,7 @@ declare global {
   }
 
   namespace storage {
-    function set(key: string, value: any): Promise<void>;
+    function set(key: string, value: unknown): Promise<void>;
   }
 
   namespace runtime {

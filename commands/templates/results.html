@@ -1,0 +1,227 @@
+/templates/results.html -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pipeline Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: "media", // Enable dark mode based on prefers-color-scheme
+        theme: {
+          extend: {
+            colors: {
+              success: "#10B981",
+              failure: "#EF4444",
+              error: "#F59E0B",
+              abort: "#6B7280",
+              pending: "#94A3B8",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      .task-details {
+        display: none;
+      }
+      .task-item:focus .task-details, 
+      .task-item:active .task-details {
+        display: block;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-100 dark:bg-gray-900 min-h-screen">
+    <div class="container mx-auto p-4">
+      <h1 class="text-3xl font-bold mb-4 dark:text-white">Pipeline Visualizer</h1>
+      
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6" id="pipeline">
+        <div class="space-y-4" id="tasks-container">
+          {{ template "renderPath" dict "Path" .Path "Depth" 0 }}
+        </div>
+      </div>
+    </div>
+    <script>
+              // Add event listeners
+              document.querySelectorAll(".task-item button").forEach(
+          (btn) => {
+            btn.addEventListener("click", function () {
+              const taskItem = this.closest(".task-item");
+              const details = taskItem.querySelector(".task-details");
+              details.classList.toggle("hidden");
+
+              // Toggle icon
+              const svg = this.querySelector("svg");
+              if (details.classList.contains("hidden")) {
+                svg.innerHTML =
+                  '<path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />';
+              } else {
+                svg.innerHTML =
+                  '<path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" />';
+              }
+            });
+          },
+        );
+
+        // Add keyboard navigation
+        document.querySelectorAll(".task-item").forEach((item) => {
+          item.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === " ") {
+              this.querySelector("button").click();
+              e.preventDefault();
+            }
+          });
+        });
+    </script>
+  </body>
+</html>
+
+{{/* Helper function to get status color */}}
+{{- define "getStatusColor" -}}
+{{- $status := .Value.status -}}
+{{- if eq $status "success" -}}
+bg-green-100 border-green-200 dark:bg-green-900/30 dark:border-green-800
+{{- else if eq $status "failure" -}}
+bg-red-100 border-red-200 dark:bg-red-900/30 dark:border-red-800
+{{- else if eq $status "error" -}}
+bg-yellow-100 border-yellow-200 dark:bg-yellow-900/30 dark:border-yellow-800
+{{- else if eq $status "abort" -}}
+bg-gray-100 border-gray-200 dark:bg-gray-700 dark:border-gray-600
+{{- else if eq $status "pending" -}}
+bg-slate-100 border-slate-200 dark:bg-slate-700 dark:border-slate-600
+{{- else -}}
+bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700
+{{- end -}}
+{{- end -}}
+
+{{/* Helper function to get status icon */}}
+{{- define "getStatusIcon" -}}
+{{- $status := .Value.status -}}
+{{- if eq $status "success" -}}
+<svg class="w-5 h-5 text-success" xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 20 20" fill="currentColor">
+  <path fill-rule="evenodd"
+    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+    clip-rule="evenodd" />
+</svg>
+{{- else if eq $status "failure" -}}
+<svg class="w-5 h-5 text-failure" xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 20 20" fill="currentColor">
+  <path fill-rule="evenodd"
+    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+    clip-rule="evenodd" />
+</svg>
+{{- else if eq $status "error" -}}
+<svg class="w-5 h-5 text-error" xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 20 20" fill="currentColor">
+  <path fill-rule="evenodd"
+    d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+    clip-rule="evenodd" />
+</svg>
+{{- else if eq $status "abort" -}}
+<svg class="w-5 h-5 text-abort" xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 20 20" fill="currentColor">
+  <path fill-rule="evenodd"
+    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z"
+    clip-rule="evenodd" />
+</svg>
+{{- else if eq $status "pending" -}}
+<svg class="w-5 h-5 text-notRun" xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 20 20" fill="currentColor">
+  <path fill-rule="evenodd"
+    d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+    clip-rule="evenodd" />
+</svg>
+{{- else -}}
+<svg class="w-5 h-5 text-gray-400" xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 20 20" fill="currentColor">
+  <path fill-rule="evenodd"
+    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z"
+    clip-rule="evenodd" />
+</svg>
+{{- end -}}
+{{- end -}}
+
+{{/* Get group color based on depth */}}
+{{- define "getGroupColor" -}}
+{{- $depth := . -}}
+{{- $mod := mod $depth 5 -}}
+{{- if eq $mod 0 -}}
+border-blue-300 dark:border-blue-600
+{{- else if eq $mod 1 -}}
+border-purple-300 dark:border-purple-600
+{{- else if eq $mod 2 -}}
+border-orange-300 dark:border-orange-600
+{{- else if eq $mod 3 -}}
+border-teal-300 dark:border-teal-600
+{{- else -}}
+border-pink-300 dark:border-pink-600
+{{- end -}}
+{{- end -}}
+
+{{/* Task template */}}
+{{- define "renderTask" -}}
+{{- $path := .Path -}}
+{{- $order := .Order -}}
+<div class="task-item {{ if eq $path.Value.status "pending" }}not-run{{ end }} {{ template "getStatusColor" $path }} border rounded-md p-3 transition-all dark:text-gray-200" tabindex="0">
+  <div class="flex items-center justify-between">
+    <div class="flex items-center space-x-2">
+      {{ template "getStatusIcon" $path }}
+      <div class="flex items-center">
+        <span class="inline-flex items-center justify-center w-6 h-6 mr-2 text-xs font-semibold rounded-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 dark:text-gray-200">
+          {{ $order }}
+        </span>
+        <span class="font-medium">{{ $path.Name }}</span>
+        {{ if $path.Value.note }}
+        <span class="text-xs text-gray-500 dark:text-gray-400 ml-2">({{ $path.Value.note }})</span>
+        {{ end }}
+      </div>
+    </div>
+    <div class="flex items-center space-x-2">
+      <span class="text-xs px-2 py-1 rounded-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 dark:text-gray-300">
+        {{ $path.Value.type }}
+      </span>
+    </div>
+  </div>
+  <div class="task-details mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+    <div class="grid grid-cols-2 gap-4 text-sm">
+      <div>
+        <p class="font-semibold">Status: <span class="font-normal">{{ $path.Value.status }}</span></p>
+      </div>
+    </div>
+  </div>
+</div>
+{{- end -}}
+
+{{/* Group template */}}
+{{- define "renderGroup" -}}
+{{- $path := .Path -}}
+{{- $depth := .Depth -}}
+<div class="group-container border-l-4 pl-4 {{ template "getGroupColor" $depth }}">
+  <div class="font-medium text-gray-700 dark:text-gray-300 mb-2">{{ $path.Name }}</div>
+  <div class="space-y-2">
+    {{/* Render children */}}
+    {{ range $index, $child := $path.Children }}
+      {{ template "renderPath" dict "Path" $child "Depth" (add $depth 1) "Order" (add $index 1) }}
+    {{ end }}
+  </div>
+</div>
+{{- end -}}
+
+{{/* Main recursive path rendering */}}
+{{ define "renderPath" }}
+  {{ $path := .Path }}
+  {{ $depth := .Depth }}
+  {{ $order := .Order }}
+  
+  {{ if and $path.Children (gt (len $path.Children) 0) }}
+    {{ template "renderGroup" dict "Path" $path "Depth" $depth }}
+  {{ else if ne $path.Name "" }}
+    {{ template "renderTask" dict "Path" $path "Order" $order }}
+  {{ else }}
+    {{ range $index, $child := $path.Children }}
+      {{ template "renderPath" dict "Path" $child "Depth" $depth "Order" (add $index 1) }}
+    {{ end }}
+  {{ end }}
+{{ end }}
