@@ -153,6 +153,8 @@ export class JobRunner {
         ensure: step.ensure,
         on_success: step.on_success,
         on_failure: step.on_failure,
+        on_error: step.on_error,
+        on_abort: step.on_abort,
         timeout: step.timeout,
       },
       JSON.stringify({
@@ -188,6 +190,8 @@ export class JobRunner {
         ensure: step.ensure,
         on_success: step.on_success,
         on_failure: step.on_failure,
+        on_error: step.on_error,
+        on_abort: step.on_abort,
         timeout: step.timeout,
       },
       JSON.stringify({
@@ -221,6 +225,8 @@ export class JobRunner {
         ensure: step.ensure,
         on_success: step.on_success,
         on_failure: step.on_failure,
+        on_error: step.on_error,
+        on_abort: step.on_abort,
         timeout: step.timeout,
       },
       JSON.stringify({
@@ -255,6 +261,8 @@ export class JobRunner {
         ensure: step.ensure,
         on_success: step.on_success,
         on_failure: step.on_failure,
+        on_error: step.on_error,
+        on_abort: step.on_abort,
         timeout: step.timeout,
       },
       JSON.stringify({
