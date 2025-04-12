@@ -335,7 +335,7 @@ export class JobRunner {
       storage.set(
         storageKey,
         {
-          status: result.status,
+          status: result.code === 0 ? "success" : "failure",
           code: result.code,
           stdout: result.stdout,
           stderr: result.stderr,
