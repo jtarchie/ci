@@ -41,7 +41,7 @@ func youtubeIDStyle(input string) string {
 	return encoded
 }
 
-func (c *Runner) Run() error {
+func (c *Runner) Run(loggers ...*slog.Logger) error {
 	pipelinePath, err := filepath.Abs(c.Pipeline)
 	if err != nil {
 		return fmt.Errorf("could not get absolute path to pipeline: %w", err)
@@ -49,7 +49,11 @@ func (c *Runner) Run() error {
 
 	runtimeID := youtubeIDStyle(pipelinePath)
 
-	logger := slog.Default().WithGroup("runner").With(
+	if len(loggers) == 0 {
+		loggers = []*slog.Logger{slog.Default()}
+	}
+
+	logger := loggers[0].WithGroup("runner").With(
 		"id", runtimeID,
 		"pipeline", c.Pipeline,
 		"orchestrator", c.Orchestrator,
