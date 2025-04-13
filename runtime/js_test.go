@@ -76,5 +76,5 @@ func TestYAMLAndAssert(t *testing.T) {
 
 		export { pipeline };
 	`, nil, nil)
-	assert.Expect(err).ToNot(HaveOccurred())
+	assert.Expect(err).NotTo(HaveOccurred())
 }

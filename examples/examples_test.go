@@ -17,13 +17,13 @@ func TestExamplesDocker(t *testing.T) {
 	assert := NewGomegaWithT(t)
 
 	matches, err := doublestar.FilepathGlob("docker/*.{js,ts,yml,yaml}")
-	assert.Expect(err).ToNot(HaveOccurred())
+	assert.Expect(err).NotTo(HaveOccurred())
 
 	drivers := []string{"docker"}
 
 	for _, match := range matches {
 		examplePath, err := filepath.Abs(match)
-		assert.Expect(err).ToNot(HaveOccurred())
+		assert.Expect(err).NotTo(HaveOccurred())
 
 		for _, driver := range drivers {
 			t.Run(driver+": "+match, func(t *testing.T) {
@@ -35,7 +35,7 @@ func TestExamplesDocker(t *testing.T) {
 					Orchestrator: driver,
 				}
 				err := runner.Run()
-				assert.Expect(err).ToNot(HaveOccurred())
+				assert.Expect(err).NotTo(HaveOccurred())
 			})
 		}
 	}
@@ -47,7 +47,7 @@ func TestExamplesAll(t *testing.T) {
 	assert := NewGomegaWithT(t)
 
 	matches, err := doublestar.FilepathGlob("both/*.{js,ts,yml,yaml}")
-	assert.Expect(err).ToNot(HaveOccurred())
+	assert.Expect(err).NotTo(HaveOccurred())
 
 	drivers := []string{
 		"docker",
@@ -56,7 +56,7 @@ func TestExamplesAll(t *testing.T) {
 
 	for _, match := range matches {
 		examplePath, err := filepath.Abs(match)
-		assert.Expect(err).ToNot(HaveOccurred())
+		assert.Expect(err).NotTo(HaveOccurred())
 
 		for _, driver := range drivers {
 			t.Run(driver+": "+match, func(t *testing.T) {
@@ -68,7 +68,7 @@ func TestExamplesAll(t *testing.T) {
 					Orchestrator: driver,
 				}
 				err := runner.Run()
-				assert.Expect(err).ToNot(HaveOccurred())
+				assert.Expect(err).NotTo(HaveOccurred())
 			})
 		}
 	}

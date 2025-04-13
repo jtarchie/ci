@@ -33,7 +33,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 			Orchestrator: "native",
 		}
 		err := runner.Run(logger)
-		assert.Expect(err).ToNot(HaveOccurred())
+		assert.Expect(err).NotTo(HaveOccurred())
 		assert.Expect(logs.String()).To(ContainSubstring("failing-task failed with code 1"))
 	})
 
@@ -46,7 +46,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 			Orchestrator: "native",
 		}
 		err := runner.Run()
-		assert.Expect(err).ToNot(HaveOccurred())
+		assert.Expect(err).NotTo(HaveOccurred())
 	})
 
 	t.Run("ensure", func(t *testing.T) {
@@ -59,7 +59,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 			Orchestrator: "native",
 		}
 		err := runner.Run(logger)
-		assert.Expect(err).ToNot(HaveOccurred())
+		assert.Expect(err).NotTo(HaveOccurred())
 		assert.Expect(logs.String()).To(ContainSubstring("ensure-task failed with code 1"))
 	})
 
@@ -73,7 +73,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 			Orchestrator: "native",
 		}
 		err := runner.Run(logger)
-		assert.Expect(err).ToNot(HaveOccurred())
+		assert.Expect(err).NotTo(HaveOccurred())
 		assert.Expect(logs.String()).To(ContainSubstring("ensure-task failed with code 11"))
 	})
 
@@ -86,7 +86,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 			Orchestrator: "native",
 		}
 		err := runner.Run()
-		assert.Expect(err).ToNot(HaveOccurred())
+		assert.Expect(err).NotTo(HaveOccurred())
 	})
 
 	t.Run("all", func(t *testing.T) {
@@ -99,7 +99,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 			Orchestrator: "native",
 		}
 		err := runner.Run(logger)
-		assert.Expect(err).ToNot(HaveOccurred())
+		assert.Expect(err).NotTo(HaveOccurred())
 		assert.Expect(logs.String()).To(ContainSubstring(`assert`))
 		assert.Expect(strings.Count(logs.String(), `assert`)).To(Equal(6))
 	})
@@ -114,7 +114,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 			Orchestrator: "native",
 		}
 		err := runner.Run(logger)
-		assert.Expect(err).ToNot(HaveOccurred())
+		assert.Expect(err).NotTo(HaveOccurred())
 		assert.Expect(logs.String()).To(ContainSubstring("Task erroring-task errored"))
 		assert.Expect(logs.String()).To(ContainSubstring(`assert`))
 		assert.Expect(strings.Count(logs.String(), `assert`)).To(Equal(10))
@@ -130,7 +130,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 			Orchestrator: "native",
 		}
 		err := runner.Run(logger)
-		assert.Expect(err).ToNot(HaveOccurred())
+		assert.Expect(err).NotTo(HaveOccurred())
 		assert.Expect(logs.String()).To(ContainSubstring("Task abort-task aborted"))
 	})
 
@@ -143,6 +143,6 @@ func TestBackwardsCompatibility(t *testing.T) {
 			Orchestrator: "native",
 		}
 		err := runner.Run()
-		assert.Expect(err).ToNot(HaveOccurred())
+		assert.Expect(err).NotTo(HaveOccurred())
 	})
 }
