@@ -12,31 +12,70 @@ const buildID = Date.now();
 export class JobRunner {
   private taskNames: string[] = [];
   private taskRunner: TaskRunner;
+  private storagePathPrefix: string;
 
   constructor(
     private job: Job,
     private resources: Resource[],
     private resourceTypes: ResourceType[],
   ) {
-    const storagePathPrefix = `/pipeline/${buildID}/jobs/${this.job.name}`;
-    this.taskRunner = new TaskRunner(job, storagePathPrefix, this.taskNames);
+    this.storagePathPrefix = `/pipeline/${buildID}/jobs/${this.job.name}`;
+    this.taskRunner = new TaskRunner(
+      job,
+      this.storagePathPrefix,
+      this.taskNames,
+    );
   }
 
   async run(): Promise<void> {
+    let failure: unknown = undefined;
+
+    storage.set(this.storagePathPrefix, { status: "pending" });
+
     try {
       for (const step of this.job.plan) {
         await this.processStep(step);
       }
+      storage.set(this.storagePathPrefix, { status: "success" });
+    } catch (error) {
+      console.error(error);
+      failure = error;
+    }
 
-      if (this.job.assert?.execution) {
-        assert.equal(this.taskNames, this.job.assert.execution);
+    try {
+      // Handle job-level hooks based on the outcome
+      if (failure === undefined && this.job.on_success) {
+        await this.processStep(this.job.on_success);
+      } else if (failure instanceof TaskFailure) {
+        storage.set(this.storagePathPrefix, { status: "failure" });
+
+        if (this.job.on_failure) {
+          await this.processStep(this.job.on_failure);
+        }
+      } else if (failure instanceof TaskErrored) {
+        storage.set(this.storagePathPrefix, { status: "error" });
+
+        if (this.job.on_error) {
+          await this.processStep(this.job.on_error);
+        }
+      } else if (failure instanceof TaskAbort) {
+        storage.set(this.storagePathPrefix, { status: "abort" });
+
+        if (this.job.on_abort) {
+          await this.processStep(this.job.on_abort);
+        }
+      }
+
+      // Always execute ensure hook if present
+      if (this.job.ensure) {
+        await this.processStep(this.job.ensure);
       }
     } catch (error) {
-      if (this.job.assert?.execution) {
-        assert.equal(this.taskNames, this.job.assert.execution);
-      }
-
       console.error(error);
+    }
+
+    if (this.job.assert?.execution) {
+      assert.equal(this.taskNames, this.job.assert.execution);
     }
   }
 

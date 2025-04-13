@@ -101,7 +101,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 		err := runner.Run(logger)
 		assert.Expect(err).NotTo(HaveOccurred())
 		assert.Expect(logs.String()).To(ContainSubstring(`assert`))
-		assert.Expect(strings.Count(logs.String(), `assert`)).To(Equal(6))
+		assert.Expect(strings.Count(logs.String(), `assert`)).To(Equal(17))
 	})
 
 	t.Run("on_error", func(t *testing.T) {

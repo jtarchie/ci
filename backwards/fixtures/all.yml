@@ -1,3 +1,11 @@
+assert:
+  execution:
+  - test-job
+  - test-job-hooks
+  - test-job-failure-hooks
+  - test-job-error-hooks
+  - test-job-abort-hooks
+
 jobs:
   - name: test-job
     plan:
@@ -187,3 +195,103 @@ jobs:
         - "ensure-do-abort-task"
         - "abort-try-abort-task"
         - "ensure-try-abort-task"
+
+  - name: test-job-hooks
+    plan:
+      - task: successful-task
+        config: &success
+          platform: linux
+          image_resource:
+            type: docker-image
+            source:
+              repository: busybox
+              tag: latest
+          run:
+            path: sh
+            args: ["-c", "exit 0"]
+    on_success:
+      task: job-success-hook
+      config: *success
+    ensure:
+      task: job-ensure-hook
+      config: *success
+    assert:
+      execution:
+        - "successful-task"
+        - "job-success-hook"
+        - "job-ensure-hook"
+
+  - name: test-job-failure-hooks
+    plan:
+      - task: failing-task
+        config: &failure
+          platform: linux
+          image_resource:
+            type: docker-image
+            source:
+              repository: busybox
+              tag: latest
+          run:
+            path: sh
+            args: ["-c", "exit 1"]
+    on_failure:
+      task: job-failure-hook
+      config: *success
+    ensure:
+      task: job-ensure-hook
+      config: *success
+    assert:
+      execution:
+        - "failing-task"
+        - "job-failure-hook"
+        - "job-ensure-hook"
+
+  - name: test-job-error-hooks
+    plan:
+      - task: error-task
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source:
+              repository: busybox
+              tag: latest
+          run:
+            path: command-that-does-not-exist
+    on_error:
+      task: job-error-hook
+      config: *success
+    ensure:
+      task: job-ensure-hook
+      config: *success
+    assert:
+      execution:
+        - "error-task"
+        - "job-error-hook"
+        - "job-ensure-hook"
+
+  - name: test-job-abort-hooks
+    plan:
+      - task: abort-task
+        timeout: 1ms
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source:
+              repository: busybox
+              tag: latest
+          run:
+            path: sh
+            args: ["-c", "sleep 10"]
+    on_abort:
+      task: job-abort-hook
+      config: *success
+    ensure:
+      task: job-ensure-hook
+      config: *success
+    assert:
+      execution:
+        - "abort-task"
+        - "job-abort-hook"
+        - "job-ensure-hook"
