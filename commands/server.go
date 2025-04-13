@@ -46,13 +46,12 @@ func (t *TemplateRender) Render(w io.Writer, name string, data interface{}, c ec
 
 type Payload map[string]any
 
-// nolint: wrapcheck
 func (p *Payload) Value() (driver.Value, error) {
-	return json.Marshal(p)
+	return json.Marshal(p) //nolint: wrapcheck
 }
 
-// nolint: wrapcheck,err113
 func (p *Payload) Scan(value any) error {
+	//nolint: wrapcheck,err113
 	switch x := value.(type) {
 	case string:
 		return json.NewDecoder(bytes.NewBufferString(x)).Decode(p)
