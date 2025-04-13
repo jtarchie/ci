@@ -1,3 +1,7 @@
+assert:
+  execution:
+  - "success-job"
+
 jobs:
   - name: success-job
     plan:

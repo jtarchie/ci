@@ -1,5 +1,9 @@
+assert:
+  execution:
+  - "error-job"
+
 jobs:
-  - name: failing-job
+  - name: error-job
     plan:
       - task: erroring-task
         config:

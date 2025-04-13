@@ -1,3 +1,7 @@
+assert:
+  execution:
+  - "abort-job"
+
 jobs:
   - name: abort-job
     plan:

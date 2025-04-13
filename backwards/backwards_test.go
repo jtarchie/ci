@@ -2,9 +2,13 @@ package backwards_test
 
 import (
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/goccy/go-yaml"
+	"github.com/jtarchie/ci/backwards"
 	"github.com/jtarchie/ci/commands"
 	_ "github.com/jtarchie/ci/orchestra/native"
 	. "github.com/onsi/gomega"
@@ -101,7 +105,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 		err := runner.Run(logger)
 		assert.Expect(err).NotTo(HaveOccurred())
 		assert.Expect(logs.String()).To(ContainSubstring(`assert`))
-		assert.Expect(strings.Count(logs.String(), `assert`)).To(Equal(17))
+		assert.Expect(strings.Count(logs.String(), `assert`)).To(Equal(21))
 	})
 
 	t.Run("on_error", func(t *testing.T) {
@@ -117,7 +121,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 		assert.Expect(err).NotTo(HaveOccurred())
 		assert.Expect(logs.String()).To(ContainSubstring("Task erroring-task errored"))
 		assert.Expect(logs.String()).To(ContainSubstring(`assert`))
-		assert.Expect(strings.Count(logs.String(), `assert`)).To(Equal(10))
+		assert.Expect(strings.Count(logs.String(), `assert`)).To(Equal(12))
 	})
 
 	t.Run("on_abort", func(t *testing.T) {
@@ -144,5 +148,51 @@ func TestBackwardsCompatibility(t *testing.T) {
 		}
 		err := runner.Run(nil)
 		assert.Expect(err).NotTo(HaveOccurred())
+	})
+
+	t.Run("mutate job asserts", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		matches, err := filepath.Glob("fixtures/*.yml")
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(matches).NotTo(BeEmpty())
+
+		for _, match := range matches {
+			// Capture the variable for the closure
+			t.Run(filepath.Base(match), func(t *testing.T) {
+				t.Parallel()
+
+				assert := NewGomegaWithT(t)
+				contents, err := os.ReadFile(match)
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				var config backwards.Config
+				err = yaml.UnmarshalWithOptions(contents, &config, yaml.Strict())
+				assert.Expect(err).NotTo(HaveOccurred())
+				assert.Expect(config.Assert.Execution).NotTo(BeEmpty())
+
+				config.Assert.Execution[0] = "unknown-job"
+
+				file, err := os.CreateTemp(t.TempDir(), "*.yml")
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer os.Remove(file.Name())
+
+				contents, err = yaml.MarshalWithOptions(config)
+				assert.Expect(err).NotTo(HaveOccurred())
+				_, err = file.Write(contents)
+				assert.Expect(err).NotTo(HaveOccurred())
+				assert.Expect(file.Close()).NotTo(HaveOccurred())
+
+				runner := commands.Runner{
+					Pipeline:     file.Name(),
+					Orchestrator: "native",
+				}
+				err = runner.Run(nil)
+
+				assert.Expect(err).To(HaveOccurred())
+				assert.Expect(err.Error()).To(ContainSubstring("assertion failed"))
+			})
+		}
 	})
 }
