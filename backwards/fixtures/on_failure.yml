@@ -1,3 +1,7 @@
+assert:
+  execution:
+  - "failing-job"
+
 jobs:
   - name: failing-job
     plan:
