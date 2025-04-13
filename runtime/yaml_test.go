@@ -17,10 +17,10 @@ func TestYAML(t *testing.T) {
 
 	jsVM := goja.New()
 	err := jsVM.Set("assert", runtime.NewAssert(jsVM, slog.Default()))
-	assert.Expect(err).ToNot(HaveOccurred())
+	assert.Expect(err).NotTo(HaveOccurred())
 
 	err = jsVM.Set("YAML", runtime.NewYAML(jsVM, slog.Default()))
-	assert.Expect(err).ToNot(HaveOccurred())
+	assert.Expect(err).NotTo(HaveOccurred())
 
 	_, err = jsVM.RunString(strings.TrimSpace(`
 		const payload = YAML.Parse("foo: bar\nbaz: qux");
@@ -30,7 +30,7 @@ func TestYAML(t *testing.T) {
 		const yaml = YAML.Stringify(payload);
 		assert.Equal(yaml, "baz: qux\nfoo: bar\n");
 	`))
-	assert.Expect(err).ToNot(HaveOccurred())
+	assert.Expect(err).NotTo(HaveOccurred())
 
 	_, err = jsVM.RunString(`YAML.Parse("[{]]")`)
 	assert.Expect(err).To(HaveOccurred())

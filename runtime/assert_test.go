@@ -17,7 +17,7 @@ func TestAssert(t *testing.T) {
 
 	jsVM := goja.New()
 	err := jsVM.Set("assert", runtime.NewAssert(jsVM, slog.Default()))
-	assert.Expect(err).ToNot(HaveOccurred())
+	assert.Expect(err).NotTo(HaveOccurred())
 	_, err = jsVM.RunString(strings.TrimSpace(`
 		assert.Equal(1, 1);
 		assert.NotEqual(1, 2);
@@ -25,7 +25,7 @@ func TestAssert(t *testing.T) {
 		assert.Truthy(true);
 		assert.ContainsElement([1, 2, 3], 2);
 	`))
-	assert.Expect(err).ToNot(HaveOccurred())
+	assert.Expect(err).NotTo(HaveOccurred())
 
 	failures := []string{
 		"assert.Equal(1, 2);",
