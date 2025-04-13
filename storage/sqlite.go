@@ -22,9 +22,11 @@ func NewSqlite(filename string, namespace string) (*Sqlite, error) {
 
 	_, err = client.Exec(`
 		CREATE TABLE IF NOT EXISTS tasks (
-			path TEXT NOT NULL PRIMARY KEY,
+			id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+			path TEXT NOT NULL,
 			payload BLOB,
-			created_at TEXT DEFAULT CURRENT_TIMESTAMP
+			created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(path)
 		) STRICT;
 	`)
 	if err != nil {

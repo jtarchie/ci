@@ -4,18 +4,21 @@ export class TaskRunner {
   private knownMounts: KnownMounts = {};
 
   constructor(
-    private job: Job,
-    private storagePathPrefix: string,
     private taskNames: string[],
   ) {}
 
-  async runTask(step: Task, stdin?: string): Promise<RunTaskResult> {
-    const storageKey = `${this.storagePathPrefix}/tasks/${step.task}`;
+  async runTask(
+    step: Task,
+    stdin: string | undefined,
+    storageKey: string,
+  ): Promise<RunTaskResult> {
+    // Use provided storage key or default to a simple task name key
+    const taskStorageKey = storageKey;
     const mounts = await this.prepareMounts(step);
     this.taskNames.push(step.task);
 
     storage.set(
-      storageKey,
+      taskStorageKey,
       {
         status: "pending",
       },
@@ -47,7 +50,7 @@ export class TaskRunner {
       }
 
       storage.set(
-        storageKey,
+        taskStorageKey,
         {
           status: status,
           code: result.code,
@@ -60,48 +63,12 @@ export class TaskRunner {
 
       return result;
     } catch (error) {
-      storage.set(storageKey, { status: "error" });
+      storage.set(taskStorageKey, { status: "error" });
 
       throw new TaskErrored(
         `Task ${step.task} errored with message ${error}`,
       );
     }
-  }
-
-  async getFile(file: string, mountName: string): Promise<string> {
-    if (!this.knownMounts[mountName]) {
-      throw new Error(`Mount ${mountName} does not exist`);
-    }
-
-    const result = await this.runTask(
-      {
-        task: `get-file-${file}`,
-        config: {
-          image_resource: {
-            type: "registry-image",
-            source: {
-              repository: "busybox",
-            },
-          },
-          inputs: [
-            { name: mountName },
-          ],
-          run: {
-            path: "sh",
-            args: ["-c", `cat ${file}`],
-          },
-        },
-        assert: {
-          code: 0,
-        },
-      },
-    );
-
-    if (result.code !== 0) {
-      throw new Error(`Failed to get file ${file}`);
-    }
-
-    return result.stdout;
   }
 
   getKnownMounts(): KnownMounts {

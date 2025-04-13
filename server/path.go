@@ -19,12 +19,8 @@ func (p *Path[T]) AddChild(name string, value T) {
 	for _, part := range parts {
 		var child *Path[T]
 
-		for _, c := range current.Children {
-			if c.Name == part {
-				child = c
-
-				break
-			}
+		if len(current.Children) > 0 && current.Children[len(current.Children)-1].Name == part {
+			child = current.Children[len(current.Children)-1]
 		}
 
 		if child == nil {

@@ -1,17 +1,15 @@
 // src/task_runner.ts
 var TaskRunner = class {
-  constructor(job, storagePathPrefix, taskNames) {
-    this.job = job;
-    this.storagePathPrefix = storagePathPrefix;
+  constructor(taskNames) {
     this.taskNames = taskNames;
   }
   knownMounts = {};
-  async runTask(step, stdin) {
-    const storageKey = `${this.storagePathPrefix}/tasks/${step.task}`;
+  async runTask(step, stdin, storageKey) {
+    const taskStorageKey = storageKey;
     const mounts = await this.prepareMounts(step);
     this.taskNames.push(step.task);
     storage.set(
-      storageKey,
+      taskStorageKey,
       {
         status: "pending"
       }
@@ -39,7 +37,7 @@ var TaskRunner = class {
         status = "failure";
       }
       storage.set(
-        storageKey,
+        taskStorageKey,
         {
           status,
           code: result.code,
@@ -50,43 +48,11 @@ var TaskRunner = class {
       this.validateTaskResult(step, result);
       return result;
     } catch (error) {
-      storage.set(storageKey, { status: "error" });
+      storage.set(taskStorageKey, { status: "error" });
       throw new TaskErrored(
         `Task ${step.task} errored with message ${error}`
       );
     }
-  }
-  async getFile(file, mountName) {
-    if (!this.knownMounts[mountName]) {
-      throw new Error(`Mount ${mountName} does not exist`);
-    }
-    const result = await this.runTask(
-      {
-        task: `get-file-${file}`,
-        config: {
-          image_resource: {
-            type: "registry-image",
-            source: {
-              repository: "busybox"
-            }
-          },
-          inputs: [
-            { name: mountName }
-          ],
-          run: {
-            path: "sh",
-            args: ["-c", `cat ${file}`]
-          }
-        },
-        assert: {
-          code: 0
-        }
-      }
-    );
-    if (result.code !== 0) {
-      throw new Error(`Failed to get file ${file}`);
-    }
-    return result.stdout;
   }
   getKnownMounts() {
     return this.knownMounts;
@@ -131,112 +97,178 @@ var TaskAbort = class extends CustomError {
 };
 
 // src/job_runner.ts
-var buildID = Date.now();
 var JobRunner = class {
-  constructor(job, resources, resourceTypes) {
-    this.job = job;
+  constructor(jobConfig, resources, resourceTypes) {
+    this.jobConfig = jobConfig;
     this.resources = resources;
     this.resourceTypes = resourceTypes;
-    this.storagePathPrefix = `/pipeline/${buildID}/jobs/${this.job.name}`;
-    this.taskRunner = new TaskRunner(
-      job,
-      this.storagePathPrefix,
-      this.taskNames
-    );
+    this.buildID = Date.now();
+    this.taskRunner = new TaskRunner(this.taskNames);
   }
   taskNames = [];
   taskRunner;
-  storagePathPrefix;
+  buildID;
   async run() {
-    const storageKey = this.storagePathPrefix + "/tasks";
+    const storageKey = `${this.getBaseStorageKey()}/tasks`;
     let failure = void 0;
     storage.set(storageKey, { status: "pending" });
     try {
-      for (const step of this.job.plan) {
-        await this.processStep(step);
+      for (const step of this.jobConfig.plan) {
+        await this.processStep(step, "");
       }
       storage.set(storageKey, { status: "success" });
     } catch (error) {
       console.error(error);
       failure = error;
-    }
-    try {
-      if (failure === void 0 && this.job.on_success) {
-        await this.processStep(this.job.on_success);
-      } else if (failure instanceof TaskFailure) {
+      if (failure instanceof TaskFailure) {
         storage.set(storageKey, { status: "failure" });
-        if (this.job.on_failure) {
-          await this.processStep(this.job.on_failure);
-        }
       } else if (failure instanceof TaskErrored) {
         storage.set(storageKey, { status: "error" });
-        if (this.job.on_error) {
-          await this.processStep(this.job.on_error);
-        }
       } else if (failure instanceof TaskAbort) {
         storage.set(storageKey, { status: "abort" });
-        if (this.job.on_abort) {
-          await this.processStep(this.job.on_abort);
-        }
+      } else {
+        storage.set(storageKey, { status: "error" });
       }
-      if (this.job.ensure) {
-        await this.processStep(this.job.ensure);
+    }
+    try {
+      if (failure === void 0 && this.jobConfig.on_success) {
+        await this.processStep(this.jobConfig.on_success, "hooks/on_success");
+      } else if (failure instanceof TaskFailure && this.jobConfig.on_failure) {
+        await this.processStep(this.jobConfig.on_failure, "hooks/on_failure");
+      } else if (failure instanceof TaskErrored && this.jobConfig.on_error) {
+        await this.processStep(this.jobConfig.on_error, "hooks/on_error");
+      } else if (failure instanceof TaskAbort && this.jobConfig.on_abort) {
+        await this.processStep(this.jobConfig.on_abort, "hooks/on_abort");
+      }
+      if (this.jobConfig.ensure) {
+        await this.processStep(this.jobConfig.ensure, "hooks/ensure");
       }
     } catch (error) {
       console.error(error);
     }
-    if (this.job.assert?.execution) {
-      assert.equal(this.taskNames, this.job.assert.execution);
+    if (this.jobConfig.assert?.execution) {
+      assert.equal(this.taskNames, this.jobConfig.assert.execution);
     }
   }
-  async processStep(step) {
-    if ("get" in step) {
-      await this.processGetStep(step);
-    } else if ("do" in step) {
-      await this.processDoStep(step);
+  getBaseStorageKey() {
+    return `/pipeline/${this.buildID}/jobs/${this.jobConfig.name}`;
+  }
+  getStepIdentifier(step) {
+    if ("task" in step) {
+      return `tasks/${step.task}`;
+    } else if ("get" in step) {
+      return `get/${step.get}`;
     } else if ("put" in step) {
-      await this.processPutStep(step);
+      return `put/${step.put}`;
+    } else if ("do" in step) {
+      return "do";
     } else if ("try" in step) {
-      await this.processTryStep(step);
-    } else if ("task" in step) {
-      await this.processTaskStep(step);
+      return "try";
     } else if ("in_parallel" in step) {
-      await this.processParallelSteps(step);
+      return "in_parallel";
+    }
+    return "unknown";
+  }
+  generateStorageKeyForStep(step, currentPath) {
+    const basePath = this.getBaseStorageKey();
+    const stepId = this.getStepIdentifier(step);
+    return `${basePath}/${currentPath}/${stepId}`;
+  }
+  async processStep(step, pathContext) {
+    if ("get" in step) {
+      await this.processGetStep(
+        step,
+        `${pathContext}/${this.getStepIdentifier(step)}`
+      );
+    } else if ("do" in step) {
+      await this.processDoStep(
+        step,
+        `${pathContext}/${this.getStepIdentifier(step)}`
+      );
+    } else if ("put" in step) {
+      await this.processPutStep(
+        step,
+        `${pathContext}/${this.getStepIdentifier(step)}`
+      );
+    } else if ("try" in step) {
+      await this.processTryStep(
+        step,
+        `${pathContext}/${this.getStepIdentifier(step)}`
+      );
+    } else if ("task" in step) {
+      await this.processTaskStep(
+        step,
+        `${pathContext}/${this.getStepIdentifier(step)}`
+      );
+    } else if ("in_parallel" in step) {
+      await this.processParallelSteps(
+        step,
+        `${pathContext}/${this.getStepIdentifier(step)}`
+      );
     }
   }
-  async getFile(file) {
+  async getFile(file, pathContext) {
     const mountName = file.split("/")[0];
-    return await this.taskRunner.getFile(file, mountName);
+    const result = await this.runTask(
+      {
+        task: `get-file-${file}`,
+        config: {
+          image_resource: {
+            type: "registry-image",
+            source: {
+              repository: "busybox"
+            }
+          },
+          inputs: [
+            { name: mountName }
+          ],
+          run: {
+            path: "sh",
+            args: ["-c", `cat ${file}`]
+          }
+        },
+        assert: {
+          code: 0
+        }
+      },
+      void 0,
+      pathContext
+    );
+    return result.stdout;
   }
-  async processTaskStep(step) {
+  async processTaskStep(step, pathContext) {
     if ("file" in step) {
-      const contents = await this.getFile(step.file);
+      const contents = await this.getFile(step.file, pathContext);
       const taskConfig = YAML.parse(contents);
-      await this.runTask({
-        task: step.task,
-        config: taskConfig,
-        assert: step.assert,
-        ensure: step.ensure,
-        on_success: step.on_success,
-        on_failure: step.on_failure,
-        on_error: step.on_error,
-        on_abort: step.on_abort,
-        timeout: step.timeout
-      });
+      await this.runTask(
+        {
+          task: step.task,
+          config: taskConfig,
+          assert: step.assert,
+          ensure: step.ensure,
+          on_success: step.on_success,
+          on_failure: step.on_failure,
+          on_error: step.on_error,
+          on_abort: step.on_abort,
+          timeout: step.timeout
+        },
+        void 0,
+        pathContext
+      );
     } else {
-      await this.runTask(step);
+      await this.runTask(step, void 0, pathContext);
     }
   }
-  async processParallelSteps(step) {
-    await this.processDoStep(step);
+  async processParallelSteps(step, pathContext) {
+    await this.processDoStep(step, pathContext);
   }
-  async processTryStep(step) {
+  async processTryStep(step, pathContext) {
     try {
-      await this.processDoStep(step);
+      await this.processDoStep(step, pathContext);
     } catch (_err) {
     }
   }
-  async processDoStep(step) {
+  async processDoStep(step, pathContext) {
     let failure = void 0;
     try {
       let steps = [];
@@ -247,29 +279,30 @@ var JobRunner = class {
       } else if ("try" in step) {
         steps = step.try;
       }
-      for (const subStep of steps) {
-        await this.processStep(subStep);
+      for (let i = 0; i < steps.length; i++) {
+        const subStep = steps[i];
+        await this.processStep(subStep, `${pathContext}`);
       }
     } catch (error) {
       failure = error;
     }
     if (failure == void 0 && step.on_success) {
-      await this.processStep(step.on_success);
+      await this.processStep(step.on_success, `${pathContext}/on_success`);
     } else if (failure instanceof TaskFailure && step.on_failure) {
-      await this.processStep(step.on_failure);
+      await this.processStep(step.on_failure, `${pathContext}/on_failure`);
     } else if (failure instanceof TaskErrored && step.on_error) {
-      await this.processStep(step.on_error);
+      await this.processStep(step.on_error, `${pathContext}/on_error`);
     } else if (failure instanceof TaskAbort && step.on_abort) {
-      await this.processStep(step.on_abort);
+      await this.processStep(step.on_abort, `${pathContext}/on_abort`);
     }
     if (step.ensure) {
-      await this.processStep(step.ensure);
+      await this.processStep(step.ensure, `${pathContext}/ensure`);
     }
     if (failure) {
       throw failure;
     }
   }
-  async processPutStep(step) {
+  async processPutStep(step, pathContext) {
     const resource = this.findResource(step.put);
     const resourceType = this.findResourceType(resource?.type);
     const putResponse = await this.runTask(
@@ -303,7 +336,8 @@ var JobRunner = class {
       JSON.stringify({
         source: resource?.source,
         params: step.params
-      })
+      }),
+      `${pathContext}/put`
     );
     const putPayload = JSON.parse(putResponse.stdout);
     const version = putPayload.version;
@@ -338,10 +372,11 @@ var JobRunner = class {
       JSON.stringify({
         source: resource?.source,
         version
-      })
+      }),
+      `${pathContext}/get`
     );
   }
-  async processGetStep(step) {
+  async processGetStep(step, pathContext) {
     const resource = this.findResource(step.get);
     const resourceType = this.findResourceType(resource?.type);
     const checkResult = await this.runTask(
@@ -370,7 +405,8 @@ var JobRunner = class {
       },
       JSON.stringify({
         source: resource?.source
-      })
+      }),
+      `${pathContext}/check`
     );
     const checkPayload = JSON.parse(checkResult.stdout);
     const version = checkPayload[0];
@@ -405,7 +441,8 @@ var JobRunner = class {
       JSON.stringify({
         source: resource?.source,
         version
-      })
+      }),
+      `${pathContext}/get`
     );
   }
   findResource(resourceName) {
@@ -420,27 +457,28 @@ var JobRunner = class {
     );
     return resourceType;
   }
-  async runTask(step, stdin) {
+  async runTask(step, stdin, pathContext = "") {
+    const storageKey = `${this.getBaseStorageKey()}/${pathContext}`;
     let result;
     try {
-      result = await this.taskRunner.runTask(step, stdin);
-      if (result.code === 0 && result.status == "complete" && step.on_success) {
-        await this.processStep(step.on_success);
-      } else if (result.code !== 0 && result.status == "complete" && step.on_failure) {
-        await this.processStep(step.on_failure);
-      } else if (result.status == "abort" && step.on_abort) {
-        await this.processStep(step.on_abort);
-      }
-      if (step.ensure) {
-        await this.processStep(step.ensure);
-      }
+      result = await this.taskRunner.runTask(step, stdin, storageKey);
     } catch (error) {
       if (step.on_error) {
-        await this.processStep(step.on_error);
+        await this.processStep(step.on_error, `${pathContext}/on_error`);
       }
       throw new TaskErrored(
         `Task ${step.task} errored with message ${error}`
       );
+    }
+    if (result.code === 0 && result.status == "complete" && step.on_success) {
+      await this.processStep(step.on_success, `${pathContext}/on_success`);
+    } else if (result.code !== 0 && result.status == "complete" && step.on_failure) {
+      await this.processStep(step.on_failure, `${pathContext}/on_failure`);
+    } else if (result.status == "abort" && step.on_abort) {
+      await this.processStep(step.on_abort, `${pathContext}/on_abort`);
+    }
+    if (step.ensure) {
+      await this.processStep(step.ensure, `${pathContext}/ensure`);
     }
     if (result.code > 0) {
       throw new TaskFailure(
