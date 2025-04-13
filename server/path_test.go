@@ -18,6 +18,7 @@ func TestPath(t *testing.T) {
 	path.AddChild("a/e/f", "3")
 	path.AddChild("g/h/i", "4")
 	path.AddChild("g/h/j", "5")
+	path.AddChild("a/b/d", "6")
 
 	assert.Expect(path).To(Equal(&server.Path[string]{
 		Name: "",
@@ -48,6 +49,17 @@ func TestPath(t *testing.T) {
 						Children: []*server.Path[string]{
 							{Name: "i", Children: nil, Value: "4"},
 							{Name: "j", Children: nil, Value: "5"},
+						},
+					},
+				},
+			},
+			{
+				Name: "a",
+				Children: []*server.Path[string]{
+					{
+						Name: "b",
+						Children: []*server.Path[string]{
+							{Name: "d", Children: nil, Value: "6"},
 						},
 					},
 				},

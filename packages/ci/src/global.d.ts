@@ -167,6 +167,19 @@ declare global {
     assert: AssertionBase;
   }
 
+  interface JobConfig {
+    name: string;
+    plan: Step[];
+    on_success?: Step;
+    on_failure?: Step;
+    on_error?: Step;
+    on_abort?: Step;
+    ensure?: Step;
+    assert?: {
+      execution?: string[];
+    };
+  }
+
   type Resource = ResourceBase;
   type ResourceType = ResourceBase;
 

@@ -116,7 +116,7 @@ func (c *Server) Run(logger *slog.Logger) error {
 				FROM
 					tasks
 				ORDER BY
-					path
+					id ASC
 			`,
 		)
 		if err != nil {

@@ -32,7 +32,7 @@ func (j *JS) Execute(ctx context.Context, source string, driver orchestra.Driver
 	result := api.Transform(source, api.TransformOptions{
 		Loader:     api.LoaderTS,
 		Format:     api.FormatCommonJS,
-		Target:     api.ES2015,
+		Target:     api.ES2017,
 		Sourcemap:  api.SourceMapInline,
 		Platform:   api.PlatformNeutral,
 		Sourcefile: "main.js",
