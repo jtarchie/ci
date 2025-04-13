@@ -27,11 +27,6 @@ func NewAssert(vm *goja.Runtime, logger *slog.Logger) *Assert {
 
 var ErrAssertion = errors.New("assertion failed")
 
-func (a *Assert) fail(message string) {
-	a.logger.Error("assertion.failed", "err", message)
-	a.vm.Interrupt(fmt.Errorf("%w: %s", ErrAssertion, message))
-}
-
 func (a *Assert) Equal(expected, actual interface{}, message ...string) {
 	a.logger.Debug("equality.checking",
 		"expected_type", fmt.Sprintf("%T", expected),
@@ -123,4 +118,9 @@ func (a *Assert) ContainsElement(array []interface{}, element interface{}, messa
 
 		a.fail(msg)
 	}
+}
+
+func (a *Assert) fail(message string) {
+	a.logger.Error("assertion.failed", "err", message)
+	a.vm.Interrupt(fmt.Errorf("%w: %s", ErrAssertion, message))
 }
