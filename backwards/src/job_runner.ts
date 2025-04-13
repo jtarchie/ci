@@ -28,15 +28,16 @@ export class JobRunner {
   }
 
   async run(): Promise<void> {
+    const storageKey = this.storagePathPrefix + "/tasks";
     let failure: unknown = undefined;
 
-    storage.set(this.storagePathPrefix, { status: "pending" });
+    storage.set(storageKey, { status: "pending" });
 
     try {
       for (const step of this.job.plan) {
         await this.processStep(step);
       }
-      storage.set(this.storagePathPrefix, { status: "success" });
+      storage.set(storageKey, { status: "success" });
     } catch (error) {
       console.error(error);
       failure = error;
@@ -47,19 +48,19 @@ export class JobRunner {
       if (failure === undefined && this.job.on_success) {
         await this.processStep(this.job.on_success);
       } else if (failure instanceof TaskFailure) {
-        storage.set(this.storagePathPrefix, { status: "failure" });
+        storage.set(storageKey, { status: "failure" });
 
         if (this.job.on_failure) {
           await this.processStep(this.job.on_failure);
         }
       } else if (failure instanceof TaskErrored) {
-        storage.set(this.storagePathPrefix, { status: "error" });
+        storage.set(storageKey, { status: "error" });
 
         if (this.job.on_error) {
           await this.processStep(this.job.on_error);
         }
       } else if (failure instanceof TaskAbort) {
-        storage.set(this.storagePathPrefix, { status: "abort" });
+        storage.set(storageKey, { status: "abort" });
 
         if (this.job.on_abort) {
           await this.processStep(this.job.on_abort);
