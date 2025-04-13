@@ -80,8 +80,13 @@ func (j *JS) Execute(ctx context.Context, source string, driver orchestra.Driver
 		})
 	}
 
-	new(require.Registry).Enable(jsVM)
-	console.Enable(jsVM)
+	registry := require.NewRegistry()
+	registry.Enable(jsVM)
+	registry.RegisterNativeModule("console", console.RequireWithPrinter(&printer{
+		logger: j.logger.WithGroup("console"),
+	}))
+
+	_ = jsVM.Set("console", require.Require(jsVM, "console"))
 
 	err = jsVM.Set("assert", NewAssert(jsVM, j.logger))
 	if err != nil {
