@@ -27,9 +27,12 @@ export class JobRunner {
       for (const step of this.job.plan) {
         await this.processStep(step);
       }
+
+      if (this.job.assert?.execution) {
+        assert.equal(this.taskNames, this.job.assert.execution);
+      }
     } catch (error) {
       if (this.job.assert?.execution) {
-        // this assures that the outputs are in the same order as the job
         assert.equal(this.taskNames, this.job.assert.execution);
       }
 
