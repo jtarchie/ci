@@ -32,10 +32,16 @@ var TaskRunner = class {
         stdin: stdin ?? "",
         timeout: step.timeout
       });
+      let status = "success";
+      if (result.status == "abort") {
+        status = "abort";
+      } else if (result.code !== 0) {
+        status = "failure";
+      }
       storage.set(
         storageKey,
         {
-          status: result.code === 0 ? "success" : "failure",
+          status,
           code: result.code,
           stdout: result.stdout,
           stderr: result.stderr
@@ -44,6 +50,7 @@ var TaskRunner = class {
       this.validateTaskResult(step, result);
       return result;
     } catch (error) {
+      storage.set(storageKey, { status: "error" });
       throw new TaskErrored(
         `Task ${step.task} errored with message ${error}`
       );
