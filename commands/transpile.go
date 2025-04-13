@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/jtarchie/ci/backwards"
@@ -13,7 +14,7 @@ type Transpile struct {
 
 // Run transpiles a pipeline YAML file into a pipeline.
 // This is helpful for debugging and understanding the pipeline.
-func (t *Transpile) Run() error {
+func (t *Transpile) Run(_ *slog.Logger) error {
 	var err error
 
 	pipeline, err := backwards.NewPipeline(t.Pipeline.Name())

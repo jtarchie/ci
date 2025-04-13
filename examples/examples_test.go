@@ -34,7 +34,7 @@ func TestExamplesDocker(t *testing.T) {
 					Pipeline:     examplePath,
 					Orchestrator: driver,
 				}
-				err := runner.Run()
+				err := runner.Run(nil)
 				assert.Expect(err).NotTo(HaveOccurred())
 			})
 		}
@@ -67,7 +67,7 @@ func TestExamplesAll(t *testing.T) {
 					Pipeline:     examplePath,
 					Orchestrator: driver,
 				}
-				err := runner.Run()
+				err := runner.Run(nil)
 				assert.Expect(err).NotTo(HaveOccurred())
 			})
 		}

@@ -45,7 +45,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 			Pipeline:     "fixtures/on_success.yml",
 			Orchestrator: "native",
 		}
-		err := runner.Run()
+		err := runner.Run(nil)
 		assert.Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -85,7 +85,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 			Pipeline:     "fixtures/try.yml",
 			Orchestrator: "native",
 		}
-		err := runner.Run()
+		err := runner.Run(nil)
 		assert.Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -142,7 +142,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 			Pipeline:     "fixtures/task_file.yml",
 			Orchestrator: "native",
 		}
-		err := runner.Run()
+		err := runner.Run(nil)
 		assert.Expect(err).NotTo(HaveOccurred())
 	})
 }
