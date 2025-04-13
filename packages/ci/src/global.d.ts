@@ -161,7 +161,7 @@ declare global {
   type Step = Task | Get | Put | Do | Try | InParallel;
 
   // Pipeline configuration
-  interface Job {
+  interface Job extends StepHooks {
     name: string;
     plan: Step[];
     assert: AssertionBase;

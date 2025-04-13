@@ -93,9 +93,15 @@ type Job struct {
 		Execution []string `yaml:"execution,omitempty"`
 	} `yaml:"assert,omitempty"`
 
-	Name   string `validate:"required,min=5"      yaml:"name,omitempty"`
-	Plan   Steps  `validate:"required,min=1,dive" yaml:"plan,omitempty"`
-	Public bool   `yaml:"public,omitempty"`
+	Name      string        `validate:"required,min=5"      yaml:"name,omitempty"`
+	Plan      Steps         `validate:"required,min=1,dive" yaml:"plan,omitempty"`
+	Public    bool          `yaml:"public,omitempty"`
+	Ensure    *Step         `yaml:"ensure,omitempty"`
+	OnAbort   *Step         `yaml:"on_abort,omitempty"`
+	OnError   *Step         `yaml:"on_error,omitempty"`
+	OnSuccess *Step         `yaml:"on_success,omitempty"`
+	OnFailure *Step         `yaml:"on_failure,omitempty"`
+	Timeout   time.Duration `yaml:"timeout,omitempty"`
 }
 
 type Jobs []Job
