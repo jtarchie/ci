@@ -36,7 +36,7 @@ export class JobRunner {
         assert.equal(this.taskNames, this.job.assert.execution);
       }
 
-      throw error;
+      console.error(error);
     }
   }
 
