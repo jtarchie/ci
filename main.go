@@ -37,6 +37,6 @@ func main() {
 		})))
 	}
 
-	err := ctx.Run()
+	err := ctx.Run(slog.Default())
 	ctx.FatalIfErrorf(err)
 }

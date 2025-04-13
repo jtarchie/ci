@@ -65,7 +65,7 @@ func (p *Payload) Scan(value any) error {
 	}
 }
 
-func (c *Server) Run() error {
+func (c *Server) Run(logger *slog.Logger) error {
 	client, err := sql.Open("sqlite", c.Storage)
 	if err != nil {
 		return fmt.Errorf("could not open storage file: %w", err)
@@ -95,7 +95,7 @@ func (c *Server) Run() error {
 	}
 
 	router := echo.New()
-	router.Use(slogecho.New(slog.Default()))
+	router.Use(slogecho.New(logger))
 	router.Use(middleware.Recover())
 	router.Renderer = renderer
 
@@ -124,7 +124,7 @@ func (c *Server) Run() error {
 			return fmt.Errorf("could not select: %w", err)
 		}
 
-		slog.Info("results", "results", len(results))
+		logger.Info("results", "results", len(results))
 
 		path := server.NewPath[Payload]()
 		for _, result := range results {
