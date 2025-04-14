@@ -1,12 +1,7 @@
 package commands
 
 import (
-	"bytes"
-	"context"
-	"database/sql"
-	"database/sql/driver"
 	"embed"
-	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
@@ -15,9 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/georgysavva/scany/v2/sqlscan"
 	sprig "github.com/go-task/slim-sprig/v3"
 	"github.com/jtarchie/ci/server"
+	"github.com/jtarchie/ci/storage"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	slogecho "github.com/samber/slog-echo"
@@ -44,30 +39,10 @@ func (t *TemplateRender) Render(w io.Writer, name string, data interface{}, c ec
 	return nil
 }
 
-type Payload map[string]any
-
-func (p *Payload) Value() (driver.Value, error) {
-	return json.Marshal(p) //nolint: wrapcheck
-}
-
-func (p *Payload) Scan(value any) error {
-	//nolint: wrapcheck,err113
-	switch x := value.(type) {
-	case string:
-		return json.NewDecoder(bytes.NewBufferString(x)).Decode(p)
-	case []byte:
-		return json.NewDecoder(bytes.NewBuffer(x)).Decode(p)
-	case nil:
-		return nil
-	default:
-		return fmt.Errorf("cannot scan type %T: %v", value, value)
-	}
-}
-
 func (c *Server) Run(logger *slog.Logger) error {
-	client, err := sql.Open("sqlite", c.Storage)
+	client, err := storage.NewSqlite(c.Storage, "")
 	if err != nil {
-		return fmt.Errorf("could not open storage file: %w", err)
+		return fmt.Errorf("could not create sqlite client: %w", err)
 	}
 	defer client.Close()
 
@@ -99,33 +74,12 @@ func (c *Server) Run(logger *slog.Logger) error {
 	router.Renderer = renderer
 
 	router.GET("/", func(ctx echo.Context) error {
-		type result struct {
-			Path    string  `db:"path"`
-			Payload Payload `db:"payload"`
-		}
-
-		var results []result
-
-		err := sqlscan.Select(
-			context.Background(),
-			client,
-			&results,
-			`
-				SELECT
-					path, json(payload) as payload
-				FROM
-					tasks
-				ORDER BY
-					id ASC
-			`,
-		)
+		results, err := client.GetAll("")
 		if err != nil {
-			return fmt.Errorf("could not select: %w", err)
+			return fmt.Errorf("could not get all results: %w", err)
 		}
 
-		logger.Info("results", "results", len(results))
-
-		path := server.NewPath[Payload]()
+		path := server.NewPath[storage.Payload]()
 		for _, result := range results {
 			path.AddChild(result.Path, result.Payload)
 		}

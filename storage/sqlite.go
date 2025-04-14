@@ -1,11 +1,13 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
 
+	"github.com/georgysavva/scany/v2/sqlscan"
 	_ "modernc.org/sqlite"
 )
 
@@ -58,6 +60,33 @@ func (s *Sqlite) Set(prefix string, payload any) error {
 	}
 
 	return nil
+}
+
+func (s *Sqlite) GetAll(prefix string) ([]Result, error) {
+	path := filepath.Clean("/" + s.namespace + "/" + prefix)
+
+	var results []Result
+
+	err := sqlscan.Select(
+		context.Background(),
+		s.client,
+		&results,
+		`
+			SELECT
+				id, path, json(payload) as payload
+			FROM
+				tasks
+			WHERE path GLOB :path
+			ORDER BY
+				id ASC
+		`,
+		sql.Named("path", path+"*"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not select: %w", err)
+	}
+
+	return results, nil
 }
 
 func (s *Sqlite) Close() error {
