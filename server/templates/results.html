@@ -147,7 +147,7 @@ bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700
 {{/* Get group color based on depth */}}
 {{- define "getGroupColor" -}}
 {{- $depth := . -}}
-{{- $mod := mod $depth 5 -}}
+{{- $mod := mod $depth 8 -}}
 {{- if eq $mod 0 -}}
 border-blue-300 dark:border-blue-600
 {{- else if eq $mod 1 -}}
@@ -156,8 +156,14 @@ border-purple-300 dark:border-purple-600
 border-orange-300 dark:border-orange-600
 {{- else if eq $mod 3 -}}
 border-teal-300 dark:border-teal-600
-{{- else -}}
+{{- else if eq $mod 4 -}}
 border-pink-300 dark:border-pink-600
+{{- else if eq $mod 5 -}}
+border-green-300 dark:border-green-600
+{{- else if eq $mod 6 -}}
+border-red-300 dark:border-red-600
+{{- else -}}
+border-indigo-300 dark:border-indigo-600
 {{- end -}}
 {{- end -}}
 
