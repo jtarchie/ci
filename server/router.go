@@ -12,6 +12,7 @@ import (
 
 func NewRouter(logger *slog.Logger) (*echo.Echo, error) {
 	router := echo.New()
+	router.Pre(middleware.AddTrailingSlash())
 	router.Use(slogecho.New(logger))
 	router.Use(middleware.Recover())
 

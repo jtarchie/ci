@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -27,7 +28,7 @@ func (c *Server) Run(logger *slog.Logger) error {
 		return fmt.Errorf("could not create router: %w", err)
 	}
 
-	router.GET("/*", func(ctx echo.Context) error {
+	router.GET("/tasks/*", func(ctx echo.Context) error {
 		lookupPath := ctx.Param("*")
 		if lookupPath == "" || lookupPath[0] != '/' {
 			lookupPath = "/" + lookupPath
@@ -48,6 +49,39 @@ func (c *Server) Run(logger *slog.Logger) error {
 		return ctx.Render(http.StatusOK, "results.html", map[string]any{
 			"Path": path,
 		})
+	})
+
+	router.GET("/asciicast/*", func(ctx echo.Context) error {
+		lookupPath := ctx.Param("*")
+		if lookupPath == "" || lookupPath[0] != '/' {
+			lookupPath = "/" + lookupPath
+		}
+
+		results, err := client.GetAll(lookupPath, []string{"stdout"})
+		if err != nil {
+			return fmt.Errorf("could not get all results: %w", err)
+		}
+
+		if len(results) > 1 {
+			return errors.New("cannot render multiple results as asciicast") //nolint:err113
+		}
+
+		stdout, ok := results[0].Payload["stdout"].(string)
+		if !ok {
+			return errors.New("stdout is not a string") //nolint:err113
+		}
+
+		ctx.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		ctx.Response().WriteHeader(http.StatusOK)
+
+		err = server.ToAsciiCast(stdout, ctx.Response().Writer)
+		if err != nil {
+			return fmt.Errorf("could not write asciicast: %w", err)
+		}
+
+		ctx.Response().Flush()
+
+		return nil
 	})
 
 	err = router.Start(fmt.Sprintf(":%d", c.Port))
