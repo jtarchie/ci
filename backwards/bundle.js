@@ -113,8 +113,8 @@ var JobRunner = class {
     let failure = void 0;
     storage.set(storageKey, { status: "pending" });
     try {
-      for (const step of this.jobConfig.plan) {
-        await this.processStep(step, "");
+      for (let i = 0; i < this.jobConfig.plan.length; i++) {
+        await this.processStep(this.jobConfig.plan[i], `${i}`);
       }
       storage.set(storageKey, { status: "success" });
     } catch (error) {
@@ -281,7 +281,7 @@ var JobRunner = class {
       }
       for (let i = 0; i < steps.length; i++) {
         const subStep = steps[i];
-        await this.processStep(subStep, `${pathContext}`);
+        await this.processStep(subStep, `${pathContext}/${i}`);
       }
     } catch (error) {
       failure = error;
