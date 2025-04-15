@@ -266,11 +266,15 @@ var JobRunner = class {
     try {
       await this.processDoStep(step, pathContext);
     } catch (_err) {
+    } finally {
+      storage.set(pathContext, { status: "success" });
     }
   }
   async processDoStep(step, pathContext) {
+    const storageKey = `${this.getBaseStorageKey()}/${pathContext}`;
     let failure = void 0;
     try {
+      storage.set(storageKey, { status: "pending" });
       let steps = [];
       if ("in_parallel" in step) {
         steps = step.in_parallel.steps;
@@ -286,14 +290,26 @@ var JobRunner = class {
     } catch (error) {
       failure = error;
     }
-    if (failure == void 0 && step.on_success) {
-      await this.processStep(step.on_success, `${pathContext}/on_success`);
-    } else if (failure instanceof TaskFailure && step.on_failure) {
-      await this.processStep(step.on_failure, `${pathContext}/on_failure`);
-    } else if (failure instanceof TaskErrored && step.on_error) {
-      await this.processStep(step.on_error, `${pathContext}/on_error`);
-    } else if (failure instanceof TaskAbort && step.on_abort) {
-      await this.processStep(step.on_abort, `${pathContext}/on_abort`);
+    if (failure == void 0) {
+      storage.set(storageKey, { status: "success" });
+      if (step.on_success) {
+        await this.processStep(step.on_success, `${pathContext}/on_success`);
+      }
+    } else if (failure instanceof TaskFailure) {
+      storage.set(storageKey, { status: "failure" });
+      if (step.on_failure) {
+        await this.processStep(step.on_failure, `${pathContext}/on_failure`);
+      }
+    } else if (failure instanceof TaskErrored) {
+      storage.set(storageKey, { status: "error" });
+      if (step.on_error) {
+        await this.processStep(step.on_error, `${pathContext}/on_error`);
+      }
+    } else if (failure instanceof TaskAbort) {
+      storage.set(storageKey, { status: "abort" });
+      if (step.on_abort) {
+        await this.processStep(step.on_abort, `${pathContext}/on_abort`);
+      }
     }
     if (step.ensure) {
       await this.processStep(step.ensure, `${pathContext}/ensure`);
