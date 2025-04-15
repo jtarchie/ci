@@ -27,8 +27,13 @@ func (c *Server) Run(logger *slog.Logger) error {
 		return fmt.Errorf("could not create router: %w", err)
 	}
 
-	router.GET("/", func(ctx echo.Context) error {
-		results, err := client.GetAll("", []string{"status"})
+	router.GET("/*", func(ctx echo.Context) error {
+		lookupPath := ctx.Param("*")
+		if lookupPath == "" || lookupPath[0] != '/' {
+			lookupPath = "/" + lookupPath
+		}
+
+		results, err := client.GetAll(lookupPath, []string{"status"})
 		if err != nil {
 			return fmt.Errorf("could not get all results: %w", err)
 		}
