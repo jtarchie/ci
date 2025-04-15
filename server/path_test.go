@@ -29,17 +29,20 @@ func TestPath(t *testing.T) {
 					{
 						Name: "b",
 						Children: []*server.Path[string]{
-							{Name: "c", Children: nil, Value: "1"},
-							{Name: "d", Children: nil, Value: "2"},
+							{Name: "c", Children: nil, Value: "1", FullPath: "/a/b/c"},
+							{Name: "d", Children: nil, Value: "2", FullPath: "/a/b/d"},
 						},
+						FullPath: "/a/b",
 					},
 					{
 						Name: "e",
 						Children: []*server.Path[string]{
-							{Name: "f", Children: nil, Value: "3"},
+							{Name: "f", Children: nil, Value: "3", FullPath: "/a/e/f"},
 						},
+						FullPath: "/a/e",
 					},
 				},
+				FullPath: "/a",
 			},
 			{
 				Name: "g",
@@ -47,11 +50,13 @@ func TestPath(t *testing.T) {
 					{
 						Name: "h",
 						Children: []*server.Path[string]{
-							{Name: "i", Children: nil, Value: "4"},
-							{Name: "j", Children: nil, Value: "5"},
+							{Name: "i", Children: nil, Value: "4", FullPath: "/g/h/i"},
+							{Name: "j", Children: nil, Value: "5", FullPath: "/g/h/j"},
 						},
+						FullPath: "/g/h",
 					},
 				},
+				FullPath: "/g",
 			},
 			{
 				Name: "a",
@@ -59,11 +64,46 @@ func TestPath(t *testing.T) {
 					{
 						Name: "b",
 						Children: []*server.Path[string]{
-							{Name: "d", Children: nil, Value: "6"},
+							{Name: "d", Children: nil, Value: "6", FullPath: "/a/b/d"},
 						},
+						FullPath: "/a/b",
 					},
 				},
+				FullPath: "/a",
 			},
+		},
+	},
+	))
+
+	path.Flatten()
+
+	assert.Expect(path).To(Equal(&server.Path[string]{
+		Name: "",
+		Children: []*server.Path[string]{
+			{
+				Name: "a",
+				Children: []*server.Path[string]{
+					{
+						Name: "b",
+						Children: []*server.Path[string]{
+							{Name: "c", Children: nil, Value: "1", FullPath: "/a/b/c"},
+							{Name: "d", Children: nil, Value: "2", FullPath: "/a/b/d"},
+						},
+						FullPath: "/a/b",
+					},
+					{Name: "e/f", Children: nil, Value: "3", FullPath: "/a/e/f"},
+				},
+				FullPath: "/a",
+			},
+			{
+				Name: "g/h",
+				Children: []*server.Path[string]{
+					{Name: "i", Children: nil, Value: "4", FullPath: "/g/h/i"},
+					{Name: "j", Children: nil, Value: "5", FullPath: "/g/h/j"},
+				},
+				FullPath: "/g/h",
+			},
+			{Name: "a/b/d", Children: nil, Value: "6", FullPath: "/a/b/d"},
 		},
 	},
 	))

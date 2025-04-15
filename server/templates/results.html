@@ -182,7 +182,7 @@ border-indigo-300 dark:border-indigo-600
           class="inline-flex items-center justify-center w-6 h-6 mr-2 text-xs font-semibold rounded-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 dark:text-gray-200">
           {{ $order }}
         </span>
-        <span class="font-medium">{{ $path.Name | formatPath }}</span>
+        <span class="font-medium"><a href="{{ $path.FullPath }}">{{ $path.Name }}</a></span>
       </div>
     </div>
   </div>
@@ -209,9 +209,8 @@ border-indigo-300 dark:border-indigo-600
     {{ if $path.Value.status }}
     <span class="mr-2">{{ template "getStatusIcon" $path }}</span>
     {{ end }}
-    <div class="font-medium text-gray-700 dark:text-gray-300">{{ $path.Name |
-      formatPath }}</div>
-    {{/* Show status text if status exists */}}
+    <div class="font-medium text-gray-700 dark:text-gray-300"><a href="{{ $path.FullPath }}">{{
+      $path.Name }}</a></div>
   </div>
   <div class="space-y-2">
     {{/* Render children */}}
@@ -223,30 +222,14 @@ border-indigo-300 dark:border-indigo-600
 </div>
 {{- end -}}
 
-{{/* Main recursive path rendering - modified to handle single child paths */}}
+{{/* Main recursive path rendering - simplified with new methods */}}
 {{ define "renderPath" }}
 {{ $path := .Path }}
 {{ $depth := .Depth }}
 {{ $order := .Order }}
 
-{{ if and $path.Children (gt (len $path.Children) 0) }}
-{{ if eq (len $path.Children) 1 }}
-{{/* Single child path - create breadcrumb and pass through */}}
-{{ $child := index $path.Children 0 }}
-{{ if $child.Children }}
-{{/* Create a combined path name for breadcrumbs */}}
-{{ template "renderPath" dict "Path" (dict "Name" (printf "%s / %s" $path.Name
-$child.Name) "Children" $child.Children "Value" $child.Value) "Depth" $depth
-"Order" $order }}
-{{ else }}
-{{/* Render the leaf task with combined name */}}
-{{ template "renderTask" dict "Path" (dict "Name" (printf "%s / %s" $path.Name
-$child.Name) "Value" $child.Value) "Order" $order }}
-{{ end }}
-{{ else }}
-{{/* Multiple children - render as normal group */}}
+{{ if $path.IsGroup }}
 {{ template "renderGroup" dict "Path" $path "Depth" $depth }}
-{{ end }}
 {{ else if ne $path.Name "" }}
 {{ template "renderTask" dict "Path" $path "Order" $order }}
 {{ else }}
