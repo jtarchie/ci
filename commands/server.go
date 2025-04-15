@@ -43,6 +43,8 @@ func (c *Server) Run(logger *slog.Logger) error {
 			path.AddChild(result.Path, result.Payload)
 		}
 
+		path.Flatten()
+
 		return ctx.Render(http.StatusOK, "results.html", map[string]any{
 			"Path": path,
 		})
