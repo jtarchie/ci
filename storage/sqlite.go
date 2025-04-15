@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/georgysavva/scany/v2/sqlscan"
+	"github.com/samber/lo"
 	_ "modernc.org/sqlite"
 )
 
@@ -62,24 +64,37 @@ func (s *Sqlite) Set(prefix string, payload any) error {
 	return nil
 }
 
-func (s *Sqlite) GetAll(prefix string) ([]Result, error) {
+func (s *Sqlite) GetAll(prefix string, fields []string) ([]Result, error) {
+	if len(fields) == 0 {
+		fields = []string{"status"}
+	}
+
 	path := filepath.Clean("/" + s.namespace + "/" + prefix)
 
 	var results []Result
 
-	err := sqlscan.Select(
-		context.Background(),
-		s.client,
-		&results,
-		`
+	jsonSelects := strings.Join(
+		lo.Map(fields, func(field string, _ int) string {
+			return fmt.Sprintf("'%s', json_extract(payload, '$.%s')", field, field)
+		}),
+		",",
+	)
+
+	query := fmt.Sprintf(`
 			SELECT
-				id, path, json(payload) as payload
+				id, path, json_object(%s) as payload
 			FROM
 				tasks
 			WHERE path GLOB :path
 			ORDER BY
 				id ASC
-		`,
+		`, jsonSelects)
+
+	err := sqlscan.Select(
+		context.Background(),
+		s.client,
+		&results,
+		query,
 		sql.Named("path", path+"*"),
 	)
 	if err != nil {

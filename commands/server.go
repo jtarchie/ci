@@ -28,7 +28,7 @@ func (c *Server) Run(logger *slog.Logger) error {
 	}
 
 	router.GET("/", func(ctx echo.Context) error {
-		results, err := client.GetAll("")
+		results, err := client.GetAll("", []string{"status"})
 		if err != nil {
 			return fmt.Errorf("could not get all results: %w", err)
 		}
