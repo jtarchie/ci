@@ -10,6 +10,7 @@ import (
 type Driver interface {
 	Close() error
 	Set(prefix string, payload any) error
+	GetAll(prefix string) ([]Result, error)
 }
 
 type Payload map[string]any
