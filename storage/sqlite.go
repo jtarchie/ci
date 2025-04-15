@@ -14,17 +14,18 @@ import (
 )
 
 type Sqlite struct {
-	client    *sql.DB
+	writer    *sql.DB
+	reader    *sql.DB
 	namespace string
 }
 
 func NewSqlite(filename string, namespace string) (*Sqlite, error) {
-	client, err := sql.Open("sqlite", filename)
+	writer, err := sql.Open("sqlite", filename)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	_, err = client.Exec(`
+	_, err = writer.Exec(`
 		CREATE TABLE IF NOT EXISTS tasks (
 			id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
 			path TEXT NOT NULL,
@@ -37,8 +38,17 @@ func NewSqlite(filename string, namespace string) (*Sqlite, error) {
 		return nil, fmt.Errorf("failed to create tasks table: %w", err)
 	}
 
+	writer.SetMaxIdleConns(1)
+	writer.SetMaxOpenConns(1)
+
+	reader, err := sql.Open("sqlite", filename+"?mode=ro&immutable=1")
+	if err != nil {
+		return nil, fmt.Errorf("failed to open database: %w", err)
+	}
+
 	return &Sqlite{
-		client:    client,
+		writer:    writer,
+		reader:    reader,
 		namespace: namespace,
 	}, nil
 }
@@ -51,7 +61,7 @@ func (s *Sqlite) Set(prefix string, payload any) error {
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	_, err = s.client.Exec(`
+	_, err = s.writer.Exec(`
 		INSERT INTO tasks (path, payload)
 		VALUES (?, ?)
 		ON CONFLICT(path) DO UPDATE SET
@@ -92,7 +102,7 @@ func (s *Sqlite) GetAll(prefix string, fields []string) ([]Result, error) {
 
 	err := sqlscan.Select(
 		context.Background(),
-		s.client,
+		s.reader,
 		&results,
 		query,
 		sql.Named("path", path+"*"),
@@ -105,7 +115,12 @@ func (s *Sqlite) GetAll(prefix string, fields []string) ([]Result, error) {
 }
 
 func (s *Sqlite) Close() error {
-	err := s.client.Close()
+	err := s.writer.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close database: %w", err)
+	}
+
+	err = s.reader.Close()
 	if err != nil {
 		return fmt.Errorf("failed to close database: %w", err)
 	}
