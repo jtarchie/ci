@@ -22,7 +22,7 @@ export class JobRunner {
   }
 
   async run(): Promise<void> {
-    const storageKey = `${this.getBaseStorageKey()}/tasks`;
+    const storageKey = this.getBaseStorageKey();
     let failure: unknown = undefined;
 
     storage.set(storageKey, { status: "pending" });

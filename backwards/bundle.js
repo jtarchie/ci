@@ -109,7 +109,7 @@ var JobRunner = class {
   taskRunner;
   buildID;
   async run() {
-    const storageKey = `${this.getBaseStorageKey()}/tasks`;
+    const storageKey = this.getBaseStorageKey();
     let failure = void 0;
     storage.set(storageKey, { status: "pending" });
     try {
