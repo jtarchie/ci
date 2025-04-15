@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pipeline Visualizer</title>
+    <link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/asciinema-player@3.9.0/dist/bundle/asciinema-player.min.css">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -25,8 +27,7 @@
       .task-details {
         display: none;
       }
-      .task-item:focus .task-details, 
-      .task-item:active .task-details {
+      .task-item[open] .task-details {
         display: block;
       }
     </style>
@@ -43,38 +44,67 @@
         </div>
       </div>
     </div>
-    <script>
-              // Add event listeners
-              document.querySelectorAll(".task-item button").forEach(
-          (btn) => {
-            btn.addEventListener("click", function () {
-              const taskItem = this.closest(".task-item");
-              const details = taskItem.querySelector(".task-details");
-              details.classList.toggle("hidden");
+    <footer class="bg-gray-50 dark:bg-gray-900">
+      <div class="mx-auto max-w-screen-xl px-4 py-8 sm:px-6 lg:px-8">
+        <div class="sm:flex sm:items-center sm:justify-between">
+          <div
+            class="flex justify-center text-teal-600 sm:justify-start dark:text-teal-300">
+            <svg
+              class="h-8"
+              viewBox="0 0 100 40"
+              xmlns="http://www.w3.org/2000/svg">
+              <!-- Red LED Circle -->
+              <circle
+                cx="25"
+                cy="20"
+                r="15"
+                fill="#FF3B30"
+                stroke="#CC2D26"
+                stroke-width="2">
+                <!-- Light reflection effect -->
+                <animate attributeName="opacity" from="0.9" to="1" dur="2s"
+                  repeatCount="indefinite" />
+              </circle>
+              <!-- White reflection spot on red LED -->
+              <circle
+                cx="20"
+                cy="15"
+                r="5"
+                fill="white"
+                opacity="0.3" />
 
-              // Toggle icon
-              const svg = this.querySelector("svg");
-              if (details.classList.contains("hidden")) {
-                svg.innerHTML =
-                  '<path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />';
-              } else {
-                svg.innerHTML =
-                  '<path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" />';
-              }
-            });
-          },
-        );
-
-        // Add keyboard navigation
-        document.querySelectorAll(".task-item").forEach((item) => {
-          item.addEventListener("keydown", function (e) {
-            if (e.key === "Enter" || e.key === " ") {
-              this.querySelector("button").click();
-              e.preventDefault();
-            }
-          });
-        });
-    </script>
+              <!-- Green LED Circle -->
+              <circle
+                cx="75"
+                cy="20"
+                r="15"
+                fill="#34C759"
+                stroke="#28A745"
+                stroke-width="2">
+                <!-- Light reflection effect -->
+                <animate attributeName="opacity" from="0.9" to="1" dur="1.5s"
+                  repeatCount="indefinite" />
+              </circle>
+              <!-- White reflection spot on green LED -->
+              <circle
+                cx="70"
+                cy="15"
+                r="5"
+                fill="white"
+                opacity="0.3" />
+            </svg>
+          </div>
+          <p
+            class="mt-4 text-center text-sm text-gray-500 lg:mt-0 lg:text-right dark:text-gray-400">
+            Copyright &copy; <a href="https://github.com/jtarchie/ci">{{ now | date "2006" }}</a>. All rights reserved.
+          </p>
+        </div>
+      </div>
+    </footer>
+    <script
+      src="https://cdn.jsdelivr.net/npm/asciinema-player@3.9.0/dist/bundle/asciinema-player.min.js"
+      integrity="sha256-B0AaL+wDi9kSDYYc+rWmyI2SH5dSBGACTuweeCLoKbQ="
+      crossorigin="anonymous"></script>
   </body>
 </html>
 
@@ -171,10 +201,10 @@ border-indigo-300 dark:border-indigo-600
 {{- define "renderTask" -}}
 {{- $path := .Path -}}
 {{- $order := .Order -}}
-<div class="task-item 
+<details class="task-item 
     {{ template "getStatusColor" $path }} border rounded-md p-3 transition-all
   dark:text-gray-200" tabindex="0">
-  <div class="flex items-center justify-between">
+  <summary class="flex items-center justify-between cursor-pointer">
     <div class="flex items-center space-x-2">
       {{ template "getStatusIcon" $path }}
       <div class="flex items-center">
@@ -182,20 +212,28 @@ border-indigo-300 dark:border-indigo-600
           class="inline-flex items-center justify-center w-6 h-6 mr-2 text-xs font-semibold rounded-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 dark:text-gray-200">
           {{ $order }}
         </span>
-        <span class="font-medium"><a href="{{ $path.FullPath }}">{{ $path.Name }}</a></span>
+        <span class="font-medium">{{ $path.Name }}</span>
       </div>
     </div>
-  </div>
+  </summary>
   <div
     class="task-details mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
-    <div class="grid grid-cols-2 gap-4 text-sm">
-      <div>
-        <p class="font-semibold">Status: <span class="font-normal">{{
-            $path.Value.status }}</span></p>
+    <div class="grid grid-cols-1 gap-4 text-sm">
+      <div class="mb-4">
+      <div id="player-{{ $path.FullPath | urlquery }}" class="w-full"></div>
       </div>
+      <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        AsciinemaPlayer.create('/asciicast/{{ $path.FullPath }}', 
+          document.getElementById('player-{{ $path.FullPath | urlquery }}'), {
+          fit: 'none',
+          theme: 'monokai'
+        });
+      });
+      </script>
     </div>
   </div>
-</div>
+</details>
 {{- end -}}
 
 {{/* Group template - updated to show status if available */}}
@@ -209,8 +247,9 @@ border-indigo-300 dark:border-indigo-600
     {{ if $path.Value.status }}
     <span class="mr-2">{{ template "getStatusIcon" $path }}</span>
     {{ end }}
-    <div class="font-medium text-gray-700 dark:text-gray-300"><a href="{{ $path.FullPath }}">{{
-      $path.Name }}</a></div>
+    <div class="font-medium text-gray-700 dark:text-gray-300"><a
+        href="/tasks{{ $path.FullPath }}">{{
+        $path.Name }}</a></div>
   </div>
   <div class="space-y-2">
     {{/* Render children */}}
