@@ -201,6 +201,9 @@ export class JobRunner {
       await this.processDoStep(step, pathContext);
     } catch (_err) {
       // do nothing
+    } finally {
+      // always successful
+      storage.set(pathContext, { status: "success" });
     }
   }
 
@@ -208,9 +211,12 @@ export class JobRunner {
     step: Do | Try | InParallel,
     pathContext: string,
   ): Promise<void> {
+    const storageKey = `${this.getBaseStorageKey()}/${pathContext}`;
     let failure: unknown = undefined;
 
     try {
+      storage.set(storageKey, { status: "pending" });
+
       let steps: Step[] = [];
       if ("in_parallel" in step) {
         steps = step.in_parallel.steps;
@@ -228,14 +234,26 @@ export class JobRunner {
       failure = error;
     }
 
-    if (failure == undefined && step.on_success) {
-      await this.processStep(step.on_success, `${pathContext}/on_success`);
-    } else if (failure instanceof TaskFailure && step.on_failure) {
-      await this.processStep(step.on_failure, `${pathContext}/on_failure`);
-    } else if (failure instanceof TaskErrored && step.on_error) {
-      await this.processStep(step.on_error, `${pathContext}/on_error`);
-    } else if (failure instanceof TaskAbort && step.on_abort) {
-      await this.processStep(step.on_abort, `${pathContext}/on_abort`);
+    if (failure == undefined) {
+      storage.set(storageKey, { status: "success" });
+      if (step.on_success) {
+        await this.processStep(step.on_success, `${pathContext}/on_success`);
+      }
+    } else if (failure instanceof TaskFailure) {
+      storage.set(storageKey, { status: "failure" });
+      if (step.on_failure) {
+        await this.processStep(step.on_failure, `${pathContext}/on_failure`);
+      }
+    } else if (failure instanceof TaskErrored) {
+      storage.set(storageKey, { status: "error" });
+      if (step.on_error) {
+        await this.processStep(step.on_error, `${pathContext}/on_error`);
+      }
+    } else if (failure instanceof TaskAbort) {
+      storage.set(storageKey, { status: "abort" });
+      if (step.on_abort) {
+        await this.processStep(step.on_abort, `${pathContext}/on_abort`);
+      }
     }
 
     if (step.ensure) {
