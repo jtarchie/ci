@@ -8,16 +8,22 @@ import (
 
 	"github.com/jtarchie/ci/server"
 	"github.com/jtarchie/ci/storage"
+	_ "github.com/jtarchie/ci/storage/sqlite"
 	"github.com/labstack/echo/v4"
 )
 
 type Server struct {
-	Port    int    `default:"8080"              help:"Port to run the server on"`
-	Storage string `help:"Path to storage file" required:""`
+	Port    int    `default:"8080"             help:"Port to run the server on"`
+	Storage string `default:"sqlite://test.db" help:"Path to storage file"      required:""`
 }
 
 func (c *Server) Run(logger *slog.Logger) error {
-	client, err := storage.NewSqlite(c.Storage, "")
+	initStorage, found := storage.GetFromDSN(c.Storage)
+	if !found {
+		return errors.New("could not get storage driver") //nolint:err113
+	}
+
+	client, err := initStorage(c.Storage, "", logger)
 	if err != nil {
 		return fmt.Errorf("could not create sqlite client: %w", err)
 	}
@@ -39,15 +45,8 @@ func (c *Server) Run(logger *slog.Logger) error {
 			return fmt.Errorf("could not get all results: %w", err)
 		}
 
-		path := server.NewPath[storage.Payload]()
-		for _, result := range results {
-			path.AddChild(result.Path, result.Payload)
-		}
-
-		path.Flatten()
-
 		return ctx.Render(http.StatusOK, "results.html", map[string]any{
-			"Path": path,
+			"Path": results.AsTree(),
 		})
 	})
 

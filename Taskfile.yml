@@ -13,7 +13,7 @@ tasks:
       - task: fmt
       - deno check backwards/src/ examples/both/
       - go test -race ./... -count=1
-  server: "wgo -file .html -file .ts -file .go go generate ./... :: go run main.go server --storage test.db"
+  server: "wgo -file .html -file .ts -file .go go generate ./... :: go run main.go server --storage sqlite://test.db"
   cleanup: |
     removed_containers=$(docker ps -aq | xargs -I {} docker rm -f {} | wc -l)
     removed_volumes=$(docker volume ls -q | xargs -r docker volume rm -f | wc -l)

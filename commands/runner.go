@@ -21,7 +21,7 @@ import (
 )
 
 type Runner struct {
-	Storage      string        `default:":memory:"                                            help:"Path to storage file"`
+	Storage      string        `default:"sqlite://test.db"                                    help:"Path to storage file"             required:""`
 	Pipeline     string        `arg:""                                                        help:"Path to pipeline javascript file" type:"existingfile"`
 	Orchestrator string        `default:"native"                                              help:"orchestrator runtime to use"`
 	Timeout      time.Duration `help:"timeout for the pipeline, will cause abort if exceeded"`
@@ -42,6 +42,11 @@ func youtubeIDStyle(input string) string {
 }
 
 func (c *Runner) Run(logger *slog.Logger) error {
+	initStorage, found := storage.GetFromDSN(c.Storage)
+	if !found {
+		return errors.New("could not get storage driver") //nolint:err113
+	}
+
 	pipelinePath, err := filepath.Abs(c.Pipeline)
 	if err != nil {
 		return fmt.Errorf("could not get absolute path to pipeline: %w", err)
@@ -117,7 +122,7 @@ func (c *Runner) Run(logger *slog.Logger) error {
 	}
 	defer driver.Close()
 
-	storage, err := storage.NewSqlite(c.Storage, runtimeID)
+	storage, err := initStorage(c.Storage, runtimeID, logger)
 	if err != nil {
 		return fmt.Errorf("could not create sqlite client: %w", err)
 	}

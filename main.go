@@ -8,6 +8,7 @@ import (
 	"github.com/jtarchie/ci/commands"
 	_ "github.com/jtarchie/ci/orchestra/docker"
 	_ "github.com/jtarchie/ci/orchestra/native"
+	_ "github.com/jtarchie/ci/storage/sqlite"
 	"github.com/lmittmann/tint"
 )
 
