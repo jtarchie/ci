@@ -10,7 +10,7 @@ import (
 type Driver interface {
 	Close() error
 	Set(prefix string, payload any) error
-	GetAll(prefix string, fields []string) ([]Result, error)
+	GetAll(prefix string, fields []string) (Results, error)
 }
 
 type Payload map[string]any
@@ -37,4 +37,17 @@ type Result struct {
 	ID      int     `db:"id"`
 	Path    string  `db:"path"`
 	Payload Payload `db:"payload"`
+}
+
+type Results []Result
+
+func (results Results) AsTree() *Tree[Payload] {
+	tree := NewTree[Payload]()
+	for _, result := range results {
+		tree.AddNode(result.Path, result.Payload)
+	}
+
+	tree.Flatten()
+
+	return tree
 }

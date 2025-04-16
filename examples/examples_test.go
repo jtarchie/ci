@@ -8,6 +8,7 @@ import (
 	"github.com/jtarchie/ci/commands"
 	_ "github.com/jtarchie/ci/orchestra/docker"
 	_ "github.com/jtarchie/ci/orchestra/native"
+	_ "github.com/jtarchie/ci/storage/sqlite"
 	. "github.com/onsi/gomega"
 )
 
@@ -33,6 +34,7 @@ func TestExamplesDocker(t *testing.T) {
 				runner := commands.Runner{
 					Pipeline:     examplePath,
 					Orchestrator: driver,
+					Storage:      "sqlite://:memory:",
 				}
 				err := runner.Run(nil)
 				assert.Expect(err).NotTo(HaveOccurred())
@@ -66,6 +68,7 @@ func TestExamplesAll(t *testing.T) {
 				runner := commands.Runner{
 					Pipeline:     examplePath,
 					Orchestrator: driver,
+					Storage:      "sqlite://:memory:",
 				}
 				err := runner.Run(nil)
 				assert.Expect(err).NotTo(HaveOccurred())

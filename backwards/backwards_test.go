@@ -11,6 +11,7 @@ import (
 	"github.com/jtarchie/ci/backwards"
 	"github.com/jtarchie/ci/commands"
 	_ "github.com/jtarchie/ci/orchestra/native"
+	_ "github.com/jtarchie/ci/storage/sqlite"
 	. "github.com/onsi/gomega"
 )
 
@@ -35,6 +36,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 		runner := commands.Runner{
 			Pipeline:     "fixtures/on_failure.yml",
 			Orchestrator: "native",
+			Storage:      "sqlite://:memory:",
 		}
 		err := runner.Run(logger)
 		assert.Expect(err).NotTo(HaveOccurred())
@@ -48,6 +50,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 		runner := commands.Runner{
 			Pipeline:     "fixtures/on_success.yml",
 			Orchestrator: "native",
+			Storage:      "sqlite://:memory:",
 		}
 		err := runner.Run(nil)
 		assert.Expect(err).NotTo(HaveOccurred())
@@ -61,6 +64,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 		runner := commands.Runner{
 			Pipeline:     "fixtures/ensure.yml",
 			Orchestrator: "native",
+			Storage:      "sqlite://:memory:",
 		}
 		err := runner.Run(logger)
 		assert.Expect(err).NotTo(HaveOccurred())
@@ -75,6 +79,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 		runner := commands.Runner{
 			Pipeline:     "fixtures/do.yml",
 			Orchestrator: "native",
+			Storage:      "sqlite://:memory:",
 		}
 		err := runner.Run(logger)
 		assert.Expect(err).NotTo(HaveOccurred())
@@ -88,6 +93,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 		runner := commands.Runner{
 			Pipeline:     "fixtures/try.yml",
 			Orchestrator: "native",
+			Storage:      "sqlite://:memory:",
 		}
 		err := runner.Run(nil)
 		assert.Expect(err).NotTo(HaveOccurred())
@@ -101,6 +107,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 		runner := commands.Runner{
 			Pipeline:     "fixtures/all.yml",
 			Orchestrator: "native",
+			Storage:      "sqlite://:memory:",
 		}
 		err := runner.Run(logger)
 		assert.Expect(err).NotTo(HaveOccurred())
@@ -116,6 +123,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 		runner := commands.Runner{
 			Pipeline:     "fixtures/on_error.yml",
 			Orchestrator: "native",
+			Storage:      "sqlite://:memory:",
 		}
 		err := runner.Run(logger)
 		assert.Expect(err).NotTo(HaveOccurred())
@@ -132,6 +140,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 		runner := commands.Runner{
 			Pipeline:     "fixtures/on_abort.yml",
 			Orchestrator: "native",
+			Storage:      "sqlite://:memory:",
 		}
 		err := runner.Run(logger)
 		assert.Expect(err).NotTo(HaveOccurred())
@@ -145,6 +154,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 		runner := commands.Runner{
 			Pipeline:     "fixtures/task_file.yml",
 			Orchestrator: "native",
+			Storage:      "sqlite://:memory:",
 		}
 		err := runner.Run(nil)
 		assert.Expect(err).NotTo(HaveOccurred())
@@ -187,6 +197,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 				runner := commands.Runner{
 					Pipeline:     file.Name(),
 					Orchestrator: "native",
+					Storage:      "sqlite://:memory:",
 				}
 				err = runner.Run(nil)
 

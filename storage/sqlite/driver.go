@@ -5,10 +5,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"strings"
 
 	"github.com/georgysavva/scany/v2/sqlscan"
+	"github.com/jtarchie/ci/storage"
 	"github.com/samber/lo"
 	_ "modernc.org/sqlite"
 )
@@ -19,8 +21,10 @@ type Sqlite struct {
 	namespace string
 }
 
-func NewSqlite(filename string, namespace string) (*Sqlite, error) {
-	writer, err := sql.Open("sqlite", filename)
+func NewSqlite(dsn string, namespace string, _ *slog.Logger) (storage.Driver, error) {
+	dsn = strings.TrimPrefix(dsn, "sqlite://")
+
+	writer, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
@@ -41,7 +45,7 @@ func NewSqlite(filename string, namespace string) (*Sqlite, error) {
 	writer.SetMaxIdleConns(1)
 	writer.SetMaxOpenConns(1)
 
-	reader, err := sql.Open("sqlite", filename+"?mode=ro&immutable=1")
+	reader, err := sql.Open("sqlite", dsn+"?mode=ro&immutable=1")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
@@ -74,14 +78,14 @@ func (s *Sqlite) Set(prefix string, payload any) error {
 	return nil
 }
 
-func (s *Sqlite) GetAll(prefix string, fields []string) ([]Result, error) {
+func (s *Sqlite) GetAll(prefix string, fields []string) (storage.Results, error) {
 	if len(fields) == 0 {
 		fields = []string{"status"}
 	}
 
 	path := filepath.Clean("/" + s.namespace + "/" + prefix)
 
-	var results []Result
+	var results storage.Results
 
 	jsonSelects := strings.Join(
 		lo.Map(fields, func(field string, _ int) string {
@@ -126,4 +130,8 @@ func (s *Sqlite) Close() error {
 	}
 
 	return nil
+}
+
+func init() {
+	storage.Add("sqlite", NewSqlite)
 }
