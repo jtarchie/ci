@@ -21,10 +21,10 @@ import (
 )
 
 type Runner struct {
-	Storage      string        `default:"sqlite://test.db"                                    help:"Path to storage file"             required:""`
-	Pipeline     string        `arg:""                                                        help:"Path to pipeline javascript file" type:"existingfile"`
-	Orchestrator string        `default:"native"                                              help:"orchestrator runtime to use"`
-	Timeout      time.Duration `help:"timeout for the pipeline, will cause abort if exceeded"`
+	Storage  string        `default:"sqlite://test.db"                                    help:"Path to storage file"             required:""`
+	Pipeline string        `arg:""                                                        help:"Path to pipeline javascript file" type:"existingfile"`
+	Driver   string        `default:"native"                                              help:"orchestrator runtime to use"`
+	Timeout  time.Duration `help:"timeout for the pipeline, will cause abort if exceeded"`
 }
 
 func youtubeIDStyle(input string) string {
@@ -61,7 +61,7 @@ func (c *Runner) Run(logger *slog.Logger) error {
 	logger = logger.WithGroup("runner").With(
 		"id", runtimeID,
 		"pipeline", c.Pipeline,
-		"orchestrator", c.Orchestrator,
+		"orchestrator", c.Driver,
 	)
 
 	// Create a context with cancellation
@@ -111,9 +111,9 @@ func (c *Runner) Run(logger *slog.Logger) error {
 		pipeline = string(result.OutputFiles[0].Contents)
 	}
 
-	orchestrator, found := orchestra.Get(c.Orchestrator)
+	orchestrator, found := orchestra.Get(c.Driver)
 	if !found {
-		return fmt.Errorf("could not get orchestrator (%q): %w", c.Orchestrator, ErrOrchestratorNotFound)
+		return fmt.Errorf("could not get orchestrator (%q): %w", c.Driver, ErrOrchestratorNotFound)
 	}
 
 	driver, err := orchestrator("ci-"+runtimeID, logger)
