@@ -34,9 +34,9 @@ func TestBackwardsCompatibility(t *testing.T) {
 
 		assert := NewGomegaWithT(t)
 		runner := commands.Runner{
-			Pipeline:     "fixtures/on_failure.yml",
-			Orchestrator: "native",
-			Storage:      "sqlite://:memory:",
+			Pipeline: "fixtures/on_failure.yml",
+			Driver:   "native",
+			Storage:  "sqlite://:memory:",
 		}
 		err := runner.Run(logger)
 		assert.Expect(err).NotTo(HaveOccurred())
@@ -48,9 +48,9 @@ func TestBackwardsCompatibility(t *testing.T) {
 
 		assert := NewGomegaWithT(t)
 		runner := commands.Runner{
-			Pipeline:     "fixtures/on_success.yml",
-			Orchestrator: "native",
-			Storage:      "sqlite://:memory:",
+			Pipeline: "fixtures/on_success.yml",
+			Driver:   "native",
+			Storage:  "sqlite://:memory:",
 		}
 		err := runner.Run(nil)
 		assert.Expect(err).NotTo(HaveOccurred())
@@ -62,9 +62,9 @@ func TestBackwardsCompatibility(t *testing.T) {
 		logs, logger := createLogger()
 		assert := NewGomegaWithT(t)
 		runner := commands.Runner{
-			Pipeline:     "fixtures/ensure.yml",
-			Orchestrator: "native",
-			Storage:      "sqlite://:memory:",
+			Pipeline: "fixtures/ensure.yml",
+			Driver:   "native",
+			Storage:  "sqlite://:memory:",
 		}
 		err := runner.Run(logger)
 		assert.Expect(err).NotTo(HaveOccurred())
@@ -77,9 +77,9 @@ func TestBackwardsCompatibility(t *testing.T) {
 		logs, logger := createLogger()
 		assert := NewGomegaWithT(t)
 		runner := commands.Runner{
-			Pipeline:     "fixtures/do.yml",
-			Orchestrator: "native",
-			Storage:      "sqlite://:memory:",
+			Pipeline: "fixtures/do.yml",
+			Driver:   "native",
+			Storage:  "sqlite://:memory:",
 		}
 		err := runner.Run(logger)
 		assert.Expect(err).NotTo(HaveOccurred())
@@ -91,9 +91,9 @@ func TestBackwardsCompatibility(t *testing.T) {
 
 		assert := NewGomegaWithT(t)
 		runner := commands.Runner{
-			Pipeline:     "fixtures/try.yml",
-			Orchestrator: "native",
-			Storage:      "sqlite://:memory:",
+			Pipeline: "fixtures/try.yml",
+			Driver:   "native",
+			Storage:  "sqlite://:memory:",
 		}
 		err := runner.Run(nil)
 		assert.Expect(err).NotTo(HaveOccurred())
@@ -105,9 +105,9 @@ func TestBackwardsCompatibility(t *testing.T) {
 		logs, logger := createLogger()
 		assert := NewGomegaWithT(t)
 		runner := commands.Runner{
-			Pipeline:     "fixtures/all.yml",
-			Orchestrator: "native",
-			Storage:      "sqlite://:memory:",
+			Pipeline: "fixtures/all.yml",
+			Driver:   "native",
+			Storage:  "sqlite://:memory:",
 		}
 		err := runner.Run(logger)
 		assert.Expect(err).NotTo(HaveOccurred())
@@ -121,9 +121,9 @@ func TestBackwardsCompatibility(t *testing.T) {
 		logs, logger := createLogger()
 		assert := NewGomegaWithT(t)
 		runner := commands.Runner{
-			Pipeline:     "fixtures/on_error.yml",
-			Orchestrator: "native",
-			Storage:      "sqlite://:memory:",
+			Pipeline: "fixtures/on_error.yml",
+			Driver:   "native",
+			Storage:  "sqlite://:memory:",
 		}
 		err := runner.Run(logger)
 		assert.Expect(err).NotTo(HaveOccurred())
@@ -138,9 +138,9 @@ func TestBackwardsCompatibility(t *testing.T) {
 		logs, logger := createLogger()
 		assert := NewGomegaWithT(t)
 		runner := commands.Runner{
-			Pipeline:     "fixtures/on_abort.yml",
-			Orchestrator: "native",
-			Storage:      "sqlite://:memory:",
+			Pipeline: "fixtures/on_abort.yml",
+			Driver:   "native",
+			Storage:  "sqlite://:memory:",
 		}
 		err := runner.Run(logger)
 		assert.Expect(err).NotTo(HaveOccurred())
@@ -152,9 +152,9 @@ func TestBackwardsCompatibility(t *testing.T) {
 
 		assert := NewGomegaWithT(t)
 		runner := commands.Runner{
-			Pipeline:     "fixtures/task_file.yml",
-			Orchestrator: "native",
-			Storage:      "sqlite://:memory:",
+			Pipeline: "fixtures/task_file.yml",
+			Driver:   "native",
+			Storage:  "sqlite://:memory:",
 		}
 		err := runner.Run(nil)
 		assert.Expect(err).NotTo(HaveOccurred())
@@ -195,9 +195,9 @@ func TestBackwardsCompatibility(t *testing.T) {
 				assert.Expect(file.Close()).NotTo(HaveOccurred())
 
 				runner := commands.Runner{
-					Pipeline:     file.Name(),
-					Orchestrator: "native",
-					Storage:      "sqlite://:memory:",
+					Pipeline: file.Name(),
+					Driver:   "native",
+					Storage:  "sqlite://:memory:",
 				}
 				err = runner.Run(nil)
 

@@ -32,9 +32,9 @@ func TestExamplesDocker(t *testing.T) {
 
 				assert := NewGomegaWithT(t)
 				runner := commands.Runner{
-					Pipeline:     examplePath,
-					Orchestrator: driver,
-					Storage:      "sqlite://:memory:",
+					Pipeline: examplePath,
+					Driver:   driver,
+					Storage:  "sqlite://:memory:",
 				}
 				err := runner.Run(nil)
 				assert.Expect(err).NotTo(HaveOccurred())
@@ -66,9 +66,9 @@ func TestExamplesAll(t *testing.T) {
 
 				assert := NewGomegaWithT(t)
 				runner := commands.Runner{
-					Pipeline:     examplePath,
-					Orchestrator: driver,
-					Storage:      "sqlite://:memory:",
+					Pipeline: examplePath,
+					Driver:   driver,
+					Storage:  "sqlite://:memory:",
 				}
 				err := runner.Run(nil)
 				assert.Expect(err).NotTo(HaveOccurred())
