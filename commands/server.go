@@ -70,7 +70,7 @@ func (c *Server) Run(logger *slog.Logger) error {
 			return errors.New("stdout is not a string") //nolint:err113
 		}
 
-		ctx.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		ctx.Response().Header().Set(echo.HeaderContentType, "application/x-asciicast")
 		ctx.Response().WriteHeader(http.StatusOK)
 
 		err = server.ToAsciiCast(stdout, ctx.Response().Writer)
