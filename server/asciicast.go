@@ -86,23 +86,9 @@ func ToAsciiCast(stdout string, writer io.Writer) error {
 	}
 
 	// Handle any remaining content in the final chunk
-	if remainingChunk := currentChunk.String(); remainingChunk != "" {
-		event := []interface{}{currentTime, "o", remainingChunk}
-
-		eventBytes, err := json.Marshal(event)
-		if err != nil {
-			return fmt.Errorf("could not marshal final event: %w", err)
-		}
-
-		_, err = writer.Write(eventBytes)
-		if err != nil {
-			return fmt.Errorf("could not write final event: %w", err)
-		}
-
-		_, err = writer.Write([]byte("\n"))
-		if err != nil {
-			return fmt.Errorf("could not write final event newline: %w", err)
-		}
+	err = writeChunk(&currentChunk, writer, &currentTime)
+	if err != nil {
+		return fmt.Errorf("could not write final chunk: %w", err)
 	}
 
 	// Check for scanner errors
