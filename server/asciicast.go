@@ -9,29 +9,45 @@ import (
 	"time"
 )
 
-const (
-	// AsciiCastVersion is the version of the asciicast format.
-	AsciiCastVersion = 2
-	// DefaultTerminalWidth is the default width of the terminal in columns.
-	DefaultTerminalWidth = 80
-	// DefaultTerminalHeight is the default height of the terminal in rows.
-	DefaultTerminalHeight = 24
-	// LinesPerChunk controls how many lines we group together in a single event.
-	LinesPerChunk = 5
-	// ChunkSpeedDivisor controls how the chunk size affects timing.
-	ChunkSpeedDivisor = 1000.0
-	// MinTimeIncrement is the minimum time between events in seconds.
-	MinTimeIncrement = 0.05
-	// MaxTimeIncrement is the maximum time between events in seconds.
-	MaxTimeIncrement = 0.3
-)
+// AsciiCastConverter handles the conversion of text output to asciicast format.
+type AsciiCastConverter struct {
+	// Version is the version of the asciicast format
+	Version int
+	// TerminalWidth is the width of the terminal in columns
+	TerminalWidth int
+	// TerminalHeight is the height of the terminal in rows
+	TerminalHeight int
+	// LinesPerChunk controls how many lines we group together in a single event
+	LinesPerChunk int
+	// ChunkSpeedDivisor controls how the chunk size affects timing
+	ChunkSpeedDivisor float64
+	// MinTimeIncrement is the minimum time between events in seconds
+	MinTimeIncrement float64
+	// MaxTimeIncrement is the maximum time between events in seconds
+	MaxTimeIncrement float64
+}
 
-func ToAsciiCast(stdout string, writer io.Writer) error {
+// NewAsciiCastConverter creates a new converter with default settings.
+func NewAsciiCastConverter() *AsciiCastConverter {
+	//nolint:mnd
+	return &AsciiCastConverter{
+		Version:           2,
+		TerminalWidth:     80,
+		TerminalHeight:    24,
+		LinesPerChunk:     5,
+		ChunkSpeedDivisor: 1000.0,
+		MinTimeIncrement:  0.05,
+		MaxTimeIncrement:  0.3,
+	}
+}
+
+// ToAsciiCast converts a string of stdout to asciicast format and writes it to the given writer.
+func (c *AsciiCastConverter) ToAsciiCast(stdout string, writer io.Writer) error {
 	// Create the header with required fields
 	header := map[string]interface{}{
-		"version":   AsciiCastVersion,
-		"width":     DefaultTerminalWidth,
-		"height":    DefaultTerminalHeight,
+		"version":   c.Version,
+		"width":     c.TerminalWidth,
+		"height":    c.TerminalHeight,
 		"timestamp": time.Now().Unix(),
 	}
 
@@ -71,11 +87,11 @@ func ToAsciiCast(stdout string, writer io.Writer) error {
 		lineCount++
 
 		// Write chunk when it reaches the desired size or end of input
-		if lineCount < LinesPerChunk {
+		if lineCount < c.LinesPerChunk {
 			continue
 		}
 
-		if err := writeChunk(&currentChunk, writer, &currentTime); err != nil {
+		if err := c.writeChunk(&currentChunk, writer, &currentTime); err != nil {
 			return err
 		}
 
@@ -86,7 +102,7 @@ func ToAsciiCast(stdout string, writer io.Writer) error {
 	}
 
 	// Handle any remaining content in the final chunk
-	err = writeChunk(&currentChunk, writer, &currentTime)
+	err = c.writeChunk(&currentChunk, writer, &currentTime)
 	if err != nil {
 		return fmt.Errorf("could not write final chunk: %w", err)
 	}
@@ -100,7 +116,7 @@ func ToAsciiCast(stdout string, writer io.Writer) error {
 }
 
 // writeChunk writes a chunk of text as an asciicast event and updates the current time.
-func writeChunk(chunk *strings.Builder, writer io.Writer, currentTime *float64) error {
+func (c *AsciiCastConverter) writeChunk(chunk *strings.Builder, writer io.Writer, currentTime *float64) error {
 	chunkStr := chunk.String()
 
 	// Create and write event
@@ -122,17 +138,24 @@ func writeChunk(chunk *strings.Builder, writer io.Writer, currentTime *float64) 
 	}
 
 	// Calculate timing based on chunk length
-	timeIncrement := float64(len(chunkStr)) / ChunkSpeedDivisor
+	timeIncrement := float64(len(chunkStr)) / c.ChunkSpeedDivisor
 
-	if timeIncrement < MinTimeIncrement {
-		timeIncrement = MinTimeIncrement
+	if timeIncrement < c.MinTimeIncrement {
+		timeIncrement = c.MinTimeIncrement
 	}
 
-	if timeIncrement > MaxTimeIncrement {
-		timeIncrement = MaxTimeIncrement
+	if timeIncrement > c.MaxTimeIncrement {
+		timeIncrement = c.MaxTimeIncrement
 	}
 
 	*currentTime += timeIncrement
 
 	return nil
+}
+
+// For backward compatibility.
+func ToAsciiCast(stdout string, writer io.Writer) error {
+	converter := NewAsciiCastConverter()
+
+	return converter.ToAsciiCast(stdout, writer)
 }
