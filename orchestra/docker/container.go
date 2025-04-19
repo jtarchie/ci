@@ -101,11 +101,10 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 
 	mounts := []mount.Mount{}
 
-	//nolint:varnamelen
-	for _, m := range task.Mounts {
-		volume, err := d.CreateVolume(ctx, m.Name, 0)
+	for _, taskMount := range task.Mounts {
+		volume, err := d.CreateVolume(ctx, taskMount.Name, 0)
 		if err != nil {
-			logger.Error("volume.create", "name", m.Name, "err", err)
+			logger.Error("volume.create", "name", taskMount.Name, "err", err)
 
 			return nil, fmt.Errorf("failed to create volume: %w", err)
 		}
@@ -115,7 +114,7 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 		mounts = append(mounts, mount.Mount{
 			Type:   "volume",
 			Source: dockerVolume.volume.Name,
-			Target: filepath.Join("/tmp", containerName, m.Path),
+			Target: filepath.Join("/tmp", containerName, taskMount.Path),
 		})
 	}
 

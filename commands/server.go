@@ -20,7 +20,7 @@ type Server struct {
 func (c *Server) Run(logger *slog.Logger) error {
 	initStorage, found := storage.GetFromDSN(c.Storage)
 	if !found {
-		return errors.New("could not get storage driver") //nolint:err113
+		return fmt.Errorf("could not get storage driver: %w", errors.ErrUnsupported)
 	}
 
 	client, err := initStorage(c.Storage, "", logger)
@@ -62,12 +62,12 @@ func (c *Server) Run(logger *slog.Logger) error {
 		}
 
 		if len(results) > 1 {
-			return errors.New("cannot render multiple results as asciicast") //nolint:err113
+			return fmt.Errorf("cannot render multiple results as asciicast: %w", errors.ErrUnsupported)
 		}
 
 		stdout, ok := results[0].Payload["stdout"].(string)
 		if !ok {
-			return errors.New("stdout is not a string") //nolint:err113
+			return fmt.Errorf("stdout is not a string: %w", errors.ErrUnsupported)
 		}
 
 		ctx.Response().Header().Set(echo.HeaderContentType, "application/x-asciicast")

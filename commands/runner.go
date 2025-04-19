@@ -44,7 +44,7 @@ func youtubeIDStyle(input string) string {
 func (c *Runner) Run(logger *slog.Logger) error {
 	initStorage, found := storage.GetFromDSN(c.Storage)
 	if !found {
-		return errors.New("could not get storage driver") //nolint:err113
+		return fmt.Errorf("could not get storage driver: %w", errors.ErrUnsupported)
 	}
 
 	pipelinePath, err := filepath.Abs(c.Pipeline)

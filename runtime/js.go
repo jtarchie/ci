@@ -50,8 +50,7 @@ func (j *JS) Execute(ctx context.Context, source string, driver orchestra.Driver
 	lines := strings.Split(strings.TrimSpace(string(result.Code)), "\n")
 
 	if len(lines) == 0 {
-		//nolint: err113
-		return errors.New("could not find source map")
+		return fmt.Errorf("could not find source map: %w", errors.ErrUnsupported)
 	}
 
 	var sourceMap string
@@ -118,8 +117,8 @@ func (j *JS) Execute(ctx context.Context, source string, driver orchestra.Driver
 	}
 
 	// let's run the pipeline
-	pipelineFunc, ok := goja.AssertFunction(pipeline) //nolint: varnamelen
-	if !ok {
+	pipelineFunc, found := goja.AssertFunction(pipeline)
+	if !found {
 		return ErrPipelineNotFunction
 	}
 
@@ -132,8 +131,8 @@ func (j *JS) Execute(ctx context.Context, source string, driver orchestra.Driver
 		return fmt.Errorf("pipeline returned nil: %w", ErrPipelineReturnedNonPromise)
 	}
 
-	promise, ok := value.Export().(*goja.Promise)
-	if !ok {
+	promise, found := value.Export().(*goja.Promise)
+	if !found {
 		return fmt.Errorf("pipeline did not return a promise: %w", ErrPipelineNotFunction)
 	}
 
@@ -146,13 +145,11 @@ func (j *JS) Execute(ctx context.Context, source string, driver orchestra.Driver
 		res := promise.Result()
 		if resObj, ok := res.(*goja.Object); ok {
 			if stack := resObj.Get("stack"); stack != nil {
-				//nolint: err113
-				return fmt.Errorf("pipeline promise rejected: %v\n%v", res, stack)
+				return fmt.Errorf("%w: %v\n%v", ErrPromiseRejected, res, stack)
 			}
 		}
 
-		//nolint: err113
-		return fmt.Errorf("pipeline promise rejected: %v", res)
+		return fmt.Errorf("%w: %v", ErrPromiseRejected, res)
 	}
 
 	return nil
@@ -161,4 +158,5 @@ func (j *JS) Execute(ctx context.Context, source string, driver orchestra.Driver
 var (
 	ErrPipelineNotFunction        = errors.New("pipeline is not a function")
 	ErrPipelineReturnedNonPromise = errors.New("pipeline did not return a promise")
+	ErrPromiseRejected            = errors.New("promise rejected")
 )

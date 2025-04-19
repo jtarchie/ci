@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -33,14 +34,16 @@ func (t *Transpile) Run(_ *slog.Logger) error {
 	})
 
 	if len(result.Errors) > 0 {
-		return fmt.Errorf("could not transpile pipeline: %s", result.Errors[0].Text) //nolint:err113
+		return fmt.Errorf("%s: %w", result.Errors[0].Text, ErrTranspile)
 	}
 
 	if len(result.Warnings) > 0 {
-		return fmt.Errorf("could not transpile pipeline: %s", result.Warnings[0].Text) //nolint:err113
+		return fmt.Errorf("%s: %w", result.Warnings[0].Text, ErrTranspile)
 	}
 
 	fmt.Fprintln(os.Stdout, string(result.Code))
 
 	return nil
 }
+
+var ErrTranspile = errors.New("could not transpile pipeline")

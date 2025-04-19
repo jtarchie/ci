@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql/driver"
 	"encoding/json"
+	"errors"
 	"fmt"
 )
 
@@ -16,20 +17,34 @@ type Driver interface {
 type Payload map[string]any
 
 func (p *Payload) Value() (driver.Value, error) {
-	return json.Marshal(p) //nolint: wrapcheck
+	contents, err := json.Marshal(p)
+	if err != nil {
+		return nil, fmt.Errorf("could not marshal payload: %w", err)
+	}
+
+	return contents, nil
 }
 
-func (p *Payload) Scan(value any) error {
-	//nolint: wrapcheck,err113
-	switch x := value.(type) {
+func (p *Payload) Scan(sqlValue any) error {
+	switch typedValue := sqlValue.(type) {
 	case string:
-		return json.NewDecoder(bytes.NewBufferString(x)).Decode(p)
+		err := json.NewDecoder(bytes.NewBufferString(typedValue)).Decode(p)
+		if err != nil {
+			return fmt.Errorf("could not unmarshal string payload: %w", err)
+		}
+
+		return nil
 	case []byte:
-		return json.NewDecoder(bytes.NewBuffer(x)).Decode(p)
+		err := json.NewDecoder(bytes.NewBuffer(typedValue)).Decode(p)
+		if err != nil {
+			return fmt.Errorf("could not unmarshal byte payload: %w", err)
+		}
+
+		return nil
 	case nil:
 		return nil
 	default:
-		return fmt.Errorf("cannot scan type %T: %v", value, value)
+		return fmt.Errorf("%w: cannot scan type %T: %v", errors.ErrUnsupported, sqlValue, sqlValue)
 	}
 }
 
