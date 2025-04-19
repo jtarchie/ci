@@ -97,12 +97,20 @@ var TaskAbort = class extends CustomError {
 };
 
 // src/job_runner.ts
+function zeroPad(num, places) {
+  return String(num).padStart(places, "0");
+}
+function zeroPadWithLength(num, length) {
+  const decimalPlaces = String(length).split(".")[1]?.length || 0;
+  return zeroPad(num, decimalPlaces);
+}
+var buildID = zeroPad(Date.now(), 20);
 var JobRunner = class {
   constructor(jobConfig, resources, resourceTypes) {
     this.jobConfig = jobConfig;
     this.resources = resources;
     this.resourceTypes = resourceTypes;
-    this.buildID = Date.now();
+    this.buildID = buildID;
     this.taskRunner = new TaskRunner(this.taskNames);
   }
   taskNames = [];
@@ -114,7 +122,10 @@ var JobRunner = class {
     storage.set(storageKey, { status: "pending" });
     try {
       for (let i = 0; i < this.jobConfig.plan.length; i++) {
-        await this.processStep(this.jobConfig.plan[i], `${i}`);
+        await this.processStep(
+          this.jobConfig.plan[i],
+          zeroPadWithLength(i, this.jobConfig.plan.length)
+        );
       }
       storage.set(storageKey, { status: "success" });
     } catch (error) {
@@ -285,7 +296,10 @@ var JobRunner = class {
       }
       for (let i = 0; i < steps.length; i++) {
         const subStep = steps[i];
-        await this.processStep(subStep, `${pathContext}/${i}`);
+        await this.processStep(
+          subStep,
+          `${pathContext}/${zeroPadWithLength(i, steps.length)}`
+        );
       }
     } catch (error) {
       failure = error;

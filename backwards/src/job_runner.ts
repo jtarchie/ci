@@ -7,17 +7,28 @@ import {
   TaskRunner,
 } from "./task_runner.ts";
 
+function zeroPad(num: number, places: number): string {
+  return String(num).padStart(places, "0");
+}
+
+function zeroPadWithLength(num: number, length: number): string {
+  const decimalPlaces = String(length).split(".")[1]?.length || 0;
+  return zeroPad(num, decimalPlaces);
+}
+
+const buildID = zeroPad(Date.now(), 20);
+
 export class JobRunner {
   private taskNames: string[] = [];
   private taskRunner: TaskRunner;
-  private buildID: number;
+  private buildID: string;
 
   constructor(
     private jobConfig: JobConfig,
     private resources: Resource[],
     private resourceTypes: ResourceType[],
   ) {
-    this.buildID = Date.now();
+    this.buildID = buildID;
     this.taskRunner = new TaskRunner(this.taskNames);
   }
 
@@ -29,7 +40,10 @@ export class JobRunner {
 
     try {
       for (let i = 0; i < this.jobConfig.plan.length; i++) {
-        await this.processStep(this.jobConfig.plan[i], `${i}`);
+        await this.processStep(
+          this.jobConfig.plan[i],
+          zeroPadWithLength(i, this.jobConfig.plan.length),
+        );
       }
       storage.set(storageKey, { status: "success" });
     } catch (error) {
@@ -228,7 +242,10 @@ export class JobRunner {
 
       for (let i = 0; i < steps.length; i++) {
         const subStep = steps[i];
-        await this.processStep(subStep, `${pathContext}/${i}`);
+        await this.processStep(
+          subStep,
+          `${pathContext}/${zeroPadWithLength(i, steps.length)}`,
+        );
       }
     } catch (error) {
       failure = error;
