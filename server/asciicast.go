@@ -43,6 +43,9 @@ func NewAsciiCastConverter() *AsciiCastConverter {
 
 // ToAsciiCast converts a string of stdout to asciicast format and writes it to the given writer.
 func (c *AsciiCastConverter) ToAsciiCast(stdout string, writer io.Writer) error {
+	// Create a single JSON encoder to be used throughout the function
+	encoder := json.NewEncoder(writer)
+
 	// Create the header with required fields
 	header := map[string]interface{}{
 		"version":   c.Version,
@@ -51,20 +54,9 @@ func (c *AsciiCastConverter) ToAsciiCast(stdout string, writer io.Writer) error 
 		"timestamp": time.Now().Unix(),
 	}
 
-	// Write the header as JSON object
-	headerBytes, err := json.Marshal(header)
-	if err != nil {
-		return fmt.Errorf("could not marshal header: %w", err)
-	}
-
-	_, err = writer.Write(headerBytes)
-	if err != nil {
-		return fmt.Errorf("could not write header: %w", err)
-	}
-
-	_, err = writer.Write([]byte("\n"))
-	if err != nil {
-		return fmt.Errorf("could not write header newline: %w", err)
+	// Write the header using the encoder
+	if err := encoder.Encode(header); err != nil {
+		return fmt.Errorf("could not encode header: %w", err)
 	}
 
 	// Set up scanner to read line by line
@@ -86,24 +78,20 @@ func (c *AsciiCastConverter) ToAsciiCast(stdout string, writer io.Writer) error 
 
 		lineCount++
 
-		// Write chunk when it reaches the desired size or end of input
-		if lineCount < c.LinesPerChunk {
-			continue
+		// Write chunk when it reaches the desired size
+		if lineCount >= c.LinesPerChunk {
+			if err := c.writeChunkWithEncoder(&currentChunk, encoder, &currentTime); err != nil {
+				return err
+			}
+
+			// Reset for next chunk
+			currentChunk.Reset()
+
+			lineCount = 0
 		}
-
-		if err := c.writeChunk(&currentChunk, writer, &currentTime); err != nil {
-			return err
-		}
-
-		// Reset for next chunk
-		currentChunk.Reset()
-
-		lineCount = 0
 	}
 
-	// Handle any remaining content in the final chunk
-	err = c.writeChunk(&currentChunk, writer, &currentTime)
-	if err != nil {
+	if err := c.writeChunkWithEncoder(&currentChunk, encoder, &currentTime); err != nil {
 		return fmt.Errorf("could not write final chunk: %w", err)
 	}
 
@@ -115,26 +103,17 @@ func (c *AsciiCastConverter) ToAsciiCast(stdout string, writer io.Writer) error 
 	return nil
 }
 
-// writeChunk writes a chunk of text as an asciicast event and updates the current time.
-func (c *AsciiCastConverter) writeChunk(chunk *strings.Builder, writer io.Writer, currentTime *float64) error {
+// writeChunkWithEncoder writes a chunk of text as an asciicast event using the provided JSON encoder
+// and updates the current time.
+func (c *AsciiCastConverter) writeChunkWithEncoder(chunk *strings.Builder, encoder *json.Encoder, currentTime *float64) error {
 	chunkStr := chunk.String()
 
-	// Create and write event
+	// Create the event as a slice
 	event := []interface{}{*currentTime, "o", chunkStr}
 
-	eventBytes, err := json.Marshal(event)
-	if err != nil {
-		return fmt.Errorf("could not marshal event: %w", err)
-	}
-
-	_, err = writer.Write(eventBytes)
-	if err != nil {
-		return fmt.Errorf("could not write event: %w", err)
-	}
-
-	_, err = writer.Write([]byte("\n"))
-	if err != nil {
-		return fmt.Errorf("could not write event newline: %w", err)
+	// Encode the event (this will automatically add a newline)
+	if err := encoder.Encode(event); err != nil {
+		return fmt.Errorf("could not encode event: %w", err)
 	}
 
 	// Calculate timing based on chunk length
