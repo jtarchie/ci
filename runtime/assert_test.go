@@ -29,6 +29,7 @@ func TestAssert(t *testing.T) {
 
 	failures := []string{
 		"assert.Equal(1, 2);",
+		"assert.Equal({a: 1}, {a: 1, b: 2});",
 		"assert.NotEqual(1, 1);",
 		"assert.ContainsString('foobar', 'baz');",
 		"assert.Truthy(false);",
