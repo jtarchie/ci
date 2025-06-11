@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pipeline Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/asciinema-player@3.9.0/dist/bundle/asciinema-player.min.css">
-    <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
         darkMode: "media", // Enable dark mode based on prefers-color-scheme
@@ -29,6 +29,9 @@
       }
       .task-item[open] .task-details {
         display: block;
+      }
+      .ap-player .ap-overlay-start .ap-play-button svg {
+        display: inline-block;
       }
     </style>
   </head>
