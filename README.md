@@ -103,5 +103,5 @@ brew bundle
 task
 ```
 
-Please see `examples/` for real world usages. They are run as part of the text
+Please see `examples/` for real world usages. They are run as part of the test
 suite to.
