@@ -120,13 +120,13 @@ func (c *Runner) Run(logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("could not create orchestrator client: %w", err)
 	}
-	defer driver.Close()
+	defer func() { _ = driver.Close() }()
 
 	storage, err := initStorage(c.Storage, runtimeID, logger)
 	if err != nil {
 		return fmt.Errorf("could not create sqlite client: %w", err)
 	}
-	defer storage.Close()
+	defer func() { _ = storage.Close() }()
 
 	js := runtime.NewJS(logger)
 

@@ -58,7 +58,8 @@ func (d *Docker) Close() error {
 	}
 
 	for _, volume := range volumes.Volumes {
-		if err := d.client.VolumeRemove(context.Background(), volume.Name, true); err != nil {
+		err := d.client.VolumeRemove(context.Background(), volume.Name, true)
+		if err != nil {
 			return fmt.Errorf("failed to remove volume %s: %w", volume.Name, err)
 		}
 	}

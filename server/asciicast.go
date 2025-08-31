@@ -55,7 +55,8 @@ func (c *AsciiCastConverter) ToAsciiCast(stdout string, writer io.Writer) error 
 	}
 
 	// Write the header using the encoder
-	if err := encoder.Encode(header); err != nil {
+	err := encoder.Encode(header)
+	if err != nil {
 		return fmt.Errorf("could not encode header: %w", err)
 	}
 
@@ -80,7 +81,8 @@ func (c *AsciiCastConverter) ToAsciiCast(stdout string, writer io.Writer) error 
 
 		// Write chunk when it reaches the desired size
 		if lineCount >= c.LinesPerChunk {
-			if err := c.writeChunkWithEncoder(&currentChunk, encoder, &currentTime); err != nil {
+			err := c.writeChunkWithEncoder(&currentChunk, encoder, &currentTime)
+			if err != nil {
 				return err
 			}
 
@@ -91,12 +93,14 @@ func (c *AsciiCastConverter) ToAsciiCast(stdout string, writer io.Writer) error 
 		}
 	}
 
-	if err := c.writeChunkWithEncoder(&currentChunk, encoder, &currentTime); err != nil {
+	err = c.writeChunkWithEncoder(&currentChunk, encoder, &currentTime)
+	if err != nil {
 		return fmt.Errorf("could not write final chunk: %w", err)
 	}
 
 	// Check for scanner errors
-	if err := scanner.Err(); err != nil {
+	err = scanner.Err()
+	if err != nil {
 		return fmt.Errorf("error reading stdout: %w", err)
 	}
 
@@ -112,7 +116,8 @@ func (c *AsciiCastConverter) writeChunkWithEncoder(chunk *strings.Builder, encod
 	event := []interface{}{*currentTime, "o", chunkStr}
 
 	// Encode the event (this will automatically add a newline)
-	if err := encoder.Encode(event); err != nil {
+	err := encoder.Encode(event)
+	if err != nil {
 		return fmt.Errorf("could not encode event: %w", err)
 	}
 

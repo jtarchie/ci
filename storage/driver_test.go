@@ -24,11 +24,13 @@ func TestDrivers(t *testing.T) {
 
 				buildFile, err := os.CreateTemp(t.TempDir(), "")
 				assert.Expect(err).NotTo(HaveOccurred())
-				defer buildFile.Close()
+
+				defer assert.Expect(buildFile.Close()).NotTo(HaveOccurred())
 
 				client, err := init(buildFile.Name(), "namespace", slog.Default())
 				assert.Expect(err).NotTo(HaveOccurred())
-				defer client.Close()
+
+				defer assert.Expect(client.Close()).NotTo(HaveOccurred())
 
 				err = client.Set("/foo", map[string]string{
 					"field":   "123",

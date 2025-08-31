@@ -29,6 +29,7 @@ func NewSqlite(dsn string, namespace string, _ *slog.Logger) (storage.Driver, er
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
+	//nolint: noctx
 	_, err = writer.Exec(`
 		CREATE TABLE IF NOT EXISTS tasks (
 			id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
@@ -65,6 +66,7 @@ func (s *Sqlite) Set(prefix string, payload any) error {
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
+	//nolint: noctx
 	_, err = s.writer.Exec(`
 		INSERT INTO tasks (path, payload)
 		VALUES (?, ?)

@@ -41,7 +41,10 @@ func (t *Transpile) Run(_ *slog.Logger) error {
 		return fmt.Errorf("%s: %w", result.Warnings[0].Text, ErrTranspile)
 	}
 
-	fmt.Fprintln(os.Stdout, string(result.Code))
+	_, err = fmt.Fprintln(os.Stdout, string(result.Code))
+	if err != nil {
+		return fmt.Errorf("could not write transpiled code to stdout: %w", err)
+	}
 
 	return nil
 }

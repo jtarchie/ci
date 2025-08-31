@@ -29,7 +29,8 @@ func TestDrivers(t *testing.T) {
 
 				client, err := init("test-"+gonanoid.Must(), slog.Default())
 				assert.Expect(err).NotTo(HaveOccurred())
-				defer client.Close()
+
+				defer assert.Expect(client.Close()).NotTo(HaveOccurred())
 
 				taskID := gonanoid.Must()
 
@@ -72,7 +73,8 @@ func TestDrivers(t *testing.T) {
 
 				client, err := init("test-"+gonanoid.Must(), slog.Default())
 				assert.Expect(err).NotTo(HaveOccurred())
-				defer client.Close()
+
+				defer assert.Expect(client.Close()).NotTo(HaveOccurred())
 
 				taskID := gonanoid.Must()
 
@@ -111,7 +113,8 @@ func TestDrivers(t *testing.T) {
 
 				client, err := init("test-"+gonanoid.Must(), slog.Default())
 				assert.Expect(err).NotTo(HaveOccurred())
-				defer client.Close()
+
+				defer assert.Expect(client.Close()).NotTo(HaveOccurred())
 
 				taskID := gonanoid.Must()
 
@@ -183,7 +186,8 @@ func TestDrivers(t *testing.T) {
 
 				client, err := init("test-"+gonanoid.Must(), slog.Default())
 				assert.Expect(err).NotTo(HaveOccurred())
-				defer client.Close()
+
+				defer assert.Expect(client.Close()).NotTo(HaveOccurred())
 
 				taskID := gonanoid.Must()
 
@@ -244,13 +248,14 @@ func TestDrivers(t *testing.T) {
 			t.Run("environment variables", func(t *testing.T) {
 				t.Parallel()
 
-				os.Setenv("IGNORE", "ME") //nolint: usetesting
-
 				assert := NewGomegaWithT(t)
+
+				assert.Expect(os.Setenv("IGNORE", "ME")).NotTo(HaveOccurred()) //nolint: usetesting
 
 				client, err := init("test-"+gonanoid.Must(), slog.Default())
 				assert.Expect(err).NotTo(HaveOccurred())
-				defer client.Close()
+
+				defer assert.Expect(client.Close()).NotTo(HaveOccurred())
 
 				taskID := gonanoid.Must()
 
