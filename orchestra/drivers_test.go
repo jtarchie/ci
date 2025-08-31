@@ -30,7 +30,7 @@ func TestDrivers(t *testing.T) {
 				client, err := init("test-"+gonanoid.Must(), slog.Default())
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				defer assert.Expect(client.Close()).NotTo(HaveOccurred())
+				defer func() { _ = client.Close() }()
 
 				taskID := gonanoid.Must()
 
@@ -74,7 +74,7 @@ func TestDrivers(t *testing.T) {
 				client, err := init("test-"+gonanoid.Must(), slog.Default())
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				defer assert.Expect(client.Close()).NotTo(HaveOccurred())
+				defer func() { _ = client.Close() }()
 
 				taskID := gonanoid.Must()
 
@@ -114,7 +114,7 @@ func TestDrivers(t *testing.T) {
 				client, err := init("test-"+gonanoid.Must(), slog.Default())
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				defer assert.Expect(client.Close()).NotTo(HaveOccurred())
+				defer func() { _ = client.Close() }()
 
 				taskID := gonanoid.Must()
 
@@ -187,7 +187,7 @@ func TestDrivers(t *testing.T) {
 				client, err := init("test-"+gonanoid.Must(), slog.Default())
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				defer assert.Expect(client.Close()).NotTo(HaveOccurred())
+				defer func() { _ = client.Close() }()
 
 				taskID := gonanoid.Must()
 
@@ -255,7 +255,7 @@ func TestDrivers(t *testing.T) {
 				client, err := init("test-"+gonanoid.Must(), slog.Default())
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				defer assert.Expect(client.Close()).NotTo(HaveOccurred())
+				defer func() { _ = client.Close() }()
 
 				taskID := gonanoid.Must()
 

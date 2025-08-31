@@ -188,7 +188,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 				file, err := os.CreateTemp(t.TempDir(), "*.yml")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				defer assert.Expect(os.Remove(file.Name())).NotTo(HaveOccurred())
+				defer func() { _ = os.Remove(file.Name()) }()
 
 				contents, err = yaml.MarshalWithOptions(config)
 				assert.Expect(err).NotTo(HaveOccurred())

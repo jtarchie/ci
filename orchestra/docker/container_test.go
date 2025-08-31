@@ -24,7 +24,7 @@ func TestDocker(t *testing.T) {
 		client, err := docker.NewDocker("test-"+gonanoid.Must(), slog.Default())
 		assert.Expect(err).NotTo(HaveOccurred())
 
-		defer assert.Expect(client.Close()).NotTo(HaveOccurred())
+		defer func() { _ = client.Close() }()
 
 		taskID := gonanoid.Must()
 
@@ -68,7 +68,7 @@ func TestDocker(t *testing.T) {
 		client, err := docker.NewDocker("test-"+gonanoid.Must(), slog.Default())
 		assert.Expect(err).NotTo(HaveOccurred())
 
-		defer assert.Expect(client.Close()).NotTo(HaveOccurred())
+		defer func() { _ = client.Close() }()
 
 		taskID := gonanoid.Must()
 
