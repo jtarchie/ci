@@ -27,7 +27,7 @@ func (c *Server) Run(logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("could not create sqlite client: %w", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	router, err := server.NewRouter(logger)
 	if err != nil {

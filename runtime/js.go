@@ -54,6 +54,7 @@ func (j *JS) Execute(ctx context.Context, source string, driver orchestra.Driver
 	}
 
 	var sourceMap string
+
 	sourceMap, lines = lines[len(lines)-1], lines[:len(lines)-1]
 	finalSource := "{(function() { const module = {}; " + strings.Join(lines, "\n") +
 		"; return module.exports.pipeline;}).apply(undefined)}\n" +

@@ -139,6 +139,7 @@ func (n *Native) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 		err := command.Run()
 		if err != nil {
 			logger.Error("orchestra.native", "err", err)
+
 			errChan <- fmt.Errorf("failed to run command: %w", err)
 
 			return

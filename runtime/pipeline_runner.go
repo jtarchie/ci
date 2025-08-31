@@ -100,6 +100,7 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 
 		if timeout > 0 {
 			var cancel context.CancelFunc
+
 			ctx, cancel = context.WithTimeout(ctx, timeout)
 			defer cancel()
 		}
