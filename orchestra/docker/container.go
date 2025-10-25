@@ -125,6 +125,15 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 
 	enabledStdin := task.Stdin != nil
 
+	// Set up container resources (CPU and memory limits)
+	resources := container.Resources{}
+	if task.ContainerLimits.CPU > 0 {
+		resources.CPUShares = task.ContainerLimits.CPU
+	}
+	if task.ContainerLimits.Memory > 0 {
+		resources.Memory = task.ContainerLimits.Memory
+	}
+
 	response, err := d.client.ContainerCreate(
 		ctx,
 		&container.Config{
@@ -142,6 +151,7 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 		&container.HostConfig{
 			Mounts:     mounts,
 			Privileged: task.Privileged,
+			Resources:  resources,
 		}, nil, nil,
 		containerName,
 	)

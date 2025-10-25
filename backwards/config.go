@@ -26,13 +26,19 @@ type Inputs []Input
 
 type Outputs []Output
 
+type ContainerLimits struct {
+	CPU    int64 `yaml:"cpu,omitempty"`
+	Memory int64 `yaml:"memory,omitempty"`
+}
+
 type TaskConfig struct {
-	Env           map[string]string `yaml:"env,omitempty"`
-	ImageResource ImageResource     `yaml:"image_resource,omitempty"`
-	Inputs        Inputs            `yaml:"inputs,omitempty"`
-	Outputs       Outputs           `yaml:"outputs,omitempty"`
-	Platform      string            `validate:"oneof='linux' 'darwin' 'windows'" yaml:"platform,omitempty"`
-	Run           TaskConfigRun     `validate:"required"                         yaml:"run,omitempty"`
+	ContainerLimits ContainerLimits   `yaml:"container_limits,omitempty"`
+	Env             map[string]string `yaml:"env,omitempty"`
+	ImageResource   ImageResource     `yaml:"image_resource,omitempty"`
+	Inputs          Inputs            `yaml:"inputs,omitempty"`
+	Outputs         Outputs           `yaml:"outputs,omitempty"`
+	Platform        string            `validate:"oneof='linux' 'darwin' 'windows'" yaml:"platform,omitempty"`
+	Run             TaskConfigRun     `validate:"required"                         yaml:"run,omitempty"`
 }
 
 type GetConfig struct {
@@ -58,10 +64,11 @@ type Step struct {
 		Stdout string `yaml:"stdout,omitempty"`
 	} `yaml:"assert,omitempty"`
 
-	Task       string      `yaml:"task,omitempty"`
-	TaskConfig *TaskConfig `yaml:"config,omitempty"`
-	File       string      `yaml:"file,omitempty"`
-	Privileged bool        `yaml:"privileged,omitempty"`
+	Task            string           `yaml:"task,omitempty"`
+	TaskConfig      *TaskConfig      `yaml:"config,omitempty"`
+	ContainerLimits *ContainerLimits `yaml:"container_limits,omitempty"`
+	File            string           `yaml:"file,omitempty"`
+	Privileged      bool             `yaml:"privileged,omitempty"`
 
 	Get       string    `yaml:"get,omitempty"`
 	GetConfig GetConfig `yaml:",inline,omitempty"`
