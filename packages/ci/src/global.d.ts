@@ -11,6 +11,11 @@ declare global {
     user?: string;
   }
 
+  interface ContainerLimits {
+    cpu?: number;
+    memory?: number;
+  }
+
   interface AssertionBase {
     execution?: string[];
   }
@@ -24,6 +29,7 @@ declare global {
   // Runtime types
   interface RunTaskConfig {
     command: CommandConfig;
+    container_limits?: ContainerLimits;
     env?: EnvVars;
     image: string;
     mounts?: KnownMounts;
@@ -109,6 +115,7 @@ declare global {
   }
 
   interface TaskConfig {
+    container_limits?: ContainerLimits;
     env?: EnvVars;
     platform?: string;
     image_resource: ImageResource;
@@ -122,6 +129,7 @@ declare global {
   interface Task extends StepHooks {
     task: string;
     config: TaskConfig;
+    container_limits?: ContainerLimits;
     file?: string;
     privileged?: boolean;
     assert?: TaskAssertion;

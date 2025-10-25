@@ -71,6 +71,10 @@ type RunInput struct {
 		Args []string `json:"args"`
 		User string   `json:"user"`
 	} `json:"command"`
+	ContainerLimits struct {
+		CPU    int64 `json:"cpu"`
+		Memory int64 `json:"memory"`
+	} `json:"container_limits"`
 	Env        map[string]string       `json:"env"`
 	Image      string                  `json:"image"`
 	Mounts     map[string]VolumeResult `json:"mounts"`
@@ -128,7 +132,11 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 	container, err := c.client.RunContainer(
 		ctx,
 		orchestra.Task{
-			Command:    command,
+			Command: command,
+			ContainerLimits: orchestra.ContainerLimits{
+				CPU:    input.ContainerLimits.CPU,
+				Memory: input.ContainerLimits.Memory,
+			},
 			Env:        input.Env,
 			ID:         fmt.Sprintf("%s-%s", input.Name, taskID),
 			Image:      input.Image,
