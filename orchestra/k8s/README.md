@@ -45,14 +45,52 @@ The following standard Kubernetes environment variables are respected:
 
 ### Known Limitations
 
-- ❌ **Stdin input**: Kubernetes stdin support requires complex Pod attach/exec
-  API usage with SPDY/WebSocket protocols. This is not currently implemented.
 - ⚠️ **Stderr separation**: Kubernetes logs don't separate stdout and stderr by
-  default. All logs are written to the stdout writer.
+  default. This requires the `PodLogsQuerySplitStreams` feature gate (alpha in
+  Kubernetes 1.32+). Without this feature gate enabled, all logs are written to
+  the stdout writer. See the "Feature Gates" section below for setup
+  instructions.
 - ⚠️ **Namespace**: All resources are created in the `default` Kubernetes
   namespace. Multi-namespace support is not implemented.
 - ⚠️ **Storage classes**: PVCs use the default storage class. Custom storage
   class selection is not supported.
+
+## Feature Gates
+
+### PodLogsQuerySplitStreams (Kubernetes 1.32+)
+
+The driver supports separate stdout/stderr log streams when the
+`PodLogsQuerySplitStreams` feature gate is enabled. This alpha feature allows
+proper separation of stdout and stderr, which is important for tasks that parse
+JSON from stdout.
+
+**To enable in minikube:**
+
+```bash
+# Delete existing cluster (if any)
+minikube delete
+
+# Start with feature gate enabled
+minikube start --feature-gates=PodLogsQuerySplitStreams=true
+```
+
+**To verify the feature gate is enabled:**
+
+```bash
+kubectl get pod kube-apiserver-minikube -n kube-system -o yaml | grep feature-gates
+```
+
+**Behavior without the feature gate:**
+
+- Stdout and stderr are combined in the log stream
+- Applications that write debug logs to stderr may interfere with stdout parsing
+- The driver falls back to writing all logs to the stdout writer
+
+**Behavior with the feature gate:**
+
+- Stdout and stderr are properly separated
+- JSON and other structured output on stdout is not mixed with stderr logs
+- Better compatibility with Concourse CI resource types and similar tools
 
 ## Resource Naming
 
@@ -88,15 +126,22 @@ CPU and memory limits are translated from Docker format to Kubernetes format:
 The driver is tested with minikube. To run tests locally:
 
 ```bash
-# Start minikube
-minikube start
+# Start minikube with required feature gates
+minikube start --feature-gates=PodLogsQuerySplitStreams=true
 
 # Run k8s driver tests
 go test -v -race -count=1 -run 'TestDrivers/k8s' ./orchestra
 
+# Run all examples with k8s driver
+go test -v -race -count=1 -run 'TestExamplesDocker/k8s:' ./examples
+
 # Cleanup minikube
 minikube delete
 ```
+
+**Note**: The `PodLogsQuerySplitStreams` feature gate is required for all tests
+to pass. Without it, tests that rely on clean stdout output (like resource
+tests) will fail due to stderr logs being mixed into stdout.
 
 ## Implementation Notes
 

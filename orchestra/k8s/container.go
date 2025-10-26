@@ -112,22 +112,70 @@ func (c *Container) Status(ctx context.Context) (orchestra.ContainerStatus, erro
 }
 
 func (c *Container) Logs(ctx context.Context, stdout, stderr io.Writer) error {
-	req := c.clientset.CoreV1().Pods("default").GetLogs(c.podName, &corev1.PodLogOptions{})
+	// Kubernetes 1.32+ supports separate stdout/stderr streams via the PodLogsQuerySplitStreams feature gate
+	// If the feature gate is not enabled, this will fall back to interleaved logs
 
-	podLogs, err := req.Stream(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get pod logs: %w", err)
-	}
-	defer func() {
-		if closeErr := podLogs.Close(); closeErr != nil {
-			c.logger.Warn("failed to close pod logs stream", "err", closeErr)
+	// Helper function to fetch a specific stream
+	fetchStream := func(streamName *string, writer io.Writer) error {
+		if writer == nil {
+			return nil
 		}
-	}()
 
-	// K8s doesn't separate stdout/stderr in logs by default, so we write everything to stdout
-	_, err = io.Copy(stdout, podLogs)
-	if err != nil {
-		return fmt.Errorf("failed to copy logs: %w", err)
+		req := c.clientset.CoreV1().Pods("default").GetLogs(c.podName, &corev1.PodLogOptions{
+			Container: "task",
+			Stream:    streamName,
+		})
+
+		podLogs, err := req.Stream(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get pod logs for stream %v: %w", streamName, err)
+		}
+		defer func() {
+			if closeErr := podLogs.Close(); closeErr != nil {
+				c.logger.Warn("failed to close pod logs stream", "stream", streamName, "err", closeErr)
+			}
+		}()
+
+		_, err = io.Copy(writer, podLogs)
+		if err != nil {
+			return fmt.Errorf("failed to copy logs for stream %v: %w", streamName, err)
+		}
+
+		return nil
+	}
+
+	// Fetch stdout stream
+	streamStdout := "Stdout"
+	if err := fetchStream(&streamStdout, stdout); err != nil {
+		// If split streams are not supported, fall back to getting all logs
+		c.logger.Debug("split streams not supported, falling back to combined logs", "err", err)
+
+		req := c.clientset.CoreV1().Pods("default").GetLogs(c.podName, &corev1.PodLogOptions{
+			Container: "task",
+		})
+
+		podLogs, err := req.Stream(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get pod logs: %w", err)
+		}
+		defer func() {
+			if closeErr := podLogs.Close(); closeErr != nil {
+				c.logger.Warn("failed to close pod logs stream", "err", closeErr)
+			}
+		}()
+
+		_, err = io.Copy(stdout, podLogs)
+		if err != nil {
+			return fmt.Errorf("failed to copy logs: %w", err)
+		}
+
+		return nil
+	}
+
+	// Fetch stderr stream
+	streamStderr := "Stderr"
+	if err := fetchStream(&streamStderr, stderr); err != nil {
+		return err
 	}
 
 	return nil
