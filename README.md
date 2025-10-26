@@ -14,8 +14,8 @@ The project represents a CI/CD that provides container orchestration
 capabilities for automation workflows. It allows users to define pipelines in
 JavaScript/TypeScript or YAML format (with backward compatibility for Concourse
 CI-style configurations). The system currently supports two orchestration
-drivers, Docker and Native, with Docker being the more feature-complete
-implementation.
+drivers, Docker, k8s (experimental), Native, with Docker being the more
+feature-complete implementation.
 
 The pipeline execution model follows a task-based approach where containers can
 be run with defined commands, environment variables, and shared volumes. The
