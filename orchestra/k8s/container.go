@@ -183,8 +183,11 @@ func (k *K8s) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.
 
 		k8sVolume, _ := volume.(*Volume)
 
+		// Sanitize volume name to comply with k8s naming requirements
+		sanitizedVolumeName := sanitizeName(taskMount.Name)
+
 		volumes = append(volumes, corev1.Volume{
-			Name: taskMount.Name,
+			Name: sanitizedVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 					ClaimName: k8sVolume.pvcName,
@@ -193,7 +196,7 @@ func (k *K8s) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.
 		})
 
 		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      taskMount.Name,
+			Name:      sanitizedVolumeName,
 			MountPath: filepath.Join("/tmp", podName, taskMount.Path),
 		})
 	}
@@ -261,15 +264,25 @@ func (k *K8s) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.
 	if task.User != "" {
 		// Parse user as UID (k8s requires numeric UID)
 		var uid int64
-		_, err := fmt.Sscanf(task.User, "%d", &uid)
-		if err != nil {
-			logger.Warn("user.parse", "user", task.User, "err", err, "msg", "using default user")
-		} else {
-			pod.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
-				RunAsUser: &uid,
+
+		// Handle common username to UID mappings
+		switch task.User {
+		case "root":
+			uid = 0
+		default:
+			_, err := fmt.Sscanf(task.User, "%d", &uid)
+			if err != nil {
+				logger.Warn("user.parse", "user", task.User, "err", err, "msg", "using default user")
+				// Skip setting user if we can't parse it
+				goto skipUser
 			}
 		}
+
+		pod.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
+			RunAsUser: &uid,
+		}
 	}
+skipUser:
 
 	// Set privileged mode if needed
 	if task.Privileged {
@@ -304,14 +317,42 @@ func (k *K8s) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.
 		}
 		defer watcher.Stop()
 
-		// Wait for the pod to reach Running state
+		// Wait for the pod to reach Running state and have containers ready
 		podRunning := false
 		for event := range watcher.ResultChan() {
 			if event.Type == watch.Modified || event.Type == watch.Added {
 				p, ok := event.Object.(*corev1.Pod)
-				if ok && p.Status.Phase == corev1.PodRunning {
+				if !ok {
+					continue
+				}
+
+				logger.Debug("pod.status", "name", podName, "phase", p.Status.Phase, "containers", len(p.Status.ContainerStatuses))
+
+				// Check if pod is running and at least one container is ready
+				if p.Status.Phase == corev1.PodRunning {
+					// Check if any container is running (not just created)
+					for _, cs := range p.Status.ContainerStatuses {
+						if cs.State.Running != nil {
+							podRunning = true
+							break
+						}
+					}
+					if podRunning {
+						break
+					}
+				}
+
+				// If the pod completed very quickly (before we could see it running),
+				// that's okay - we can still attach (though stdin may not work)
+				if p.Status.Phase == corev1.PodSucceeded {
+					logger.Debug("pod.completed.quickly", "name", podName)
 					podRunning = true
 					break
+				}
+
+				// Also check for failed states
+				if p.Status.Phase == corev1.PodFailed {
+					return nil, fmt.Errorf("pod failed to start: %s", p.Status.Message)
 				}
 			}
 
@@ -326,6 +367,8 @@ func (k *K8s) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.
 		if !podRunning {
 			return nil, fmt.Errorf("pod did not reach running state")
 		}
+
+		logger.Debug("pod.running", "name", podName)
 
 		// Now attach stdin to the running pod
 		req := k.clientset.CoreV1().RESTClient().Post().
