@@ -27,6 +27,7 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           check-latest: true
+          go-version: 'stable'
           cache: true
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v7
