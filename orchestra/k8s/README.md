@@ -37,14 +37,19 @@ The following standard Kubernetes environment variables are respected:
 - ✅ Environment variables
 - ✅ Resource limits (CPU and memory)
 - ✅ Exit code detection
-- ✅ Log retrieval
+- ✅ Log retrieval (stdout/stderr)
 - ✅ Container cleanup
 - ✅ Privileged containers
-- ✅ Custom user (via security context)
+- ✅ Custom user (via security context, numeric UIDs only)
+- ✅ Stdin support (via SPDY attach protocol)
 - ✅ Idempotent operations (running same task ID returns existing pod)
 
 ### Known Limitations
 
+- ⚠️ **User specification**: Only numeric UIDs are supported (e.g., `"65534"`
+  for nobody). The special case `"root"` is mapped to UID 0. Username strings
+  like `"nobody"` are not supported and will log a warning before falling back
+  to the container's default user.
 - ⚠️ **Stderr separation**: Kubernetes logs don't separate stdout and stderr by
   default. This requires the `PodLogsQuerySplitStreams` feature gate (alpha in
   Kubernetes 1.32+). Without this feature gate enabled, all logs are written to
@@ -108,18 +113,23 @@ requirements:
 Volumes are implemented as PersistentVolumeClaims (PVCs):
 
 - Default access mode: `ReadWriteOnce`
-- Default size: 1Gi (if not specified)
+- Default size: 1Gi (if size is 0 or not specified)
+- Size conversion: Specified in bytes, converted to MiB for Kubernetes
 - Storage class: Uses cluster default
 - Volumes are mounted at `/tmp/{pod-name}/{mount-path}`
+- Idempotent: Requesting the same volume name returns the existing PVC
 
 ## Resource Limits
 
 CPU and memory limits are translated from Docker format to Kubernetes format:
 
-- **CPU**: Docker CPU shares are converted to Kubernetes millicores (1024 shares
-  ≈ 1000 millicores)
+- **CPU**: Docker CPU shares are converted to Kubernetes millicores using the
+  formula: `(shares * 1000) / 1024`. For example, 512 shares becomes ~500
+  millicores.
 - **Memory**: Direct byte-to-byte mapping
-- Kubernetes requests are set to 50% of limits
+- **Requests**: Kubernetes resource requests are automatically set to 50% of the
+  specified limits for both CPU and memory
+- **Zero values**: If CPU or Memory is 0, no limits are set (unlimited)
 
 ## Testing with Minikube
 
@@ -161,15 +171,29 @@ drivers.
 
 - Pods use `RestartPolicy: Never`
 - Pods are created and started immediately
-- Status polling detects when pods complete
+- Stdin attachment (if provided) waits for pod to reach Running state with a
+  30-second timeout
+- Status polling detects when pods complete (Succeeded or Failed phase)
 - Pods remain after completion for log retrieval
 - Explicit cleanup or driver `Close()` removes pods
+
+### Stdin Support
+
+The driver implements stdin streaming using the Kubernetes attach protocol:
+
+1. Pod is created with `Stdin: true` and `StdinOnce: true` if stdin is provided
+2. Driver waits for pod to reach Running state (with container actually running,
+   not just created)
+3. Uses SPDY executor to attach stdin stream to the pod
+4. Supports quick-completing pods that finish before Running state is reached
+5. 30-second timeout for pod to become ready for stdin attachment
 
 ## Future Enhancements
 
 Potential improvements for future versions:
 
-1. **Stdin support**: Implement using remotecommand.Executor and SPDY protocol
+1. **Username support**: Add username-to-UID resolution (requires querying
+   container image or maintaining a mapping)
 2. **Multi-namespace**: Support custom Kubernetes namespaces
 3. **Storage classes**: Allow configurable storage class for PVCs
 4. **Volume modes**: Support ReadWriteMany and other access modes
@@ -177,6 +201,8 @@ Potential improvements for future versions:
 6. **Image pull secrets**: Support private container registries
 7. **Health checks**: Add liveness/readiness probes
 8. **Job resources**: Option to use Kubernetes Jobs instead of bare Pods
+9. **Working directory**: Allow custom working directory (currently always
+   `/tmp/{pod-name}`)
 
 ## Dependencies
 
