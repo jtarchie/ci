@@ -15,6 +15,7 @@ import (
 
 type K8s struct {
 	clientset *kubernetes.Clientset
+	config    *rest.Config
 	logger    *slog.Logger
 	namespace string
 }
@@ -78,6 +79,7 @@ func NewK8s(namespace string, logger *slog.Logger) (orchestra.Driver, error) {
 
 	return &K8s{
 		clientset: clientset,
+		config:    config,
 		logger:    logger,
 		namespace: namespace,
 	}, nil

@@ -8,13 +8,18 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/jtarchie/ci/orchestra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/remotecommand"
 )
 
 // sanitizeName converts a string to a valid Kubernetes resource name (DNS-1123 subdomain)
@@ -72,6 +77,7 @@ func sanitizeLabel(label string) string {
 
 type Container struct {
 	clientset *kubernetes.Clientset
+	config    *rest.Config
 	podName   string
 	task      orchestra.Task
 	logger    *slog.Logger
@@ -159,6 +165,7 @@ func (k *K8s) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.
 		logger.Debug("pod.exists", "name", podName)
 		return &Container{
 			clientset: k.clientset,
+			config:    k.config,
 			podName:   existingPod.Name,
 			task:      task,
 			logger:    logger,
@@ -221,6 +228,8 @@ func (k *K8s) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.
 	}
 
 	// Build the pod spec
+	enabledStdin := task.Stdin != nil
+
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
@@ -240,10 +249,8 @@ func (k *K8s) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.
 					VolumeMounts: volumeMounts,
 					WorkingDir:   filepath.Join("/tmp", podName),
 					Resources:    resources,
-					// Note: Stdin support is not yet implemented for k8s
-					// Setting these to false prevents the pod from hanging
-					Stdin:     false,
-					StdinOnce: false,
+					Stdin:        enabledStdin,
+					StdinOnce:    enabledStdin,
 				},
 			},
 			Volumes: volumes,
@@ -281,18 +288,77 @@ func (k *K8s) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.
 	}
 
 	// Handle stdin if provided
-	// Note: K8s stdin handling is complex and requires the pod to be running first
-	// We'll skip stdin support for now as it requires watching pod status and using exec/attach APIs
-	if task.Stdin != nil {
-		logger.Warn("stdin.unsupported", "msg", "stdin input for k8s pods is not yet implemented")
-		// For a full implementation, you would:
-		// 1. Wait for pod to reach Running state using a watch
-		// 2. Use the remotecommand.Executor to attach stdin via SPDY
-		// 3. Stream the stdin data to the pod
+	if enabledStdin && task.Stdin != nil {
+		logger.Debug("pod.stdin", "name", podName)
+
+		// Wait for pod to be in Running state with a timeout
+		waitCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+
+		watcher, err := k.clientset.CoreV1().Pods("default").Watch(waitCtx, metav1.ListOptions{
+			FieldSelector: fmt.Sprintf("metadata.name=%s", podName),
+		})
+		if err != nil {
+			logger.Error("pod.watch", "name", podName, "err", err)
+			return nil, fmt.Errorf("failed to watch pod: %w", err)
+		}
+		defer watcher.Stop()
+
+		// Wait for the pod to reach Running state
+		podRunning := false
+		for event := range watcher.ResultChan() {
+			if event.Type == watch.Modified || event.Type == watch.Added {
+				p, ok := event.Object.(*corev1.Pod)
+				if ok && p.Status.Phase == corev1.PodRunning {
+					podRunning = true
+					break
+				}
+			}
+
+			// Check if context was cancelled
+			select {
+			case <-waitCtx.Done():
+				return nil, fmt.Errorf("timeout waiting for pod to reach running state")
+			default:
+			}
+		}
+
+		if !podRunning {
+			return nil, fmt.Errorf("pod did not reach running state")
+		}
+
+		// Now attach stdin to the running pod
+		req := k.clientset.CoreV1().RESTClient().Post().
+			Resource("pods").
+			Name(podName).
+			Namespace("default").
+			SubResource("attach").
+			VersionedParams(&corev1.PodAttachOptions{
+				Stdin:     true,
+				Container: "task",
+			}, scheme.ParameterCodec)
+
+		exec, err := remotecommand.NewSPDYExecutor(k.config, "POST", req.URL())
+		if err != nil {
+			logger.Error("pod.attach.executor", "name", podName, "err", err)
+			return nil, fmt.Errorf("failed to create attach executor: %w", err)
+		}
+
+		// Stream stdin to the pod
+		err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
+			Stdin: task.Stdin,
+		})
+		if err != nil {
+			logger.Error("pod.attach.stream", "name", podName, "err", err)
+			return nil, fmt.Errorf("failed to stream stdin: %w", err)
+		}
+
+		logger.Debug("pod.stdin.complete", "name", podName)
 	}
 
 	return &Container{
 		clientset: k.clientset,
+		config:    k.config,
 		podName:   createdPod.Name,
 		task:      task,
 		logger:    logger,
