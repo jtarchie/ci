@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"strings"
 	"time"
@@ -129,6 +130,12 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 	command := []string{input.Command.Path}
 	command = append(command, input.Command.Args...)
 
+	// Only create stdin reader if there's actual content
+	var stdinReader io.Reader
+	if input.Stdin != "" {
+		stdinReader = strings.NewReader(input.Stdin)
+	}
+
 	container, err := c.client.RunContainer(
 		ctx,
 		orchestra.Task{
@@ -142,7 +149,7 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 			Image:      input.Image,
 			Mounts:     mounts,
 			Privileged: input.Privileged,
-			Stdin:      strings.NewReader(input.Stdin),
+			Stdin:      stdinReader,
 			User:       input.Command.User,
 		},
 	)
@@ -196,6 +203,8 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 
 		return nil, fmt.Errorf("could not get container logs: %w", err)
 	}
+
+	logger.Debug("container.logs", "stdout", stdout.String(), "stderr", stderr.String())
 
 	return &RunResult{
 		Status: RunComplete,
