@@ -10,6 +10,7 @@ import (
 
 	"github.com/jtarchie/ci/orchestra"
 	_ "github.com/jtarchie/ci/orchestra/docker"
+	_ "github.com/jtarchie/ci/orchestra/k8s"
 	_ "github.com/jtarchie/ci/orchestra/native"
 	gonanoid "github.com/matoous/go-nanoid/v2"
 	. "github.com/onsi/gomega"
