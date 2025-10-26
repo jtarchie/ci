@@ -14,45 +14,11 @@ jobs:
             cpu: 512 # CPU shares
             memory: 134217728 # 128MB in bytes
           run:
-            path: echo
-            args: ["Running with 512 CPU shares and 128MB memory limit"]
-
-      # Example 2: Container limits at task level (overrides config limits)
-      - task: task-with-step-limits
-        container_limits:
-          cpu: 1024
-          memory: 268435456 # 256MB in bytes
-        config:
-          platform: linux
-          image_resource:
-            type: registry-image
-            source: { repository: busybox }
-          run:
-            path: echo
-            args: ["Running with 1024 CPU shares and 256MB memory limit"]
-
-      # Example 3: Only CPU limit
-      - task: cpu-only-limit
-        config:
-          platform: linux
-          image_resource:
-            type: registry-image
-            source: { repository: busybox }
-          container_limits:
-            cpu: 256
-          run:
-            path: echo
-            args: ["Running with 256 CPU shares, unlimited memory"]
-
-      # Example 4: Only memory limit
-      - task: memory-only-limit
-        config:
-          platform: linux
-          image_resource:
-            type: registry-image
-            source: { repository: busybox }
-          container_limits:
-            memory: 67108864 # 64MB in bytes
-          run:
-            path: echo
-            args: ["Running with unlimited CPU, 64MB memory limit"]
+            path: sh
+            args:
+              - -c
+              - |
+                  echo "Checking memory limit..."
+                  cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null || cat /sys/fs/cgroup/memory.max 2>/dev/null
+        assert:
+          stdout: "134217728"
