@@ -33,7 +33,7 @@ export class TaskRunner {
           args: step.config.run.args || [],
           user: step.config.run.user,
         },
-        container_limits: step.container_limits ?? step.config.container_limits,
+        container_limits: step.config.container_limits,
         env: step.config.env,
         image: step.config?.image_resource.source.repository!,
         name: step.task,
