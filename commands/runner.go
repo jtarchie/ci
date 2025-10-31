@@ -21,9 +21,9 @@ import (
 )
 
 type Runner struct {
-	Storage  string        `default:"sqlite://test.db"                                    help:"Path to storage file"             required:""`
-	Pipeline string        `arg:""                                                        help:"Path to pipeline javascript file" type:"existingfile"`
-	Driver   string        `default:"native"                                              help:"orchestrator runtime to use"`
+	Storage  string        `default:"sqlite://test.db"                                    help:"Path to storage file"                                                                                                                                      required:""`
+	Pipeline string        `arg:""                                                        help:"Path to pipeline javascript file"                                                                                                                          type:"existingfile"`
+	Driver   string        `default:"native"                                              help:"Orchestrator driver DSN (e.g., 'k8s:namespace=my-ns', 'k8s://my-ns', 'docker', 'native')"`
 	Timeout  time.Duration `help:"timeout for the pipeline, will cause abort if exceeded"`
 }
 
@@ -111,12 +111,18 @@ func (c *Runner) Run(logger *slog.Logger) error {
 		pipeline = string(result.OutputFiles[0].Contents)
 	}
 
-	orchestrator, found := orchestra.Get(c.Driver)
-	if !found {
-		return fmt.Errorf("could not get orchestrator (%q): %w", c.Driver, ErrOrchestratorNotFound)
+	driverConfig, orchestrator, err := orchestra.GetFromDSN(c.Driver)
+	if err != nil {
+		return fmt.Errorf("could not parse driver DSN (%q): %w", c.Driver, err)
 	}
 
-	driver, err := orchestrator("ci-"+runtimeID, logger)
+	// Use namespace from DSN if provided, otherwise use generated ID
+	namespace := driverConfig.Namespace
+	if namespace == "" {
+		namespace = "ci-" + runtimeID
+	}
+
+	driver, err := orchestrator(namespace, logger, driverConfig.Params)
 	if err != nil {
 		return fmt.Errorf("could not create orchestrator client: %w", err)
 	}

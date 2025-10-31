@@ -13,15 +13,16 @@ import (
 )
 
 type Volume struct {
-	clientset  *kubernetes.Clientset
-	pvcName    string
-	volumeName string
+	clientset    *kubernetes.Clientset
+	pvcName      string
+	volumeName   string
+	k8sNamespace string
 }
 
 // Cleanup implements orchestra.Volume.
 func (v *Volume) Cleanup(ctx context.Context) error {
 	deletePolicy := metav1.DeletePropagationForeground
-	err := v.clientset.CoreV1().PersistentVolumeClaims("default").Delete(
+	err := v.clientset.CoreV1().PersistentVolumeClaims(v.k8sNamespace).Delete(
 		ctx,
 		v.pvcName,
 		metav1.DeleteOptions{
@@ -39,12 +40,13 @@ func (k *K8s) CreateVolume(ctx context.Context, name string, size int) (orchestr
 	pvcName := sanitizeName(fmt.Sprintf("%s-%s", k.namespace, name))
 
 	// Check if PVC already exists
-	existingPVC, err := k.clientset.CoreV1().PersistentVolumeClaims("default").Get(ctx, pvcName, metav1.GetOptions{})
+	existingPVC, err := k.clientset.CoreV1().PersistentVolumeClaims(k.k8sNamespace).Get(ctx, pvcName, metav1.GetOptions{})
 	if err == nil {
 		return &Volume{
-			clientset:  k.clientset,
-			pvcName:    existingPVC.Name,
-			volumeName: name,
+			clientset:    k.clientset,
+			pvcName:      existingPVC.Name,
+			volumeName:   name,
+			k8sNamespace: k.k8sNamespace,
 		}, nil
 	}
 
@@ -76,15 +78,16 @@ func (k *K8s) CreateVolume(ctx context.Context, name string, size int) (orchestr
 		},
 	}
 
-	createdPVC, err := k.clientset.CoreV1().PersistentVolumeClaims("default").Create(ctx, pvc, metav1.CreateOptions{})
+	createdPVC, err := k.clientset.CoreV1().PersistentVolumeClaims(k.k8sNamespace).Create(ctx, pvc, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("could not create volume: %w", err)
 	}
 
 	return &Volume{
-		clientset:  k.clientset,
-		pvcName:    createdPVC.Name,
-		volumeName: name,
+		clientset:    k.clientset,
+		pvcName:      createdPVC.Name,
+		volumeName:   name,
+		k8sNamespace: k.k8sNamespace,
 	}, nil
 }
 

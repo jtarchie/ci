@@ -78,12 +78,13 @@ func sanitizeLabel(label string) string {
 }
 
 type Container struct {
-	clientset *kubernetes.Clientset
-	config    *rest.Config
-	jobName   string
-	podName   string
-	task      orchestra.Task
-	logger    *slog.Logger
+	clientset    *kubernetes.Clientset
+	config       *rest.Config
+	jobName      string
+	podName      string
+	k8sNamespace string
+	task         orchestra.Task
+	logger       *slog.Logger
 }
 
 type ContainerStatus struct {
@@ -94,7 +95,7 @@ type ContainerStatus struct {
 
 func (c *Container) Status(ctx context.Context) (orchestra.ContainerStatus, error) {
 	// Get job status for completion tracking
-	job, err := c.clientset.BatchV1().Jobs("default").Get(ctx, c.jobName, metav1.GetOptions{})
+	job, err := c.clientset.BatchV1().Jobs(c.k8sNamespace).Get(ctx, c.jobName, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get job: %w", err)
 	}
@@ -118,7 +119,7 @@ func (c *Container) Status(ctx context.Context) (orchestra.ContainerStatus, erro
 		podName := c.podName
 		if podName == "" {
 			// Find the pod created by this job
-			pods, err := c.clientset.CoreV1().Pods("default").List(ctx, metav1.ListOptions{
+			pods, err := c.clientset.CoreV1().Pods(c.k8sNamespace).List(ctx, metav1.ListOptions{
 				LabelSelector: fmt.Sprintf("job-name=%s", c.jobName),
 			})
 			if err == nil && len(pods.Items) > 0 {
@@ -127,7 +128,7 @@ func (c *Container) Status(ctx context.Context) (orchestra.ContainerStatus, erro
 		}
 
 		if podName != "" {
-			pod, err := c.clientset.CoreV1().Pods("default").Get(ctx, podName, metav1.GetOptions{})
+			pod, err := c.clientset.CoreV1().Pods(c.k8sNamespace).Get(ctx, podName, metav1.GetOptions{})
 			if err == nil && len(pod.Status.ContainerStatuses) > 0 {
 				containerStatus := pod.Status.ContainerStatuses[0]
 				if containerStatus.State.Terminated != nil {
@@ -143,7 +144,7 @@ func (c *Container) Status(ctx context.Context) (orchestra.ContainerStatus, erro
 	podName := c.podName
 	if podName == "" {
 		// Find the pod created by this job
-		pods, err := c.clientset.CoreV1().Pods("default").List(ctx, metav1.ListOptions{
+		pods, err := c.clientset.CoreV1().Pods(c.k8sNamespace).List(ctx, metav1.ListOptions{
 			LabelSelector: fmt.Sprintf("job-name=%s", c.jobName),
 		})
 		if err == nil && len(pods.Items) > 0 {
@@ -153,7 +154,7 @@ func (c *Container) Status(ctx context.Context) (orchestra.ContainerStatus, erro
 	}
 
 	if podName != "" {
-		pod, err := c.clientset.CoreV1().Pods("default").Get(ctx, podName, metav1.GetOptions{})
+		pod, err := c.clientset.CoreV1().Pods(c.k8sNamespace).Get(ctx, podName, metav1.GetOptions{})
 		if err == nil {
 			status.phase = pod.Status.Phase
 			if len(pod.Status.ContainerStatuses) > 0 {
@@ -179,7 +180,7 @@ func (c *Container) Logs(ctx context.Context, stdout, stderr io.Writer) error {
 			return nil
 		}
 
-		req := c.clientset.CoreV1().Pods("default").GetLogs(c.podName, &corev1.PodLogOptions{
+		req := c.clientset.CoreV1().Pods(c.k8sNamespace).GetLogs(c.podName, &corev1.PodLogOptions{
 			Container: "task",
 			Stream:    streamName,
 		})
@@ -208,7 +209,7 @@ func (c *Container) Logs(ctx context.Context, stdout, stderr io.Writer) error {
 		// If split streams are not supported, fall back to getting all logs
 		c.logger.Debug("split streams not supported, falling back to combined logs", "err", err)
 
-		req := c.clientset.CoreV1().Pods("default").GetLogs(c.podName, &corev1.PodLogOptions{
+		req := c.clientset.CoreV1().Pods(c.k8sNamespace).GetLogs(c.podName, &corev1.PodLogOptions{
 			Container: "task",
 		})
 
@@ -242,7 +243,7 @@ func (c *Container) Logs(ctx context.Context, stdout, stderr io.Writer) error {
 func (c *Container) Cleanup(ctx context.Context) error {
 	deletePolicy := metav1.DeletePropagationForeground
 	// Delete the job (which will cascade delete the pod)
-	err := c.clientset.BatchV1().Jobs("default").Delete(ctx, c.jobName, metav1.DeleteOptions{
+	err := c.clientset.BatchV1().Jobs(c.k8sNamespace).Delete(ctx, c.jobName, metav1.DeleteOptions{
 		PropagationPolicy: &deletePolicy,
 	})
 	if err != nil && !errors.IsNotFound(err) {
@@ -267,13 +268,13 @@ func (k *K8s) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.
 	jobName := sanitizeName(fmt.Sprintf("%s-%s", k.namespace, task.ID))
 
 	// Check if job already exists
-	existingJob, err := k.clientset.BatchV1().Jobs("default").Get(ctx, jobName, metav1.GetOptions{})
+	existingJob, err := k.clientset.BatchV1().Jobs(k.k8sNamespace).Get(ctx, jobName, metav1.GetOptions{})
 	if err == nil {
 		logger.Debug("job.exists", "name", jobName)
 
 		// Find the pod created by this job
 		podName := ""
-		pods, err := k.clientset.CoreV1().Pods("default").List(ctx, metav1.ListOptions{
+		pods, err := k.clientset.CoreV1().Pods(k.k8sNamespace).List(ctx, metav1.ListOptions{
 			LabelSelector: fmt.Sprintf("job-name=%s", jobName),
 		})
 		if err == nil && len(pods.Items) > 0 {
@@ -281,12 +282,13 @@ func (k *K8s) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.
 		}
 
 		return &Container{
-			clientset: k.clientset,
-			config:    k.config,
-			jobName:   existingJob.Name,
-			podName:   podName,
-			task:      task,
-			logger:    logger,
+			clientset:    k.clientset,
+			config:       k.config,
+			jobName:      existingJob.Name,
+			podName:      podName,
+			k8sNamespace: k.k8sNamespace,
+			task:         task,
+			logger:       logger,
 		}, nil
 	}
 
@@ -432,7 +434,7 @@ skipUser:
 		},
 	}
 
-	_, err = k.clientset.BatchV1().Jobs("default").Create(ctx, job, metav1.CreateOptions{})
+	_, err = k.clientset.BatchV1().Jobs(k.k8sNamespace).Create(ctx, job, metav1.CreateOptions{})
 	if err != nil {
 		logger.Error("job.create", "name", jobName, "err", err)
 		return nil, fmt.Errorf("failed to create job: %w", err)
@@ -449,7 +451,7 @@ skipUser:
 
 		// Wait for pod to be created by the job
 		for {
-			pods, err := k.clientset.CoreV1().Pods("default").List(waitCtx, metav1.ListOptions{
+			pods, err := k.clientset.CoreV1().Pods(k.k8sNamespace).List(waitCtx, metav1.ListOptions{
 				LabelSelector: fmt.Sprintf("job-name=%s", jobName),
 			})
 			if err != nil {
@@ -474,7 +476,7 @@ skipUser:
 		// Wait for pod to be in Running state
 		logger.Debug("pod.stdin", "name", podName)
 
-		watcher, err := k.clientset.CoreV1().Pods("default").Watch(waitCtx, metav1.ListOptions{
+		watcher, err := k.clientset.CoreV1().Pods(k.k8sNamespace).Watch(waitCtx, metav1.ListOptions{
 			FieldSelector: fmt.Sprintf("metadata.name=%s", podName),
 		})
 		if err != nil {
@@ -540,7 +542,7 @@ skipUser:
 		req := k.clientset.CoreV1().RESTClient().Post().
 			Resource("pods").
 			Name(podName).
-			Namespace("default").
+			Namespace(k.k8sNamespace).
 			SubResource("attach").
 			VersionedParams(&corev1.PodAttachOptions{
 				Stdin:     true,
@@ -566,11 +568,12 @@ skipUser:
 	}
 
 	return &Container{
-		clientset: k.clientset,
-		config:    k.config,
-		jobName:   jobName,
-		podName:   podName,
-		task:      task,
-		logger:    logger,
+		clientset:    k.clientset,
+		config:       k.config,
+		jobName:      jobName,
+		podName:      podName,
+		k8sNamespace: k.k8sNamespace,
+		task:         task,
+		logger:       logger,
 	}, nil
 }
