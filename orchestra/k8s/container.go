@@ -259,10 +259,16 @@ func (k *K8s) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.
 	}
 
 	// Set up resource requirements
-	resources := corev1.ResourceRequirements{}
+	// Always set requests for cluster autoscaler to function properly
+	resources := corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),     // 0.1 CPU
+			corev1.ResourceMemory: *resource.NewQuantity(128*1024*1024, resource.BinarySI), // 128Mi
+		},
+	}
+
 	if task.ContainerLimits.CPU > 0 || task.ContainerLimits.Memory > 0 {
 		resources.Limits = corev1.ResourceList{}
-		resources.Requests = corev1.ResourceList{}
 
 		if task.ContainerLimits.CPU > 0 {
 			// Convert CPU shares to millicores (rough approximation)
