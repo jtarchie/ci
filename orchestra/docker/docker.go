@@ -67,10 +67,15 @@ func (d *Docker) Close() error {
 	return nil
 }
 
-func NewDocker(namespace string, logger *slog.Logger) (orchestra.Driver, error) {
+func NewDocker(namespace string, logger *slog.Logger, params map[string]string) (orchestra.Driver, error) {
 	var clientOpts []client.Opt
 
-	dockerHost := os.Getenv("DOCKER_HOST")
+	// Check DSN parameter first, then fall back to environment variable
+	dockerHost := params["host"]
+	if dockerHost == "" {
+		dockerHost = os.Getenv("DOCKER_HOST")
+	}
+
 	if strings.HasPrefix(dockerHost, "ssh://") {
 		// https://gist.github.com/agbaraka/654a218f8ea13b3da8a47d47595f5d05
 		helper, err := connhelper.GetConnectionHelper(dockerHost)

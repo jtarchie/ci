@@ -18,15 +18,39 @@ The driver uses standard Kubernetes client configuration:
 2. **Kubeconfig file**: When running outside a cluster, it uses the default
    kubeconfig file (`~/.kube/config`)
 
-### Environment Variables
+### Configuration
 
-The following standard Kubernetes environment variables are respected:
+The K8s driver is configured via **Driver DSN**:
 
-- `KUBECONFIG` - Path to kubeconfig file
-- `KUBERNETES_SERVICE_HOST` - Kubernetes API server host (when running
-  in-cluster)
-- `KUBERNETES_SERVICE_PORT` - Kubernetes API server port (when running
-  in-cluster)
+```bash
+# Simple usage (uses 'default' namespace)
+go run main.go runner --driver=k8s examples/both/hello-world.ts
+
+# URL-style with namespace
+go run main.go runner --driver=k8s://my-namespace examples/both/hello-world.ts
+
+# Colon-separated parameters
+go run main.go runner --driver=k8s:namespace=staging examples/both/hello-world.ts
+
+# With custom kubeconfig
+go run main.go runner --driver=k8s:kubeconfig=/path/to/config examples/both/hello-world.ts
+
+# Multiple parameters
+go run main.go runner --driver=k8s://production?kubeconfig=/etc/k8s/config examples/both/hello-world.ts
+```
+
+**Available Parameters**:
+
+- `namespace` - Kubernetes namespace for resource placement (default: `default`)
+- `kubeconfig` - Path to kubeconfig file (default: `~/.kube/config` or
+  `KUBECONFIG` env var)
+
+**Authentication Priority**:
+
+1. In-cluster service account credentials (when running inside Kubernetes)
+2. Kubeconfig from DSN parameter (`kubeconfig=...`)
+3. Kubeconfig from `KUBECONFIG` environment variable
+4. Default kubeconfig at `~/.kube/config`
 
 ## Features
 
@@ -55,8 +79,8 @@ The following standard Kubernetes environment variables are respected:
   Kubernetes 1.32+). Without this feature gate enabled, all logs are written to
   the stdout writer. See the "Feature Gates" section below for setup
   instructions.
-- ⚠️ **Namespace**: All resources are created in the `default` Kubernetes
-  namespace. Multi-namespace support is not implemented.
+- ✅ **Namespace**: Resources are created in the Kubernetes namespace specified
+  by the `namespace` DSN parameter (defaults to `default`).
 - ⚠️ **Storage classes**: PVCs use the default storage class. Custom storage
   class selection is not supported.
 
