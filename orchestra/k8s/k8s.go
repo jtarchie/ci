@@ -24,11 +24,11 @@ type K8s struct {
 func (k *K8s) Close() error {
 	ctx := context.Background()
 
-	// Delete all pods in the namespace with our label
+	// Delete all jobs in the namespace with our label (pods will be cascade deleted)
 	labelSelector := fmt.Sprintf("orchestra.namespace=%s", sanitizeLabel(k.namespace))
 
 	deletePolicy := metav1.DeletePropagationForeground
-	err := k.clientset.CoreV1().Pods("default").DeleteCollection(
+	err := k.clientset.BatchV1().Jobs("default").DeleteCollection(
 		ctx,
 		metav1.DeleteOptions{
 			PropagationPolicy: &deletePolicy,
@@ -38,7 +38,7 @@ func (k *K8s) Close() error {
 		},
 	)
 	if err != nil && !errors.IsNotFound(err) {
-		return fmt.Errorf("failed to delete pods: %w", err)
+		return fmt.Errorf("failed to delete jobs: %w", err)
 	}
 
 	// Delete all PVCs in the namespace with our label

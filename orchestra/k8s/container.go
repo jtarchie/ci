@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jtarchie/ci/orchestra"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -20,6 +21,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/utils/ptr"
 )
 
 // sanitizeName converts a string to a valid Kubernetes resource name (DNS-1123 subdomain)
@@ -78,6 +80,7 @@ func sanitizeLabel(label string) string {
 type Container struct {
 	clientset *kubernetes.Clientset
 	config    *rest.Config
+	jobName   string
 	podName   string
 	task      orchestra.Task
 	logger    *slog.Logger
@@ -90,21 +93,76 @@ type ContainerStatus struct {
 }
 
 func (c *Container) Status(ctx context.Context) (orchestra.ContainerStatus, error) {
-	pod, err := c.clientset.CoreV1().Pods("default").Get(ctx, c.podName, metav1.GetOptions{})
+	// Get job status for completion tracking
+	job, err := c.clientset.BatchV1().Jobs("default").Get(ctx, c.jobName, metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get pod: %w", err)
+		return nil, fmt.Errorf("failed to get job: %w", err)
 	}
 
-	status := &ContainerStatus{
-		phase: pod.Status.Phase,
+	status := &ContainerStatus{}
+
+	// Check job completion status
+	if job.Status.Succeeded > 0 {
+		status.phase = corev1.PodSucceeded
+		status.terminated = true
+		status.exitCode = 0
+		return status, nil
 	}
 
-	// Check container status
-	if len(pod.Status.ContainerStatuses) > 0 {
-		containerStatus := pod.Status.ContainerStatuses[0]
-		if containerStatus.State.Terminated != nil {
-			status.terminated = true
-			status.exitCode = containerStatus.State.Terminated.ExitCode
+	if job.Status.Failed > 0 {
+		status.phase = corev1.PodFailed
+		status.terminated = true
+		status.exitCode = 1 // Default failure code
+
+		// Try to get actual exit code from pod
+		podName := c.podName
+		if podName == "" {
+			// Find the pod created by this job
+			pods, err := c.clientset.CoreV1().Pods("default").List(ctx, metav1.ListOptions{
+				LabelSelector: fmt.Sprintf("job-name=%s", c.jobName),
+			})
+			if err == nil && len(pods.Items) > 0 {
+				podName = pods.Items[0].Name
+			}
+		}
+
+		if podName != "" {
+			pod, err := c.clientset.CoreV1().Pods("default").Get(ctx, podName, metav1.GetOptions{})
+			if err == nil && len(pod.Status.ContainerStatuses) > 0 {
+				containerStatus := pod.Status.ContainerStatuses[0]
+				if containerStatus.State.Terminated != nil {
+					status.exitCode = containerStatus.State.Terminated.ExitCode
+				}
+			}
+		}
+
+		return status, nil
+	}
+
+	// Job still running, get pod status for phase
+	podName := c.podName
+	if podName == "" {
+		// Find the pod created by this job
+		pods, err := c.clientset.CoreV1().Pods("default").List(ctx, metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("job-name=%s", c.jobName),
+		})
+		if err == nil && len(pods.Items) > 0 {
+			podName = pods.Items[0].Name
+			c.podName = podName // Cache for future calls
+		}
+	}
+
+	if podName != "" {
+		pod, err := c.clientset.CoreV1().Pods("default").Get(ctx, podName, metav1.GetOptions{})
+		if err == nil {
+			status.phase = pod.Status.Phase
+			if len(pod.Status.ContainerStatuses) > 0 {
+				containerStatus := pod.Status.ContainerStatuses[0]
+				if containerStatus.State.Terminated != nil {
+					status.terminated = true
+					status.exitCode = containerStatus.State.Terminated.ExitCode
+				}
+			}
 		}
 	}
 
@@ -183,11 +241,12 @@ func (c *Container) Logs(ctx context.Context, stdout, stderr io.Writer) error {
 
 func (c *Container) Cleanup(ctx context.Context) error {
 	deletePolicy := metav1.DeletePropagationForeground
-	err := c.clientset.CoreV1().Pods("default").Delete(ctx, c.podName, metav1.DeleteOptions{
+	// Delete the job (which will cascade delete the pod)
+	err := c.clientset.BatchV1().Jobs("default").Delete(ctx, c.jobName, metav1.DeleteOptions{
 		PropagationPolicy: &deletePolicy,
 	})
 	if err != nil && !errors.IsNotFound(err) {
-		return fmt.Errorf("failed to delete pod: %w", err)
+		return fmt.Errorf("failed to delete job: %w", err)
 	}
 
 	return nil
@@ -204,21 +263,34 @@ func (s *ContainerStatus) ExitCode() int {
 func (k *K8s) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.Container, error) {
 	logger := k.logger.With("taskID", task.ID)
 
-	// Sanitize pod name to comply with k8s naming (lowercase alphanumeric + hyphens/dots)
-	podName := sanitizeName(fmt.Sprintf("%s-%s", k.namespace, task.ID))
+	// Sanitize job name to comply with k8s naming (lowercase alphanumeric + hyphens/dots)
+	jobName := sanitizeName(fmt.Sprintf("%s-%s", k.namespace, task.ID))
 
-	// Check if pod already exists
-	existingPod, err := k.clientset.CoreV1().Pods("default").Get(ctx, podName, metav1.GetOptions{})
+	// Check if job already exists
+	existingJob, err := k.clientset.BatchV1().Jobs("default").Get(ctx, jobName, metav1.GetOptions{})
 	if err == nil {
-		logger.Debug("pod.exists", "name", podName)
+		logger.Debug("job.exists", "name", jobName)
+
+		// Find the pod created by this job
+		podName := ""
+		pods, err := k.clientset.CoreV1().Pods("default").List(ctx, metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("job-name=%s", jobName),
+		})
+		if err == nil && len(pods.Items) > 0 {
+			podName = pods.Items[0].Name
+		}
+
 		return &Container{
 			clientset: k.clientset,
 			config:    k.config,
-			podName:   existingPod.Name,
+			jobName:   existingJob.Name,
+			podName:   podName,
 			task:      task,
 			logger:    logger,
 		}, nil
-	} // Create volumes for the pod
+	}
+
+	// Create volumes for the pod
 	volumes := []corev1.Volume{}
 	volumeMounts := []corev1.VolumeMount{}
 
@@ -245,7 +317,7 @@ func (k *K8s) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.
 
 		volumeMounts = append(volumeMounts, corev1.VolumeMount{
 			Name:      sanitizedVolumeName,
-			MountPath: filepath.Join("/tmp", podName, taskMount.Path),
+			MountPath: filepath.Join("/tmp", jobName, taskMount.Path),
 		})
 	}
 
@@ -284,16 +356,17 @@ func (k *K8s) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.
 		}
 	}
 
-	// Build the pod spec
+	// Build the pod template spec
 	enabledStdin := task.Stdin != nil
 
-	pod := &corev1.Pod{
+	labels := map[string]string{
+		"orchestra.namespace": sanitizeLabel(k.namespace),
+		"orchestra.task":      sanitizeLabel(task.ID),
+	}
+
+	podTemplateSpec := corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: podName,
-			Labels: map[string]string{
-				"orchestra.namespace": sanitizeLabel(k.namespace),
-				"orchestra.task":      sanitizeLabel(task.ID),
-			},
+			Labels: labels,
 		},
 		Spec: corev1.PodSpec{
 			RestartPolicy: corev1.RestartPolicyNever,
@@ -304,7 +377,7 @@ func (k *K8s) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.
 					Command:      task.Command,
 					Env:          env,
 					VolumeMounts: volumeMounts,
-					WorkingDir:   filepath.Join("/tmp", podName),
+					WorkingDir:   filepath.Join("/tmp", jobName),
 					Resources:    resources,
 					Stdin:        enabledStdin,
 					StdinOnce:    enabledStdin,
@@ -332,7 +405,7 @@ func (k *K8s) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.
 			}
 		}
 
-		pod.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
+		podTemplateSpec.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
 			RunAsUser: &uid,
 		}
 	}
@@ -340,27 +413,66 @@ skipUser:
 
 	// Set privileged mode if needed
 	if task.Privileged {
-		if pod.Spec.Containers[0].SecurityContext == nil {
-			pod.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{}
+		if podTemplateSpec.Spec.Containers[0].SecurityContext == nil {
+			podTemplateSpec.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{}
 		}
 		privileged := true
-		pod.Spec.Containers[0].SecurityContext.Privileged = &privileged
+		podTemplateSpec.Spec.Containers[0].SecurityContext.Privileged = &privileged
 	}
 
-	// Create the pod
-	createdPod, err := k.clientset.CoreV1().Pods("default").Create(ctx, pod, metav1.CreateOptions{})
+	// Create the Job (wraps the pod)
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   jobName,
+			Labels: labels,
+		},
+		Spec: batchv1.JobSpec{
+			BackoffLimit: ptr.To(int32(0)), // No retries (match current pod behavior)
+			Template:     podTemplateSpec,
+		},
+	}
+
+	_, err = k.clientset.BatchV1().Jobs("default").Create(ctx, job, metav1.CreateOptions{})
 	if err != nil {
-		logger.Error("pod.create", "name", podName, "err", err)
-		return nil, fmt.Errorf("failed to create pod: %w", err)
+		logger.Error("job.create", "name", jobName, "err", err)
+		return nil, fmt.Errorf("failed to create job: %w", err)
 	}
 
-	// Handle stdin if provided
+	// Wait for the job to create its pod and get the pod name
+	var podName string
 	if enabledStdin && task.Stdin != nil {
-		logger.Debug("pod.stdin", "name", podName)
-
-		// Wait for pod to be in Running state with a timeout
+		// We need the pod name for stdin attachment
 		waitCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
+
+		logger.Debug("job.waiting.for.pod", "name", jobName)
+
+		// Wait for pod to be created by the job
+		for {
+			pods, err := k.clientset.CoreV1().Pods("default").List(waitCtx, metav1.ListOptions{
+				LabelSelector: fmt.Sprintf("job-name=%s", jobName),
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to list pods for job: %w", err)
+			}
+
+			if len(pods.Items) > 0 {
+				podName = pods.Items[0].Name
+				logger.Debug("job.pod.found", "job", jobName, "pod", podName)
+				break
+			}
+
+			// Check if context was cancelled
+			select {
+			case <-waitCtx.Done():
+				return nil, fmt.Errorf("timeout waiting for job to create pod")
+			case <-time.After(100 * time.Millisecond):
+				// Continue polling
+			}
+		}
+
+		// Wait for pod to be in Running state
+		logger.Debug("pod.stdin", "name", podName)
 
 		watcher, err := k.clientset.CoreV1().Pods("default").Watch(waitCtx, metav1.ListOptions{
 			FieldSelector: fmt.Sprintf("metadata.name=%s", podName),
@@ -456,7 +568,8 @@ skipUser:
 	return &Container{
 		clientset: k.clientset,
 		config:    k.config,
-		podName:   createdPod.Name,
+		jobName:   jobName,
+		podName:   podName,
 		task:      task,
 		logger:    logger,
 	}, nil
