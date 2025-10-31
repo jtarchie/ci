@@ -43,7 +43,7 @@ func TestGetParam(t *testing.T) {
 		assert := NewGomegaWithT(t)
 
 		assert.Expect(os.Setenv("TEST_ENV_VAR_2", "env-value")).To(Succeed()) //nolint:tenv
-		defer os.Unsetenv("TEST_ENV_VAR_2")                                    //nolint:tenv
+		defer os.Unsetenv("TEST_ENV_VAR_2")                                   //nolint:tenv
 
 		params := map[string]string{"key": "dsn-value"}
 		result := orchestra.GetParam(params, "key", "TEST_ENV_VAR_2", "default")
