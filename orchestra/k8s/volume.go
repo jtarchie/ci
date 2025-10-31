@@ -54,7 +54,9 @@ func (k *K8s) CreateVolume(ctx context.Context, name string, size int) (orchestr
 		storageSize = fmt.Sprintf("%dMi", size/(1024*1024))
 	}
 
-	// Create PVC
+	// Create PVC with ReadWriteOnce (RWO) access mode
+	// The project scheduler ensures serial access (one pod at a time),
+	// so RWO is sufficient and provides better performance than RWX
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: pvcName,
