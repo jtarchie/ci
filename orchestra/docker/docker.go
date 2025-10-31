@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -70,11 +69,8 @@ func (d *Docker) Close() error {
 func NewDocker(namespace string, logger *slog.Logger, params map[string]string) (orchestra.Driver, error) {
 	var clientOpts []client.Opt
 
-	// Check DSN parameter first, then fall back to environment variable
-	dockerHost := params["host"]
-	if dockerHost == "" {
-		dockerHost = os.Getenv("DOCKER_HOST")
-	}
+	// Get Docker host from DSN params or env var
+	dockerHost := orchestra.GetParam(params, "host", "DOCKER_HOST", "")
 
 	if strings.HasPrefix(dockerHost, "ssh://") {
 		// https://gist.github.com/agbaraka/654a218f8ea13b3da8a47d47595f5d05

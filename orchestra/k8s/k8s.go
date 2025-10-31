@@ -66,8 +66,8 @@ func NewK8s(namespace string, logger *slog.Logger, params map[string]string) (or
 		// Fall back to kubeconfig (for local development)
 		loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 
-		// Check DSN parameter for kubeconfig path
-		if kubeconfigPath := params["kubeconfig"]; kubeconfigPath != "" {
+		// Use helper to get kubeconfig path from DSN or env var
+		if kubeconfigPath := orchestra.GetParam(params, "kubeconfig", "KUBECONFIG", ""); kubeconfigPath != "" {
 			loadingRules.ExplicitPath = kubeconfigPath
 		}
 
@@ -84,11 +84,8 @@ func NewK8s(namespace string, logger *slog.Logger, params map[string]string) (or
 		return nil, fmt.Errorf("failed to create kubernetes client: %w", err)
 	}
 
-	// Determine the K8s namespace to use for resources from DSN parameters
-	k8sNamespace := params["namespace"]
-	if k8sNamespace == "" {
-		k8sNamespace = "default"
-	}
+	// Get K8s namespace from DSN params or default
+	k8sNamespace := orchestra.GetParam(params, "namespace", "", "default")
 
 	logger.Info("k8s.config", "k8sNamespace", k8sNamespace, "orchestraNamespace", namespace)
 
