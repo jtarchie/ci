@@ -44,6 +44,11 @@ task default  # Full build including static assets
 task server   # Development server with live reload
 ```
 
+Note: the development `server` task watches source files under
+`server/static/src`. It intentionally does NOT watch the generated
+`server/static/dist` folder or `server/static/node_modules` to avoid triggering
+rebuilds from the generated bundles (which would create a watch/rebuild loop).
+
 ## Dependencies
 
 - **asciinema-player** (^3.9.0) - Terminal session player
