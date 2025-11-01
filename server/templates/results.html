@@ -4,36 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pipeline Visualizer</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/asciinema-player@3.9.0/dist/bundle/asciinema-player.min.css">
-    <script>
-      tailwind.config = {
-        darkMode: "media", // Enable dark mode based on prefers-color-scheme
-        theme: {
-          extend: {
-            colors: {
-              success: "#10B981",
-              failure: "#EF4444",
-              error: "#F59E0B",
-              abort: "#6B7280",
-              pending: "#94A3B8",
-            },
-          },
-        },
-      };
-    </script>
-    <style>
-      .task-details {
-        display: none;
-      }
-      .task-item[open] .task-details {
-        display: block;
-      }
-      .ap-player .ap-overlay-start .ap-play-button svg {
-        display: inline-block;
-      }
-    </style>
+    <link rel="stylesheet" href="/static/bundle.css">
+    <script src="/static/bundle.js"></script>
   </head>
   <body class="bg-gray-100 dark:bg-gray-900 min-h-screen">
     <div class="container mx-auto p-4">
@@ -99,7 +71,8 @@
           </div>
           <p
             class="mt-4 text-center text-sm text-gray-500 lg:mt-0 lg:text-right dark:text-gray-400">
-            Copyright &copy; <a href="https://github.com/jtarchie/ci">{{ now | date "2006" }}</a>. All rights reserved.
+            Copyright &copy; <a href="https://github.com/jtarchie/ci">{{ now |
+              date "2006" }}</a>. All rights reserved.
           </p>
         </div>
       </div>
@@ -223,7 +196,7 @@ border-indigo-300 dark:border-indigo-600
     class="task-details mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
     <div class="grid grid-cols-1 gap-4 text-sm">
       <div class="mb-4">
-      <div id="player-{{ $path.FullPath | urlquery }}" class="w-full"></div>
+        <div id="player-{{ $path.FullPath | urlquery }}" class="w-full"></div>
       </div>
       <script>
       document.addEventListener('DOMContentLoaded', function() {

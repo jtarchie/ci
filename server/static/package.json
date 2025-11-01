@@ -1,0 +1,19 @@
+{
+  "name": "ci-server-static",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Static assets for CI server",
+  "scripts": {
+    "build": "node build.js",
+    "build:css": "tailwindcss -i src/index.css -o dist/bundle.css --minify",
+    "build:js": "esbuild src/index.js --bundle --minify --outfile=dist/bundle.js --format=iife --global-name=CI --target=es2017"
+  },
+  "dependencies": {
+    "asciinema-player": "^3.9.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.0.0",
+    "esbuild": "^0.25.11",
+    "tailwindcss": "^4.0.0"
+  }
+}

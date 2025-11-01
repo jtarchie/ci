@@ -1,0 +1,23 @@
+@import "tailwindcss";
+@import "asciinema-player/dist/bundle/asciinema-player.css";
+
+/* Custom styles */
+.task-details {
+  display: none;
+}
+
+.task-item[open] .task-details {
+  display: block;
+}
+
+.ap-player .ap-overlay-start .ap-play-button svg {
+  display: inline-block;
+}
+
+@theme {
+  --color-success: #10b981;
+  --color-failure: #ef4444;
+  --color-error: #f59e0b;
+  --color-abort: #6b7280;
+  --color-pending: #94a3b8;
+}
