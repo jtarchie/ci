@@ -1,307 +1,63 @@
-# CI Project - GitHub Copilot Instructions
+# CI Project — Senior engineer guidance
 
-## Project Overview
+This repository implements a local-first CI runtime (Go core, JS/TS pipelines) that is Concourse-compatible — it targets Concourse-style pipelines, resources, and job/step semantics. The notes below are for maintainers and automated agents operating as senior engineers: prioritize reliability, reproducibility, and minimal surface-area changes.
 
-This is a CI/CD system that provides container orchestration capabilities for automation workflows. The project is designed to be **local-first** with an accessible, non-abstracted runtime. It allows users to define pipelines in JavaScript/TypeScript or YAML format (with backward compatibility for Concourse CI-style configurations).
+What matters (short)
 
-**Status**: Work in progress, subject to change
+- Stability: tests and race detection are first-class — run `go test -race ./... -count=1`.
+- Reproducibility: static assets and transpiled TS are part of the binary — run `task build:static` and `go generate ./...` when editing frontend or `backwards/src/`.
+- Readability & safety: follow formatting/linting (`task fmt`) and explicit error handling in Go.
 
-## High-Level Architecture
+Essential commands (repo root)
 
-### Repository Structure
+- Build static assets: `task build:static`
+- Regenerate TS/static artifacts: `go generate ./...`
+- Format & lint: `task fmt` (deno + gofmt + golangci-lint)
+- Full CI locally: `task default` (builds, generate, format, type-checks, tests)
 
-- **Size**: Medium-sized Go project with TypeScript/JavaScript integration
-- **Languages**: Go (primary), TypeScript/JavaScript (pipeline definitions)
-- **Runtime**: Goja VM for JavaScript/TypeScript execution
-- **Orchestration**: Docker and Native drivers
-- **Storage**: SQLite (default)
-- **Web Framework**: Echo (v4) for server endpoints
+Common workflows
 
-### Core Components
+- Run a pipeline locally (quick):
 
-- `/orchestra/` - Container orchestration abstraction layer
+  go run main.go runner examples/both/hello-world.ts
 
-  - `docker/` - Docker driver implementation (feature-complete)
-  - `native/` - Native process driver implementation
-  - `orchestrator.go` - Main orchestration interface
-  - `task.go` - Task execution logic
-  - `drivers.go` - Driver registration and management
+- Start the server for UI/debugging:
 
-- `/runtime/` - JavaScript/TypeScript execution engine
+  go run main.go server --storage sqlite://test.db
 
-  - `js.go` - Goja VM integration with esbuild transpilation
-  - `pipeline_runner.go` - Pipeline execution coordinator
-  - `yaml.go` - YAML pipeline parser (Concourse compatibility)
-  - `assert.go` - Test assertion utilities
+- Transpile a pipeline to canonical form:
 
-- `/storage/` - Data persistence layer
+  go run main.go transpile <pipeline-file>
 
-  - `sqlite/` - SQLite driver implementation
-  - `storage.go` - Storage interface
-  - `tree.go` - Task tree data structures
+CLI defaults and useful flags
 
-- `/commands/` - CLI command implementations
+- `--storage sqlite://test.db`
+- `--driver docker` (fallback: `native`)
+- `--log-level info`
 
-  - `runner.go` - Pipeline execution command
-  - `server.go` - Web server command
-  - `transpile.go` - Pipeline transpilation command
+Style & architecture notes
 
-- `/backwards/` - Concourse CI backward compatibility
+- Go: target 1.24+, use `gofmt`, small focused interfaces, propagate errors clearly, prefer `slog` for structured logs.
+- Runtime: Goja + esbuild for executing JS/TS pipeline code. Keep TS in `backwards/src/` and regenerate when changed.
+- Tests: prefer black-box packages (`*_test`), use `gomega` for assertions, include driver parity tests (docker vs native).
 
-  - `src/` - TypeScript pipeline runner implementations
-  - `config.go` - YAML configuration parsing
-  - `pipeline.go` - Pipeline execution logic
+Practical pitfalls (what I've seen)
 
-- `/examples/` - Example pipelines (JS/TS/YAML)
-- `/server/` - Web server templates and routing
-  - `static/` - Frontend dependencies (Tailwind CSS 4.0+, Asciinema Player)
-  - `templates/` - Go HTML templates
-  - `router.go` - HTTP routing and static file serving
-- `/packages/ci/` - TypeScript type definitions
+- Forgot `go generate` after TS changes → binary runs different code than checked-in artifacts.
+- Tests run without `-race` → subtle concurrency bugs slip in.
+- Docker resource leakage during tests → run `task cleanup` periodically.
 
-## Build and Development Workflow
+Where to inspect quickly
 
-### Prerequisites
+- Orchestration primitives: `orchestra/`
+- Execution engine: `runtime/` (look at `js.go`, `pipeline_runner.go`)
+- Storage & sqlite: `storage/`, `storage/sqlite`
+- Examples and tests: `examples/`, `*_test.go` files
 
-- **Go**: Version 1.24.0 or higher
-- **Deno**: For TypeScript formatting, linting, and type checking
-- **Docker**: Required for Docker driver testing
-- **Yarn**: For managing frontend dependencies (Tailwind CSS, Asciinema Player)
-- **Node.js**: Required for esbuild bundling of static assets
-- **Task**: Task runner (see Taskfile.yml)
-- **golangci-lint**: For Go linting
+Pre-commit sanity checklist
 
-### Build Commands
+- `task fmt` (format + lint)
+- `go generate ./...` (if TS / static changed)
+- `go test -race ./... -count=1`
 
-**Always run these commands from the project root.**
-
-1. **Build static assets** (bundles frontend dependencies):
-
-   ```bash
-   task build:static
-   ```
-
-   This builds Tailwind CSS and Asciinema Player into bundled assets in `server/static/dist/`.
-   These files are embedded into the Go binary and served at `/static/`.
-
-2. **Generate code** (bundles TypeScript, runs code generation):
-
-   ```bash
-   go generate ./...
-   ```
-
-   This MUST be run before building if TypeScript files in `backwards/src/` or static assets have changed.
-
-3. **Format and lint all code**:
-
-   ```bash
-   task fmt
-   ```
-
-   This runs:
-
-   - `deno fmt` on TypeScript/JavaScript files
-   - `deno lint` on TypeScript files
-   - `gofmt` on Go files
-   - `golangci-lint` with auto-fix
-
-4. **Run tests** (integration and unit):
-
-   ```bash
-   go test -race ./... -count=1
-   ```
-
-   Always use `-count=1` to disable test caching
-   Always use `-race` to detect race conditions
-
-5. **Full validation** (equivalent to CI):
-
-   ```bash
-   task default
-   ```
-
-   This runs: static asset build → code generation → formatting → type checking → tests
-
-6. **Run development server** (with live reload):
-
-   ```bash
-   task server
-   ```
-
-   Uses `wgo` to watch `.html`, `.ts`, `.go`, `.css`, `.js` files and auto-reload
-
-7. **Clean Docker resources**:
-   ```bash
-   task cleanup
-   ```
-   Removes all Docker containers and volumes created during testing
-
-### Running Pipelines
-
-**Execute a pipeline** (single run):
-
-```bash
-go run main.go runner <pipeline-file>
-```
-
-Supported formats:
-
-- JavaScript: `go run main.go runner examples/both/hello-world.js`
-- TypeScript: `go run main.go runner examples/both/hello-world.ts`
-- YAML: `go run main.go runner examples/both/hello-world.yml`
-
-**View results** (web UI):
-
-```bash
-go run main.go server --storage sqlite://test.db
-# Navigate to http://localhost:8080/tasks
-```
-
-**Transpile pipeline** (convert to canonical format):
-
-```bash
-go run main.go transpile <pipeline-file>
-```
-
-### Command Options
-
-All commands support:
-
-- `--storage <uri>` - SQLite database path (default: `sqlite://test.db`)
-- `--driver <name>` - Orchestration driver: `docker` (default) or `native`
-- `--log-level <level>` - Log level: `debug`, `info` (default), `warn`, `error`
-- `--log-format <format>` - Log format: `text` (default) or `json`
-- `--add-source` - Add source location to log messages
-
-## Testing Strategy
-
-**Philosophy**: Strict integration testing with consistent interfaces across drivers
-
-### Test Execution
-
-- Run all tests: `go test -race ./... -count=1`
-- Run specific package: `go test -race ./runtime -count=1`
-- Run with coverage: `go test -race -coverprofile=coverage.out ./...`
-
-### Test Organization
-
-- `*_test.go` files use `package <name>_test` (black-box testing)
-- Tests validate behavior across both `docker` and `native` drivers
-- Integration tests in `/examples/examples_test.go`
-- Backward compatibility tests in `/backwards/backwards_test.go`
-
-### Key Test Files
-
-- `orchestra/drivers_test.go` - Driver interface validation
-- `runtime/js_test.go` - JavaScript execution tests
-- `runtime/yaml_test.go` - YAML parsing tests
-- `backwards/backwards_test.go` - Concourse compatibility tests
-- `examples/examples_test.go` - End-to-end pipeline tests
-
-## Coding Standards
-
-### Go Code
-
-- Use Go 1.24 features
-- Follow standard Go formatting (enforced by `gofmt`)
-- All errors must be properly handled
-- Use structured logging with `log/slog`
-- Interfaces should be small and focused
-- Driver pattern for extensibility (orchestra, storage)
-
-### TypeScript/JavaScript
-
-- Use TypeScript for type safety
-- Follow Deno formatting standards
-- Target ES2017 for Goja compatibility
-- Use CommonJS module format (transpiled by esbuild)
-- Type definitions in `/packages/ci/src/global.d.ts`
-
-### Project Conventions
-
-- Use `kong` for CLI parsing
-- Use `gomega` for test assertions
-- Driver registration via `init()` functions
-- Context-based cancellation throughout
-- Immutable task trees in storage layer
-
-## Key Interfaces
-
-### Orchestra Driver
-
-```go
-type Driver interface {
-    Container(context.Context, string) (Container, error)
-    Volume(context.Context, string) (Volume, error)
-}
-```
-
-### Storage Driver
-
-```go
-type Driver interface {
-    Set(context.Context, string, *Node) error
-    Tree(context.Context) (map[string]NodeReference, error)
-}
-```
-
-### Container Operations
-
-- `Run()` - Execute command in container
-- `Get()` - Download resource from URI
-- `Put()` - Upload resource to URI
-
-## Common Pitfalls
-
-1. **TypeScript changes require regeneration**: After modifying `backwards/src/`, always run `go generate ./...`
-
-2. **Test caching**: Always use `-count=1` flag to disable Go test cache
-
-3. **Race detection**: Always run tests with `-race` flag
-
-4. **Docker cleanup**: Run `task cleanup` if experiencing "address already in use" or volume mount errors
-
-5. **Context cancellation**: Ensure all goroutines respect context cancellation
-
-6. **Module imports**: Relative imports in TypeScript must use `.ts` extension
-
-## Dependencies
-
-### Go Modules (key dependencies)
-
-- `github.com/dop251/goja` - JavaScript VM
-- `github.com/evanw/esbuild` - TypeScript transpilation
-- `github.com/docker/docker` - Docker client
-- `github.com/labstack/echo/v4` - Web framework
-- `modernc.org/sqlite` - Pure Go SQLite
-- `github.com/onsi/gomega` - Test assertions
-- `github.com/alecthomas/kong` - CLI parser
-- `github.com/goccy/go-yaml` - YAML parsing
-
-### Development Tools
-
-- Deno (formatting, linting, type checking)
-- Task (task runner)
-- golangci-lint (Go linting)
-- wgo (file watching for development)
-
-## Environment Variables
-
-No required environment variables. All configuration via CLI flags.
-
-## Validation Steps
-
-Before committing changes:
-
-1. Run `task default` to ensure all checks pass
-2. If tests fail on Docker, try `task cleanup` first
-3. Verify both `docker` and `native` drivers work (if orchestration changes)
-4. Check that examples still execute: `go run main.go runner examples/both/hello-world.ts`
-
-## Additional Notes
-
-- The web server does NOT provide live updates - refresh manually
-- Pipeline execution is single-iteration (not continuous)
-- Storage is append-only for task history
-- Concourse compatibility is read-only (no `fly` integration)
-- Native driver has limited feature parity with Docker driver
+Keep this page minimal. If you need to expand operational runbooks or onboarding, add a `docs/` page and link it here.
