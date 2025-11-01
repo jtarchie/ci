@@ -5,7 +5,7 @@
   "description": "Static assets for CI server",
   "scripts": {
     "build": "node build.js",
-    "build:css": "tailwindcss -i src/index.css -o dist/bundle.css --minify",
+    "build:css": "tailwindcss --cwd ../ -i static/src/index.css -o static/dist/bundle.css --minify",
     "build:js": "esbuild src/index.js --bundle --minify --outfile=dist/bundle.js --format=iife --global-name=CI --target=es2017"
   },
   "dependencies": {
