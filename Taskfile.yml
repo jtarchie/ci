@@ -1,6 +1,11 @@
 version: 3
 
 tasks:
+  build:static:
+    dir: server/static
+    cmds:
+      - yarn install --frozen-lockfile
+      - yarn build
   fmt:
     cmds:
       - deno fmt backwards/src/ examples/ *.md docs/ packages/
@@ -9,11 +14,12 @@ tasks:
       - golangci-lint run ./... --fix
   default:
     cmds:
+      - task: build:static
       - go generate ./...
       - task: fmt
       - deno check backwards/src/ examples/both/
       - go test -race ./... -count=1
-  server: "wgo -file .html -file .ts -file .go go generate ./... :: go run main.go server --storage sqlite://test.db"
+  server: "wgo -file .html -file .ts -file .go -file .css -file .js go generate ./... :: go run main.go server --storage sqlite://test.db"
   cleanup: |
     removed_containers=$(docker ps -aq | xargs -I {} docker rm -f {} | wc -l)
     removed_volumes=$(docker volume ls -q | xargs -r docker volume rm -f | wc -l)

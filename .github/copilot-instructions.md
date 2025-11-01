@@ -54,6 +54,9 @@ This is a CI/CD system that provides container orchestration capabilities for au
 
 - `/examples/` - Example pipelines (JS/TS/YAML)
 - `/server/` - Web server templates and routing
+  - `static/` - Frontend dependencies (Tailwind CSS 4.0+, Asciinema Player)
+  - `templates/` - Go HTML templates
+  - `router.go` - HTTP routing and static file serving
 - `/packages/ci/` - TypeScript type definitions
 
 ## Build and Development Workflow
@@ -63,6 +66,8 @@ This is a CI/CD system that provides container orchestration capabilities for au
 - **Go**: Version 1.24.0 or higher
 - **Deno**: For TypeScript formatting, linting, and type checking
 - **Docker**: Required for Docker driver testing
+- **Yarn**: For managing frontend dependencies (Tailwind CSS, Asciinema Player)
+- **Node.js**: Required for esbuild bundling of static assets
 - **Task**: Task runner (see Taskfile.yml)
 - **golangci-lint**: For Go linting
 
@@ -70,15 +75,24 @@ This is a CI/CD system that provides container orchestration capabilities for au
 
 **Always run these commands from the project root.**
 
-1. **Generate code** (bundles TypeScript, runs code generation):
+1. **Build static assets** (bundles frontend dependencies):
+
+   ```bash
+   task build:static
+   ```
+
+   This builds Tailwind CSS and Asciinema Player into bundled assets in `server/static/dist/`.
+   These files are embedded into the Go binary and served at `/static/`.
+
+2. **Generate code** (bundles TypeScript, runs code generation):
 
    ```bash
    go generate ./...
    ```
 
-   This MUST be run before building if TypeScript files in `backwards/src/` have changed.
+   This MUST be run before building if TypeScript files in `backwards/src/` or static assets have changed.
 
-2. **Format and lint all code**:
+3. **Format and lint all code**:
 
    ```bash
    task fmt
@@ -91,7 +105,7 @@ This is a CI/CD system that provides container orchestration capabilities for au
    - `gofmt` on Go files
    - `golangci-lint` with auto-fix
 
-3. **Run tests** (integration and unit):
+4. **Run tests** (integration and unit):
 
    ```bash
    go test -race ./... -count=1
@@ -100,23 +114,23 @@ This is a CI/CD system that provides container orchestration capabilities for au
    Always use `-count=1` to disable test caching
    Always use `-race` to detect race conditions
 
-4. **Full validation** (equivalent to CI):
+5. **Full validation** (equivalent to CI):
 
    ```bash
    task default
    ```
 
-   This runs: code generation → formatting → type checking → tests
+   This runs: static asset build → code generation → formatting → type checking → tests
 
-5. **Run development server** (with live reload):
+6. **Run development server** (with live reload):
 
    ```bash
    task server
    ```
 
-   Uses `wgo` to watch `.html`, `.ts`, `.go` files and auto-reload
+   Uses `wgo` to watch `.html`, `.ts`, `.go`, `.css`, `.js` files and auto-reload
 
-6. **Clean Docker resources**:
+7. **Clean Docker resources**:
    ```bash
    task cleanup
    ```

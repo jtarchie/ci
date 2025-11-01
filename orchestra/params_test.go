@@ -21,8 +21,8 @@ func TestGetParam(t *testing.T) {
 	t.Run("falls back to environment variable when DSN param is empty", func(t *testing.T) {
 		assert := NewGomegaWithT(t)
 
-		assert.Expect(os.Setenv("TEST_ENV_VAR", "env-value")).To(Succeed()) //nolint:tenv
-		defer os.Unsetenv("TEST_ENV_VAR")                                   //nolint:tenv
+		assert.Expect(os.Setenv("TEST_ENV_VAR", "env-value")).To(Succeed())
+		defer func() { _ = os.Unsetenv("TEST_ENV_VAR") }()
 
 		params := map[string]string{}
 		result := orchestra.GetParam(params, "key", "TEST_ENV_VAR", "default")
@@ -42,8 +42,8 @@ func TestGetParam(t *testing.T) {
 	t.Run("prefers DSN parameter over environment variable", func(t *testing.T) {
 		assert := NewGomegaWithT(t)
 
-		assert.Expect(os.Setenv("TEST_ENV_VAR_2", "env-value")).To(Succeed()) //nolint:tenv
-		defer os.Unsetenv("TEST_ENV_VAR_2")                                   //nolint:tenv
+		assert.Expect(os.Setenv("TEST_ENV_VAR_2", "env-value")).To(Succeed())
+		defer func() { _ = os.Unsetenv("TEST_ENV_VAR_2") }()
 
 		params := map[string]string{"key": "dsn-value"}
 		result := orchestra.GetParam(params, "key", "TEST_ENV_VAR_2", "default")

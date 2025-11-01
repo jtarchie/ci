@@ -15,6 +15,9 @@ import (
 //go:embed templates/*
 var templatesFS embed.FS
 
+//go:embed static/dist/*
+var staticFS embed.FS
+
 type TemplateRender struct {
 	templates *template.Template
 }
