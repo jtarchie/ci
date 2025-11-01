@@ -29,12 +29,13 @@ jobs:
           check-latest: true
           go-version: 'stable'
           cache: true
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v8
       - name: Install Task
         uses: arduino/setup-task@v2
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - run: task build:static
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
       - name: Set up Docker
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
