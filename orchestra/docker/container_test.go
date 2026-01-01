@@ -104,13 +104,11 @@ func TestDocker(t *testing.T) {
 
 		defer func() { _ = client.Close() }()
 
-		t.Run("cpu and memory limits", func(t *testing.T) {
+		t.Run("cpu limit", func(t *testing.T) {
 			taskID := gonanoid.Must()
 
-			// Use sh to check cgroup values from inside the container
-			// For cgroup v2 (modern Docker), check /sys/fs/cgroup/cpu.max and memory.max
-			// For cgroup v1 (older Docker), check /sys/fs/cgroup/cpu/cpu.shares and memory/memory.limit_in_bytes
-			// Note: cgroup v2 converts CPU shares to weight differently (shares/1024 * 100 + 1)
+			// For cgroup v1: /sys/fs/cgroup/cpu/cpu.shares shows 512
+			// For cgroup v2: /sys/fs/cgroup/cpu.weight shows converted value (~20)
 			container, err := client.RunContainer(
 				context.Background(),
 				orchestra.Task{
@@ -118,11 +116,49 @@ func TestDocker(t *testing.T) {
 					Image: "busybox",
 					Command: []string{
 						"sh", "-c",
-						"cat /sys/fs/cgroup/cpu/cpu.shares 2>/dev/null || cat /sys/fs/cgroup/cpu.weight 2>/dev/null; " +
-							"cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null || cat /sys/fs/cgroup/memory.max 2>/dev/null",
+						"cat /sys/fs/cgroup/cpu/cpu.shares 2>/dev/null || cat /sys/fs/cgroup/cpu.weight 2>/dev/null",
 					},
 					ContainerLimits: orchestra.ContainerLimits{
-						CPU:    512,       // 512 CPU shares
+						CPU: 512, // 512 CPU shares
+					},
+				},
+			)
+			assert.Expect(err).NotTo(HaveOccurred())
+
+			assert.Eventually(func() bool {
+				status, err := container.Status(context.Background())
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				return status.IsDone() && status.ExitCode() == 0
+			}, "10s").Should(BeTrue())
+
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+
+			stdout, stderr := &strings.Builder{}, &strings.Builder{}
+			err = container.Logs(ctx, stdout, stderr)
+			assert.Expect(err).NotTo(HaveOccurred())
+
+			output := stdout.String()
+			// cgroup v1 shows 512, cgroup v2 shows weight around 20
+			hasCPULimit := strings.Contains(output, "512") || strings.Contains(output, "20")
+			assert.Expect(hasCPULimit).To(BeTrue(), "CPU limit not found. stdout: %q, stderr: %q", output, stderr.String())
+		})
+
+		t.Run("memory limit", func(t *testing.T) {
+			taskID := gonanoid.Must()
+
+			// Both cgroup v1 and v2 should show 134217728 bytes (128MB)
+			container, err := client.RunContainer(
+				context.Background(),
+				orchestra.Task{
+					ID:    taskID,
+					Image: "busybox",
+					Command: []string{
+						"sh", "-c",
+						"cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null || cat /sys/fs/cgroup/memory.max 2>/dev/null",
+					},
+					ContainerLimits: orchestra.ContainerLimits{
 						Memory: 134217728, // 128MB in bytes
 					},
 				},
@@ -136,23 +172,16 @@ func TestDocker(t *testing.T) {
 				return status.IsDone() && status.ExitCode() == 0
 			}, "10s").Should(BeTrue())
 
-			assert.Eventually(func() bool {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-				defer cancel()
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
 
-				stdout, stderr := &strings.Builder{}, &strings.Builder{}
-				_ = container.Logs(ctx, stdout, stderr)
+			stdout, stderr := &strings.Builder{}, &strings.Builder{}
+			err = container.Logs(ctx, stdout, stderr)
+			assert.Expect(err).NotTo(HaveOccurred())
 
-				output := stdout.String()
-
-				// Check if either cgroup v1 or v2 shows the limits
-				// For CPU: cgroup v1 shows 512 shares, cgroup v2 shows weight (formula: (shares-2)*9999/262142 + 1, so 512->20)
-				// For Memory: both should show 134217728 bytes
-				hasCPULimit := strings.Contains(output, "512") || strings.Contains(output, "20")
-				hasMemoryLimit := strings.Contains(output, "134217728")
-
-				return hasCPULimit && hasMemoryLimit
-			}, "1s").Should(BeTrue())
+			output := stdout.String()
+			hasMemoryLimit := strings.Contains(output, "134217728")
+			assert.Expect(hasMemoryLimit).To(BeTrue(), "Memory limit not found. stdout: %q, stderr: %q", output, stderr.String())
 		})
 
 		err = client.Close()
