@@ -132,7 +132,7 @@ func (d *DigitalOcean) ensureDroplet(ctx context.Context, containerLimits orches
 		},
 		Tags: []string{
 			"ci",
-			fmt.Sprintf("namespace:%s", d.namespace),
+			fmt.Sprintf("namespace-%s", sanitizeHostname(d.namespace)),
 		},
 	}
 
