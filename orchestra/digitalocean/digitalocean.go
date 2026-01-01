@@ -22,11 +22,35 @@ import (
 
 // Default values.
 const (
-	DefaultImage      = "docker-20-04"
-	DefaultSize       = "s-1vcpu-1gb"
-	DefaultRegion     = "nyc3"
-	DefaultDiskSizeGB = 25 // Default disk size in GB
+	DefaultImage         = "docker-20-04"
+	DefaultSize          = "s-1vcpu-1gb"
+	DefaultRegion        = "nyc3"
+	DefaultDiskSizeGB    = 25              // Default disk size in GB
+	DefaultSSHTimeout    = 5 * time.Minute // Default timeout for SSH to become available
+	DefaultDockerTimeout = 5 * time.Minute // Default timeout for Docker to become available
 )
+
+// sanitizeHostname converts a string to a valid hostname.
+// DigitalOcean hostnames only allow: a-z, A-Z, 0-9, . and -
+func sanitizeHostname(name string) string {
+	var result strings.Builder
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z':
+			result.WriteRune(r)
+		case r >= 'A' && r <= 'Z':
+			result.WriteRune(r)
+		case r >= '0' && r <= '9':
+			result.WriteRune(r)
+		case r == '.' || r == '-':
+			result.WriteRune(r)
+		default:
+			// Replace invalid characters with hyphen
+			result.WriteRune('-')
+		}
+	}
+	return result.String()
+}
 
 // DigitalOcean implements orchestra.Driver by creating a DigitalOcean droplet
 // that runs Docker and delegates container operations to the docker driver.
@@ -38,6 +62,9 @@ type DigitalOcean struct {
 	droplet    *godo.Droplet
 	sshKeyID   int
 	sshKeyPath string
+
+	// SSH connection to the droplet for Docker communication
+	sshClient *ssh.Client
 
 	// Underlying docker driver connected to the droplet
 	dockerDriver orchestra.Driver
@@ -91,7 +118,7 @@ func (d *DigitalOcean) ensureDroplet(ctx context.Context, containerLimits orches
 	region := orchestra.GetParam(d.params, "region", "DIGITALOCEAN_REGION", DefaultRegion)
 	size := d.determineDropletSize(containerLimits)
 
-	dropletName := fmt.Sprintf("ci-%s", d.namespace)
+	dropletName := fmt.Sprintf("ci-%s", sanitizeHostname(d.namespace))
 
 	createRequest := &godo.DropletCreateRequest{
 		Name:   dropletName,
@@ -139,30 +166,20 @@ func (d *DigitalOcean) ensureDroplet(ctx context.Context, containerLimits orches
 
 	d.logger.Info("digitalocean.droplet.ready", "ip", publicIP)
 
-	// Wait for SSH to be available
+	// Wait for SSH to be available (also stores d.sshClient)
 	if err := d.waitForSSH(ctx, publicIP); err != nil {
 		return fmt.Errorf("failed to wait for SSH: %w", err)
 	}
 
-	// Wait for Docker to be ready
-	if err := d.waitForDocker(ctx, publicIP); err != nil {
+	// Wait for Docker to be ready (uses the SSH client established in waitForSSH)
+	if err := d.waitForDocker(ctx); err != nil {
 		return fmt.Errorf("failed to wait for Docker: %w", err)
 	}
 
-	// Create docker driver connected to the droplet via SSH
-	dockerHost := fmt.Sprintf("ssh://root@%s", publicIP)
-	d.logger.Info("digitalocean.docker.connecting", "host", dockerHost)
+	// Create docker driver connected to the droplet via Go's SSH library
+	d.logger.Info("digitalocean.docker.connecting", "ip", publicIP)
 
-	// Set SSH key in environment for docker SSH connection
-	if err := os.Setenv("SSH_AUTH_SOCK", ""); err != nil {
-		d.logger.Warn("digitalocean.ssh.env_clear_failed", "err", err)
-	}
-
-	dockerParams := map[string]string{
-		"host": dockerHost,
-	}
-
-	dockerDriver, err := docker.NewDocker(d.namespace, d.logger, dockerParams)
+	dockerDriver, err := docker.NewDockerWithSSH(d.namespace, d.logger, d.sshClient)
 	if err != nil {
 		return fmt.Errorf("failed to create docker driver: %w", err)
 	}
@@ -220,7 +237,7 @@ func (d *DigitalOcean) determineDropletSize(limits orchestra.ContainerLimits) st
 
 // ensureSSHKey creates or retrieves an SSH key for droplet access.
 func (d *DigitalOcean) ensureSSHKey(ctx context.Context) (int, string, error) {
-	keyName := fmt.Sprintf("ci-%s", d.namespace)
+	keyName := fmt.Sprintf("ci-%s", sanitizeHostname(d.namespace))
 
 	// Check if SSH key already exists in DO
 	keys, _, err := d.client.Keys.List(ctx, &godo.ListOptions{})
@@ -323,6 +340,15 @@ func (d *DigitalOcean) waitForDroplet(ctx context.Context, dropletID int) (*godo
 func (d *DigitalOcean) waitForSSH(ctx context.Context, ip string) error {
 	d.logger.Info("digitalocean.ssh.waiting", "ip", ip)
 
+	// Get configurable timeout
+	sshTimeoutStr := orchestra.GetParam(d.params, "ssh_timeout", "DIGITALOCEAN_SSH_TIMEOUT", "")
+	sshTimeout := DefaultSSHTimeout
+	if sshTimeoutStr != "" {
+		if parsed, err := time.ParseDuration(sshTimeoutStr); err == nil {
+			sshTimeout = parsed
+		}
+	}
+
 	// Load private key
 	privateKeyData, err := os.ReadFile(d.sshKeyPath)
 	if err != nil {
@@ -343,98 +369,89 @@ func (d *DigitalOcean) waitForSSH(ctx context.Context, ip string) error {
 		Timeout:         10 * time.Second,
 	}
 
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
+	deadline := time.Now().Add(sshTimeout)
 
-	timeout := time.After(5 * time.Minute)
-
+	// Try immediately first, then poll
 	for {
+		if time.Now().After(deadline) {
+			return fmt.Errorf("timeout waiting for SSH after %s", sshTimeout)
+		}
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-timeout:
-			return fmt.Errorf("timeout waiting for SSH")
-		case <-ticker.C:
-			conn, err := ssh.Dial("tcp", ip+":22", config)
-			if err != nil {
-				d.logger.Debug("digitalocean.ssh.connecting", "err", err)
-
-				continue
-			}
-
-			_ = conn.Close()
-			d.logger.Info("digitalocean.ssh.connected")
-
-			return nil
+		default:
 		}
+
+		conn, err := ssh.Dial("tcp", ip+":22", config)
+		if err != nil {
+			d.logger.Debug("digitalocean.ssh.connecting", "ip", ip, "err", err)
+			time.Sleep(5 * time.Second)
+
+			continue
+		}
+
+		// Store the connection for reuse by waitForDocker
+		d.sshClient = conn
+		d.logger.Info("digitalocean.ssh.connected")
+
+		return nil
 	}
 }
 
 // waitForDocker polls until Docker is accessible on the droplet.
-func (d *DigitalOcean) waitForDocker(ctx context.Context, ip string) error {
+// Uses the existing SSH client connection established in waitForSSH.
+func (d *DigitalOcean) waitForDocker(ctx context.Context) error {
 	d.logger.Info("digitalocean.docker.waiting")
 
-	// Load private key
-	privateKeyData, err := os.ReadFile(d.sshKeyPath)
-	if err != nil {
-		return fmt.Errorf("failed to read SSH private key: %w", err)
+	// Get configurable timeout
+	dockerTimeoutStr := orchestra.GetParam(d.params, "docker_timeout", "DIGITALOCEAN_DOCKER_TIMEOUT", "")
+	dockerTimeout := DefaultDockerTimeout
+	if dockerTimeoutStr != "" {
+		if parsed, err := time.ParseDuration(dockerTimeoutStr); err == nil {
+			dockerTimeout = parsed
+		}
 	}
 
-	signer, err := ssh.ParsePrivateKey(privateKeyData)
-	if err != nil {
-		return fmt.Errorf("failed to parse SSH private key: %w", err)
+	if d.sshClient == nil {
+		return fmt.Errorf("SSH client not connected")
 	}
 
-	config := &ssh.ClientConfig{
-		User: "root",
-		Auth: []ssh.AuthMethod{
-			ssh.PublicKeys(signer),
-		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), //nolint:gosec // CI droplets are ephemeral
-		Timeout:         10 * time.Second,
-	}
+	deadline := time.Now().Add(dockerTimeout)
 
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
-
-	timeout := time.After(5 * time.Minute)
-
+	// Try immediately first, then poll
 	for {
+		if time.Now().After(deadline) {
+			return fmt.Errorf("timeout waiting for Docker after %s", dockerTimeout)
+		}
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-timeout:
-			return fmt.Errorf("timeout waiting for Docker")
-		case <-ticker.C:
-			conn, err := ssh.Dial("tcp", ip+":22", config)
-			if err != nil {
-				d.logger.Debug("digitalocean.docker.ssh_error", "err", err)
-
-				continue
-			}
-
-			session, err := conn.NewSession()
-			if err != nil {
-				_ = conn.Close()
-				d.logger.Debug("digitalocean.docker.session_error", "err", err)
-
-				continue
-			}
-
-			output, err := session.CombinedOutput("docker ps")
-			_ = session.Close()
-			_ = conn.Close()
-
-			if err != nil {
-				d.logger.Debug("digitalocean.docker.check_error", "err", err, "output", string(output))
-
-				continue
-			}
-
-			d.logger.Info("digitalocean.docker.ready")
-
-			return nil
+		default:
 		}
+
+		session, err := d.sshClient.NewSession()
+		if err != nil {
+			d.logger.Debug("digitalocean.docker.session_error", "err", err)
+			time.Sleep(5 * time.Second)
+
+			continue
+		}
+
+		output, err := session.CombinedOutput("docker ps")
+		_ = session.Close()
+
+		if err != nil {
+			d.logger.Debug("digitalocean.docker.check_error", "err", err, "output", string(output))
+			time.Sleep(5 * time.Second)
+
+			continue
+		}
+
+		d.logger.Info("digitalocean.docker.ready")
+
+		return nil
 	}
 }
 
@@ -480,6 +497,13 @@ func (d *DigitalOcean) Close() error {
 	if d.dockerDriver != nil {
 		if err := d.dockerDriver.Close(); err != nil {
 			d.logger.Warn("digitalocean.docker.close_error", "err", err)
+		}
+	}
+
+	// Close SSH client
+	if d.sshClient != nil {
+		if err := d.sshClient.Close(); err != nil {
+			d.logger.Warn("digitalocean.ssh.close_error", "err", err)
 		}
 	}
 
