@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	"github.com/jtarchie/ci/orchestra"
+	"golang.org/x/crypto/ssh"
 )
 
 type Docker struct {
@@ -96,6 +98,40 @@ func NewDocker(namespace string, logger *slog.Logger, params map[string]string) 
 	}
 
 	cli, err := client.NewClientWithOpts(clientOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create docker client: %w", err)
+	}
+
+	return &Docker{
+		client:    cli,
+		logger:    logger,
+		namespace: namespace,
+	}, nil
+}
+
+// NewDockerWithSSH creates a Docker driver that communicates over an existing SSH connection.
+// This uses Go's native SSH library to tunnel to the Docker socket, avoiding the need
+// for the host's ssh command or ssh-agent.
+func NewDockerWithSSH(namespace string, logger *slog.Logger, sshClient *ssh.Client) (orchestra.Driver, error) {
+	// Create a custom dialer that tunnels through SSH to the Docker Unix socket
+	sshDialer := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		// Always dial the Docker Unix socket through SSH, ignoring the network/addr
+		return sshClient.Dial("unix", "/var/run/docker.sock")
+	}
+
+	// Create a custom HTTP transport that uses our SSH dialer
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			DialContext: sshDialer,
+		},
+	}
+
+	cli, err := client.NewClientWithOpts(
+		client.WithHTTPClient(httpClient),
+		client.WithHost("http://localhost"), // Dummy host, actual connection is via Unix socket over SSH
+		client.WithDialContext(sshDialer),
+		client.WithAPIVersionNegotiation(),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create docker client: %w", err)
 	}
