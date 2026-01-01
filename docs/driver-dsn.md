@@ -112,6 +112,64 @@ Currently no specific parameters. Uses host process execution.
 --driver=native
 ```
 
+### DigitalOcean Driver
+
+The DigitalOcean driver creates an on-demand droplet running Docker and
+delegates container operations to it. When the driver is closed, the droplet is
+automatically deleted.
+
+| Parameter   | Description                       | Default        | Example                           |
+| ----------- | --------------------------------- | -------------- | --------------------------------- |
+| `token`     | DigitalOcean API token            | (required)     | `digitalocean:token=dop_v1_xxx`   |
+| `image`     | Droplet image slug                | `docker-20-04` | `digitalocean:image=docker-24-04` |
+| `size`      | Droplet size slug or "auto"       | `s-1vcpu-1gb`  | `digitalocean:size=s-2vcpu-4gb`   |
+| `region`    | Droplet region                    | `nyc3`         | `digitalocean:region=sfo3`        |
+| `disk_size` | Disk size for Docker volumes (GB) | `25`           | `digitalocean:disk_size=50`       |
+
+**Auto-sizing**: When `size=auto`, the driver automatically selects an
+appropriate droplet size based on the pipeline's `container_limits` (CPU and
+memory):
+
+- Memory > 8GB or CPU > 4 cores → `s-8vcpu-16gb`
+- Memory > 4GB or CPU > 2 cores → `s-4vcpu-8gb`
+- Memory > 2GB or CPU > 1 core → `s-2vcpu-4gb`
+- Memory > 1GB → `s-2vcpu-2gb`
+- Memory > 512MB → `s-1vcpu-2gb`
+- Default → `s-1vcpu-1gb`
+
+**Examples**:
+
+```bash
+# Basic usage with token
+--driver=digitalocean:token=dop_v1_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# Using environment variable for token
+DIGITALOCEAN_TOKEN=dop_v1_xxx --driver=digitalocean
+
+# Auto-size based on container limits
+--driver=digitalocean:size=auto
+
+# Full configuration
+--driver=digitalocean://ci-namespace?token=dop_v1_xxx&image=docker-20-04&size=s-2vcpu-4gb&region=sfo3&disk_size=50
+
+# Colon-separated format
+--driver=digitalocean:token=dop_v1_xxx,size=auto,region=nyc1
+```
+
+**Environment Variables**:
+
+| Variable                 | Description                    |
+| ------------------------ | ------------------------------ |
+| `DIGITALOCEAN_TOKEN`     | API token (alternative to DSN) |
+| `DIGITALOCEAN_IMAGE`     | Default image slug             |
+| `DIGITALOCEAN_SIZE`      | Default size slug              |
+| `DIGITALOCEAN_REGION`    | Default region                 |
+| `DIGITALOCEAN_DISK_SIZE` | Default disk size (GB)         |
+
+**Note**: The driver generates an ephemeral SSH key pair for each session to
+connect to the droplet. Both the key and droplet are cleaned up when the driver
+is closed.
+
 ## Examples
 
 ### Development
