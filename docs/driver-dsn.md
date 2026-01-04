@@ -170,6 +170,76 @@ DIGITALOCEAN_TOKEN=dop_v1_xxx --driver=digitalocean
 connect to the droplet. Both the key and droplet are cleaned up when the driver
 is closed.
 
+### Hetzner Driver
+
+The Hetzner driver creates an on-demand cloud server running Docker and
+delegates container operations to it. When the driver is closed, the server is
+automatically deleted.
+
+| Parameter        | Description                       | Default     | Example                      |
+| ---------------- | --------------------------------- | ----------- | ---------------------------- |
+| `token`          | Hetzner Cloud API token           | (required)  | `hetzner:token=xxx`          |
+| `image`          | Server image name                 | `docker-ce` | `hetzner:image=ubuntu-22.04` |
+| `server_type`    | Server type slug or "auto"        | `cx22`      | `hetzner:server_type=cx32`   |
+| `location`       | Server location                   | `fsn1`      | `hetzner:location=nbg1`      |
+| `disk_size`      | Disk size for Docker volumes (GB) | `10`        | `hetzner:disk_size=50`       |
+| `ssh_timeout`    | Timeout for SSH availability      | `5m`        | `hetzner:ssh_timeout=10m`    |
+| `docker_timeout` | Timeout for Docker availability   | `5m`        | `hetzner:docker_timeout=10m` |
+
+**Auto-sizing**: When `server_type=auto`, the driver automatically selects an
+appropriate server type based on the pipeline's `container_limits` (CPU and
+memory):
+
+- Memory > 16GB or CPU > 8 cores → `cx52` (16 vCPU, 32GB)
+- Memory > 8GB or CPU > 4 cores → `cx42` (8 vCPU, 16GB)
+- Memory > 4GB or CPU > 2 cores → `cx32` (4 vCPU, 8GB)
+- Default → `cx22` (2 vCPU, 4GB)
+
+**Examples**:
+
+```bash
+# Basic usage with token
+--driver=hetzner:token=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# Using environment variable for token
+HETZNER_TOKEN=xxx --driver=hetzner
+
+# Auto-size based on container limits
+--driver=hetzner:server_type=auto
+
+# Full configuration
+--driver=hetzner://ci-namespace?token=xxx&image=docker-ce&server_type=cx32&location=nbg1&disk_size=50
+
+# Colon-separated format
+--driver=hetzner:token=xxx,server_type=auto,location=fsn1
+```
+
+**Environment Variables**:
+
+| Variable                 | Description                    |
+| ------------------------ | ------------------------------ |
+| `HETZNER_TOKEN`          | API token (alternative to DSN) |
+| `HETZNER_IMAGE`          | Default image name             |
+| `HETZNER_SERVER_TYPE`    | Default server type slug       |
+| `HETZNER_LOCATION`       | Default location               |
+| `HETZNER_DISK_SIZE`      | Default disk size (GB)         |
+| `HETZNER_SSH_TIMEOUT`    | Default SSH timeout            |
+| `HETZNER_DOCKER_TIMEOUT` | Default Docker timeout         |
+
+**Available Locations**:
+
+| Location | City              |
+| -------- | ----------------- |
+| `fsn1`   | Falkenstein, DE   |
+| `nbg1`   | Nuremberg, DE     |
+| `hel1`   | Helsinki, FI      |
+| `ash`    | Ashburn, VA, US   |
+| `hil`    | Hillsboro, OR, US |
+
+**Note**: The driver generates an ephemeral SSH key pair for each session to
+connect to the server. Both the key and server are cleaned up when the driver is
+closed.
+
 ## Examples
 
 ### Development
