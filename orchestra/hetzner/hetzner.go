@@ -176,6 +176,9 @@ func (h *Hetzner) ensureServer(ctx context.Context, containerLimits orchestra.Co
 		return fmt.Errorf("failed to create server: %w", err)
 	}
 
+	// Store server immediately so Close() can clean it up even if subsequent steps fail
+	h.server = result.Server
+
 	h.logger.Info("hetzner.server.created", "id", result.Server.ID, "name", serverName)
 
 	// Wait for server to become running
@@ -558,6 +561,54 @@ func (h *Hetzner) Close() error {
 	if h.sshKeyPath != "" {
 		if err := os.Remove(h.sshKeyPath); err != nil && !os.IsNotExist(err) {
 			h.logger.Warn("hetzner.ssh_key.local_delete_error", "err", err)
+		}
+	}
+
+	return nil
+}
+
+// CleanupOrphanedResources deletes any servers and SSH keys labeled with "ci=true".
+// This is useful for cleaning up resources from failed or interrupted test runs.
+func CleanupOrphanedResources(ctx context.Context, token string, logger *slog.Logger) error {
+	client := hcloud.NewClient(hcloud.WithToken(token))
+
+	// List all servers with the "ci" label
+	servers, err := client.Server.AllWithOpts(ctx, hcloud.ServerListOpts{
+		ListOpts: hcloud.ListOpts{
+			LabelSelector: "ci=true",
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to list servers: %w", err)
+	}
+
+	for _, server := range servers {
+		logger.Info("hetzner.cleanup.deleting_server", "id", server.ID, "name", server.Name)
+
+		_, _, err := client.Server.DeleteWithResult(ctx, server)
+		if err != nil {
+			logger.Warn("hetzner.cleanup.server_delete_error", "id", server.ID, "err", err)
+		} else {
+			logger.Info("hetzner.cleanup.server_deleted", "id", server.ID)
+		}
+	}
+
+	// List all SSH keys and delete those with "ci-" prefix
+	keys, err := client.SSHKey.All(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list SSH keys: %w", err)
+	}
+
+	for _, key := range keys {
+		if strings.HasPrefix(key.Name, "ci-") {
+			logger.Info("hetzner.cleanup.deleting_ssh_key", "id", key.ID, "name", key.Name)
+
+			_, err := client.SSHKey.Delete(ctx, key)
+			if err != nil {
+				logger.Warn("hetzner.cleanup.ssh_key_delete_error", "id", key.ID, "err", err)
+			} else {
+				logger.Info("hetzner.cleanup.ssh_key_deleted", "id", key.ID)
+			}
 		}
 	}
 

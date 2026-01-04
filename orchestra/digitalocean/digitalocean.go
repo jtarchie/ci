@@ -148,6 +148,9 @@ func (d *DigitalOcean) ensureDroplet(ctx context.Context, containerLimits orches
 		return fmt.Errorf("failed to create droplet: %w", err)
 	}
 
+	// Store droplet immediately so Close() can clean it up even if subsequent steps fail
+	d.droplet = droplet
+
 	d.logger.Info("digitalocean.droplet.created", "id", droplet.ID, "name", dropletName)
 
 	// Wait for droplet to become active and get its public IP
@@ -533,6 +536,50 @@ func (d *DigitalOcean) Close() error {
 	if d.sshKeyPath != "" {
 		if err := os.Remove(d.sshKeyPath); err != nil && !os.IsNotExist(err) {
 			d.logger.Warn("digitalocean.ssh_key.local_delete_error", "err", err)
+		}
+	}
+
+	return nil
+}
+
+// CleanupOrphanedResources deletes any droplets and SSH keys tagged with "ci".
+// This is useful for cleaning up resources from failed or interrupted test runs.
+func CleanupOrphanedResources(ctx context.Context, token string, logger *slog.Logger) error {
+	client := godo.NewFromToken(token)
+
+	// List all droplets with the "ci" tag
+	droplets, _, err := client.Droplets.ListByTag(ctx, "ci", &godo.ListOptions{PerPage: 200})
+	if err != nil {
+		return fmt.Errorf("failed to list droplets: %w", err)
+	}
+
+	for _, droplet := range droplets {
+		logger.Info("digitalocean.cleanup.deleting_droplet", "id", droplet.ID, "name", droplet.Name)
+
+		_, err := client.Droplets.Delete(ctx, droplet.ID)
+		if err != nil {
+			logger.Warn("digitalocean.cleanup.droplet_delete_error", "id", droplet.ID, "err", err)
+		} else {
+			logger.Info("digitalocean.cleanup.droplet_deleted", "id", droplet.ID)
+		}
+	}
+
+	// List all SSH keys and delete those with "ci-" prefix
+	keys, _, err := client.Keys.List(ctx, &godo.ListOptions{PerPage: 200})
+	if err != nil {
+		return fmt.Errorf("failed to list SSH keys: %w", err)
+	}
+
+	for _, key := range keys {
+		if strings.HasPrefix(key.Name, "ci-") {
+			logger.Info("digitalocean.cleanup.deleting_ssh_key", "id", key.ID, "name", key.Name)
+
+			_, err := client.Keys.DeleteByID(ctx, key.ID)
+			if err != nil {
+				logger.Warn("digitalocean.cleanup.ssh_key_delete_error", "id", key.ID, "err", err)
+			} else {
+				logger.Info("digitalocean.cleanup.ssh_key_deleted", "id", key.ID)
+			}
 		}
 	}
 
