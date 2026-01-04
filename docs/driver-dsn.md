@@ -180,8 +180,8 @@ automatically deleted.
 | ---------------- | --------------------------------- | ----------- | ---------------------------- |
 | `token`          | Hetzner Cloud API token           | (required)  | `hetzner:token=xxx`          |
 | `image`          | Server image name                 | `docker-ce` | `hetzner:image=ubuntu-22.04` |
-| `server_type`    | Server type slug or "auto"        | `cx22`      | `hetzner:server_type=cx32`   |
-| `location`       | Server location                   | `fsn1`      | `hetzner:location=nbg1`      |
+| `server_type`    | Server type slug or "auto"        | `cx23`      | `hetzner:server_type=cx33`   |
+| `location`       | Server location                   | `nbg1`      | `hetzner:location=fsn1`      |
 | `disk_size`      | Disk size for Docker volumes (GB) | `10`        | `hetzner:disk_size=50`       |
 | `ssh_timeout`    | Timeout for SSH availability      | `5m`        | `hetzner:ssh_timeout=10m`    |
 | `docker_timeout` | Timeout for Docker availability   | `5m`        | `hetzner:docker_timeout=10m` |
@@ -190,10 +190,10 @@ automatically deleted.
 appropriate server type based on the pipeline's `container_limits` (CPU and
 memory):
 
-- Memory > 16GB or CPU > 8 cores → `cx52` (16 vCPU, 32GB)
-- Memory > 8GB or CPU > 4 cores → `cx42` (8 vCPU, 16GB)
-- Memory > 4GB or CPU > 2 cores → `cx32` (4 vCPU, 8GB)
-- Default → `cx22` (2 vCPU, 4GB)
+- Memory > 16GB or CPU > 8 cores → `cx53` (16 vCPU, 32GB)
+- Memory > 8GB or CPU > 4 cores → `cx43` (8 vCPU, 16GB)
+- Memory > 4GB or CPU > 2 cores → `cx33` (4 vCPU, 8GB)
+- Default → `cx23` (2 vCPU, 4GB)
 
 **Examples**:
 
@@ -208,7 +208,7 @@ HETZNER_TOKEN=xxx --driver=hetzner
 --driver=hetzner:server_type=auto
 
 # Full configuration
---driver=hetzner://ci-namespace?token=xxx&image=docker-ce&server_type=cx32&location=nbg1&disk_size=50
+--driver=hetzner://ci-namespace?token=xxx&image=docker-ce&server_type=cx33&location=nbg1&disk_size=50
 
 # Colon-separated format
 --driver=hetzner:token=xxx,server_type=auto,location=fsn1

@@ -23,8 +23,8 @@ import (
 // Default values.
 const (
 	DefaultImage         = "docker-ce" // Hetzner app image with Docker pre-installed
-	DefaultServerType    = "cx22"      // 2 vCPU, 4GB RAM (smallest shared vCPU)
-	DefaultLocation      = "fsn1"      // Falkenstein, Germany
+	DefaultServerType    = "cx23"      // 2 vCPU, 4GB RAM (smallest shared vCPU)
+	DefaultLocation      = "nbg1"      // Nuremberg, Germany
 	DefaultSSHTimeout    = 5 * time.Minute
 	DefaultDockerTimeout = 5 * time.Minute
 )
@@ -225,15 +225,15 @@ func (h *Hetzner) determineServerType(limits orchestra.ContainerLimits) string {
 
 	// Auto-determine size based on container limits
 	// Hetzner shared vCPU server types (CX line):
-	// cx22:  2 vCPU, 4GB RAM
-	// cx32:  4 vCPU, 8GB RAM
-	// cx42:  8 vCPU, 16GB RAM
-	// cx52: 16 vCPU, 32GB RAM
+	// cx23:  2 vCPU, 4GB RAM
+	// cx33:  4 vCPU, 8GB RAM
+	// cx43:  8 vCPU, 16GB RAM
+	// cx53: 16 vCPU, 32GB RAM
 	//
 	// Hetzner dedicated vCPU server types (CCX line):
-	// ccx13: 2 vCPU, 8GB RAM
-	// ccx23: 4 vCPU, 16GB RAM
-	// ccx33: 8 vCPU, 32GB RAM
+	// ccx13:  2 vCPU, 8GB RAM
+	// ccx23:  4 vCPU, 16GB RAM
+	// ccx33:  8 vCPU, 32GB RAM
 	// ccx43: 16 vCPU, 64GB RAM
 	// ccx53: 32 vCPU, 128GB RAM
 	// ccx63: 48 vCPU, 192GB RAM
@@ -250,13 +250,13 @@ func (h *Hetzner) determineServerType(limits orchestra.ContainerLimits) string {
 	// CPU shares in Docker: 1024 shares = 1 CPU core (roughly)
 	switch {
 	case memoryMB > 16384 || cpuShares > 8192:
-		return "cx52" // 16 vCPU, 32GB RAM
+		return "cx53" // 16 vCPU, 32GB RAM
 	case memoryMB > 8192 || cpuShares > 4096:
-		return "cx42" // 8 vCPU, 16GB RAM
+		return "cx43" // 8 vCPU, 16GB RAM
 	case memoryMB > 4096 || cpuShares > 2048:
-		return "cx32" // 4 vCPU, 8GB RAM
+		return "cx33" // 4 vCPU, 8GB RAM
 	default:
-		return DefaultServerType // cx22: 2 vCPU, 4GB RAM
+		return DefaultServerType // cx23: 2 vCPU, 4GB RAM
 	}
 }
 
