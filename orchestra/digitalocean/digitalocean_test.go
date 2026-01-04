@@ -20,6 +20,12 @@ func TestDigitalOcean(t *testing.T) {
 		t.Skip("DIGITALOCEAN_TOKEN not set, skipping DigitalOcean integration tests")
 	}
 
+	// Clean up any orphaned resources from previous failed runs
+	err := digitalocean.CleanupOrphanedResources(context.Background(), token, slog.Default())
+	if err != nil {
+		t.Logf("Warning: failed to cleanup orphaned resources: %v", err)
+	}
+
 	// These tests are slow (droplet creation takes time) so do not run in parallel with other packages
 	t.Run("basic container execution", func(t *testing.T) {
 		assert := NewGomegaWithT(t)

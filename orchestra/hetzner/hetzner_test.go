@@ -20,6 +20,12 @@ func TestHetzner(t *testing.T) {
 		t.Skip("HETZNER_TOKEN not set, skipping Hetzner integration tests")
 	}
 
+	// Clean up any orphaned resources from previous failed runs
+	err := hetzner.CleanupOrphanedResources(context.Background(), token, slog.Default())
+	if err != nil {
+		t.Logf("Warning: failed to cleanup orphaned resources: %v", err)
+	}
+
 	// These tests are slow (server creation takes time) so do not run in parallel with other packages
 	t.Run("basic container execution", func(t *testing.T) {
 		assert := NewGomegaWithT(t)
