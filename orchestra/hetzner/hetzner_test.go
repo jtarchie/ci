@@ -20,8 +20,11 @@ func TestHetzner(t *testing.T) {
 		t.Skip("HETZNER_TOKEN not set, skipping Hetzner integration tests")
 	}
 
-	// Clean up any orphaned resources from previous failed runs
-	err := hetzner.CleanupOrphanedResources(context.Background(), token, slog.Default())
+	// Use a test-specific label to avoid cleaning up production resources
+	const testLabel = "environment=test"
+
+	// Clean up any orphaned resources from previous failed test runs (only those with test label)
+	err := hetzner.CleanupOrphanedResources(context.Background(), token, slog.Default(), testLabel)
 	if err != nil {
 		t.Logf("Warning: failed to cleanup orphaned resources: %v", err)
 	}
@@ -32,7 +35,8 @@ func TestHetzner(t *testing.T) {
 
 		namespace := "test-" + gonanoid.Must()
 		client, err := hetzner.NewHetzner(namespace, slog.Default(), map[string]string{
-			"token": token,
+			"token":  token,
+			"labels": testLabel,
 		})
 		assert.Expect(err).NotTo(HaveOccurred())
 
@@ -82,6 +86,7 @@ func TestHetzner(t *testing.T) {
 		client, err := hetzner.NewHetzner(namespace, slog.Default(), map[string]string{
 			"token":       token,
 			"server_type": "auto",
+			"labels":      testLabel,
 		})
 		assert.Expect(err).NotTo(HaveOccurred())
 

@@ -125,6 +125,7 @@ automatically deleted.
 | `size`      | Droplet size slug or "auto"       | `s-1vcpu-1gb`  | `digitalocean:size=s-2vcpu-4gb`   |
 | `region`    | Droplet region                    | `nyc3`         | `digitalocean:region=sfo3`        |
 | `disk_size` | Disk size for Docker volumes (GB) | `25`           | `digitalocean:disk_size=50`       |
+| `tags`      | Comma-separated custom tags       | (none)         | `digitalocean:tags=prod,myapp`    |
 
 **Auto-sizing**: When `size=auto`, the driver automatically selects an
 appropriate droplet size based on the pipeline's `container_limits` (CPU and
@@ -165,6 +166,11 @@ DIGITALOCEAN_TOKEN=dop_v1_xxx --driver=digitalocean
 | `DIGITALOCEAN_SIZE`      | Default size slug              |
 | `DIGITALOCEAN_REGION`    | Default region                 |
 | `DIGITALOCEAN_DISK_SIZE` | Default disk size (GB)         |
+| `DIGITALOCEAN_TAGS`      | Default custom tags            |
+
+**Resource Tagging**: All droplets are automatically tagged with `ci` and
+`namespace-<namespace>`. Custom tags can be added via the `tags` parameter for
+more granular resource management and targeted cleanup.
 
 **Note**: The driver generates an ephemeral SSH key pair for each session to
 connect to the droplet. Both the key and droplet are cleaned up when the driver
@@ -176,15 +182,16 @@ The Hetzner driver creates an on-demand cloud server running Docker and
 delegates container operations to it. When the driver is closed, the server is
 automatically deleted.
 
-| Parameter        | Description                       | Default     | Example                      |
-| ---------------- | --------------------------------- | ----------- | ---------------------------- |
-| `token`          | Hetzner Cloud API token           | (required)  | `hetzner:token=xxx`          |
-| `image`          | Server image name                 | `docker-ce` | `hetzner:image=ubuntu-22.04` |
-| `server_type`    | Server type slug or "auto"        | `cx23`      | `hetzner:server_type=cx33`   |
-| `location`       | Server location                   | `nbg1`      | `hetzner:location=fsn1`      |
-| `disk_size`      | Disk size for Docker volumes (GB) | `10`        | `hetzner:disk_size=50`       |
-| `ssh_timeout`    | Timeout for SSH availability      | `5m`        | `hetzner:ssh_timeout=10m`    |
-| `docker_timeout` | Timeout for Docker availability   | `5m`        | `hetzner:docker_timeout=10m` |
+| Parameter        | Description                       | Default     | Example                         |
+| ---------------- | --------------------------------- | ----------- | ------------------------------- |
+| `token`          | Hetzner Cloud API token           | (required)  | `hetzner:token=xxx`             |
+| `image`          | Server image name                 | `docker-ce` | `hetzner:image=ubuntu-22.04`    |
+| `server_type`    | Server type slug or "auto"        | `cx23`      | `hetzner:server_type=cx33`      |
+| `location`       | Server location                   | `nbg1`      | `hetzner:location=fsn1`         |
+| `disk_size`      | Disk size for Docker volumes (GB) | `10`        | `hetzner:disk_size=50`          |
+| `ssh_timeout`    | Timeout for SSH availability      | `5m`        | `hetzner:ssh_timeout=10m`       |
+| `docker_timeout` | Timeout for Docker availability   | `5m`        | `hetzner:docker_timeout=10m`    |
+| `labels`         | Comma-separated key=value labels  | (none)      | `hetzner:labels=env=prod,app=x` |
 
 **Auto-sizing**: When `server_type=auto`, the driver automatically selects an
 appropriate server type based on the pipeline's `container_limits` (CPU and
@@ -225,6 +232,7 @@ HETZNER_TOKEN=xxx --driver=hetzner
 | `HETZNER_DISK_SIZE`      | Default disk size (GB)         |
 | `HETZNER_SSH_TIMEOUT`    | Default SSH timeout            |
 | `HETZNER_DOCKER_TIMEOUT` | Default Docker timeout         |
+| `HETZNER_LABELS`         | Default custom labels          |
 
 **Available Locations**:
 
@@ -235,6 +243,10 @@ HETZNER_TOKEN=xxx --driver=hetzner
 | `hel1`   | Helsinki, FI      |
 | `ash`    | Ashburn, VA, US   |
 | `hil`    | Hillsboro, OR, US |
+
+**Resource Labeling**: All servers are automatically labeled with `ci=true` and
+`namespace=<namespace>`. Custom labels can be added via the `labels` parameter
+for more granular resource management and targeted cleanup.
 
 **Note**: The driver generates an ephemeral SSH key pair for each session to
 connect to the server. Both the key and server are cleaned up when the driver is

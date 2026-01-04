@@ -75,10 +75,11 @@ type Hetzner struct {
 // DSN parameters:
 // - token: Hetzner Cloud API token (required, or HETZNER_TOKEN env var)
 // - image: Server image name (default: docker-ce)
-// - server_type: Server type or "auto" (default: cx22)
-// - location: Server location (default: fsn1)
+// - server_type: Server type or "auto" (default: cx23)
+// - location: Server location (default: nbg1)
 // - ssh_timeout: Timeout for SSH to become available (default: 5m)
 // - docker_timeout: Timeout for Docker to become available (default: 5m)
+// - labels: Comma-separated list of key=value labels to apply to resources
 func NewHetzner(namespace string, logger *slog.Logger, params map[string]string) (orchestra.Driver, error) {
 	token := orchestra.GetParam(params, "token", "HETZNER_TOKEN", "")
 	if token == "" {
@@ -152,16 +153,34 @@ func (h *Hetzner) ensureServer(ctx context.Context, containerLimits orchestra.Co
 		return fmt.Errorf("location %s not found", location)
 	}
 
+	// Build labels map: always include ci and namespace, plus any custom labels
+	labels := map[string]string{
+		"ci":        "true",
+		"namespace": sanitizeHostname(h.namespace),
+	}
+
+	// Add custom labels from DSN parameter (format: key1=value1,key2=value2)
+	customLabels := orchestra.GetParam(h.params, "labels", "HETZNER_LABELS", "")
+	if customLabels != "" {
+		for _, label := range strings.Split(customLabels, ",") {
+			label = strings.TrimSpace(label)
+			if parts := strings.SplitN(label, "=", 2); len(parts) == 2 {
+				key := sanitizeHostname(strings.TrimSpace(parts[0]))
+				value := sanitizeHostname(strings.TrimSpace(parts[1]))
+				if key != "" {
+					labels[key] = value
+				}
+			}
+		}
+	}
+
 	createOpts := hcloud.ServerCreateOpts{
 		Name:       serverName,
 		ServerType: serverTypeResult,
 		Image:      imageResult,
 		Location:   locationResult,
 		SSHKeys:    []*hcloud.SSHKey{sshKey},
-		Labels: map[string]string{
-			"ci":        "true",
-			"namespace": sanitizeHostname(h.namespace),
-		},
+		Labels:     labels,
 	}
 
 	h.logger.Debug("hetzner.server.create_request",
@@ -567,15 +586,21 @@ func (h *Hetzner) Close() error {
 	return nil
 }
 
-// CleanupOrphanedResources deletes any servers and SSH keys labeled with "ci=true".
-// This is useful for cleaning up resources from failed or interrupted test runs.
-func CleanupOrphanedResources(ctx context.Context, token string, logger *slog.Logger) error {
+// CleanupOrphanedResources deletes servers and SSH keys matching the specified label selector.
+// If labelSelector is empty, it defaults to "ci=true" which matches all CI-created resources.
+// For more targeted cleanup, use a specific selector like "environment=test" or "namespace=myns".
+// This is useful for cleaning up resources from failed or interrupted runs.
+func CleanupOrphanedResources(ctx context.Context, token string, logger *slog.Logger, labelSelector string) error {
+	if labelSelector == "" {
+		labelSelector = "ci=true"
+	}
+
 	client := hcloud.NewClient(hcloud.WithToken(token))
 
-	// List all servers with the "ci" label
+	// List all servers with the specified label selector
 	servers, err := client.Server.AllWithOpts(ctx, hcloud.ServerListOpts{
 		ListOpts: hcloud.ListOpts{
-			LabelSelector: "ci=true",
+			LabelSelector: labelSelector,
 		},
 	})
 	if err != nil {
@@ -583,7 +608,7 @@ func CleanupOrphanedResources(ctx context.Context, token string, logger *slog.Lo
 	}
 
 	for _, server := range servers {
-		logger.Info("hetzner.cleanup.deleting_server", "id", server.ID, "name", server.Name)
+		logger.Info("hetzner.cleanup.deleting_server", "id", server.ID, "name", server.Name, "selector", labelSelector)
 
 		_, _, err := client.Server.DeleteWithResult(ctx, server)
 		if err != nil {
@@ -593,14 +618,30 @@ func CleanupOrphanedResources(ctx context.Context, token string, logger *slog.Lo
 		}
 	}
 
-	// List all SSH keys and delete those with "ci-" prefix
+	// List all SSH keys and delete those matching the pattern
+	// SSH keys are named "ci-<namespace>" so we derive prefix from the label selector
+	keyPrefix := "ci-"
+
+	// If selector includes namespace, use it for more targeted cleanup
+	if strings.Contains(labelSelector, "namespace=") {
+		for _, part := range strings.Split(labelSelector, ",") {
+			part = strings.TrimSpace(part)
+			if strings.HasPrefix(part, "namespace=") {
+				ns := strings.TrimPrefix(part, "namespace=")
+				keyPrefix = "ci-" + ns
+
+				break
+			}
+		}
+	}
+
 	keys, err := client.SSHKey.All(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list SSH keys: %w", err)
 	}
 
 	for _, key := range keys {
-		if strings.HasPrefix(key.Name, "ci-") {
+		if strings.HasPrefix(key.Name, keyPrefix) {
 			logger.Info("hetzner.cleanup.deleting_ssh_key", "id", key.ID, "name", key.Name)
 
 			_, err := client.SSHKey.Delete(ctx, key)
