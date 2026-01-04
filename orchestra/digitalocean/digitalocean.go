@@ -77,6 +77,7 @@ type DigitalOcean struct {
 // - size: Droplet size slug or "auto" (default: s-1vcpu-1gb)
 // - region: Droplet region (default: nyc3)
 // - disk_size: Volume disk size in GB (default: 25)
+// - tags: Comma-separated list of custom tags to apply to resources
 func NewDigitalOcean(namespace string, logger *slog.Logger, params map[string]string) (orchestra.Driver, error) {
 	token := orchestra.GetParam(params, "token", "DIGITALOCEAN_TOKEN", "")
 	if token == "" {
@@ -120,6 +121,23 @@ func (d *DigitalOcean) ensureDroplet(ctx context.Context, containerLimits orches
 
 	dropletName := fmt.Sprintf("ci-%s", sanitizeHostname(d.namespace))
 
+	// Build tags list: always include ci and namespace, plus any custom tags
+	tags := []string{
+		"ci",
+		fmt.Sprintf("namespace-%s", sanitizeHostname(d.namespace)),
+	}
+
+	// Add custom tags from DSN parameter
+	customTags := orchestra.GetParam(d.params, "tags", "DIGITALOCEAN_TAGS", "")
+	if customTags != "" {
+		for _, tag := range strings.Split(customTags, ",") {
+			tag = strings.TrimSpace(tag)
+			if tag != "" {
+				tags = append(tags, sanitizeHostname(tag))
+			}
+		}
+	}
+
 	createRequest := &godo.DropletCreateRequest{
 		Name:   dropletName,
 		Region: region,
@@ -130,10 +148,7 @@ func (d *DigitalOcean) ensureDroplet(ctx context.Context, containerLimits orches
 		SSHKeys: []godo.DropletCreateSSHKey{
 			{ID: sshKeyID},
 		},
-		Tags: []string{
-			"ci",
-			fmt.Sprintf("namespace-%s", sanitizeHostname(d.namespace)),
-		},
+		Tags: tags,
 	}
 
 	d.logger.Debug("digitalocean.droplet.create_request",
@@ -542,19 +557,25 @@ func (d *DigitalOcean) Close() error {
 	return nil
 }
 
-// CleanupOrphanedResources deletes any droplets and SSH keys tagged with "ci".
-// This is useful for cleaning up resources from failed or interrupted test runs.
-func CleanupOrphanedResources(ctx context.Context, token string, logger *slog.Logger) error {
+// CleanupOrphanedResources deletes droplets and SSH keys matching the specified tag.
+// If tag is empty, it defaults to "ci" which matches all CI-created resources.
+// For more targeted cleanup, use a specific tag like "ci-test" or a namespace tag.
+// This is useful for cleaning up resources from failed or interrupted runs.
+func CleanupOrphanedResources(ctx context.Context, token string, logger *slog.Logger, tag string) error {
+	if tag == "" {
+		tag = "ci"
+	}
+
 	client := godo.NewFromToken(token)
 
-	// List all droplets with the "ci" tag
-	droplets, _, err := client.Droplets.ListByTag(ctx, "ci", &godo.ListOptions{PerPage: 200})
+	// List all droplets with the specified tag
+	droplets, _, err := client.Droplets.ListByTag(ctx, tag, &godo.ListOptions{PerPage: 200})
 	if err != nil {
 		return fmt.Errorf("failed to list droplets: %w", err)
 	}
 
 	for _, droplet := range droplets {
-		logger.Info("digitalocean.cleanup.deleting_droplet", "id", droplet.ID, "name", droplet.Name)
+		logger.Info("digitalocean.cleanup.deleting_droplet", "id", droplet.ID, "name", droplet.Name, "tag", tag)
 
 		_, err := client.Droplets.Delete(ctx, droplet.ID)
 		if err != nil {
@@ -564,14 +585,20 @@ func CleanupOrphanedResources(ctx context.Context, token string, logger *slog.Lo
 		}
 	}
 
-	// List all SSH keys and delete those with "ci-" prefix
+	// List all SSH keys and delete those matching the tag pattern
+	// SSH keys are named "ci-<namespace>" so we look for keys starting with the tag
+	keyPrefix := tag + "-"
+	if tag == "ci" {
+		keyPrefix = "ci-"
+	}
+
 	keys, _, err := client.Keys.List(ctx, &godo.ListOptions{PerPage: 200})
 	if err != nil {
 		return fmt.Errorf("failed to list SSH keys: %w", err)
 	}
 
 	for _, key := range keys {
-		if strings.HasPrefix(key.Name, "ci-") {
+		if strings.HasPrefix(key.Name, keyPrefix) {
 			logger.Info("digitalocean.cleanup.deleting_ssh_key", "id", key.ID, "name", key.Name)
 
 			_, err := client.Keys.DeleteByID(ctx, key.ID)

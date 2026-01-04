@@ -20,8 +20,11 @@ func TestDigitalOcean(t *testing.T) {
 		t.Skip("DIGITALOCEAN_TOKEN not set, skipping DigitalOcean integration tests")
 	}
 
-	// Clean up any orphaned resources from previous failed runs
-	err := digitalocean.CleanupOrphanedResources(context.Background(), token, slog.Default())
+	// Use a test-specific tag to avoid cleaning up production resources
+	const testTag = "ci-test"
+
+	// Clean up any orphaned resources from previous failed test runs (only those with test tag)
+	err := digitalocean.CleanupOrphanedResources(context.Background(), token, slog.Default(), testTag)
 	if err != nil {
 		t.Logf("Warning: failed to cleanup orphaned resources: %v", err)
 	}
@@ -33,6 +36,7 @@ func TestDigitalOcean(t *testing.T) {
 		namespace := "test-" + gonanoid.Must()
 		client, err := digitalocean.NewDigitalOcean(namespace, slog.Default(), map[string]string{
 			"token": token,
+			"tags":  testTag,
 		})
 		assert.Expect(err).NotTo(HaveOccurred())
 
@@ -82,6 +86,7 @@ func TestDigitalOcean(t *testing.T) {
 		client, err := digitalocean.NewDigitalOcean(namespace, slog.Default(), map[string]string{
 			"token": token,
 			"size":  "auto",
+			"tags":  testTag,
 		})
 		assert.Expect(err).NotTo(HaveOccurred())
 
