@@ -48,6 +48,7 @@ func (c *Server) Run(logger *slog.Logger) error {
 
 		return ctx.Render(http.StatusOK, "results.html", map[string]any{
 			"Tree": results.AsTree(),
+			"Path": lookupPath,
 		})
 	})
 
