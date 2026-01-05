@@ -4,6 +4,9 @@ import * as AsciinemaPlayer from "asciinema-player";
 // Import graph module
 import { initGraph } from "./graph.js";
 
+// Import results module
+import { initResults } from "./results.js";
+
 // Make AsciinemaPlayer available globally
 window.AsciinemaPlayer = AsciinemaPlayer;
 
@@ -18,6 +21,16 @@ document.addEventListener("DOMContentLoaded", function () {
       initGraph(graphData, currentPath);
     } catch (e) {
       console.error("Failed to initialize graph:", e);
+    }
+  }
+
+  // Initialize results page if we're on the results page
+  const tasksContainer = document.getElementById("tasks-container");
+  if (tasksContainer) {
+    try {
+      initResults();
+    } catch (e) {
+      console.error("Failed to initialize results:", e);
     }
   }
 });
