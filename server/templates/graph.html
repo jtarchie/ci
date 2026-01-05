@@ -13,10 +13,17 @@
         min-height: 400px;
         overflow: hidden;
         cursor: grab;
-        background-color: #1a1a2e;
+        background-color: #f3f4f6; /* gray-100 */
         background-image: 
-          radial-gradient(circle, #2d2d44 1px, transparent 1px);
+          radial-gradient(circle, #d1d5db 1px, transparent 1px); /* gray-300 */
         background-size: 20px 20px;
+      }
+      @media (prefers-color-scheme: dark) {
+        .graph-container {
+          background-color: #1f2937; /* gray-800 */
+          background-image: 
+            radial-gradient(circle, #374151 1px, transparent 1px); /* gray-700 */
+        }
       }
       .graph-container:active {
         cursor: grabbing;
@@ -46,29 +53,30 @@
         stroke-width: 2;
         transition: filter 0.15s ease;
       }
+      /* Colorblind-friendly palette using distinct hues and patterns */
       .node-rect.success {
-        fill: #22c55e;
-        stroke: #16a34a;
+        fill: #16a34a; /* green-600 - distinct green */
+        stroke: #15803d; /* green-700 */
       }
       .node-rect.failure {
-        fill: #ef4444;
-        stroke: #dc2626;
+        fill: #dc2626; /* red-600 - distinct red */
+        stroke: #b91c1c; /* red-700 */
       }
       .node-rect.error {
-        fill: #f59e0b;
-        stroke: #d97706;
+        fill: #d97706; /* amber-600 - orange/amber */
+        stroke: #b45309; /* amber-700 */
       }
       .node-rect.pending {
-        fill: #64748b;
-        stroke: #475569;
+        fill: #6b7280; /* gray-500 */
+        stroke: #4b5563; /* gray-600 */
       }
       .node-rect.abort {
-        fill: #6b7280;
-        stroke: #4b5563;
+        fill: #9ca3af; /* gray-400 */
+        stroke: #6b7280; /* gray-500 */
       }
       .node-rect.group {
-        fill: #3b82f6;
-        stroke: #2563eb;
+        fill: #2563eb; /* blue-600 */
+        stroke: #1d4ed8; /* blue-700 */
       }
       .node-text {
         fill: white;
@@ -77,13 +85,28 @@
         pointer-events: none;
         user-select: none;
       }
+      /* Ensure text is visible on all node colors */
+      .node-rect.pending + .node-text,
+      .node-rect.abort + .node-text {
+        fill: white;
+      }
       .edge-line {
-        stroke: #6b7280;
+        stroke: #9ca3af; /* gray-400 */
         stroke-width: 2;
         fill: none;
       }
+      @media (prefers-color-scheme: dark) {
+        .edge-line {
+          stroke: #6b7280; /* gray-500 */
+        }
+      }
       .edge-arrow {
-        fill: #6b7280;
+        fill: #9ca3af; /* gray-400 */
+      }
+      @media (prefers-color-scheme: dark) {
+        .edge-arrow {
+          fill: #6b7280; /* gray-500 */
+        }
       }
       .zoom-controls {
         position: absolute;
@@ -98,9 +121,9 @@
         width: 40px;
         height: 40px;
         border-radius: 8px;
-        border: 1px solid #374151;
-        background: #1f2937;
-        color: white;
+        border: 1px solid #d1d5db; /* gray-300 */
+        background: #ffffff;
+        color: #1f2937; /* gray-800 */
         font-size: 20px;
         cursor: pointer;
         display: flex;
@@ -109,7 +132,17 @@
         transition: background 0.15s ease;
       }
       .zoom-btn:hover {
-        background: #374151;
+        background: #f3f4f6; /* gray-100 */
+      }
+      @media (prefers-color-scheme: dark) {
+        .zoom-btn {
+          border: 1px solid #374151; /* gray-700 */
+          background: #1f2937; /* gray-800 */
+          color: white;
+        }
+        .zoom-btn:hover {
+          background: #374151; /* gray-700 */
+        }
       }
       .zoom-btn:focus {
         outline: 2px solid #3b82f6;
@@ -120,26 +153,42 @@
         bottom: 16px;
         left: 16px;
         padding: 8px 12px;
-        background: rgba(31, 41, 55, 0.9);
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid #e5e7eb; /* gray-200 */
         border-radius: 6px;
-        color: #9ca3af;
+        color: #4b5563; /* gray-600 */
         font-size: 12px;
         z-index: 10;
+      }
+      @media (prefers-color-scheme: dark) {
+        .zoom-info {
+          background: rgba(31, 41, 55, 0.9);
+          border-color: #374151; /* gray-700 */
+          color: #9ca3af; /* gray-400 */
+        }
       }
       .legend {
         position: absolute;
         top: 16px;
         left: 16px;
         padding: 12px;
-        background: rgba(31, 41, 55, 0.95);
+        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid #e5e7eb; /* gray-200 */
         border-radius: 8px;
-        color: white;
+        color: #1f2937; /* gray-800 */
         font-size: 12px;
         z-index: 10;
         display: flex;
         flex-wrap: wrap;
         gap: 12px;
         max-width: 400px;
+      }
+      @media (prefers-color-scheme: dark) {
+        .legend {
+          background: rgba(31, 41, 55, 0.95);
+          border-color: #374151; /* gray-700 */
+          color: white;
+        }
       }
       .legend-item {
         display: flex;
@@ -153,25 +202,37 @@
       }
       .breadcrumb {
         padding: 12px 16px;
-        background: #111827;
-        border-bottom: 1px solid #374151;
+        background: #f9fafb; /* gray-50 */
+        border-bottom: 1px solid #e5e7eb; /* gray-200 */
         display: flex;
         align-items: center;
         gap: 8px;
         flex-wrap: wrap;
       }
       .breadcrumb a {
-        color: #60a5fa;
+        color: #2563eb; /* blue-600 */
         text-decoration: none;
       }
       .breadcrumb a:hover {
         text-decoration: underline;
       }
       .breadcrumb span {
-        color: #6b7280;
+        color: #6b7280; /* gray-500 */
       }
       .breadcrumb .current {
-        color: white;
+        color: #1f2937; /* gray-800 */
+      }
+      @media (prefers-color-scheme: dark) {
+        .breadcrumb {
+          background: #111827; /* gray-900 */
+          border-bottom-color: #374151; /* gray-700 */
+        }
+        .breadcrumb a {
+          color: #60a5fa; /* blue-400 */
+        }
+        .breadcrumb .current {
+          color: white;
+        }
       }
       .help-toggle {
         position: absolute;
@@ -184,14 +245,15 @@
         top: 60px;
         right: 16px;
         padding: 16px;
-        background: rgba(31, 41, 55, 0.98);
+        background: rgba(255, 255, 255, 0.98);
         border-radius: 8px;
-        color: white;
+        color: #1f2937; /* gray-800 */
         font-size: 13px;
         z-index: 10;
         display: none;
         min-width: 250px;
-        border: 1px solid #374151;
+        border: 1px solid #e5e7eb; /* gray-200 */
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
       }
       .help-panel.visible {
         display: block;
@@ -208,10 +270,20 @@
         gap: 6px 12px;
       }
       .help-panel dt {
-        color: #9ca3af;
+        color: #6b7280; /* gray-500 */
       }
       .help-panel dd {
         margin: 0;
+      }
+      @media (prefers-color-scheme: dark) {
+        .help-panel {
+          background: rgba(31, 41, 55, 0.98);
+          color: white;
+          border-color: #374151; /* gray-700 */
+        }
+        .help-panel dt {
+          color: #9ca3af; /* gray-400 */
+        }
       }
       .sr-only {
         position: absolute;
@@ -226,7 +298,8 @@
       }
     </style>
   </head>
-  <body class="bg-gray-900 min-h-screen text-white">
+  <body
+    class="bg-gray-100 dark:bg-gray-900 min-h-screen text-gray-900 dark:text-white">
     <!-- Breadcrumb navigation -->
     <nav class="breadcrumb" aria-label="Pipeline path">
       <a href="/graph/">Home</a>
@@ -279,23 +352,23 @@
 
         <div class="legend" role="region" aria-label="Graph legend">
           <div class="legend-item">
-            <div class="legend-color" style="background: #22c55e;"></div>
+            <div class="legend-color" style="background: #16a34a;"></div>
             <span>Success</span>
           </div>
           <div class="legend-item">
-            <div class="legend-color" style="background: #ef4444;"></div>
+            <div class="legend-color" style="background: #dc2626;"></div>
             <span>Failure</span>
           </div>
           <div class="legend-item">
-            <div class="legend-color" style="background: #f59e0b;"></div>
+            <div class="legend-color" style="background: #d97706;"></div>
             <span>Error</span>
           </div>
           <div class="legend-item">
-            <div class="legend-color" style="background: #64748b;"></div>
+            <div class="legend-color" style="background: #6b7280;"></div>
             <span>Pending</span>
           </div>
           <div class="legend-item">
-            <div class="legend-color" style="background: #3b82f6;"></div>
+            <div class="legend-color" style="background: #2563eb;"></div>
             <span>Group</span>
           </div>
         </div>
@@ -352,31 +425,63 @@
       </div>
     </div>
 
-    <footer class="bg-gray-900 border-t border-gray-800">
+    <footer class="bg-gray-50 dark:bg-gray-900">
       <div class="mx-auto max-w-screen-xl px-4 py-8 sm:px-6 lg:px-8">
         <div class="sm:flex sm:items-center sm:justify-between">
           <div
             class="flex justify-center text-teal-600 sm:justify-start dark:text-teal-300">
-            <svg class="h-8" viewBox="0 0 100 40"
-              xmlns="http://www.w3.org/2000/svg">
-              <circle cx="25" cy="20" r="15" fill="#FF3B30" stroke="#CC2D26"
+            <svg
+              class="h-8"
+              viewBox="0 0 100 40"
+              xmlns="http://www.w3.org/2000/svg"
+              role="img"
+              aria-label="CI Status Indicator">
+              <!-- Red LED Circle -->
+              <circle
+                cx="25"
+                cy="20"
+                r="15"
+                fill="#FF3B30"
+                stroke="#CC2D26"
                 stroke-width="2">
+                <!-- Light reflection effect -->
                 <animate attributeName="opacity" from="0.9" to="1" dur="2s"
                   repeatCount="indefinite" />
               </circle>
-              <circle cx="20" cy="15" r="5" fill="white" opacity="0.3" />
-              <circle cx="75" cy="20" r="15" fill="#34C759" stroke="#28A745"
+              <!-- White reflection spot on red LED -->
+              <circle
+                cx="20"
+                cy="15"
+                r="5"
+                fill="white"
+                opacity="0.3" />
+
+              <!-- Green LED Circle -->
+              <circle
+                cx="75"
+                cy="20"
+                r="15"
+                fill="#34C759"
+                stroke="#28A745"
                 stroke-width="2">
+                <!-- Light reflection effect -->
                 <animate attributeName="opacity" from="0.9" to="1" dur="1.5s"
                   repeatCount="indefinite" />
               </circle>
-              <circle cx="70" cy="15" r="5" fill="white" opacity="0.3" />
+              <!-- White reflection spot on green LED -->
+              <circle
+                cx="70"
+                cy="15"
+                r="5"
+                fill="white"
+                opacity="0.3" />
             </svg>
           </div>
           <p
-            class="mt-4 text-center text-sm text-gray-400 lg:mt-0 lg:text-right">
+            class="mt-4 text-center text-sm text-gray-500 lg:mt-0 lg:text-right dark:text-gray-400">
             Copyright &copy; <a href="https://github.com/jtarchie/ci"
-              class="hover:text-white">{{ now | date "2006" }}</a>. All rights
+              class="hover:text-gray-900 dark:hover:text-white">{{ now | date
+              "2006" }}</a>. All rights
             reserved.
           </p>
         </div>

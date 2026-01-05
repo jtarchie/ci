@@ -1,6 +1,10 @@
 version: 3
 
 tasks:
+  build:
+    cmds:
+      - task: build:static
+      - go generate ./...
   build:static:
     dir: server/static
     cmds:
@@ -14,8 +18,7 @@ tasks:
       - golangci-lint run ./... --fix
   default:
     cmds:
-      - task: build:static
-      - go generate ./...
+      - task: build
       - task: fmt
       - deno check backwards/src/ examples/both/
       - go test -race ./... -count=1 -parallel=1
