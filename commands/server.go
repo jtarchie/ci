@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -47,6 +48,30 @@ func (c *Server) Run(logger *slog.Logger) error {
 
 		return ctx.Render(http.StatusOK, "results.html", map[string]any{
 			"Tree": results.AsTree(),
+		})
+	})
+
+	router.GET("/graph/*", func(ctx echo.Context) error {
+		lookupPath := ctx.Param("*")
+		if lookupPath == "" || lookupPath[0] != '/' {
+			lookupPath = "/" + lookupPath
+		}
+
+		results, err := client.GetAll(lookupPath, []string{"status"})
+		if err != nil {
+			return fmt.Errorf("could not get all results: %w", err)
+		}
+
+		tree := results.AsTree()
+		treeJSON, err := json.Marshal(tree)
+		if err != nil {
+			return fmt.Errorf("could not marshal tree: %w", err)
+		}
+
+		return ctx.Render(http.StatusOK, "graph.html", map[string]any{
+			"Tree":     tree,
+			"TreeJSON": string(treeJSON),
+			"Path":     lookupPath,
 		})
 	})
 

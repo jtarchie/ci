@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pipeline Graph</title>
+    <link rel="stylesheet" href="/static/bundle.css">
+    <style>
+      .graph-container {
+        position: relative;
+        width: 100%;
+        height: calc(100vh - 200px);
+        min-height: 400px;
+        overflow: hidden;
+        cursor: grab;
+        background-color: #1a1a2e;
+        background-image: 
+          radial-gradient(circle, #2d2d44 1px, transparent 1px);
+        background-size: 20px 20px;
+      }
+      .graph-container:active {
+        cursor: grabbing;
+      }
+      .graph-container:focus {
+        outline: 2px solid #3b82f6;
+        outline-offset: -2px;
+      }
+      .graph-svg {
+        width: 100%;
+        height: 100%;
+      }
+      .node-group {
+        cursor: pointer;
+        transition: transform 0.1s ease;
+      }
+      .node-group:hover .node-rect {
+        filter: brightness(1.2);
+      }
+      .node-group:focus .node-rect {
+        stroke: #3b82f6;
+        stroke-width: 3;
+      }
+      .node-rect {
+        rx: 6;
+        ry: 6;
+        stroke-width: 2;
+        transition: filter 0.15s ease;
+      }
+      .node-rect.success {
+        fill: #22c55e;
+        stroke: #16a34a;
+      }
+      .node-rect.failure {
+        fill: #ef4444;
+        stroke: #dc2626;
+      }
+      .node-rect.error {
+        fill: #f59e0b;
+        stroke: #d97706;
+      }
+      .node-rect.pending {
+        fill: #64748b;
+        stroke: #475569;
+      }
+      .node-rect.abort {
+        fill: #6b7280;
+        stroke: #4b5563;
+      }
+      .node-rect.group {
+        fill: #3b82f6;
+        stroke: #2563eb;
+      }
+      .node-text {
+        fill: white;
+        font-size: 12px;
+        font-family: system-ui, -apple-system, sans-serif;
+        pointer-events: none;
+        user-select: none;
+      }
+      .edge-line {
+        stroke: #6b7280;
+        stroke-width: 2;
+        fill: none;
+      }
+      .edge-arrow {
+        fill: #6b7280;
+      }
+      .zoom-controls {
+        position: absolute;
+        bottom: 16px;
+        right: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        z-index: 10;
+      }
+      .zoom-btn {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        border: 1px solid #374151;
+        background: #1f2937;
+        color: white;
+        font-size: 20px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.15s ease;
+      }
+      .zoom-btn:hover {
+        background: #374151;
+      }
+      .zoom-btn:focus {
+        outline: 2px solid #3b82f6;
+        outline-offset: 2px;
+      }
+      .zoom-info {
+        position: absolute;
+        bottom: 16px;
+        left: 16px;
+        padding: 8px 12px;
+        background: rgba(31, 41, 55, 0.9);
+        border-radius: 6px;
+        color: #9ca3af;
+        font-size: 12px;
+        z-index: 10;
+      }
+      .legend {
+        position: absolute;
+        top: 16px;
+        left: 16px;
+        padding: 12px;
+        background: rgba(31, 41, 55, 0.95);
+        border-radius: 8px;
+        color: white;
+        font-size: 12px;
+        z-index: 10;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        max-width: 400px;
+      }
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .legend-color {
+        width: 16px;
+        height: 16px;
+        border-radius: 4px;
+      }
+      .breadcrumb {
+        padding: 12px 16px;
+        background: #111827;
+        border-bottom: 1px solid #374151;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .breadcrumb a {
+        color: #60a5fa;
+        text-decoration: none;
+      }
+      .breadcrumb a:hover {
+        text-decoration: underline;
+      }
+      .breadcrumb span {
+        color: #6b7280;
+      }
+      .breadcrumb .current {
+        color: white;
+      }
+      .help-toggle {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        z-index: 10;
+      }
+      .help-panel {
+        position: absolute;
+        top: 60px;
+        right: 16px;
+        padding: 16px;
+        background: rgba(31, 41, 55, 0.98);
+        border-radius: 8px;
+        color: white;
+        font-size: 13px;
+        z-index: 10;
+        display: none;
+        min-width: 250px;
+        border: 1px solid #374151;
+      }
+      .help-panel.visible {
+        display: block;
+      }
+      .help-panel h3 {
+        margin: 0 0 12px 0;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .help-panel dl {
+        margin: 0;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 6px 12px;
+      }
+      .help-panel dt {
+        color: #9ca3af;
+      }
+      .help-panel dd {
+        margin: 0;
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-900 min-h-screen text-white">
+    <!-- Breadcrumb navigation -->
+    <nav class="breadcrumb" aria-label="Pipeline path">
+      <a href="/graph/">Home</a>
+      {{ if and .Path (ne .Path "/") }}
+      {{ $parts := splitList "/" .Path }}
+      {{ $accumulated := "" }}
+      {{ range $i, $part := $parts }}
+      {{ if $part }}
+      {{ $accumulated = printf "%s/%s" $accumulated $part }}
+      <span aria-hidden="true">/</span>
+      {{ if eq $i (sub (len $parts) 1) }}
+      <span class="current">{{ $part }}</span>
+      {{ else }}
+      <a href="/graph{{ $accumulated }}/">{{ $part }}</a>
+      {{ end }}
+      {{ end }}
+      {{ end }}
+      {{ end }}
+    </nav>
+
+    <div class="container mx-auto p-4">
+      <div class="flex items-center justify-between mb-4">
+        <h1 class="text-2xl font-bold">Pipeline Graph</h1>
+        <div class="flex gap-2">
+          <a href="/tasks{{ .Path }}/"
+            class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition-colors">
+            List View
+          </a>
+        </div>
+      </div>
+
+      <div class="graph-container"
+        id="graph-container"
+        tabindex="0"
+        role="application"
+        aria-label="Pipeline graph visualization. Use arrow keys to pan, plus and minus to zoom, and Tab to navigate between nodes.">
+
+        <svg class="graph-svg" id="graph-svg" aria-hidden="true">
+          <defs>
+            <marker id="arrowhead" markerWidth="10" markerHeight="7"
+              refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" class="edge-arrow" />
+            </marker>
+          </defs>
+          <g id="graph-viewport">
+            <g id="edges-layer"></g>
+            <g id="nodes-layer"></g>
+          </g>
+        </svg>
+
+        <div class="legend" role="region" aria-label="Graph legend">
+          <div class="legend-item">
+            <div class="legend-color" style="background: #22c55e;"></div>
+            <span>Success</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background: #ef4444;"></div>
+            <span>Failure</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background: #f59e0b;"></div>
+            <span>Error</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background: #64748b;"></div>
+            <span>Pending</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background: #3b82f6;"></div>
+            <span>Group</span>
+          </div>
+        </div>
+
+        <button class="zoom-btn help-toggle"
+          id="help-toggle"
+          aria-expanded="false"
+          aria-controls="help-panel">
+          ?
+        </button>
+
+        <div class="help-panel" id="help-panel" role="tooltip">
+          <h3>Keyboard Shortcuts</h3>
+          <dl>
+            <dt><kbd>+</kbd> / <kbd>=</kbd></dt>
+            <dd>Zoom in</dd>
+            <dt><kbd>-</kbd></dt>
+            <dd>Zoom out</dd>
+            <dt><kbd>0</kbd></dt>
+            <dd>Reset view</dd>
+            <dt><kbd>Arrow keys</kbd></dt>
+            <dd>Pan view</dd>
+            <dt><kbd>Tab</kbd></dt>
+            <dd>Navigate nodes</dd>
+            <dt><kbd>Enter</kbd></dt>
+            <dd>Open node</dd>
+          </dl>
+          <h3 style="margin-top: 12px;">Mouse Controls</h3>
+          <dl>
+            <dt>Scroll</dt>
+            <dd>Zoom in/out</dd>
+            <dt>Drag</dt>
+            <dd>Pan view</dd>
+            <dt>Click node</dt>
+            <dd>Open node details</dd>
+          </dl>
+        </div>
+
+        <div class="zoom-controls" role="group" aria-label="Zoom controls">
+          <button class="zoom-btn"
+            id="zoom-in"
+            aria-label="Zoom in">+</button>
+          <button class="zoom-btn"
+            id="zoom-out"
+            aria-label="Zoom out">−</button>
+          <button class="zoom-btn"
+            id="zoom-reset"
+            aria-label="Reset zoom">⌂</button>
+        </div>
+
+        <div class="zoom-info" id="zoom-info" aria-live="polite">
+          Zoom: 100%
+        </div>
+      </div>
+    </div>
+
+    <footer class="bg-gray-900 border-t border-gray-800">
+      <div class="mx-auto max-w-screen-xl px-4 py-8 sm:px-6 lg:px-8">
+        <div class="sm:flex sm:items-center sm:justify-between">
+          <div
+            class="flex justify-center text-teal-600 sm:justify-start dark:text-teal-300">
+            <svg class="h-8" viewBox="0 0 100 40"
+              xmlns="http://www.w3.org/2000/svg">
+              <circle cx="25" cy="20" r="15" fill="#FF3B30" stroke="#CC2D26"
+                stroke-width="2">
+                <animate attributeName="opacity" from="0.9" to="1" dur="2s"
+                  repeatCount="indefinite" />
+              </circle>
+              <circle cx="20" cy="15" r="5" fill="white" opacity="0.3" />
+              <circle cx="75" cy="20" r="15" fill="#34C759" stroke="#28A745"
+                stroke-width="2">
+                <animate attributeName="opacity" from="0.9" to="1" dur="1.5s"
+                  repeatCount="indefinite" />
+              </circle>
+              <circle cx="70" cy="15" r="5" fill="white" opacity="0.3" />
+            </svg>
+          </div>
+          <p
+            class="mt-4 text-center text-sm text-gray-400 lg:mt-0 lg:text-right">
+            Copyright &copy; <a href="https://github.com/jtarchie/ci"
+              class="hover:text-white">{{ now | date "2006" }}</a>. All rights
+            reserved.
+          </p>
+        </div>
+      </div>
+    </footer>
+
+    <script>
+    (function() {
+      'use strict';
+
+      // Graph data from server
+      const graphData = {{ .TreeJSON }};
+      const currentPath = "{{ .Path }}";
+
+      // Graph configuration
+      const NODE_WIDTH = 140;
+      const NODE_HEIGHT = 40;
+      const NODE_MARGIN_X = 60;
+      const NODE_MARGIN_Y = 30;
+      const PADDING = 50;
+
+      // State
+      let scale = 1;
+      let translateX = 0;
+      let translateY = 0;
+      let isDragging = false;
+      let dragStartX = 0;
+      let dragStartY = 0;
+      let lastTranslateX = 0;
+      let lastTranslateY = 0;
+
+      // DOM elements
+      const container = document.getElementById('graph-container');
+      const svg = document.getElementById('graph-svg');
+      const viewport = document.getElementById('graph-viewport');
+      const nodesLayer = document.getElementById('nodes-layer');
+      const edgesLayer = document.getElementById('edges-layer');
+      const zoomInfo = document.getElementById('zoom-info');
+      const helpToggle = document.getElementById('help-toggle');
+      const helpPanel = document.getElementById('help-panel');
+
+      // Layout algorithm - simple hierarchical layout
+      function layoutGraph(tree) {
+        const nodes = [];
+        const edges = [];
+        let maxDepth = 0;
+        const depthCounts = {};
+
+        // First pass: collect all nodes and calculate positions
+        function traverse(node, depth, parentId) {
+          if (!node || !node.name) return;
+
+          const id = node.full_path || `node-${nodes.length}`;
+          
+          if (!depthCounts[depth]) depthCounts[depth] = 0;
+          const yIndex = depthCounts[depth]++;
+          maxDepth = Math.max(maxDepth, depth);
+
+          const isGroup = node.children && node.children.length > 0;
+          const status = node.value?.status || (isGroup ? 'group' : 'pending');
+
+          nodes.push({
+            id,
+            name: node.name,
+            status,
+            isGroup,
+            depth,
+            yIndex,
+            x: 0, // Will be calculated after
+            y: 0,
+            fullPath: node.full_path || '',
+            children: node.children || []
+          });
+
+          if (parentId) {
+            edges.push({ from: parentId, to: id });
+          }
+
+          if (node.children) {
+            node.children.forEach(child => traverse(child, depth + 1, id));
+          }
+        }
+
+        // Handle root node specially
+        if (tree.children && tree.children.length > 0) {
+          tree.children.forEach(child => traverse(child, 0, null));
+        } else if (tree.name) {
+          traverse(tree, 0, null);
+        }
+
+        // Second pass: calculate actual positions
+        // Find max count at each depth for centering
+        const maxCount = Math.max(...Object.values(depthCounts), 1);
+        
+        nodes.forEach(node => {
+          const countAtDepth = depthCounts[node.depth];
+          const startY = (maxCount - countAtDepth) * (NODE_HEIGHT + NODE_MARGIN_Y) / 2;
+          
+          node.x = PADDING + node.depth * (NODE_WIDTH + NODE_MARGIN_X);
+          node.y = PADDING + startY + node.yIndex * (NODE_HEIGHT + NODE_MARGIN_Y);
+        });
+
+        return { nodes, edges, maxDepth, depthCounts };
+      }
+
+      // Render the graph
+      function renderGraph() {
+        const { nodes, edges } = layoutGraph(graphData);
+
+        // Clear existing content
+        nodesLayer.innerHTML = '';
+        edgesLayer.innerHTML = '';
+
+        // Create a map for quick node lookup
+        const nodeMap = new Map(nodes.map(n => [n.id, n]));
+
+        // Render edges first (so they appear behind nodes)
+        edges.forEach(edge => {
+          const fromNode = nodeMap.get(edge.from);
+          const toNode = nodeMap.get(edge.to);
+          if (!fromNode || !toNode) return;
+
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          
+          const x1 = fromNode.x + NODE_WIDTH;
+          const y1 = fromNode.y + NODE_HEIGHT / 2;
+          const x2 = toNode.x;
+          const y2 = toNode.y + NODE_HEIGHT / 2;
+          
+          // Bezier curve for smooth edges
+          const midX = (x1 + x2) / 2;
+          const d = `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
+          
+          path.setAttribute('d', d);
+          path.setAttribute('class', 'edge-line');
+          path.setAttribute('marker-end', 'url(#arrowhead)');
+          
+          edgesLayer.appendChild(path);
+        });
+
+        // Render nodes
+        nodes.forEach((node, index) => {
+          const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          g.setAttribute('class', 'node-group');
+          g.setAttribute('transform', `translate(${node.x}, ${node.y})`);
+          g.setAttribute('tabindex', '0');
+          g.setAttribute('role', 'button');
+          g.setAttribute('aria-label', `${node.name}, status: ${node.status}${node.isGroup ? ', click to expand' : ''}`);
+          g.dataset.nodeId = node.id;
+          g.dataset.index = index;
+
+          // Node rectangle
+          const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          rect.setAttribute('width', NODE_WIDTH);
+          rect.setAttribute('height', NODE_HEIGHT);
+          rect.setAttribute('class', `node-rect ${node.status}`);
+          g.appendChild(rect);
+
+          // Node text
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          text.setAttribute('x', NODE_WIDTH / 2);
+          text.setAttribute('y', NODE_HEIGHT / 2);
+          text.setAttribute('text-anchor', 'middle');
+          text.setAttribute('dominant-baseline', 'central');
+          text.setAttribute('class', 'node-text');
+          
+          // Truncate text if too long
+          let displayName = node.name;
+          if (displayName.length > 16) {
+            displayName = displayName.substring(0, 14) + '…';
+          }
+          text.textContent = displayName;
+          g.appendChild(text);
+
+          // Status indicator for groups
+          if (node.isGroup) {
+            const indicator = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            indicator.setAttribute('x', NODE_WIDTH - 10);
+            indicator.setAttribute('y', NODE_HEIGHT / 2);
+            indicator.setAttribute('text-anchor', 'middle');
+            indicator.setAttribute('dominant-baseline', 'central');
+            indicator.setAttribute('class', 'node-text');
+            indicator.setAttribute('font-size', '14');
+            indicator.textContent = '›';
+            g.appendChild(indicator);
+          }
+
+          // Click handler
+          g.addEventListener('click', () => handleNodeClick(node));
+          g.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleNodeClick(node);
+            }
+          });
+
+          nodesLayer.appendChild(g);
+        });
+
+        // Auto-fit on initial render
+        if (nodes.length > 0) {
+          autoFit(nodes);
+        }
+      }
+
+      function handleNodeClick(node) {
+        if (node.isGroup) {
+          // Navigate to group
+          window.location.href = `/graph${node.fullPath}/`;
+        } else {
+          // Navigate to task details
+          window.location.href = `/tasks${node.fullPath}/`;
+        }
+      }
+
+      function autoFit(nodes) {
+        if (nodes.length === 0) return;
+
+        const containerRect = container.getBoundingClientRect();
+        
+        // Calculate bounds
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        nodes.forEach(node => {
+          minX = Math.min(minX, node.x);
+          minY = Math.min(minY, node.y);
+          maxX = Math.max(maxX, node.x + NODE_WIDTH);
+          maxY = Math.max(maxY, node.y + NODE_HEIGHT);
+        });
+
+        const graphWidth = maxX - minX + PADDING * 2;
+        const graphHeight = maxY - minY + PADDING * 2;
+
+        // Calculate scale to fit
+        const scaleX = containerRect.width / graphWidth;
+        const scaleY = containerRect.height / graphHeight;
+        scale = Math.min(scaleX, scaleY, 1.5); // Max scale of 1.5
+        scale = Math.max(scale, 0.1); // Min scale of 0.1
+
+        // Center the graph
+        translateX = (containerRect.width - graphWidth * scale) / 2 - minX * scale + PADDING * scale;
+        translateY = (containerRect.height - graphHeight * scale) / 2 - minY * scale + PADDING * scale;
+
+        updateTransform();
+      }
+
+      function updateTransform() {
+        viewport.setAttribute('transform', `translate(${translateX}, ${translateY}) scale(${scale})`);
+        zoomInfo.textContent = `Zoom: ${Math.round(scale * 100)}%`;
+      }
+
+      function zoom(delta, centerX, centerY) {
+        const oldScale = scale;
+        scale = Math.max(0.1, Math.min(3, scale * (1 + delta)));
+
+        // Zoom towards the center point
+        if (centerX !== undefined && centerY !== undefined) {
+          translateX = centerX - (centerX - translateX) * (scale / oldScale);
+          translateY = centerY - (centerY - translateY) * (scale / oldScale);
+        }
+
+        updateTransform();
+      }
+
+      function pan(dx, dy) {
+        translateX += dx;
+        translateY += dy;
+        updateTransform();
+      }
+
+      function resetView() {
+        scale = 1;
+        translateX = 0;
+        translateY = 0;
+        renderGraph(); // This will auto-fit
+      }
+
+      // Event handlers
+      container.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const rect = container.getBoundingClientRect();
+        const centerX = e.clientX - rect.left;
+        const centerY = e.clientY - rect.top;
+        zoom(e.deltaY > 0 ? -0.1 : 0.1, centerX, centerY);
+      }, { passive: false });
+
+      container.addEventListener('mousedown', (e) => {
+        if (e.target.closest('.node-group')) return;
+        isDragging = true;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+        lastTranslateX = translateX;
+        lastTranslateY = translateY;
+        container.style.cursor = 'grabbing';
+      });
+
+      document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        translateX = lastTranslateX + (e.clientX - dragStartX);
+        translateY = lastTranslateY + (e.clientY - dragStartY);
+        updateTransform();
+      });
+
+      document.addEventListener('mouseup', () => {
+        isDragging = false;
+        container.style.cursor = 'grab';
+      });
+
+      // Touch support
+      let lastTouchDistance = 0;
+      let lastTouchCenter = { x: 0, y: 0 };
+
+      container.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+          isDragging = true;
+          dragStartX = e.touches[0].clientX;
+          dragStartY = e.touches[0].clientY;
+          lastTranslateX = translateX;
+          lastTranslateY = translateY;
+        } else if (e.touches.length === 2) {
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          lastTouchDistance = Math.sqrt(dx * dx + dy * dy);
+          lastTouchCenter = {
+            x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+            y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+          };
+        }
+      }, { passive: true });
+
+      container.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if (e.touches.length === 1 && isDragging) {
+          translateX = lastTranslateX + (e.touches[0].clientX - dragStartX);
+          translateY = lastTranslateY + (e.touches[0].clientY - dragStartY);
+          updateTransform();
+        } else if (e.touches.length === 2) {
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          const delta = (distance - lastTouchDistance) / lastTouchDistance;
+          
+          const rect = container.getBoundingClientRect();
+          const centerX = lastTouchCenter.x - rect.left;
+          const centerY = lastTouchCenter.y - rect.top;
+          
+          zoom(delta * 0.5, centerX, centerY);
+          lastTouchDistance = distance;
+        }
+      }, { passive: false });
+
+      container.addEventListener('touchend', () => {
+        isDragging = false;
+        lastTouchDistance = 0;
+      });
+
+      // Keyboard navigation
+      container.addEventListener('keydown', (e) => {
+        const PAN_AMOUNT = 50;
+        
+        switch (e.key) {
+          case '+':
+          case '=':
+            e.preventDefault();
+            zoom(0.2);
+            break;
+          case '-':
+            e.preventDefault();
+            zoom(-0.2);
+            break;
+          case '0':
+            e.preventDefault();
+            resetView();
+            break;
+          case 'ArrowUp':
+            e.preventDefault();
+            pan(0, PAN_AMOUNT);
+            break;
+          case 'ArrowDown':
+            e.preventDefault();
+            pan(0, -PAN_AMOUNT);
+            break;
+          case 'ArrowLeft':
+            e.preventDefault();
+            pan(PAN_AMOUNT, 0);
+            break;
+          case 'ArrowRight':
+            e.preventDefault();
+            pan(-PAN_AMOUNT, 0);
+            break;
+        }
+      });
+
+      // Zoom buttons
+      document.getElementById('zoom-in').addEventListener('click', () => zoom(0.2));
+      document.getElementById('zoom-out').addEventListener('click', () => zoom(-0.2));
+      document.getElementById('zoom-reset').addEventListener('click', resetView);
+
+      // Help panel toggle
+      helpToggle.addEventListener('click', () => {
+        const isVisible = helpPanel.classList.toggle('visible');
+        helpToggle.setAttribute('aria-expanded', isVisible);
+      });
+
+      // Close help panel when clicking outside
+      document.addEventListener('click', (e) => {
+        if (!helpPanel.contains(e.target) && e.target !== helpToggle) {
+          helpPanel.classList.remove('visible');
+          helpToggle.setAttribute('aria-expanded', 'false');
+        }
+      });
+
+      // Initialize
+      renderGraph();
+
+      // Announce for screen readers
+      const announcer = document.createElement('div');
+      announcer.setAttribute('role', 'status');
+      announcer.setAttribute('aria-live', 'polite');
+      announcer.classList.add('sr-only');
+      announcer.textContent = `Pipeline graph loaded with ${nodesLayer.children.length} nodes. Use Tab to navigate between nodes, arrow keys to pan, and plus/minus to zoom.`;
+      document.body.appendChild(announcer);
+    })();
+    </script>
+  </body>
+</html>

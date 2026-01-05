@@ -7,10 +7,10 @@ import (
 
 type Tree[T any] struct {
 	Name     string     `json:"name"`
-	Children []*Tree[T] `json:"children"`
+	Children []*Tree[T] `json:"children,omitempty"`
 	Value    T          `json:"value,omitempty"`
 
-	FullPath string `json:"-"`
+	FullPath string `json:"full_path,omitempty"`
 }
 
 func NewTree[T any]() *Tree[T] {
