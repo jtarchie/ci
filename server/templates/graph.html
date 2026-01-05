@@ -418,68 +418,119 @@
       const helpToggle = document.getElementById('help-toggle');
       const helpPanel = document.getElementById('help-panel');
 
-      // Layout algorithm - simple hierarchical layout
+      // Layout algorithm - tree-based hierarchical layout
+      // This ensures children are grouped near their parent and parents are centered
       function layoutGraph(tree) {
         const nodes = [];
         const edges = [];
-        let maxDepth = 0;
-        const depthCounts = {};
+        const nodeMap = new Map(); // id -> node object
+        
+        // First pass: build node objects and collect all nodes
+        function buildNodes(treeNode, depth, parentId) {
+          if (!treeNode || !treeNode.name) return null;
 
-        // First pass: collect all nodes and calculate positions
-        function traverse(node, depth, parentId) {
-          if (!node || !node.name) return;
+          const id = treeNode.full_path || `node-${nodes.length}`;
+          const isGroup = treeNode.children && treeNode.children.length > 0;
+          const status = treeNode.value?.status || (isGroup ? 'group' : 'pending');
 
-          const id = node.full_path || `node-${nodes.length}`;
-          
-          if (!depthCounts[depth]) depthCounts[depth] = 0;
-          const yIndex = depthCounts[depth]++;
-          maxDepth = Math.max(maxDepth, depth);
-
-          const isGroup = node.children && node.children.length > 0;
-          const status = node.value?.status || (isGroup ? 'group' : 'pending');
-
-          nodes.push({
+          const node = {
             id,
-            name: node.name,
+            name: treeNode.name,
             status,
             isGroup,
             depth,
-            yIndex,
-            x: 0, // Will be calculated after
+            x: 0,
             y: 0,
-            fullPath: node.full_path || '',
-            children: node.children || []
-          });
+            fullPath: treeNode.full_path || '',
+            childIds: [],
+            parentId,
+            subtreeHeight: 0 // Will be calculated
+          };
+
+          nodes.push(node);
+          nodeMap.set(id, node);
 
           if (parentId) {
             edges.push({ from: parentId, to: id });
           }
 
-          if (node.children) {
-            node.children.forEach(child => traverse(child, depth + 1, id));
+          // Process children and track their IDs
+          if (treeNode.children) {
+            treeNode.children.forEach(child => {
+              const childNode = buildNodes(child, depth + 1, id);
+              if (childNode) {
+                node.childIds.push(childNode.id);
+              }
+            });
           }
+
+          return node;
         }
 
         // Handle root node specially
+        const rootNodes = [];
         if (tree.children && tree.children.length > 0) {
-          tree.children.forEach(child => traverse(child, 0, null));
+          tree.children.forEach(child => {
+            const node = buildNodes(child, 0, null);
+            if (node) rootNodes.push(node);
+          });
         } else if (tree.name) {
-          traverse(tree, 0, null);
+          const node = buildNodes(tree, 0, null);
+          if (node) rootNodes.push(node);
         }
 
-        // Second pass: calculate actual positions
-        // Find max count at each depth for centering
-        const maxCount = Math.max(...Object.values(depthCounts), 1);
-        
-        nodes.forEach(node => {
-          const countAtDepth = depthCounts[node.depth];
-          const startY = (maxCount - countAtDepth) * (NODE_HEIGHT + NODE_MARGIN_Y) / 2;
+        // Second pass: calculate subtree heights (bottom-up)
+        // Subtree height = sum of children's subtree heights, or 1 if leaf
+        function calculateSubtreeHeight(node) {
+          if (node.childIds.length === 0) {
+            node.subtreeHeight = 1;
+            return 1;
+          }
           
+          let totalHeight = 0;
+          node.childIds.forEach(childId => {
+            const child = nodeMap.get(childId);
+            totalHeight += calculateSubtreeHeight(child);
+          });
+          node.subtreeHeight = totalHeight;
+          return totalHeight;
+        }
+
+        rootNodes.forEach(node => calculateSubtreeHeight(node));
+
+        // Third pass: assign Y positions (top-down)
+        // Each node is centered among its children
+        function assignPositions(node, yOffset) {
           node.x = PADDING + node.depth * (NODE_WIDTH + NODE_MARGIN_X);
-          node.y = PADDING + startY + node.yIndex * (NODE_HEIGHT + NODE_MARGIN_Y);
+          
+          if (node.childIds.length === 0) {
+            // Leaf node: place at the current offset
+            node.y = PADDING + yOffset * (NODE_HEIGHT + NODE_MARGIN_Y);
+            return;
+          }
+
+          // Place children first, then center parent among them
+          let currentOffset = yOffset;
+          const childNodes = node.childIds.map(id => nodeMap.get(id));
+          
+          childNodes.forEach(child => {
+            assignPositions(child, currentOffset);
+            currentOffset += child.subtreeHeight;
+          });
+
+          // Center this node among its children
+          const firstChild = childNodes[0];
+          const lastChild = childNodes[childNodes.length - 1];
+          node.y = (firstChild.y + lastChild.y) / 2;
+        }
+
+        let globalOffset = 0;
+        rootNodes.forEach(rootNode => {
+          assignPositions(rootNode, globalOffset);
+          globalOffset += rootNode.subtreeHeight;
         });
 
-        return { nodes, edges, maxDepth, depthCounts };
+        return { nodes, edges };
       }
 
       // Render the graph
