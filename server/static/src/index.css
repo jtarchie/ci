@@ -21,3 +21,154 @@
   --color-abort: #6b7280;
   --color-pending: #94a3b8;
 }
+
+/* Graph container - dot grid background needs custom CSS */
+.graph-container {
+  height: calc(100vh - 200px);
+  background-image: radial-gradient(circle, #d1d5db 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .graph-container {
+    background-image: radial-gradient(circle, #374151 1px, transparent 1px);
+  }
+}
+
+.graph-container:active {
+  cursor: grabbing;
+}
+
+/* SVG elements - require custom CSS for fill/stroke */
+.node-group {
+  cursor: pointer;
+}
+
+.node-group:hover .node-rect {
+  filter: brightness(1.2);
+}
+
+.node-group:focus .node-rect {
+  stroke: #3b82f6;
+  stroke-width: 3;
+}
+
+.node-rect {
+  rx: 6;
+  ry: 6;
+  stroke-width: 2;
+  transition: filter 0.15s ease;
+}
+
+.node-rect.success {
+  fill: #16a34a;
+  stroke: #15803d;
+}
+
+.node-rect.failure {
+  fill: #dc2626;
+  stroke: #b91c1c;
+}
+
+.node-rect.error {
+  fill: #d97706;
+  stroke: #b45309;
+}
+
+.node-rect.pending {
+  fill: #6b7280;
+  stroke: #4b5563;
+}
+
+.node-rect.abort {
+  fill: #9ca3af;
+  stroke: #6b7280;
+}
+
+.node-rect.group {
+  fill: #2563eb;
+  stroke: #1d4ed8;
+}
+
+.node-text {
+  fill: white;
+  font-size: 12px;
+  font-family: system-ui, -apple-system, sans-serif;
+  pointer-events: none;
+  user-select: none;
+}
+
+.edge-line {
+  stroke: #9ca3af;
+  stroke-width: 2;
+  fill: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .edge-line {
+    stroke: #6b7280;
+  }
+}
+
+.edge-arrow {
+  fill: #9ca3af;
+}
+
+@media (prefers-color-scheme: dark) {
+  .edge-arrow {
+    fill: #6b7280;
+  }
+}
+
+.order-badge {
+  fill: #1f2937;
+}
+
+.order-badge-text {
+  fill: white;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  .order-badge {
+    fill: #f3f4f6;
+  }
+
+  .order-badge-text {
+    fill: #1f2937;
+  }
+}
+
+/* Search highlighting */
+.node-group.search-match .node-rect {
+  stroke: #fbbf24 !important;
+  stroke-width: 4 !important;
+}
+
+.node-group.search-dim {
+  opacity: 0.3;
+}
+
+/* Minimap SVG */
+.minimap-viewport {
+  fill: rgba(59, 130, 246, 0.2);
+  stroke: #3b82f6;
+  stroke-width: 1;
+}
+
+.minimap-node {
+  rx: 1;
+  ry: 1;
+}
+
+/* Tooltip visibility toggle */
+.graph-tooltip.visible {
+  opacity: 1;
+}
+
+/* Help panel visibility toggle */
+.help-panel.visible {
+  display: block;
+}
