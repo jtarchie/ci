@@ -296,6 +296,152 @@
         white-space: nowrap;
         border: 0;
       }
+      /* Order badge on nodes */
+      .order-badge {
+        fill: #1f2937; /* gray-800 */
+      }
+      .order-badge-text {
+        fill: white;
+        font-size: 10px;
+        font-weight: 600;
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        .order-badge {
+          fill: #f3f4f6; /* gray-100 */
+        }
+        .order-badge-text {
+          fill: #1f2937; /* gray-800 */
+        }
+      }
+      /* Tooltip */
+      .graph-tooltip {
+        position: absolute;
+        padding: 10px 14px;
+        background: rgba(255, 255, 255, 0.98);
+        border: 1px solid #d1d5db; /* gray-300 */
+        border-radius: 8px;
+        color: #1f2937; /* gray-800 */
+        font-size: 13px;
+        z-index: 100;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+        max-width: 280px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
+      .graph-tooltip.visible {
+        opacity: 1;
+      }
+      .graph-tooltip h4 {
+        margin: 0 0 6px 0;
+        font-weight: 600;
+        font-size: 14px;
+        word-break: break-all;
+      }
+      .graph-tooltip dl {
+        margin: 0;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 4px 10px;
+        font-size: 12px;
+      }
+      .graph-tooltip dt {
+        color: #6b7280; /* gray-500 */
+      }
+      .graph-tooltip dd {
+        margin: 0;
+        font-weight: 500;
+      }
+      @media (prefers-color-scheme: dark) {
+        .graph-tooltip {
+          background: rgba(31, 41, 55, 0.98);
+          border-color: #4b5563; /* gray-600 */
+          color: white;
+        }
+        .graph-tooltip dt {
+          color: #9ca3af; /* gray-400 */
+        }
+      }
+      /* Search box */
+      .search-container {
+        position: absolute;
+        top: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10;
+      }
+      .search-input {
+        width: 240px;
+        padding: 8px 12px 8px 36px;
+        border: 1px solid #d1d5db; /* gray-300 */
+        border-radius: 8px;
+        font-size: 14px;
+        background: rgba(255, 255, 255, 0.95);
+        color: #1f2937;
+      }
+      .search-input:focus {
+        outline: 2px solid #3b82f6;
+        outline-offset: 1px;
+      }
+      .search-input::placeholder {
+        color: #9ca3af;
+      }
+      .search-icon {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #9ca3af;
+        pointer-events: none;
+      }
+      @media (prefers-color-scheme: dark) {
+        .search-input {
+          background: rgba(31, 41, 55, 0.95);
+          border-color: #4b5563;
+          color: white;
+        }
+      }
+      /* Highlight matched nodes */
+      .node-group.search-match .node-rect {
+        stroke: #fbbf24 !important; /* amber-400 */
+        stroke-width: 4 !important;
+      }
+      .node-group.search-dim {
+        opacity: 0.3;
+      }
+      /* Minimap */
+      .minimap {
+        position: absolute;
+        bottom: 160px;
+        right: 16px;
+        width: 160px;
+        height: 100px;
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid #d1d5db; /* gray-300 */
+        border-radius: 8px;
+        overflow: hidden;
+        z-index: 10;
+      }
+      .minimap-svg {
+        width: 100%;
+        height: 100%;
+      }
+      .minimap-viewport {
+        fill: rgba(59, 130, 246, 0.2); /* blue-500 with opacity */
+        stroke: #3b82f6; /* blue-500 */
+        stroke-width: 1;
+      }
+      .minimap-node {
+        rx: 1;
+        ry: 1;
+      }
+      @media (prefers-color-scheme: dark) {
+        .minimap {
+          background: rgba(31, 41, 55, 0.9);
+          border-color: #4b5563;
+        }
+      }
     </style>
   </head>
   <body
@@ -422,6 +568,43 @@
         <div class="zoom-info" id="zoom-info" aria-live="polite">
           Zoom: 100%
         </div>
+
+        <!-- Search box -->
+        <div class="search-container">
+          <svg class="search-icon" width="16" height="16" viewBox="0 0 20 20"
+            fill="currentColor">
+            <path fill-rule="evenodd"
+              d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+              clip-rule="evenodd" />
+          </svg>
+          <input type="text"
+            class="search-input"
+            id="search-input"
+            placeholder="Search nodes..."
+            aria-label="Search nodes"
+            autocomplete="off">
+        </div>
+
+        <!-- Minimap -->
+        <div class="minimap" id="minimap" aria-hidden="true">
+          <svg class="minimap-svg" id="minimap-svg">
+            <g id="minimap-nodes"></g>
+            <rect class="minimap-viewport" id="minimap-viewport"></rect>
+          </svg>
+        </div>
+
+        <!-- Tooltip -->
+        <div class="graph-tooltip" id="graph-tooltip" role="tooltip">
+          <h4 id="tooltip-name">Node</h4>
+          <dl>
+            <dt>Status</dt>
+            <dd id="tooltip-status"></dd>
+            <dt>Type</dt>
+            <dd id="tooltip-type"></dd>
+            <dt id="tooltip-duration-label" style="display:none">Duration</dt>
+            <dd id="tooltip-duration" style="display:none"></dd>
+          </dl>
+        </div>
       </div>
     </div>
 
@@ -522,6 +705,21 @@
       const zoomInfo = document.getElementById('zoom-info');
       const helpToggle = document.getElementById('help-toggle');
       const helpPanel = document.getElementById('help-panel');
+      const tooltip = document.getElementById('graph-tooltip');
+      const tooltipName = document.getElementById('tooltip-name');
+      const tooltipStatus = document.getElementById('tooltip-status');
+      const tooltipType = document.getElementById('tooltip-type');
+      const tooltipDurationLabel = document.getElementById('tooltip-duration-label');
+      const tooltipDuration = document.getElementById('tooltip-duration');
+      const searchInput = document.getElementById('search-input');
+      const minimap = document.getElementById('minimap');
+      const minimapSvg = document.getElementById('minimap-svg');
+      const minimapNodes = document.getElementById('minimap-nodes');
+      const minimapViewport = document.getElementById('minimap-viewport');
+
+      // Store nodes for search
+      let allNodes = [];
+      let graphBounds = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
 
       // Layout algorithm - tree-based hierarchical layout
       // This ensures children are grouped near their parent and parents are centered
@@ -537,6 +735,9 @@
           const id = treeNode.full_path || `node-${nodes.length}`;
           const isGroup = treeNode.children && treeNode.children.length > 0;
           const status = treeNode.value?.status || (isGroup ? 'group' : 'pending');
+          const duration = treeNode.value?.duration || null;
+          const startTime = treeNode.value?.start_time || null;
+          const endTime = treeNode.value?.end_time || null;
 
           const node = {
             id,
@@ -549,7 +750,11 @@
             fullPath: treeNode.full_path || '',
             childIds: [],
             parentId,
-            subtreeHeight: 0 // Will be calculated
+            subtreeHeight: 0, // Will be calculated
+            duration,
+            startTime,
+            endTime,
+            order: nodes.length + 1 // Execution order
           };
 
           nodes.push(node);
@@ -641,6 +846,7 @@
       // Render the graph
       function renderGraph() {
         const { nodes, edges } = layoutGraph(graphData);
+        allNodes = nodes; // Store for search
 
         // Clear existing content
         nodesLayer.innerHTML = '';
@@ -720,6 +926,30 @@
             g.appendChild(indicator);
           }
 
+          // Order badge (top-left corner)
+          const badgeRadius = 10;
+          const badge = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          badge.setAttribute('cx', -4);
+          badge.setAttribute('cy', -4);
+          badge.setAttribute('r', badgeRadius);
+          badge.setAttribute('class', 'order-badge');
+          g.appendChild(badge);
+
+          const badgeText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          badgeText.setAttribute('x', -4);
+          badgeText.setAttribute('y', -4);
+          badgeText.setAttribute('text-anchor', 'middle');
+          badgeText.setAttribute('dominant-baseline', 'central');
+          badgeText.setAttribute('class', 'order-badge-text');
+          badgeText.textContent = node.order;
+          g.appendChild(badgeText);
+
+          // Tooltip handlers
+          g.addEventListener('mouseenter', (e) => showTooltip(e, node));
+          g.addEventListener('mouseleave', hideTooltip);
+          g.addEventListener('focus', (e) => showTooltip(e, node));
+          g.addEventListener('blur', hideTooltip);
+
           // Click handler
           g.addEventListener('click', () => handleNodeClick(node));
           g.addEventListener('keydown', (e) => {
@@ -735,6 +965,7 @@
         // Auto-fit on initial render
         if (nodes.length > 0) {
           autoFit(nodes);
+          renderMinimap(nodes);
         }
       }
 
@@ -781,7 +1012,191 @@
       function updateTransform() {
         viewport.setAttribute('transform', `translate(${translateX}, ${translateY}) scale(${scale})`);
         zoomInfo.textContent = `Zoom: ${Math.round(scale * 100)}%`;
+        updateMinimapViewport();
       }
+
+      // Tooltip functions
+      function showTooltip(event, node) {
+        tooltipName.textContent = node.name;
+        tooltipStatus.textContent = node.status.charAt(0).toUpperCase() + node.status.slice(1);
+        tooltipType.textContent = node.isGroup ? 'Group' : 'Task';
+        
+        // Show duration if available
+        if (node.duration) {
+          tooltipDurationLabel.style.display = '';
+          tooltipDuration.style.display = '';
+          tooltipDuration.textContent = formatDuration(node.duration);
+        } else if (node.startTime && node.endTime) {
+          tooltipDurationLabel.style.display = '';
+          tooltipDuration.style.display = '';
+          const duration = new Date(node.endTime) - new Date(node.startTime);
+          tooltipDuration.textContent = formatDuration(duration);
+        } else {
+          tooltipDurationLabel.style.display = 'none';
+          tooltipDuration.style.display = 'none';
+        }
+        
+        // Position tooltip near cursor
+        const containerRect = container.getBoundingClientRect();
+        let x = event.clientX - containerRect.left + 15;
+        let y = event.clientY - containerRect.top + 15;
+        
+        // Keep tooltip within container bounds
+        const tooltipRect = tooltip.getBoundingClientRect();
+        if (x + tooltipRect.width > containerRect.width) {
+          x = event.clientX - containerRect.left - tooltipRect.width - 15;
+        }
+        if (y + tooltipRect.height > containerRect.height) {
+          y = event.clientY - containerRect.top - tooltipRect.height - 15;
+        }
+        
+        tooltip.style.left = `${x}px`;
+        tooltip.style.top = `${y}px`;
+        tooltip.classList.add('visible');
+      }
+
+      function hideTooltip() {
+        tooltip.classList.remove('visible');
+      }
+
+      function formatDuration(ms) {
+        if (typeof ms === 'string') {
+          // Parse Go duration string (e.g., "1.5s", "2m30s")
+          return ms;
+        }
+        if (ms < 1000) return `${ms}ms`;
+        if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+        const mins = Math.floor(ms / 60000);
+        const secs = ((ms % 60000) / 1000).toFixed(0);
+        return `${mins}m ${secs}s`;
+      }
+
+      // Minimap functions
+      function renderMinimap(nodes) {
+        if (nodes.length === 0) return;
+        
+        minimapNodes.innerHTML = '';
+        
+        // Calculate bounds
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        nodes.forEach(node => {
+          minX = Math.min(minX, node.x);
+          minY = Math.min(minY, node.y);
+          maxX = Math.max(maxX, node.x + NODE_WIDTH);
+          maxY = Math.max(maxY, node.y + NODE_HEIGHT);
+        });
+        
+        graphBounds = { minX, minY, maxX, maxY };
+        
+        const graphWidth = maxX - minX;
+        const graphHeight = maxY - minY;
+        
+        const minimapRect = minimap.getBoundingClientRect();
+        const minimapScale = Math.min(
+          (minimapRect.width - 10) / graphWidth,
+          (minimapRect.height - 10) / graphHeight
+        );
+        
+        // Render mini nodes
+        nodes.forEach(node => {
+          const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          rect.setAttribute('x', 5 + (node.x - minX) * minimapScale);
+          rect.setAttribute('y', 5 + (node.y - minY) * minimapScale);
+          rect.setAttribute('width', Math.max(NODE_WIDTH * minimapScale, 3));
+          rect.setAttribute('height', Math.max(NODE_HEIGHT * minimapScale, 2));
+          rect.setAttribute('class', `minimap-node node-rect ${node.status}`);
+          minimapNodes.appendChild(rect);
+        });
+        
+        updateMinimapViewport();
+      }
+
+      function updateMinimapViewport() {
+        if (!graphBounds.maxX) return;
+        
+        const containerRect = container.getBoundingClientRect();
+        const minimapRect = minimap.getBoundingClientRect();
+        
+        const graphWidth = graphBounds.maxX - graphBounds.minX;
+        const graphHeight = graphBounds.maxY - graphBounds.minY;
+        
+        const minimapScale = Math.min(
+          (minimapRect.width - 10) / graphWidth,
+          (minimapRect.height - 10) / graphHeight
+        );
+        
+        // Calculate visible area in graph coordinates
+        const visibleX = -translateX / scale;
+        const visibleY = -translateY / scale;
+        const visibleWidth = containerRect.width / scale;
+        const visibleHeight = containerRect.height / scale;
+        
+        // Convert to minimap coordinates
+        minimapViewport.setAttribute('x', 5 + (visibleX - graphBounds.minX) * minimapScale);
+        minimapViewport.setAttribute('y', 5 + (visibleY - graphBounds.minY) * minimapScale);
+        minimapViewport.setAttribute('width', visibleWidth * minimapScale);
+        minimapViewport.setAttribute('height', visibleHeight * minimapScale);
+      }
+
+      // Search functionality
+      function handleSearch(query) {
+        const nodeElements = nodesLayer.querySelectorAll('.node-group');
+        
+        if (!query.trim()) {
+          // Clear search - show all nodes normally
+          nodeElements.forEach(el => {
+            el.classList.remove('search-match', 'search-dim');
+          });
+          return;
+        }
+        
+        const lowerQuery = query.toLowerCase();
+        let hasMatch = false;
+        
+        nodeElements.forEach((el, index) => {
+          const node = allNodes[index];
+          if (node && node.name.toLowerCase().includes(lowerQuery)) {
+            el.classList.add('search-match');
+            el.classList.remove('search-dim');
+            hasMatch = true;
+          } else {
+            el.classList.remove('search-match');
+            el.classList.add('search-dim');
+          }
+        });
+        
+        // If there's a match, pan to the first one
+        if (hasMatch) {
+          const matchIndex = allNodes.findIndex(n => n.name.toLowerCase().includes(lowerQuery));
+          if (matchIndex >= 0) {
+            const node = allNodes[matchIndex];
+            panToNode(node);
+          }
+        }
+      }
+
+      function panToNode(node) {
+        const containerRect = container.getBoundingClientRect();
+        // Center the node in the viewport
+        translateX = containerRect.width / 2 - (node.x + NODE_WIDTH / 2) * scale;
+        translateY = containerRect.height / 2 - (node.y + NODE_HEIGHT / 2) * scale;
+        updateTransform();
+      }
+
+      // Search input handler
+      let searchTimeout;
+      searchInput.addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => handleSearch(e.target.value), 150);
+      });
+
+      searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          searchInput.value = '';
+          handleSearch('');
+          searchInput.blur();
+        }
+      });
 
       function zoom(delta, centerX, centerY) {
         const oldScale = scale;
