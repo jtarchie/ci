@@ -12,8 +12,8 @@ tasks:
       - yarn build
   fmt:
     cmds:
-      - deno fmt backwards/src/ examples/ *.md docs/ packages/
-      - deno lint backwards/src/ examples/ packages/
+      - deno fmt --ignore=server/templates/,backwards/bundle.js .
+      - deno lint --rules-exclude=no-window,no-process-global --ignore=server/templates/,backwards/bundle.js .
       - gofmt -w .
       - golangci-lint run ./... --fix
   default:

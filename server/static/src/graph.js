@@ -12,7 +12,7 @@ const PADDING = 50;
  * @param {Object} graphData - The tree data from the server
  * @param {string} currentPath - The current path in the pipeline
  */
-export function initGraph(graphData, currentPath) {
+export function initGraph(graphData, _currentPath) {
   // State
   let scale = 1;
   let translateX = 0;
@@ -174,7 +174,7 @@ export function initGraph(graphData, currentPath) {
     // Third pass: assign positions
     if (edgeMode === "tree") {
       // Tree mode: use tree depth for X, subtree-based Y positioning
-      function assignTreePositions(node, yOffset) {
+      const assignTreePositions = (node, yOffset) => {
         node.x = PADDING + node.depth * (NODE_WIDTH + NODE_MARGIN_X);
 
         if (node.childIds.length === 0) {
@@ -193,7 +193,7 @@ export function initGraph(graphData, currentPath) {
         const firstChild = childNodes[0];
         const lastChild = childNodes[childNodes.length - 1];
         node.y = (firstChild.y + lastChild.y) / 2;
-      }
+      };
 
       let globalOffset = 0;
       rootNodes.forEach((rootNode) => {
@@ -205,7 +205,7 @@ export function initGraph(graphData, currentPath) {
       // Track rows used at each flowDepth to avoid collisions
       const rowsByDepth = new Map();
 
-      function assignFlowPositions(node, preferredRow) {
+      const assignFlowPositions = (node, preferredRow) => {
         const depth = node.flowDepth;
         node.x = PADDING + depth * (NODE_WIDTH + NODE_MARGIN_X);
 
@@ -236,7 +236,7 @@ export function initGraph(graphData, currentPath) {
             assignFlowPositions(child, nextRow);
           }
         });
-      }
+      };
 
       let globalRow = 0;
       rootNodes.forEach((rootNode) => {
@@ -256,7 +256,7 @@ export function initGraph(graphData, currentPath) {
     // In flow mode: build sequential edges based on execution order
     // Parent -> first child, then child1 -> child2 -> child3, etc.
     if (edgeMode === "flow") {
-      function buildFlowEdges(node) {
+      const buildFlowEdges = (node) => {
         const childNodes = node.childIds.map((id) => nodeMap.get(id));
         if (childNodes.length > 0) {
           // Parent connects to first child only
@@ -270,7 +270,7 @@ export function initGraph(graphData, currentPath) {
           // Recursively process children
           childNodes.forEach((child) => buildFlowEdges(child));
         }
-      }
+      };
 
       rootNodes.forEach((rootNode) => buildFlowEdges(rootNode));
     }

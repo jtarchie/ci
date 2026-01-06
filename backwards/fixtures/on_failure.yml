@@ -1,6 +1,6 @@
 assert:
   execution:
-  - "failing-job"
+    - "failing-job"
 
 jobs:
   - name: failing-job

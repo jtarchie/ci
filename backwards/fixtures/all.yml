@@ -1,10 +1,10 @@
 assert:
   execution:
-  - test-job
-  - test-job-hooks
-  - test-job-failure-hooks
-  - test-job-error-hooks
-  - test-job-abort-hooks
+    - test-job
+    - test-job-hooks
+    - test-job-failure-hooks
+    - test-job-error-hooks
+    - test-job-abort-hooks
 
 jobs:
   - name: test-job

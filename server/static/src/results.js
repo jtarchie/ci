@@ -87,10 +87,10 @@ export function initResults() {
       // Show groups that have visible children
       groups.forEach((group) => {
         const visibleTasks = group.querySelectorAll(
-          '.task-item:not([style*="display: none"])'
+          '.task-item:not([style*="display: none"])',
         );
         const visibleGroups = group.querySelectorAll(
-          '.group-container:not([style*="display: none"])'
+          '.group-container:not([style*="display: none"])',
         );
         group.style.display =
           visibleTasks.length > 0 || visibleGroups.length > 0 || query === ""
@@ -128,7 +128,7 @@ export function initResults() {
     }
 
     const tasks = Array.from(getAllTasks()).filter(
-      (t) => t.style.display !== "none"
+      (t) => t.style.display !== "none",
     );
     if (tasks.length === 0) return;
 
@@ -184,7 +184,7 @@ export function initResults() {
         if (e.target.tagName !== "INPUT") {
           // Jump to first failure
           const firstFailure = tasksContainer.querySelector(
-            ".task-item.bg-red-100, .task-item.dark\\:bg-red-900\\/30"
+            ".task-item.bg-red-100, .task-item.dark\\:bg-red-900\\/30",
           );
           if (firstFailure) {
             firstFailure.scrollIntoView({
