@@ -65,8 +65,8 @@ func (r *ResourceRunner) Check(input ResourceCheckInput) (*ResourceCheckResult, 
 	return &ResourceCheckResult{Versions: versions}, nil
 }
 
-// ResourceInInput is the input for an In operation from JS.
-type ResourceInInput struct {
+// ResourceFetchInput is the input for a Fetch operation from JS.
+type ResourceFetchInput struct {
 	Type    string                 `json:"type"`
 	Source  map[string]interface{} `json:"source"`
 	Version map[string]string      `json:"version"`
@@ -74,8 +74,8 @@ type ResourceInInput struct {
 	DestDir string                 `json:"destDir"`
 }
 
-// ResourceInResult is the result of an In operation.
-type ResourceInResult struct {
+// ResourceFetchResult is the result of a Fetch operation.
+type ResourceFetchResult struct {
 	Version  map[string]string `json:"version"`
 	Metadata []struct {
 		Name  string `json:"name"`
@@ -83,10 +83,10 @@ type ResourceInResult struct {
 	} `json:"metadata"`
 }
 
-// In fetches a specific version of a resource.
-func (r *ResourceRunner) In(input ResourceInInput) (*ResourceInResult, error) {
-	logger := r.logger.With("type", input.Type, "operation", "in", "destDir", input.DestDir)
-	logger.Debug("resource.in")
+// Fetch retrieves a specific version of a resource (equivalent to 'in' or 'get').
+func (r *ResourceRunner) Fetch(input ResourceFetchInput) (*ResourceFetchResult, error) {
+	logger := r.logger.With("type", input.Type, "operation", "fetch", "destDir", input.DestDir)
+	logger.Debug("resource.fetch")
 
 	res, err := resources.Get(input.Type)
 	if err != nil {
@@ -101,12 +101,12 @@ func (r *ResourceRunner) In(input ResourceInInput) (*ResourceInResult, error) {
 
 	resp, err := res.In(r.ctx, input.DestDir, req)
 	if err != nil {
-		logger.Error("resource.in", "err", err)
+		logger.Error("resource.fetch", "err", err)
 
-		return nil, fmt.Errorf("in failed: %w", err)
+		return nil, fmt.Errorf("fetch failed: %w", err)
 	}
 
-	result := &ResourceInResult{
+	result := &ResourceFetchResult{
 		Version: resp.Version,
 	}
 
@@ -120,16 +120,16 @@ func (r *ResourceRunner) In(input ResourceInInput) (*ResourceInResult, error) {
 	return result, nil
 }
 
-// ResourceOutInput is the input for an Out operation from JS.
-type ResourceOutInput struct {
+// ResourcePushInput is the input for a Push operation from JS.
+type ResourcePushInput struct {
 	Type   string                 `json:"type"`
 	Source map[string]interface{} `json:"source"`
 	Params map[string]interface{} `json:"params,omitempty"`
 	SrcDir string                 `json:"srcDir"`
 }
 
-// ResourceOutResult is the result of an Out operation.
-type ResourceOutResult struct {
+// ResourcePushResult is the result of a Push operation.
+type ResourcePushResult struct {
 	Version  map[string]string `json:"version"`
 	Metadata []struct {
 		Name  string `json:"name"`
@@ -137,10 +137,10 @@ type ResourceOutResult struct {
 	} `json:"metadata"`
 }
 
-// Out pushes a new version of a resource.
-func (r *ResourceRunner) Out(input ResourceOutInput) (*ResourceOutResult, error) {
-	logger := r.logger.With("type", input.Type, "operation", "out", "srcDir", input.SrcDir)
-	logger.Debug("resource.out")
+// Push publishes a new version of a resource (equivalent to 'out' or 'put').
+func (r *ResourceRunner) Push(input ResourcePushInput) (*ResourcePushResult, error) {
+	logger := r.logger.With("type", input.Type, "operation", "push", "srcDir", input.SrcDir)
+	logger.Debug("resource.push")
 
 	res, err := resources.Get(input.Type)
 	if err != nil {
@@ -154,12 +154,12 @@ func (r *ResourceRunner) Out(input ResourceOutInput) (*ResourceOutResult, error)
 
 	resp, err := res.Out(r.ctx, input.SrcDir, req)
 	if err != nil {
-		logger.Error("resource.out", "err", err)
+		logger.Error("resource.push", "err", err)
 
-		return nil, fmt.Errorf("out failed: %w", err)
+		return nil, fmt.Errorf("push failed: %w", err)
 	}
 
-	result := &ResourceOutResult{
+	result := &ResourcePushResult{
 		Version: resp.Version,
 	}
 

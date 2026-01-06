@@ -109,7 +109,7 @@ declare global {
     versions: ResourceVersion[];
   }
 
-  interface ResourceInInput {
+  interface ResourceFetchInput {
     type: string;
     source: { [key: string]: unknown };
     version: ResourceVersion;
@@ -117,27 +117,27 @@ declare global {
     destDir: string;
   }
 
-  interface ResourceInResult {
+  interface ResourceFetchResult {
     version: ResourceVersion;
     metadata: ResourceMetadataField[];
   }
 
-  interface ResourceOutInput {
+  interface ResourcePushInput {
     type: string;
     source: { [key: string]: unknown };
     params?: { [key: string]: unknown };
     srcDir: string;
   }
 
-  interface ResourceOutResult {
+  interface ResourcePushResult {
     version: ResourceVersion;
     metadata: ResourceMetadataField[];
   }
 
   namespace nativeResources {
     function check(input: ResourceCheckInput): ResourceCheckResult;
-    function in (input: ResourceInInput): ResourceInResult;
-    function out(input: ResourceOutInput): ResourceOutResult;
+    function fetch(input: ResourceFetchInput): ResourceFetchResult;
+    function push(input: ResourcePushInput): ResourcePushResult;
     function isNative(resourceType: string): boolean;
     function listNativeResources(): string[];
   }
