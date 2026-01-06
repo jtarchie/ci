@@ -1,63 +1,99 @@
-# CI Project — Senior engineer guidance
+# CI Project — AI Agent Instructions
 
-This repository implements a local-first CI runtime (Go core, JS/TS pipelines) that is Concourse-compatible — it targets Concourse-style pipelines, resources, and job/step semantics. The notes below are for maintainers and automated agents operating as senior engineers: prioritize reliability, reproducibility, and minimal surface-area changes.
+Local-first CI runtime in Go that executes JS/TS pipelines via Goja VM, with
+Concourse YAML backward compatibility.
 
-What matters (short)
+## Architecture Overview
 
-- Stability: tests and race detection are first-class — run `go test -race ./... -count=1`.
-- Reproducibility: static assets and transpiled TS are part of the binary — run `task build:static` and `go generate ./...` when editing frontend or `backwards/src/`.
-- Readability & safety: follow formatting/linting (`task fmt`) and explicit error handling in Go.
+```
+main.go → commands/ → runtime/ → orchestra/ → drivers (docker/native/k8s/...)
+                         ↓
+                    storage/sqlite
+```
 
-Essential commands (repo root)
+- **runtime/**: Goja VM executes pipelines; `js.go` transpiles TS→JS via
+  esbuild, `pipeline_runner.go` runs containers
+- **orchestra/**: Driver interface for container orchestration
+  (`orchestrator.go` defines `Driver`, `Container`, `Volume` interfaces)
+- **backwards/**: Concourse YAML → JS transpiler (TS source in `src/`, compiled
+  to `bundle.js`)
+- **storage/**: Persistence layer for task results (tree structure with
+  path-based keys)
 
-- Build static assets: `task build:static`
-- Regenerate TS/static artifacts: `go generate ./...`
-- Format & lint: `task fmt` (deno + gofmt + golangci-lint)
-- Full CI locally: `task default` (builds, generate, format, type-checks, tests)
+## Plugin Registration Pattern
 
-Common workflows
+Drivers/storage self-register via `init()` and blank imports in `main.go`:
 
-- Run a pipeline locally (quick):
+```go
+// orchestra/docker/docker.go
+func init() { orchestra.Add("docker", NewDocker) }
 
-  go run main.go runner examples/both/hello-world.ts
+// main.go — blank imports activate drivers
+_ "github.com/jtarchie/ci/orchestra/docker"
+```
 
-- Start the server for UI/debugging:
+## Essential Commands
 
-  go run main.go server --storage sqlite://test.db
+```bash
+task default          # Full CI: build, generate, fmt, lint, typecheck, test
+task fmt              # deno fmt/lint + gofmt + golangci-lint
+task build            # Build static assets + go generate
+go generate ./...     # Regenerate TS bundle + static assets
+go test -race ./... -count=1 -parallel=1  # Tests with race detector
+task cleanup          # Remove leaked Docker containers/volumes
+```
 
-- Transpile a pipeline to canonical form:
+## Pipeline API (JS/TS)
 
-  go run main.go transpile <pipeline-file>
+Pipelines export an async `pipeline` function using `runtime.run()`:
 
-CLI defaults and useful flags
+```typescript
+// examples/both/hello-world.ts
+const pipeline = async () => {
+  let result = await runtime.run({
+    name: "task-name",
+    image: "busybox",
+    command: { path: "echo", args: ["hello"] },
+    env: { FOO: "bar" },
+  });
+  assert.containsString(result.stdout, "hello");
+};
+export { pipeline };
+```
 
-- `--storage sqlite://test.db`
-- `--driver docker` (fallback: `native`)
-- `--log-level info`
+## Testing Patterns
 
-Style & architecture notes
+- Black-box packages: `package foo_test` with
+  `_ "github.com/jtarchie/ci/orchestra/docker"` imports
+- Use `gomega` assertions: `assert := NewGomegaWithT(t)`,
+  `assert.Expect(...).NotTo(HaveOccurred())`
+- Driver parity: tests run against both `docker` and `native` drivers (see
+  `examples/examples_test.go`)
+- In-memory DB for tests: `--storage sqlite://:memory:`
 
-- Go: target 1.24+, use `gofmt`, small focused interfaces, propagate errors clearly, prefer `slog` for structured logs.
-- Runtime: Goja + esbuild for executing JS/TS pipeline code. Keep TS in `backwards/src/` and regenerate when changed.
-- Tests: prefer black-box packages (`*_test`), use `gomega` for assertions, include driver parity tests (docker vs native).
+## Code Style
 
-Practical pitfalls (what I've seen)
+- Go 1.25+, `slog` for structured logging, explicit error wrapping with
+  `fmt.Errorf("context: %w", err)`
+- Interfaces in `orchestrator.go`/`storage.go`; implementations in
+  subdirectories
+- JSON field tags for Goja interop: `json:"fieldName"`
 
-- Forgot `go generate` after TS changes → binary runs different code than checked-in artifacts.
-- Tests run without `-race` → subtle concurrency bugs slip in.
-- Docker resource leakage during tests → run `task cleanup` periodically.
+## Common Pitfalls
 
-Where to inspect quickly
+- **Stale TS bundle**: Always run `go generate ./...` after editing
+  `backwards/src/*.ts`
+- **Race conditions**: Never skip `-race` flag in tests
+- **Docker leaks**: Run `task cleanup` if tests fail mid-execution
 
-- Orchestration primitives: `orchestra/`
-- Execution engine: `runtime/` (look at `js.go`, `pipeline_runner.go`)
-- Storage & sqlite: `storage/`, `storage/sqlite`
-- Examples and tests: `examples/`, `*_test.go` files
+## Key Files
 
-Pre-commit sanity checklist
-
-- `task fmt` (format + lint)
-- `go generate ./...` (if TS / static changed)
-- `go test -race ./... -count=1`
-
-Keep this page minimal. If you need to expand operational runbooks or onboarding, add a `docs/` page and link it here.
+| Purpose                | Location                                  |
+| ---------------------- | ----------------------------------------- |
+| CLI entry              | `main.go`, `commands/`                    |
+| JS/TS execution        | `runtime/js.go`, `runtime/runtime.go`     |
+| Container abstraction  | `orchestra/orchestrator.go`               |
+| Driver implementations | `orchestra/{docker,native,k8s}/`          |
+| Storage interface      | `storage/storage.go`, `storage/sqlite/`   |
+| Concourse compat       | `backwards/src/`, `backwards/pipeline.go` |
+| Example pipelines      | `examples/both/`                          |
