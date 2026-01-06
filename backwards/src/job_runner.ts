@@ -35,8 +35,9 @@ export class JobRunner {
   async run(): Promise<void> {
     const storageKey = this.getBaseStorageKey();
     let failure: unknown = undefined;
+    const dependsOn = this.extractDependencies();
 
-    storage.set(storageKey, { status: "pending" });
+    storage.set(storageKey, { status: "pending", dependsOn });
 
     try {
       for (let i = 0; i < this.jobConfig.plan.length; i++) {
@@ -45,19 +46,19 @@ export class JobRunner {
           zeroPadWithLength(i, this.jobConfig.plan.length),
         );
       }
-      storage.set(storageKey, { status: "success" });
+      storage.set(storageKey, { status: "success", dependsOn });
     } catch (error) {
       console.error(error);
       failure = error;
 
       if (failure instanceof TaskFailure) {
-        storage.set(storageKey, { status: "failure" });
+        storage.set(storageKey, { status: "failure", dependsOn });
       } else if (failure instanceof TaskErrored) {
-        storage.set(storageKey, { status: "error" });
+        storage.set(storageKey, { status: "error", dependsOn });
       } else if (failure instanceof TaskAbort) {
-        storage.set(storageKey, { status: "abort" });
+        storage.set(storageKey, { status: "abort", dependsOn });
       } else {
-        storage.set(storageKey, { status: "error" });
+        storage.set(storageKey, { status: "error", dependsOn });
       }
     }
 
@@ -82,6 +83,20 @@ export class JobRunner {
     if (this.jobConfig.assert?.execution) {
       assert.equal(this.taskNames, this.jobConfig.assert.execution);
     }
+  }
+
+  private extractDependencies(): string[] {
+    const dependencies: string[] = [];
+    for (const step of this.jobConfig.plan) {
+      if ("get" in step && step.passed) {
+        for (const passedJob of step.passed) {
+          if (!dependencies.includes(passedJob)) {
+            dependencies.push(passedJob);
+          }
+        }
+      }
+    }
+    return dependencies;
   }
 
   private getBaseStorageKey(): string {

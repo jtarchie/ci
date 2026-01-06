@@ -58,7 +58,7 @@ func (c *Server) Run(logger *slog.Logger) error {
 			lookupPath = "/" + lookupPath
 		}
 
-		results, err := client.GetAll(lookupPath, []string{"status"})
+		results, err := client.GetAll(lookupPath, []string{"status", "dependsOn"})
 		if err != nil {
 			return fmt.Errorf("could not get all results: %w", err)
 		}
