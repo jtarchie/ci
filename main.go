@@ -10,12 +10,15 @@ import (
 	_ "github.com/jtarchie/ci/orchestra/docker"
 	_ "github.com/jtarchie/ci/orchestra/k8s"
 	_ "github.com/jtarchie/ci/orchestra/native"
+	_ "github.com/jtarchie/ci/resources/git"
+	_ "github.com/jtarchie/ci/resources/mock"
 	_ "github.com/jtarchie/ci/storage/sqlite"
 	"github.com/lmittmann/tint"
 )
 
 type CLI struct {
 	Runner    commands.Runner    `cmd:"" help:"Run a pipeline"`
+	Resource  commands.Resource  `cmd:"" help:"Execute a native resource operation"`
 	Transpile commands.Transpile `cmd:"" help:"Transpile a pipeline"`
 	Server    commands.Server    `cmd:"" help:"Run a server"`
 

@@ -88,6 +88,59 @@ declare global {
     function parse(text: string): object;
     function stringify(obj: object): string;
   }
+
+  // Native Resources types
+  interface ResourceVersion {
+    [key: string]: string;
+  }
+
+  interface ResourceMetadataField {
+    name: string;
+    value: string;
+  }
+
+  interface ResourceCheckInput {
+    type: string;
+    source: { [key: string]: unknown };
+    version?: ResourceVersion;
+  }
+
+  interface ResourceCheckResult {
+    versions: ResourceVersion[];
+  }
+
+  interface ResourceInInput {
+    type: string;
+    source: { [key: string]: unknown };
+    version: ResourceVersion;
+    params?: { [key: string]: unknown };
+    destDir: string;
+  }
+
+  interface ResourceInResult {
+    version: ResourceVersion;
+    metadata: ResourceMetadataField[];
+  }
+
+  interface ResourceOutInput {
+    type: string;
+    source: { [key: string]: unknown };
+    params?: { [key: string]: unknown };
+    srcDir: string;
+  }
+
+  interface ResourceOutResult {
+    version: ResourceVersion;
+    metadata: ResourceMetadataField[];
+  }
+
+  namespace nativeResources {
+    function check(input: ResourceCheckInput): ResourceCheckResult;
+    function in (input: ResourceInInput): ResourceInResult;
+    function out(input: ResourceOutInput): ResourceOutResult;
+    function isNative(resourceType: string): boolean;
+    function listNativeResources(): string[];
+  }
 }
 
 // types for backwards compatibility
@@ -199,4 +252,4 @@ declare global {
   }
 }
 
-export {};
+export { };
