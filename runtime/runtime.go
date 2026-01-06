@@ -11,13 +11,13 @@ import (
 type Runtime struct {
 	jsVM     *goja.Runtime
 	promises *sync.WaitGroup
-	sandbox  *PipelineRunner
+	runner   Runner
 	tasks    chan func() error
 }
 
 func NewRuntime(
 	jsVM *goja.Runtime,
-	sandbox *PipelineRunner,
+	runner Runner,
 ) *Runtime {
 	promises := &sync.WaitGroup{}
 	tasks := make(chan func() error, 1)
@@ -25,7 +25,7 @@ func NewRuntime(
 	return &Runtime{
 		jsVM:     jsVM,
 		promises: promises,
-		sandbox:  sandbox,
+		runner:   runner,
 		tasks:    tasks,
 	}
 }
@@ -36,7 +36,7 @@ func (r *Runtime) Run(input RunInput) *goja.Promise {
 	r.promises.Add(1)
 
 	go func() {
-		result, err := r.sandbox.Run(input)
+		result, err := r.runner.Run(input)
 
 		r.tasks <- func() error {
 			defer r.promises.Done()
@@ -72,7 +72,7 @@ func (r *Runtime) CreateVolume(input VolumeInput) *goja.Promise {
 	r.promises.Add(1)
 
 	go func() {
-		result, err := r.sandbox.CreateVolume(input)
+		result, err := r.runner.CreateVolume(input)
 
 		r.tasks <- func() error {
 			defer r.promises.Done()

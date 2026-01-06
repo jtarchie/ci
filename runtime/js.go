@@ -16,6 +16,15 @@ import (
 	"github.com/jtarchie/ci/storage"
 )
 
+// ExecuteOptions configures pipeline execution.
+type ExecuteOptions struct {
+	// Resume enables resume mode for the pipeline.
+	Resume bool
+	// RunID is the unique identifier for this pipeline run.
+	// If resuming, this should match the previous run's ID.
+	RunID string
+}
+
 type JS struct {
 	logger *slog.Logger
 }
@@ -26,8 +35,27 @@ func NewJS(logger *slog.Logger) *JS {
 	}
 }
 
+// Execute runs a pipeline with default options (no resume).
 func (j *JS) Execute(ctx context.Context, source string, driver orchestra.Driver, storage storage.Driver) error {
-	runner := NewPipelineRunner(ctx, driver, j.logger)
+	return j.ExecuteWithOptions(ctx, source, driver, storage, ExecuteOptions{})
+}
+
+// ExecuteWithOptions runs a pipeline with the given options.
+func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orchestra.Driver, storage storage.Driver, opts ExecuteOptions) error {
+	var runner Runner
+
+	if opts.Resume {
+		resumableRunner, err := NewResumableRunner(ctx, driver, storage, j.logger, ResumeOptions{
+			RunID:  opts.RunID,
+			Resume: opts.Resume,
+		})
+		if err != nil {
+			return fmt.Errorf("could not create resumable runner: %w", err)
+		}
+		runner = resumableRunner
+	} else {
+		runner = NewPipelineRunner(ctx, driver, j.logger)
+	}
 
 	result := api.Transform(source, api.TransformOptions{
 		Loader:     api.LoaderTS,

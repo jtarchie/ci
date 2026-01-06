@@ -25,6 +25,8 @@ type Runner struct {
 	Pipeline string        `arg:""                                                        help:"Path to pipeline javascript file"                                                                                                                          type:"existingfile"`
 	Driver   string        `default:"native"                                              help:"Orchestrator driver DSN (e.g., 'k8s:namespace=my-ns', 'k8s://my-ns', 'docker', 'native')"`
 	Timeout  time.Duration `help:"timeout for the pipeline, will cause abort if exceeded"`
+	Resume   bool          `help:"Resume from last checkpoint if pipeline was interrupted"`
+	RunID    string        `help:"Unique run ID for resume support (auto-generated if not provided)"`
 }
 
 func youtubeIDStyle(input string) string {
@@ -136,7 +138,17 @@ func (c *Runner) Run(logger *slog.Logger) error {
 
 	js := runtime.NewJS(logger)
 
-	err = js.Execute(ctx, pipeline, driver, storage)
+	opts := runtime.ExecuteOptions{
+		Resume: c.Resume,
+		RunID:  c.RunID,
+	}
+
+	// If resuming but no RunID provided, use the runtime ID for consistency
+	if c.Resume && opts.RunID == "" {
+		opts.RunID = runtimeID
+	}
+
+	err = js.ExecuteWithOptions(ctx, pipeline, driver, storage, opts)
 	if err != nil {
 		// Check if the error was due to context cancellation
 		if errors.Is(err, context.Canceled) {

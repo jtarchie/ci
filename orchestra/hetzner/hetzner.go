@@ -512,6 +512,15 @@ func (h *Hetzner) RunContainer(ctx context.Context, task orchestra.Task) (orches
 	return h.dockerDriver.RunContainer(ctx, task)
 }
 
+// GetContainer attempts to find and return an existing container by its ID.
+// Delegates to the docker driver after ensuring the server exists.
+func (h *Hetzner) GetContainer(ctx context.Context, containerID string) (orchestra.Container, error) {
+	if h.dockerDriver == nil {
+		return nil, orchestra.ErrContainerNotFound
+	}
+	return h.dockerDriver.GetContainer(ctx, containerID)
+}
+
 // CreateVolume creates a volume on the server's docker instance.
 func (h *Hetzner) CreateVolume(ctx context.Context, name string, size int) (orchestra.Volume, error) {
 	if err := h.ensureServer(ctx, orchestra.ContainerLimits{}); err != nil {

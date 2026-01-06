@@ -482,6 +482,15 @@ func (d *DigitalOcean) RunContainer(ctx context.Context, task orchestra.Task) (o
 	return d.dockerDriver.RunContainer(ctx, task)
 }
 
+// GetContainer attempts to find and return an existing container by its ID.
+// Delegates to the docker driver after ensuring the droplet exists.
+func (d *DigitalOcean) GetContainer(ctx context.Context, containerID string) (orchestra.Container, error) {
+	if d.dockerDriver == nil {
+		return nil, orchestra.ErrContainerNotFound
+	}
+	return d.dockerDriver.GetContainer(ctx, containerID)
+}
+
 // CreateVolume creates a volume on the droplet's docker instance.
 // The size parameter is used when creating Digital Ocean block storage volumes.
 func (d *DigitalOcean) CreateVolume(ctx context.Context, name string, size int) (orchestra.Volume, error) {

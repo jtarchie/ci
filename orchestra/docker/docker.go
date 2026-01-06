@@ -2,7 +2,6 @@ package docker
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -147,7 +146,22 @@ func (d *Docker) Name() string {
 	return "docker"
 }
 
-var ErrContainerNotFound = errors.New("container not found")
+// GetContainer finds and returns an existing container by its ID.
+// Returns ErrContainerNotFound if the container does not exist.
+func (d *Docker) GetContainer(ctx context.Context, containerID string) (orchestra.Container, error) {
+	_, err := d.client.ContainerInspect(ctx, containerID)
+	if err != nil {
+		if errdefs.IsNotFound(err) {
+			return nil, orchestra.ErrContainerNotFound
+		}
+		return nil, fmt.Errorf("failed to inspect container: %w", err)
+	}
+
+	return &Container{
+		id:     containerID,
+		client: d.client,
+	}, nil
+}
 
 func init() {
 	orchestra.Add("docker", NewDocker)

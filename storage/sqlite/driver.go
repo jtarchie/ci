@@ -80,6 +80,34 @@ func (s *Sqlite) Set(prefix string, payload any) error {
 	return nil
 }
 
+func (s *Sqlite) Get(prefix string) (storage.Payload, error) {
+	path := filepath.Clean("/" + s.namespace + "/" + prefix)
+
+	var payload storage.Payload
+	var payloadBytes []byte
+
+	// Use writer instead of reader to work with in-memory databases
+	// where each connection gets its own database.
+	// Use json() to convert JSONB back to regular JSON text.
+	//nolint: noctx
+	err := s.writer.QueryRow(`
+		SELECT json(payload) FROM tasks WHERE path = ?
+	`, path).Scan(&payloadBytes)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to get task: %w", err)
+	}
+
+	err = json.Unmarshal(payloadBytes, &payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal payload: %w", err)
+	}
+
+	return payload, nil
+}
+
 func (s *Sqlite) GetAll(prefix string, fields []string) (storage.Results, error) {
 	if len(fields) == 0 {
 		fields = []string{"status"}

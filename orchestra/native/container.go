@@ -15,9 +15,15 @@ import (
 )
 
 type Container struct {
+	id      string
 	command *exec.Cmd
 	stdout  *strings.Builder
 	errChan chan error
+}
+
+// ID returns the container identifier (process-based, not persistent).
+func (n *Container) ID() string {
+	return n.id
 }
 
 func (n *Container) Cleanup(_ context.Context) error {
@@ -149,6 +155,7 @@ func (n *Native) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 	}()
 
 	return &Container{
+		id:      task.ID,
 		command: command,
 		errChan: errChan,
 		stdout:  stdout,
