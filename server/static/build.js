@@ -1,8 +1,7 @@
 const { execSync } = require("child_process");
 const fs = require("fs");
-const path = require("path");
 
-async function build() {
+function build() {
   try {
     // Create dist directory if it doesn't exist
     if (!fs.existsSync("dist")) {

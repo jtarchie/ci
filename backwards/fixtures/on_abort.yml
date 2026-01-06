@@ -1,6 +1,6 @@
 assert:
   execution:
-  - "abort-job"
+    - "abort-job"
 
 jobs:
   - name: abort-job

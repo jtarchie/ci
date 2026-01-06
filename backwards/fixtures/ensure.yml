@@ -1,6 +1,6 @@
 assert:
   execution:
-  - "success-job"
+    - "success-job"
 
 jobs:
   - name: success-job
