@@ -8,9 +8,13 @@ import (
 	"fmt"
 )
 
+// ErrNotFound is returned when a requested key does not exist.
+var ErrNotFound = errors.New("not found")
+
 type Driver interface {
 	Close() error
 	Set(prefix string, payload any) error
+	Get(prefix string) (Payload, error)
 	GetAll(prefix string, fields []string) (Results, error)
 }
 

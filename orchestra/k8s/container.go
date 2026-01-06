@@ -87,6 +87,11 @@ type Container struct {
 	logger       *slog.Logger
 }
 
+// ID returns the Kubernetes job name as the container identifier.
+func (c *Container) ID() string {
+	return c.jobName
+}
+
 type ContainerStatus struct {
 	phase      corev1.PodPhase
 	exitCode   int32

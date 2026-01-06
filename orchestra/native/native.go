@@ -1,6 +1,7 @@
 package native
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -39,6 +40,13 @@ func NewNative(namespace string, logger *slog.Logger, params map[string]string) 
 
 func (n *Native) Name() string {
 	return "native"
+}
+
+// GetContainer attempts to find an existing container.
+// Native driver does not support container reattachment since processes are not persistent.
+// Always returns ErrContainerNotFound.
+func (n *Native) GetContainer(_ context.Context, _ string) (orchestra.Container, error) {
+	return nil, orchestra.ErrContainerNotFound
 }
 
 func init() {

@@ -22,6 +22,11 @@ type Container struct {
 	task   orchestra.Task
 }
 
+// ID returns the Docker container ID.
+func (d *Container) ID() string {
+	return d.id
+}
+
 type ContainerStatus struct {
 	state *container.State
 }
@@ -169,7 +174,7 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 		}
 
 		if len(containers) == 0 {
-			return nil, fmt.Errorf("failed to find container by name %s: %w", containerName, ErrContainerNotFound)
+			return nil, fmt.Errorf("failed to find container by name %s: %w", containerName, orchestra.ErrContainerNotFound)
 		}
 
 		return &Container{

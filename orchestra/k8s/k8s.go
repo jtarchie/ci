@@ -102,6 +102,36 @@ func (k *K8s) Name() string {
 	return "k8s"
 }
 
+// GetContainer attempts to find and return an existing container (job) by its name.
+// Returns ErrContainerNotFound if the container does not exist.
+func (k *K8s) GetContainer(ctx context.Context, containerID string) (orchestra.Container, error) {
+	job, err := k.clientset.BatchV1().Jobs(k.k8sNamespace).Get(ctx, containerID, metav1.GetOptions{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil, orchestra.ErrContainerNotFound
+		}
+		return nil, fmt.Errorf("failed to get job: %w", err)
+	}
+
+	// Get pod name from job
+	podName := ""
+	pods, err := k.clientset.CoreV1().Pods(k.k8sNamespace).List(ctx, metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("job-name=%s", job.Name),
+	})
+	if err == nil && len(pods.Items) > 0 {
+		podName = pods.Items[0].Name
+	}
+
+	return &Container{
+		clientset:    k.clientset,
+		config:       k.config,
+		jobName:      job.Name,
+		podName:      podName,
+		k8sNamespace: k.k8sNamespace,
+		logger:       k.logger,
+	}, nil
+}
+
 func init() {
 	orchestra.Add("k8s", NewK8s)
 }
