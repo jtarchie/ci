@@ -23,6 +23,9 @@ export function initGraph(graphData, currentPath) {
   let lastTranslateX = 0;
   let lastTranslateY = 0;
 
+  // Edge display mode: 'tree' (parent->children) or 'flow' (sequential execution order)
+  let edgeMode = localStorage.getItem("graphEdgeMode") || "tree";
+
   // DOM elements
   const container = document.getElementById("graph-container");
   const viewport = document.getElementById("graph-viewport");
@@ -77,7 +80,8 @@ export function initGraph(graphData, currentPath) {
         name: treeNode.name,
         status,
         isGroup,
-        depth,
+        depth, // Tree depth (will be recalculated for flow mode)
+        flowDepth: 0, // Flow depth (sequential position)
         x: 0,
         y: 0,
         fullPath: treeNode.full_path || "",
@@ -94,7 +98,9 @@ export function initGraph(graphData, currentPath) {
       nodes.push(node);
       nodeMap.set(id, node);
 
-      if (parentId) {
+      // In tree mode: parent connects to all children
+      // In flow mode: we'll build edges after all nodes are created
+      if (edgeMode === "tree" && parentId) {
         edges.push({ from: parentId, to: id });
       }
 
@@ -123,6 +129,29 @@ export function initGraph(graphData, currentPath) {
       if (node) rootNodes.push(node);
     }
 
+    // Calculate flow depths for flow mode
+    // In flow mode, siblings execute sequentially: P at col 0, C1 at col 1, C2 at col 2, etc.
+    // Root nodes always start at column 0
+    function calculateFlowDepth(node, currentFlowDepth) {
+      node.flowDepth = currentFlowDepth;
+
+      const childNodes = node.childIds.map((id) => nodeMap.get(id));
+      // Children execute sequentially, so each gets the next column
+      let nextDepth = currentFlowDepth + 1;
+      childNodes.forEach((child) => {
+        calculateFlowDepth(child, nextDepth);
+        nextDepth++; // Each sibling goes to the next column
+      });
+    }
+
+    // Only calculate flow depths in flow mode
+    if (edgeMode === "flow") {
+      // All root nodes start at column 0
+      rootNodes.forEach((rootNode) => {
+        calculateFlowDepth(rootNode, 0);
+      });
+    }
+
     // Second pass: calculate subtree heights (bottom-up)
     // Subtree height = sum of children's subtree heights, or 1 if leaf
     function calculateSubtreeHeight(node) {
@@ -142,37 +171,109 @@ export function initGraph(graphData, currentPath) {
 
     rootNodes.forEach((node) => calculateSubtreeHeight(node));
 
-    // Third pass: assign Y positions (top-down)
-    // Each node is centered among its children
-    function assignPositions(node, yOffset) {
-      node.x = PADDING + node.depth * (NODE_WIDTH + NODE_MARGIN_X);
+    // Third pass: assign positions
+    if (edgeMode === "tree") {
+      // Tree mode: use tree depth for X, subtree-based Y positioning
+      function assignTreePositions(node, yOffset) {
+        node.x = PADDING + node.depth * (NODE_WIDTH + NODE_MARGIN_X);
 
-      if (node.childIds.length === 0) {
-        // Leaf node: place at the current offset
-        node.y = PADDING + yOffset * (NODE_HEIGHT + NODE_MARGIN_Y);
-        return;
+        if (node.childIds.length === 0) {
+          node.y = PADDING + yOffset * (NODE_HEIGHT + NODE_MARGIN_Y);
+          return;
+        }
+
+        let currentOffset = yOffset;
+        const childNodes = node.childIds.map((id) => nodeMap.get(id));
+
+        childNodes.forEach((child) => {
+          assignTreePositions(child, currentOffset);
+          currentOffset += child.subtreeHeight;
+        });
+
+        const firstChild = childNodes[0];
+        const lastChild = childNodes[childNodes.length - 1];
+        node.y = (firstChild.y + lastChild.y) / 2;
       }
 
-      // Place children first, then center parent among them
-      let currentOffset = yOffset;
-      const childNodes = node.childIds.map((id) => nodeMap.get(id));
-
-      childNodes.forEach((child) => {
-        assignPositions(child, currentOffset);
-        currentOffset += child.subtreeHeight;
+      let globalOffset = 0;
+      rootNodes.forEach((rootNode) => {
+        assignTreePositions(rootNode, globalOffset);
+        globalOffset += rootNode.subtreeHeight;
       });
+    } else {
+      // Flow mode: use flow depth for X, assign Y based on row
+      // Track rows used at each flowDepth to avoid collisions
+      const rowsByDepth = new Map();
 
-      // Center this node among its children
-      const firstChild = childNodes[0];
-      const lastChild = childNodes[childNodes.length - 1];
-      node.y = (firstChild.y + lastChild.y) / 2;
+      function assignFlowPositions(node, preferredRow) {
+        const depth = node.flowDepth;
+        node.x = PADDING + depth * (NODE_WIDTH + NODE_MARGIN_X);
+
+        // Find an available row at this depth
+        if (!rowsByDepth.has(depth)) {
+          rowsByDepth.set(depth, new Set());
+        }
+        const usedRows = rowsByDepth.get(depth);
+
+        let row = preferredRow;
+        while (usedRows.has(row)) {
+          row++;
+        }
+        usedRows.add(row);
+
+        node.y = PADDING + row * (NODE_HEIGHT + NODE_MARGIN_Y);
+
+        // Process children - each child tries to stay on same row as its flow predecessor
+        const childNodes = node.childIds.map((id) => nodeMap.get(id));
+        let nextRow = row;
+        childNodes.forEach((child, index) => {
+          if (index === 0) {
+            // First child tries to stay on same row as parent
+            assignFlowPositions(child, row);
+          } else {
+            // Subsequent children go to next available row
+            nextRow++;
+            assignFlowPositions(child, nextRow);
+          }
+        });
+      }
+
+      let globalRow = 0;
+      rootNodes.forEach((rootNode) => {
+        assignFlowPositions(rootNode, globalRow);
+        // Find max row used and start next root after it
+        let maxRow = globalRow;
+        nodes.forEach((n) => {
+          const nodeRow = Math.floor(
+            (n.y - PADDING) / (NODE_HEIGHT + NODE_MARGIN_Y)
+          );
+          if (nodeRow > maxRow) maxRow = nodeRow;
+        });
+        globalRow = maxRow + 1;
+      });
     }
 
-    let globalOffset = 0;
-    rootNodes.forEach((rootNode) => {
-      assignPositions(rootNode, globalOffset);
-      globalOffset += rootNode.subtreeHeight;
-    });
+    // In flow mode: build sequential edges based on execution order
+    // Parent -> first child, then child1 -> child2 -> child3, etc.
+    if (edgeMode === "flow") {
+      function buildFlowEdges(node) {
+        const childNodes = node.childIds.map((id) => nodeMap.get(id));
+        if (childNodes.length > 0) {
+          // Parent connects to first child only
+          edges.push({ from: node.id, to: childNodes[0].id });
+
+          // Each child connects to the next sibling (execution order chain)
+          for (let i = 0; i < childNodes.length - 1; i++) {
+            edges.push({ from: childNodes[i].id, to: childNodes[i + 1].id });
+          }
+
+          // Recursively process children
+          childNodes.forEach((child) => buildFlowEdges(child));
+        }
+      }
+
+      rootNodes.forEach((rootNode) => buildFlowEdges(rootNode));
+    }
 
     return { nodes, edges };
   }
@@ -806,6 +907,81 @@ export function initGraph(graphData, currentPath) {
     .getElementById("zoom-out")
     .addEventListener("click", () => zoom(-0.2));
   document.getElementById("zoom-reset").addEventListener("click", resetView);
+
+  // Edge mode toggle
+  const edgeModeTree = document.getElementById("edge-mode-tree");
+  const edgeModeFlow = document.getElementById("edge-mode-flow");
+
+  function updateEdgeModeButtons() {
+    if (edgeMode === "tree") {
+      edgeModeTree.classList.remove(
+        "bg-gray-200",
+        "dark:bg-gray-700",
+        "text-gray-700",
+        "dark:text-gray-300",
+        "hover:bg-gray-300",
+        "dark:hover:bg-gray-600"
+      );
+      edgeModeTree.classList.add("bg-blue-600", "text-white");
+      edgeModeTree.setAttribute("aria-pressed", "true");
+
+      edgeModeFlow.classList.remove("bg-blue-600", "text-white");
+      edgeModeFlow.classList.add(
+        "bg-gray-200",
+        "dark:bg-gray-700",
+        "text-gray-700",
+        "dark:text-gray-300",
+        "hover:bg-gray-300",
+        "dark:hover:bg-gray-600"
+      );
+      edgeModeFlow.setAttribute("aria-pressed", "false");
+    } else {
+      edgeModeFlow.classList.remove(
+        "bg-gray-200",
+        "dark:bg-gray-700",
+        "text-gray-700",
+        "dark:text-gray-300",
+        "hover:bg-gray-300",
+        "dark:hover:bg-gray-600"
+      );
+      edgeModeFlow.classList.add("bg-blue-600", "text-white");
+      edgeModeFlow.setAttribute("aria-pressed", "true");
+
+      edgeModeTree.classList.remove("bg-blue-600", "text-white");
+      edgeModeTree.classList.add(
+        "bg-gray-200",
+        "dark:bg-gray-700",
+        "text-gray-700",
+        "dark:text-gray-300",
+        "hover:bg-gray-300",
+        "dark:hover:bg-gray-600"
+      );
+      edgeModeTree.setAttribute("aria-pressed", "false");
+    }
+  }
+
+  if (edgeModeTree && edgeModeFlow) {
+    // Initialize button states
+    updateEdgeModeButtons();
+
+    edgeModeTree.addEventListener("click", () => {
+      if (edgeMode !== "tree") {
+        edgeMode = "tree";
+        localStorage.setItem("graphEdgeMode", "tree");
+        updateEdgeModeButtons();
+        renderGraph();
+      }
+    });
+
+    edgeModeFlow.addEventListener("click", () => {
+      if (edgeMode !== "flow") {
+        edgeMode = "flow";
+        localStorage.setItem("graphEdgeMode", "flow");
+        updateEdgeModeButtons();
+        renderGraph();
+      }
+    });
+  }
 
   // Help panel toggle
   helpToggle.addEventListener("click", () => {
