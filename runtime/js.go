@@ -133,6 +133,14 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 		return fmt.Errorf("could not set runtime: %w", err)
 	}
 
+	// Set up native resource runner
+	resourceRunner := NewResourceRunner(ctx, j.logger)
+
+	err = jsVM.Set("nativeResources", resourceRunner)
+	if err != nil {
+		return fmt.Errorf("could not set nativeResources: %w", err)
+	}
+
 	err = jsVM.Set("storage", storage)
 	if err != nil {
 		return fmt.Errorf("could not set storage: %w", err)
