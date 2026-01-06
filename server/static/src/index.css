@@ -104,9 +104,19 @@
   fill: none;
 }
 
+.edge-line.dependency-edge {
+  stroke: #a855f7; /* purple-500 */
+  stroke-width: 2;
+  stroke-dasharray: 6 3;
+}
+
 @media (prefers-color-scheme: dark) {
   .edge-line {
     stroke: #6b7280;
+  }
+
+  .edge-line.dependency-edge {
+    stroke: #c084fc; /* purple-400 */
   }
 }
 
@@ -114,9 +124,17 @@
   fill: #9ca3af;
 }
 
+.dependency-arrow {
+  fill: #a855f7; /* purple-500 */
+}
+
 @media (prefers-color-scheme: dark) {
   .edge-arrow {
     fill: #6b7280;
+  }
+
+  .dependency-arrow {
+    fill: #c084fc; /* purple-400 */
   }
 }
 

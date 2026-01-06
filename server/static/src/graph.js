@@ -70,6 +70,7 @@ export function initGraph(graphData, currentPath) {
       const duration = treeNode.value?.duration || null;
       const startTime = treeNode.value?.start_time || null;
       const endTime = treeNode.value?.end_time || null;
+      const dependsOn = treeNode.value?.dependsOn || [];
 
       const node = {
         id,
@@ -87,6 +88,7 @@ export function initGraph(graphData, currentPath) {
         startTime,
         endTime,
         order: nodes.length + 1, // Execution order
+        dependsOn,
       };
 
       nodes.push(node);
@@ -212,6 +214,70 @@ export function initGraph(graphData, currentPath) {
       path.setAttribute("marker-end", "url(#arrowhead)");
 
       edgesLayer.appendChild(path);
+    });
+
+    // Render dependency edges (job-to-job dependencies from "passed" constraints)
+    // These are rendered with dashed lines to distinguish from parent-child edges
+    // Build a map of job names to their nodes for dependency lookup
+    // Key format: "pipelinePrefix/jobName" to avoid conflicts between pipeline runs
+    const jobNodes = new Map();
+    nodes.forEach((node) => {
+      // Job nodes are at the "jobs" level - look for paths like /pipeline/.../jobs/jobname
+      if (node.fullPath && node.fullPath.includes("/jobs/")) {
+        // Extract the pipeline prefix (everything before /jobs/) and job name
+        const jobsIndex = node.fullPath.indexOf("/jobs/");
+        const pipelinePrefix = node.fullPath.substring(0, jobsIndex);
+        const afterJobs = node.fullPath.substring(jobsIndex + 6); // skip "/jobs/"
+        // Job name is the first segment after /jobs/
+        const slashIndex = afterJobs.indexOf("/");
+        const jobName =
+          slashIndex === -1 ? afterJobs : afterJobs.substring(0, slashIndex);
+        // Only register if this is the actual job node (not a child like tasks/compile)
+        if (slashIndex === -1) {
+          const key = `${pipelinePrefix}/${jobName}`;
+          jobNodes.set(key, node);
+        }
+      }
+    });
+
+    // Draw dependency edges
+    nodes.forEach((node) => {
+      if (node.dependsOn && node.dependsOn.length > 0) {
+        // Extract pipeline prefix for this node
+        const jobsIndex = node.fullPath ? node.fullPath.indexOf("/jobs/") : -1;
+        if (jobsIndex === -1) return;
+        const pipelinePrefix = node.fullPath.substring(0, jobsIndex);
+
+        node.dependsOn.forEach((depJobName) => {
+          const key = `${pipelinePrefix}/${depJobName}`;
+          const depNode = jobNodes.get(key);
+          if (!depNode) return;
+
+          const path = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "path"
+          );
+
+          // Draw from dependency job to this job
+          const x1 = depNode.x + NODE_WIDTH;
+          const y1 = depNode.y + NODE_HEIGHT / 2;
+          const x2 = node.x;
+          const y2 = node.y + NODE_HEIGHT / 2;
+
+          // Use a curved path with offset to avoid overlapping with parent-child edges
+          const midX = (x1 + x2) / 2;
+          const offsetY = 15; // Slight vertical offset for visual separation
+          const d = `M ${x1} ${y1} C ${midX} ${y1 + offsetY}, ${midX} ${
+            y2 - offsetY
+          }, ${x2} ${y2}`;
+
+          path.setAttribute("d", d);
+          path.setAttribute("class", "edge-line dependency-edge");
+          path.setAttribute("marker-end", "url(#arrowhead-dependency)");
+
+          edgesLayer.appendChild(path);
+        });
+      }
     });
 
     // Render nodes
