@@ -354,7 +354,7 @@ resources:
     type: git
     source:
       uri: https://github.com/...
-    native: true # Prefer native implementation
+    native: true  Prefer native implementation
 ```
 
 Or globally via CLI:
@@ -362,3 +362,110 @@ Or globally via CLI:
 ```bash
 ci runner --prefer-native-resources pipeline.ts
 ```
+## Future Direction: Native-First Execution (No Containers for Resources)
+
+The cleanest architecture is to **always execute native resources directly in
+the `ci` process** - no containers at all for resource operations. This
+eliminates all sidecar/binary-mounting complexity.
+
+### Why Resources Don't Need Containers
+
+1. **No isolation needed** - Resources read/write to a specific directory that
+   becomes a volume mount for tasks
+2. **The `ci` process already has filesystem access** - It creates volumes and
+   manages the workspace
+3. **Network access is fine** - Resources need to reach git repos, S3, etc.
+   anyway
+4. **No security boundary needed** - Unlike tasks, resources are trusted code
+   (built into the binary)
+
+### Execution Model
+
+```
+Pipeline Request
+       │
+       ▼
+┌─────────────────┐
+│  ci process     │
+│  ┌───────────┐  │
+│  │ Native    │  │  ← git clone happens here (in-process)
+│  │ Resource  │  │
+│  └───────────┘  │
+│       │         │
+│       ▼         │
+│  ┌───────────┐  │
+│  │ Volume/   │  │  ← files written to workspace
+│  │ Workspace │  │
+│  └───────────┘  │
+└─────────────────┘
+       │
+       ▼
+┌─────────────────┐
+│  Container      │  ← Only tasks run in containers
+│  (Task)         │
+│  ┌───────────┐  │
+│  │ Volume    │──┼── mounted from above
+│  │ Mount     │  │
+│  └───────────┘  │
+└─────────────────┘
+```
+
+### Flow for a Get Step
+
+1. `ci` receives get step request
+2. `ci` creates a volume (directory for native, Docker volume for Docker)
+3. `ci` executes native git resource **in-process**:
+   - Clones repo directly to volume path
+   - No container spawned
+4. Volume is mounted into subsequent task containers
+
+### Volume Path Resolution by Driver
+
+| Driver   | Volume Path                      | How Resources Access It                                        |
+| -------- | -------------------------------- | -------------------------------------------------------------- |
+| `native` | `/tmp/ci-volumes/abc123`         | Direct filesystem access                                       |
+| `docker` | Host path mounted as Docker volume | Direct filesystem access (same host)                          |
+| `k8s`    | PVC mount path on controller node | Direct access if controller has PVC mounted (see below)       |
+
+### Kubernetes Consideration
+
+For K8s, if the `ci` controller runs **outside** the cluster, you'd need the
+binary-mounting approach from the strategies above. But if `ci` runs **inside**
+the cluster (as a pod), it can mount the same PVCs and write directly:
+
+```yaml
+# ci controller running in-cluster
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ci-controller
+spec:
+  containers:
+    - name: ci
+      image: ghcr.io/jtarchie/ci:latest
+      volumeMounts:
+        - name: workspace-pvc
+          mountPath: /workspace
+  volumes:
+    - name: workspace-pvc
+      persistentVolumeClaim:
+        claimName: ci-workspace
+```
+
+### Benefits of Native-First
+
+- **Zero container overhead** for resource operations
+- **Faster pipeline execution** - git clone starts immediately
+- **Simpler architecture** - no binary mounting or sidecars needed
+- **Works identically** across native/docker drivers
+- **Reduced complexity** - fewer moving parts to debug
+
+### Implementation Priority
+
+This is the recommended long-term direction. The current implementation supports
+both approaches, allowing gradual migration:
+
+1. Native resources execute in-process when possible
+2. Fall back to container-based resources for custom/unknown types
+3. Eventually, most common resources (git, s3, time, registry-image) will be
+   native, making container-based resources rare
