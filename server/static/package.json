@@ -4,7 +4,7 @@
   "private": true,
   "description": "Static assets for CI server",
   "scripts": {
-    "build": "node build.js",
+    "build": "npm run build:css && npm run build:js",
     "build:css": "tailwindcss --cwd ../ -i static/src/index.css -o static/dist/bundle.css --minify --optimize",
     "build:js": "esbuild src/index.js --bundle --minify --outfile=dist/bundle.js --format=iife --global-name=CI --target=es2017"
   },
