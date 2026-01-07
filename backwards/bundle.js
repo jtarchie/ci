@@ -11,8 +11,8 @@ var TaskRunner = class {
     storage.set(
       taskStorageKey,
       {
-        status: "pending",
-      },
+        status: "pending"
+      }
     );
     let result;
     try {
@@ -20,7 +20,7 @@ var TaskRunner = class {
         command: {
           path: step.config.run.path,
           args: step.config.run.args || [],
-          user: step.config.run.user,
+          user: step.config.run.user
         },
         container_limits: step.config.container_limits,
         env: step.config.env,
@@ -29,7 +29,7 @@ var TaskRunner = class {
         mounts,
         privileged: step.privileged ?? false,
         stdin: stdin ?? "",
-        timeout: step.timeout,
+        timeout: step.timeout
       });
       let status = "success";
       if (result.status == "abort") {
@@ -43,15 +43,15 @@ var TaskRunner = class {
           status,
           code: result.code,
           stdout: result.stdout,
-          stderr: result.stderr,
-        },
+          stderr: result.stderr
+        }
       );
       this.validateTaskResult(step, result);
       return result;
     } catch (error) {
       storage.set(taskStorageKey, { status: "error" });
       throw new TaskErrored(
-        `Task ${step.task} errored with message ${error}`,
+        `Task ${step.task} errored with message ${error}`
       );
     }
   }
@@ -126,7 +126,7 @@ var JobRunner = class {
       for (let i = 0; i < this.jobConfig.plan.length; i++) {
         await this.processStep(
           this.jobConfig.plan[i],
-          zeroPadWithLength(i, this.jobConfig.plan.length),
+          zeroPadWithLength(i, this.jobConfig.plan.length)
         );
       }
       storage.set(storageKey, { status: "success", dependsOn });
@@ -204,32 +204,32 @@ var JobRunner = class {
     if ("get" in step) {
       await this.processGetStep(
         step,
-        `${pathContext}/${this.getStepIdentifier(step)}`,
+        `${pathContext}/${this.getStepIdentifier(step)}`
       );
     } else if ("do" in step) {
       await this.processDoStep(
         step,
-        `${pathContext}/${this.getStepIdentifier(step)}`,
+        `${pathContext}/${this.getStepIdentifier(step)}`
       );
     } else if ("put" in step) {
       await this.processPutStep(
         step,
-        `${pathContext}/${this.getStepIdentifier(step)}`,
+        `${pathContext}/${this.getStepIdentifier(step)}`
       );
     } else if ("try" in step) {
       await this.processTryStep(
         step,
-        `${pathContext}/${this.getStepIdentifier(step)}`,
+        `${pathContext}/${this.getStepIdentifier(step)}`
       );
     } else if ("task" in step) {
       await this.processTaskStep(
         step,
-        `${pathContext}/${this.getStepIdentifier(step)}`,
+        `${pathContext}/${this.getStepIdentifier(step)}`
       );
     } else if ("in_parallel" in step) {
       await this.processParallelSteps(
         step,
-        `${pathContext}/${this.getStepIdentifier(step)}`,
+        `${pathContext}/${this.getStepIdentifier(step)}`
       );
     }
   }
@@ -242,23 +242,23 @@ var JobRunner = class {
           image_resource: {
             type: "registry-image",
             source: {
-              repository: "busybox",
-            },
+              repository: "busybox"
+            }
           },
           inputs: [
-            { name: mountName },
+            { name: mountName }
           ],
           run: {
             path: "sh",
-            args: ["-c", `cat ${file}`],
-          },
+            args: ["-c", `cat ${file}`]
+          }
         },
         assert: {
-          code: 0,
-        },
+          code: 0
+        }
       },
       void 0,
-      pathContext,
+      pathContext
     );
     return result.stdout;
   }
@@ -276,10 +276,10 @@ var JobRunner = class {
           on_failure: step.on_failure,
           on_error: step.on_error,
           on_abort: step.on_abort,
-          timeout: step.timeout,
+          timeout: step.timeout
         },
         void 0,
-        pathContext,
+        pathContext
       );
     } else {
       await this.runTask(step, void 0, pathContext);
@@ -313,7 +313,7 @@ var JobRunner = class {
         const subStep = steps[i];
         await this.processStep(
           subStep,
-          `${pathContext}/${zeroPadWithLength(i, steps.length)}`,
+          `${pathContext}/${zeroPadWithLength(i, steps.length)}`
         );
       }
     } catch (error) {
@@ -357,32 +357,32 @@ var JobRunner = class {
           image_resource: {
             type: "registry-image",
             source: {
-              repository: resourceType?.source.repository,
-            },
+              repository: resourceType?.source.repository
+            }
           },
           outputs: [
-            { name: resource?.name },
+            { name: resource?.name }
           ],
           run: {
             path: "/opt/resource/out",
-            args: [`./${resource?.name}`],
-          },
+            args: [`./${resource?.name}`]
+          }
         },
         assert: {
-          code: 0,
+          code: 0
         },
         ensure: step.ensure,
         on_success: step.on_success,
         on_failure: step.on_failure,
         on_error: step.on_error,
         on_abort: step.on_abort,
-        timeout: step.timeout,
+        timeout: step.timeout
       },
       JSON.stringify({
         source: resource?.source,
-        params: step.params,
+        params: step.params
       }),
-      `${pathContext}/put`,
+      `${pathContext}/put`
     );
     const putPayload = JSON.parse(putResponse.stdout);
     const version = putPayload.version;
@@ -393,32 +393,32 @@ var JobRunner = class {
           image_resource: {
             type: "registry-image",
             source: {
-              repository: resourceType?.source.repository,
-            },
+              repository: resourceType?.source.repository
+            }
           },
           outputs: [
-            { name: resource?.name },
+            { name: resource?.name }
           ],
           run: {
             path: "/opt/resource/in",
-            args: [`./${resource?.name}`],
-          },
+            args: [`./${resource?.name}`]
+          }
         },
         assert: {
-          code: 0,
+          code: 0
         },
         ensure: step.ensure,
         on_success: step.on_success,
         on_failure: step.on_failure,
         on_error: step.on_error,
         on_abort: step.on_abort,
-        timeout: step.timeout,
+        timeout: step.timeout
       },
       JSON.stringify({
         source: resource?.source,
-        version,
+        version
       }),
-      `${pathContext}/get`,
+      `${pathContext}/get`
     );
   }
   async processGetStep(step, pathContext) {
@@ -431,27 +431,27 @@ var JobRunner = class {
           image_resource: {
             type: "registry-image",
             source: {
-              repository: resourceType?.source.repository,
-            },
+              repository: resourceType?.source.repository
+            }
           },
           run: {
-            path: "/opt/resource/check",
-          },
+            path: "/opt/resource/check"
+          }
         },
         assert: {
-          code: 0,
+          code: 0
         },
         ensure: step.ensure,
         on_success: step.on_success,
         on_failure: step.on_failure,
         on_error: step.on_error,
         on_abort: step.on_abort,
-        timeout: step.timeout,
+        timeout: step.timeout
       },
       JSON.stringify({
-        source: resource?.source,
+        source: resource?.source
       }),
-      `${pathContext}/check`,
+      `${pathContext}/check`
     );
     const checkPayload = JSON.parse(checkResult.stdout);
     const version = checkPayload[0];
@@ -462,43 +462,43 @@ var JobRunner = class {
           image_resource: {
             type: "registry-image",
             source: {
-              repository: resourceType?.source.repository,
-            },
+              repository: resourceType?.source.repository
+            }
           },
           outputs: [
-            { name: resource?.name },
+            { name: resource?.name }
           ],
           run: {
             path: "/opt/resource/in",
-            args: [`./${resource?.name}`],
-          },
+            args: [`./${resource?.name}`]
+          }
         },
         assert: {
-          code: 0,
+          code: 0
         },
         ensure: step.ensure,
         on_success: step.on_success,
         on_failure: step.on_failure,
         on_error: step.on_error,
         on_abort: step.on_abort,
-        timeout: step.timeout,
+        timeout: step.timeout
       },
       JSON.stringify({
         source: resource?.source,
-        version,
+        version
       }),
-      `${pathContext}/get`,
+      `${pathContext}/get`
     );
   }
   findResource(resourceName) {
     const resource = this.resources.find(
-      (resource2) => resource2.name === resourceName,
+      (resource2) => resource2.name === resourceName
     );
     return resource;
   }
   findResourceType(typeName) {
     const resourceType = this.resourceTypes.find(
-      (type) => type.name === typeName,
+      (type) => type.name === typeName
     );
     return resourceType;
   }
@@ -512,14 +512,12 @@ var JobRunner = class {
         await this.processStep(step.on_error, `${pathContext}/on_error`);
       }
       throw new TaskErrored(
-        `Task ${step.task} errored with message ${error}`,
+        `Task ${step.task} errored with message ${error}`
       );
     }
     if (result.code === 0 && result.status == "complete" && step.on_success) {
       await this.processStep(step.on_success, `${pathContext}/on_success`);
-    } else if (
-      result.code !== 0 && result.status == "complete" && step.on_failure
-    ) {
+    } else if (result.code !== 0 && result.status == "complete" && step.on_failure) {
       await this.processStep(step.on_failure, `${pathContext}/on_failure`);
     } else if (result.status == "abort" && step.on_abort) {
       await this.processStep(step.on_abort, `${pathContext}/on_abort`);
@@ -529,11 +527,11 @@ var JobRunner = class {
     }
     if (result.code > 0) {
       throw new TaskFailure(
-        `Task ${step.task} failed with code ${result.code}`,
+        `Task ${step.task} failed with code ${result.code}`
       );
     } else if (result.status == "abort") {
       throw new TaskAbort(
-        `Task ${step.task} aborted with message ${result.message}`,
+        `Task ${step.task} aborted with message ${result.message}`
       );
     }
     return result;
@@ -551,17 +549,17 @@ var PipelineRunner = class {
   validatePipelineConfig() {
     assert.truthy(
       this.config.jobs.length > 0,
-      "Pipeline must have at least one job",
+      "Pipeline must have at least one job"
     );
     assert.truthy(
       this.config.jobs.every((job) => job.plan.length > 0),
-      "Every job must have at least one step",
+      "Every job must have at least one step"
     );
     const jobNames = this.config.jobs.map((job) => job.name);
     assert.equal(
       jobNames.length,
       new Set(jobNames).size,
-      "Job names must be unique",
+      "Job names must be unique"
     );
     if (this.config.jobs.length > 1) {
       this.validateJobDependencies();
@@ -574,15 +572,14 @@ var PipelineRunner = class {
     const jobNames = new Set(this.config.jobs.map((job) => job.name));
     assert.truthy(
       this.config.jobs.every(
-        (job) =>
-          job.plan.every((step) => {
-            if ("get" in step && step.passed) {
-              return step.passed.every((passedJob) => jobNames.has(passedJob));
-            }
-            return true;
-          }),
+        (job) => job.plan.every((step) => {
+          if ("get" in step && step.passed) {
+            return step.passed.every((passedJob) => jobNames.has(passedJob));
+          }
+          return true;
+        })
       ),
-      "All passed constraints must reference existing jobs",
+      "All passed constraints must reference existing jobs"
     );
     this.detectCircularDependencies();
   }
@@ -626,26 +623,22 @@ var PipelineRunner = class {
   validateResources() {
     assert.truthy(
       this.config.resources.every(
-        (resource) =>
-          this.config.resource_types.some((type) =>
-            type.name === resource.type
-          ),
+        (resource) => this.config.resource_types.some((type) => type.name === resource.type)
       ),
-      "Every resource must have a valid resource type",
+      "Every resource must have a valid resource type"
     );
     assert.truthy(
       this.config.jobs.every(
-        (job) =>
-          job.plan.every((step) => {
-            if ("get" in step) {
-              return this.config.resources.some(
-                (resource) => resource.name === step.get,
-              );
-            }
-            return true;
-          }),
+        (job) => job.plan.every((step) => {
+          if ("get" in step) {
+            return this.config.resources.some(
+              (resource) => resource.name === step.get
+            );
+          }
+          return true;
+        })
       ),
-      "Every get must have a resource reference",
+      "Every get must have a resource reference"
     );
   }
   async run() {
@@ -673,7 +666,7 @@ var PipelineRunner = class {
       const jobRunner = new JobRunner(
         job,
         this.config.resources,
-        this.config.resource_types,
+        this.config.resource_types
       );
       await jobRunner.run();
       this.jobResults.set(job.name, true);
@@ -706,7 +699,7 @@ var PipelineRunner = class {
     for (const step of job.plan) {
       if ("get" in step && step.passed && step.passed.length > 0) {
         const allDependenciesMet = step.passed.every(
-          (depJobName) => this.jobResults.get(depJobName) === true,
+          (depJobName) => this.jobResults.get(depJobName) === true
         );
         if (!allDependenciesMet) {
           return false;
@@ -722,4 +715,6 @@ function createPipeline(config) {
   const runner = new PipelineRunner(config);
   return () => runner.run();
 }
-export { createPipeline };
+export {
+  createPipeline
+};

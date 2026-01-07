@@ -123,7 +123,9 @@ func (g *Git) Check(ctx context.Context, req resources.CheckRequest) (resources.
 		return nil, fmt.Errorf("failed to create temp dir: %w", err)
 	}
 
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
 
 	// Use git.Init and fetch to get refs without full clone
 	repo, err := git.PlainInit(tmpDir, true)

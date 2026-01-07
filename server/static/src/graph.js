@@ -39,7 +39,7 @@ export function initGraph(graphData, _currentPath) {
   const tooltipStatus = document.getElementById("tooltip-status");
   const tooltipType = document.getElementById("tooltip-type");
   const tooltipDurationLabel = document.getElementById(
-    "tooltip-duration-label"
+    "tooltip-duration-label",
   );
   const tooltipDuration = document.getElementById("tooltip-duration");
   const searchInput = document.getElementById("search-input");
@@ -245,7 +245,7 @@ export function initGraph(graphData, _currentPath) {
         let maxRow = globalRow;
         nodes.forEach((n) => {
           const nodeRow = Math.floor(
-            (n.y - PADDING) / (NODE_HEIGHT + NODE_MARGIN_Y)
+            (n.y - PADDING) / (NODE_HEIGHT + NODE_MARGIN_Y),
           );
           if (nodeRow > maxRow) maxRow = nodeRow;
         });
@@ -298,7 +298,7 @@ export function initGraph(graphData, _currentPath) {
 
       const path = document.createElementNS(
         "http://www.w3.org/2000/svg",
-        "path"
+        "path",
       );
 
       const x1 = fromNode.x + NODE_WIDTH;
@@ -331,8 +331,9 @@ export function initGraph(graphData, _currentPath) {
         const afterJobs = node.fullPath.substring(jobsIndex + 6); // skip "/jobs/"
         // Job name is the first segment after /jobs/
         const slashIndex = afterJobs.indexOf("/");
-        const jobName =
-          slashIndex === -1 ? afterJobs : afterJobs.substring(0, slashIndex);
+        const jobName = slashIndex === -1
+          ? afterJobs
+          : afterJobs.substring(0, slashIndex);
         // Only register if this is the actual job node (not a child like tasks/compile)
         if (slashIndex === -1) {
           const key = `${pipelinePrefix}/${jobName}`;
@@ -356,7 +357,7 @@ export function initGraph(graphData, _currentPath) {
 
           const path = document.createElementNS(
             "http://www.w3.org/2000/svg",
-            "path"
+            "path",
           );
 
           // Draw from dependency job to this job
@@ -392,7 +393,7 @@ export function initGraph(graphData, _currentPath) {
         "aria-label",
         `${node.name}, status: ${node.status}${
           node.isGroup ? ", click to expand" : ""
-        }`
+        }`,
       );
       g.dataset.nodeId = node.id;
       g.dataset.index = index;
@@ -400,7 +401,7 @@ export function initGraph(graphData, _currentPath) {
       // Node rectangle
       const rect = document.createElementNS(
         "http://www.w3.org/2000/svg",
-        "rect"
+        "rect",
       );
       rect.setAttribute("width", NODE_WIDTH);
       rect.setAttribute("height", NODE_HEIGHT);
@@ -410,7 +411,7 @@ export function initGraph(graphData, _currentPath) {
       // Node text
       const text = document.createElementNS(
         "http://www.w3.org/2000/svg",
-        "text"
+        "text",
       );
       text.setAttribute("x", NODE_WIDTH / 2);
       text.setAttribute("y", NODE_HEIGHT / 2);
@@ -430,7 +431,7 @@ export function initGraph(graphData, _currentPath) {
       if (node.isGroup) {
         const indicator = document.createElementNS(
           "http://www.w3.org/2000/svg",
-          "text"
+          "text",
         );
         indicator.setAttribute("x", NODE_WIDTH - 10);
         indicator.setAttribute("y", NODE_HEIGHT / 2);
@@ -446,7 +447,7 @@ export function initGraph(graphData, _currentPath) {
       const badgeRadius = 10;
       const badge = document.createElementNS(
         "http://www.w3.org/2000/svg",
-        "circle"
+        "circle",
       );
       badge.setAttribute("cx", -4);
       badge.setAttribute("cy", -4);
@@ -456,7 +457,7 @@ export function initGraph(graphData, _currentPath) {
 
       const badgeText = document.createElementNS(
         "http://www.w3.org/2000/svg",
-        "text"
+        "text",
       );
       badgeText.setAttribute("x", -4);
       badgeText.setAttribute("y", -4);
@@ -528,12 +529,10 @@ export function initGraph(graphData, _currentPath) {
     scale = Math.max(scale, 0.1); // Min scale of 0.1
 
     // Center the graph
-    translateX =
-      (containerRect.width - graphWidth * scale) / 2 -
+    translateX = (containerRect.width - graphWidth * scale) / 2 -
       minX * scale +
       PADDING * scale;
-    translateY =
-      (containerRect.height - graphHeight * scale) / 2 -
+    translateY = (containerRect.height - graphHeight * scale) / 2 -
       minY * scale +
       PADDING * scale;
 
@@ -543,7 +542,7 @@ export function initGraph(graphData, _currentPath) {
   function updateTransform() {
     viewport.setAttribute(
       "transform",
-      `translate(${translateX}, ${translateY}) scale(${scale})`
+      `translate(${translateX}, ${translateY}) scale(${scale})`,
     );
     zoomInfo.textContent = `Zoom: ${Math.round(scale * 100)}%`;
     updateMinimapViewport();
@@ -552,8 +551,8 @@ export function initGraph(graphData, _currentPath) {
   // Tooltip functions
   function showTooltip(event, node) {
     tooltipName.textContent = node.name;
-    tooltipStatus.textContent =
-      node.status.charAt(0).toUpperCase() + node.status.slice(1);
+    tooltipStatus.textContent = node.status.charAt(0).toUpperCase() +
+      node.status.slice(1);
     tooltipType.textContent = node.isGroup ? "Group" : "Task";
 
     // Show duration if available
@@ -632,14 +631,14 @@ export function initGraph(graphData, _currentPath) {
     const minimapRect = minimap.getBoundingClientRect();
     const minimapScale = Math.min(
       (minimapRect.width - 10) / graphWidth,
-      (minimapRect.height - 10) / graphHeight
+      (minimapRect.height - 10) / graphHeight,
     );
 
     // Render mini nodes
     nodes.forEach((node) => {
       const rect = document.createElementNS(
         "http://www.w3.org/2000/svg",
-        "rect"
+        "rect",
       );
       rect.setAttribute("x", 5 + (node.x - minX) * minimapScale);
       rect.setAttribute("y", 5 + (node.y - minY) * minimapScale);
@@ -663,7 +662,7 @@ export function initGraph(graphData, _currentPath) {
 
     const minimapScale = Math.min(
       (minimapRect.width - 10) / graphWidth,
-      (minimapRect.height - 10) / graphHeight
+      (minimapRect.height - 10) / graphHeight,
     );
 
     // Calculate visible area in graph coordinates
@@ -675,11 +674,11 @@ export function initGraph(graphData, _currentPath) {
     // Convert to minimap coordinates
     minimapViewport.setAttribute(
       "x",
-      5 + (visibleX - graphBounds.minX) * minimapScale
+      5 + (visibleX - graphBounds.minX) * minimapScale,
     );
     minimapViewport.setAttribute(
       "y",
-      5 + (visibleY - graphBounds.minY) * minimapScale
+      5 + (visibleY - graphBounds.minY) * minimapScale,
     );
     minimapViewport.setAttribute("width", visibleWidth * minimapScale);
     minimapViewport.setAttribute("height", visibleHeight * minimapScale);
@@ -783,7 +782,7 @@ export function initGraph(graphData, _currentPath) {
       const centerY = e.clientY - rect.top;
       zoom(e.deltaY > 0 ? -0.1 : 0.1, centerX, centerY);
     },
-    { passive: false }
+    { passive: false },
   );
 
   container.addEventListener("mousedown", (e) => {
@@ -831,7 +830,7 @@ export function initGraph(graphData, _currentPath) {
         };
       }
     },
-    { passive: true }
+    { passive: true },
   );
 
   container.addEventListener(
@@ -856,7 +855,7 @@ export function initGraph(graphData, _currentPath) {
         lastTouchDistance = distance;
       }
     },
-    { passive: false }
+    { passive: false },
   );
 
   container.addEventListener("touchend", () => {
@@ -920,7 +919,7 @@ export function initGraph(graphData, _currentPath) {
         "text-gray-700",
         "dark:text-gray-300",
         "hover:bg-gray-300",
-        "dark:hover:bg-gray-600"
+        "dark:hover:bg-gray-600",
       );
       edgeModeTree.classList.add("bg-blue-600", "text-white");
       edgeModeTree.setAttribute("aria-pressed", "true");
@@ -932,7 +931,7 @@ export function initGraph(graphData, _currentPath) {
         "text-gray-700",
         "dark:text-gray-300",
         "hover:bg-gray-300",
-        "dark:hover:bg-gray-600"
+        "dark:hover:bg-gray-600",
       );
       edgeModeFlow.setAttribute("aria-pressed", "false");
     } else {
@@ -942,7 +941,7 @@ export function initGraph(graphData, _currentPath) {
         "text-gray-700",
         "dark:text-gray-300",
         "hover:bg-gray-300",
-        "dark:hover:bg-gray-600"
+        "dark:hover:bg-gray-600",
       );
       edgeModeFlow.classList.add("bg-blue-600", "text-white");
       edgeModeFlow.setAttribute("aria-pressed", "true");
@@ -954,7 +953,7 @@ export function initGraph(graphData, _currentPath) {
         "text-gray-700",
         "dark:text-gray-300",
         "hover:bg-gray-300",
-        "dark:hover:bg-gray-600"
+        "dark:hover:bg-gray-600",
       );
       edgeModeTree.setAttribute("aria-pressed", "false");
     }
@@ -1005,6 +1004,7 @@ export function initGraph(graphData, _currentPath) {
   announcer.setAttribute("role", "status");
   announcer.setAttribute("aria-live", "polite");
   announcer.classList.add("sr-only");
-  announcer.textContent = `Pipeline graph loaded with ${nodesLayer.children.length} nodes. Use Tab to navigate between nodes, arrow keys to pan, and plus/minus to zoom.`;
+  announcer.textContent =
+    `Pipeline graph loaded with ${nodesLayer.children.length} nodes. Use Tab to navigate between nodes, arrow keys to pan, and plus/minus to zoom.`;
   document.body.appendChild(announcer);
 }
