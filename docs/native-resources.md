@@ -362,6 +362,7 @@ Or globally via CLI:
 ```bash
 ci runner --prefer-native-resources pipeline.ts
 ```
+
 ## Future Direction: Native-First Execution (No Containers for Resources)
 
 The cleanest architecture is to **always execute native resources directly in
@@ -421,11 +422,11 @@ Pipeline Request
 
 ### Volume Path Resolution by Driver
 
-| Driver   | Volume Path                      | How Resources Access It                                        |
-| -------- | -------------------------------- | -------------------------------------------------------------- |
-| `native` | `/tmp/ci-volumes/abc123`         | Direct filesystem access                                       |
-| `docker` | Host path mounted as Docker volume | Direct filesystem access (same host)                          |
-| `k8s`    | PVC mount path on controller node | Direct access if controller has PVC mounted (see below)       |
+| Driver   | Volume Path                        | How Resources Access It                                 |
+| -------- | ---------------------------------- | ------------------------------------------------------- |
+| `native` | `/tmp/ci-volumes/abc123`           | Direct filesystem access                                |
+| `docker` | Host path mounted as Docker volume | Direct filesystem access (same host)                    |
+| `k8s`    | PVC mount path on controller node  | Direct access if controller has PVC mounted (see below) |
 
 ### Kubernetes Consideration
 
