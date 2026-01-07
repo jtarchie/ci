@@ -61,7 +61,9 @@ func TestGitResource(t *testing.T) {
 		destDir, err := os.MkdirTemp("", "git-in-test-*")
 		assert.Expect(err).NotTo(HaveOccurred())
 
-		defer os.RemoveAll(destDir)
+		defer func() {
+			_ = os.RemoveAll(destDir)
+		}()
 
 		// In (get) the repository
 		inResp, err := res.In(ctx, destDir, resources.InRequest{

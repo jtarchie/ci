@@ -48,7 +48,9 @@ func TestMockResource(t *testing.T) {
 		destDir, err := os.MkdirTemp("", "mock-in-test-*")
 		assert.Expect(err).NotTo(HaveOccurred())
 
-		defer os.RemoveAll(destDir)
+		defer func() {
+			_ = os.RemoveAll(destDir)
+		}()
 
 		ctx := context.Background()
 		inResp, err := res.In(ctx, destDir, resources.InRequest{

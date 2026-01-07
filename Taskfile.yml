@@ -12,7 +12,7 @@ tasks:
       - yarn build
   fmt:
     cmds:
-      - deno fmt --ignore=server/templates/,backwards/bundle.js .
+      - deno fmt --ignore=server/templates/,backwards/bundle.js,server/static/build.js .
       - deno lint --rules-exclude=no-window,no-process-global --ignore=server/templates/,backwards/bundle.js .
       - gofmt -w .
       - golangci-lint run ./... --fix
