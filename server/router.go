@@ -26,6 +26,11 @@ type RouterOptions struct {
 	MaxInFlight int
 }
 
+// isHtmxRequest checks if the request is from htmx.
+func isHtmxRequest(ctx echo.Context) bool {
+	return ctx.Request().Header.Get("HX-Request") == "true"
+}
+
 func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*echo.Echo, error) {
 	router := echo.New()
 
@@ -281,8 +286,7 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 
 		// Check if we can execute more pipelines
 		if !execService.CanExecute() {
-			// For htmx requests, return error as HTML
-			if ctx.Request().Header.Get("HX-Request") == "true" {
+			if isHtmxRequest(ctx) {
 				return ctx.String(http.StatusTooManyRequests, "Max concurrent executions reached")
 			}
 			return ctx.JSON(http.StatusTooManyRequests, map[string]any{
@@ -296,7 +300,7 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 		pipeline, err := store.GetPipeline(ctx.Request().Context(), id)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
-				if ctx.Request().Header.Get("HX-Request") == "true" {
+				if isHtmxRequest(ctx) {
 					return ctx.String(http.StatusNotFound, "Pipeline not found")
 				}
 				return ctx.JSON(http.StatusNotFound, map[string]string{
@@ -318,7 +322,7 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 		}
 
 		// For htmx requests, return the updated runs section
-		if ctx.Request().Header.Get("HX-Request") == "true" {
+		if isHtmxRequest(ctx) {
 			runs, err := store.ListRunsByPipeline(ctx.Request().Context(), id)
 			if err != nil {
 				return fmt.Errorf("could not list runs: %w", err)

@@ -11,10 +11,13 @@ import { initGraph } from "./graph.js";
 import { initResults } from "./results.js";
 
 // Import pipelines module
-import { initPipelines } from "./pipelines.js";
+import { initPipelines, showToast } from "./pipelines.js";
 
 // Make AsciinemaPlayer available globally
 window.AsciinemaPlayer = AsciinemaPlayer;
+
+// Export CI namespace for htmx hx-on attributes
+window.CI = { showToast };
 
 // Initialize when DOM is ready
 document.addEventListener("DOMContentLoaded", function () {
