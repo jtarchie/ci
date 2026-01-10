@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v5
-      - uses: denoland/setup-deno@v1
+      - uses: denoland/setup-deno@v2
       - name: start minikube
         id: minikube
         uses: medyagh/setup-minikube@latest
