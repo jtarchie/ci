@@ -9,8 +9,8 @@ import (
 	"sync"
 	"text/template"
 
-	"github.com/go-task/slim-sprig/v3"
 	"github.com/dop251/goja"
+	"github.com/go-task/slim-sprig/v3"
 	"github.com/nikoksr/notify"
 	nhttp "github.com/nikoksr/notify/service/http"
 	"github.com/nikoksr/notify/service/msteams"
