@@ -75,7 +75,7 @@ func (c *AsciiCastConverter) ToAsciiCast(stdout string, writer io.Writer) error 
 
 		// Add line to current chunk
 		currentChunk.WriteString(line)
-		currentChunk.WriteString("\n")
+		currentChunk.WriteString("\r\n")
 
 		lineCount++
 
