@@ -265,9 +265,10 @@ export class JobRunner {
     storage.set(storageKey, { status: "pending", total: combinations.length });
 
     let failureOccurred = false;
+    const failFast = (step as { fail_fast?: boolean }).fail_fast || false;
 
     for (let i = 0; i < combinations.length; i++) {
-      if (failureOccurred && step.fail_fast) {
+      if (failureOccurred && failFast) {
         break; // Stop processing if fail_fast is enabled and a failure occurred
       }
 
@@ -286,7 +287,7 @@ export class JobRunner {
         );
       } catch (error) {
         failureOccurred = true;
-        if (step.fail_fast) {
+        if (failFast) {
           storage.set(storageKey, { status: "failure", failed_at: i });
           throw error;
         }
@@ -295,7 +296,7 @@ export class JobRunner {
       }
     }
 
-    if (failureOccurred && !step.fail_fast) {
+    if (failureOccurred && !failFast) {
       storage.set(storageKey, { status: "failure" });
       throw new TaskFailure("One or more across combinations failed");
     }
