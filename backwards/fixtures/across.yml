@@ -34,13 +34,13 @@ jobs:
             args:
               - -c
               - |
-                echo "Testing with Go version: $go_version"
-                # Verify the environment variable is set correctly
-                if [ -z "$go_version" ]; then
-                  echo "ERROR: go_version not set"
-                  exit 1
-                fi
-                echo "Go $go_version test passed"
+                  echo "Testing with Go version: $go_version"
+                  # Verify the environment variable is set correctly
+                  if [ -z "$go_version" ]; then
+                    echo "ERROR: go_version not set"
+                    exit 1
+                  fi
+                  echo "Go $go_version test passed"
         assert:
           code: 0
 
@@ -70,13 +70,13 @@ jobs:
             args:
               - -c
               - |
-                echo "Building for platform=$platform size=$size"
-                # Verify both variables are set
-                if [ -z "$platform" ] || [ -z "$size" ]; then
-                  echo "ERROR: Variables not set correctly"
-                  exit 1
-                fi
-                echo "Build completed: $platform-$size"
+                  echo "Building for platform=$platform size=$size"
+                  # Verify both variables are set
+                  if [ -z "$platform" ] || [ -z "$size" ]; then
+                    echo "ERROR: Variables not set correctly"
+                    exit 1
+                  fi
+                  echo "Build completed: $platform-$size"
         assert:
           code: 0
 
@@ -108,9 +108,9 @@ jobs:
             args:
               - -c
               - |
-                echo "Running test for version $version"
-                # Always fail - this should stop after first iteration
-                exit 1
+                  echo "Running test for version $version"
+                  # Always fail - this should stop after first iteration
+                  exit 1
         assert:
           code: 1
     on_failure:
@@ -150,14 +150,14 @@ jobs:
             args:
               - -c
               - |
-                echo "Running test $test_id"
-                # Fail on test 2, succeed on others
-                if [ "$test_id" = "2" ]; then
-                  echo "Test $test_id failed"
-                  exit 1
-                fi
-                echo "Test $test_id passed"
-                exit 0
+                  echo "Running test $test_id"
+                  # Fail on test 2, succeed on others
+                  if [ "$test_id" = "2" ]; then
+                    echo "Test $test_id failed"
+                    exit 1
+                  fi
+                  echo "Test $test_id passed"
+                  exit 0
     on_failure:
       task: report-failures
       config:
@@ -196,7 +196,7 @@ jobs:
             args:
               - -c
               - |
-                echo "Number is $number"
+                  echo "Number is $number"
         assert:
           code: 0
           stdout: "Number is"
@@ -229,12 +229,12 @@ jobs:
             args:
               - -c
               - |
-                echo "Deploying to env=$env region=$region tier=$tier"
-                # Verify all three variables are set
-                if [ -z "$env" ] || [ -z "$region" ] || [ -z "$tier" ]; then
-                  echo "ERROR: Not all variables set"
-                  exit 1
-                fi
+                  echo "Deploying to env=$env region=$region tier=$tier"
+                  # Verify all three variables are set
+                  if [ -z "$env" ] || [ -z "$region" ] || [ -z "$tier" ]; then
+                    echo "ERROR: Not all variables set"
+                    exit 1
+                  fi
         assert:
           code: 0
 
