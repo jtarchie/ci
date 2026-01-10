@@ -60,6 +60,23 @@ func NewSqlite(dsn string, namespace string, _ *slog.Logger) (storage.Driver, er
 		return nil, fmt.Errorf("failed to create pipelines table: %w", err)
 	}
 
+	//nolint: noctx
+	_, err = writer.Exec(`
+		CREATE TABLE IF NOT EXISTS pipeline_runs (
+			id TEXT NOT NULL PRIMARY KEY,
+			pipeline_id TEXT NOT NULL,
+			status TEXT NOT NULL,
+			started_at TEXT,
+			completed_at TEXT,
+			error_message TEXT,
+			created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (pipeline_id) REFERENCES pipelines(id)
+		) STRICT;
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pipeline_runs table: %w", err)
+	}
+
 	writer.SetMaxIdleConns(1)
 	writer.SetMaxOpenConns(1)
 
@@ -262,6 +279,102 @@ func (s *Sqlite) DeletePipeline(ctx context.Context, id string) error {
 	result, err := s.writer.ExecContext(ctx, `DELETE FROM pipelines WHERE id = ?`, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete pipeline: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return storage.ErrNotFound
+	}
+
+	return nil
+}
+
+// SaveRun creates a new pipeline run record.
+func (s *Sqlite) SaveRun(ctx context.Context, pipelineID string) (*storage.PipelineRun, error) {
+	id := gonanoid.Must()
+	now := time.Now().UTC()
+
+	_, err := s.writer.ExecContext(ctx, `
+		INSERT INTO pipeline_runs (id, pipeline_id, status, created_at)
+		VALUES (?, ?, ?, ?)
+	`, id, pipelineID, storage.RunStatusQueued, now.Format(time.RFC3339))
+	if err != nil {
+		return nil, fmt.Errorf("failed to save run: %w", err)
+	}
+
+	return &storage.PipelineRun{
+		ID:         id,
+		PipelineID: pipelineID,
+		Status:     storage.RunStatusQueued,
+		CreatedAt:  now,
+	}, nil
+}
+
+// GetRun retrieves a pipeline run by its ID.
+func (s *Sqlite) GetRun(ctx context.Context, runID string) (*storage.PipelineRun, error) {
+	var run storage.PipelineRun
+	var status string
+	var createdAt string
+	var startedAt, completedAt, errorMessage sql.NullString
+
+	err := s.writer.QueryRowContext(ctx, `
+		SELECT id, pipeline_id, status, started_at, completed_at, error_message, created_at
+		FROM pipeline_runs WHERE id = ?
+	`, runID).Scan(&run.ID, &run.PipelineID, &status, &startedAt, &completedAt, &errorMessage, &createdAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, storage.ErrNotFound
+		}
+
+		return nil, fmt.Errorf("failed to get run: %w", err)
+	}
+
+	run.Status = storage.RunStatus(status)
+	run.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+
+	if startedAt.Valid {
+		t, _ := time.Parse(time.RFC3339, startedAt.String)
+		run.StartedAt = &t
+	}
+
+	if completedAt.Valid {
+		t, _ := time.Parse(time.RFC3339, completedAt.String)
+		run.CompletedAt = &t
+	}
+
+	if errorMessage.Valid {
+		run.ErrorMessage = errorMessage.String
+	}
+
+	return &run, nil
+}
+
+// UpdateRunStatus updates the status of a pipeline run.
+func (s *Sqlite) UpdateRunStatus(ctx context.Context, runID string, status storage.RunStatus, errorMessage string) error {
+	now := time.Now().UTC()
+
+	var query string
+	var args []any
+
+	switch status {
+	case storage.RunStatusRunning:
+		query = `UPDATE pipeline_runs SET status = ?, started_at = ? WHERE id = ?`
+		args = []any{status, now.Format(time.RFC3339), runID}
+	case storage.RunStatusSuccess, storage.RunStatusFailed:
+		query = `UPDATE pipeline_runs SET status = ?, completed_at = ?, error_message = ? WHERE id = ?`
+		args = []any{status, now.Format(time.RFC3339), errorMessage, runID}
+	default:
+		query = `UPDATE pipeline_runs SET status = ? WHERE id = ?`
+		args = []any{status, runID}
+	}
+
+	result, err := s.writer.ExecContext(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("failed to update run status: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
