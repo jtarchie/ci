@@ -1,6 +1,7 @@
 package storage_test
 
 import (
+	"context"
 	"log/slog"
 	"os"
 	"testing"
@@ -32,13 +33,13 @@ func TestDrivers(t *testing.T) {
 
 				defer func() { _ = client.Close() }()
 
-				err = client.Set("/foo", map[string]string{
+				err = client.Set(context.Background(), "/foo", map[string]string{
 					"field":   "123",
 					"another": "456",
 				})
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				results, err := client.GetAll("/foo", []string{"field"})
+				results, err := client.GetAll(context.Background(), "/foo", []string{"field"})
 				assert.Expect(err).NotTo(HaveOccurred())
 				assert.Expect(results).To(HaveLen(1))
 				assert.Expect(results[0].Path).To(Equal("/namespace/foo"))

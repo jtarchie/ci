@@ -1,6 +1,7 @@
 package storage_test
 
 import (
+	"context"
 	"log/slog"
 	"os"
 	"testing"
@@ -29,7 +30,7 @@ func TestPipelineStorage(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				pipeline, err := client.SavePipeline("test-pipeline", "console.log('hello');", "docker://")
+				pipeline, err := client.SavePipeline(context.Background(), "test-pipeline", "console.log('hello');", "docker://")
 				assert.Expect(err).NotTo(HaveOccurred())
 				assert.Expect(pipeline).NotTo(BeNil())
 				assert.Expect(pipeline.ID).NotTo(BeEmpty())
@@ -52,10 +53,10 @@ func TestPipelineStorage(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				saved, err := client.SavePipeline("my-pipeline", "export { pipeline };", "native://")
+				saved, err := client.SavePipeline(context.Background(), "my-pipeline", "export { pipeline };", "native://")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				retrieved, err := client.GetPipeline(saved.ID)
+				retrieved, err := client.GetPipeline(context.Background(), saved.ID)
 				assert.Expect(err).NotTo(HaveOccurred())
 				assert.Expect(retrieved.ID).To(Equal(saved.ID))
 				assert.Expect(retrieved.Name).To(Equal("my-pipeline"))
@@ -75,7 +76,7 @@ func TestPipelineStorage(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				_, err = client.GetPipeline("non-existent-id")
+				_, err = client.GetPipeline(context.Background(), "non-existent-id")
 				assert.Expect(err).To(Equal(storage.ErrNotFound))
 			})
 
@@ -91,13 +92,13 @@ func TestPipelineStorage(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				_, err = client.SavePipeline("pipeline-1", "content1", "docker://")
+				_, err = client.SavePipeline(context.Background(), "pipeline-1", "content1", "docker://")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				_, err = client.SavePipeline("pipeline-2", "content2", "native://")
+				_, err = client.SavePipeline(context.Background(), "pipeline-2", "content2", "native://")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				pipelines, err := client.ListPipelines()
+				pipelines, err := client.ListPipelines(context.Background())
 				assert.Expect(err).NotTo(HaveOccurred())
 				assert.Expect(pipelines).To(HaveLen(2))
 			})
@@ -114,7 +115,7 @@ func TestPipelineStorage(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				pipelines, err := client.ListPipelines()
+				pipelines, err := client.ListPipelines(context.Background())
 				assert.Expect(err).NotTo(HaveOccurred())
 				assert.Expect(pipelines).To(BeEmpty())
 			})
@@ -131,13 +132,13 @@ func TestPipelineStorage(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				saved, err := client.SavePipeline("to-delete", "content", "docker://")
+				saved, err := client.SavePipeline(context.Background(), "to-delete", "content", "docker://")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				err = client.DeletePipeline(saved.ID)
+				err = client.DeletePipeline(context.Background(), saved.ID)
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				_, err = client.GetPipeline(saved.ID)
+				_, err = client.GetPipeline(context.Background(), saved.ID)
 				assert.Expect(err).To(Equal(storage.ErrNotFound))
 			})
 
@@ -153,7 +154,7 @@ func TestPipelineStorage(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				err = client.DeletePipeline("non-existent-id")
+				err = client.DeletePipeline(context.Background(), "non-existent-id")
 				assert.Expect(err).To(Equal(storage.ErrNotFound))
 			})
 		})

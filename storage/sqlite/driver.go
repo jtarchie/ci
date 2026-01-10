@@ -75,7 +75,7 @@ func NewSqlite(dsn string, namespace string, _ *slog.Logger) (storage.Driver, er
 	}, nil
 }
 
-func (s *Sqlite) Set(prefix string, payload any) error {
+func (s *Sqlite) Set(ctx context.Context, prefix string, payload any) error {
 	path := filepath.Clean("/" + s.namespace + "/" + prefix)
 
 	contents, err := json.Marshal(payload)
@@ -83,8 +83,7 @@ func (s *Sqlite) Set(prefix string, payload any) error {
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	//nolint: noctx
-	_, err = s.writer.Exec(`
+	_, err = s.writer.ExecContext(ctx, `
 		INSERT INTO tasks (path, payload)
 		VALUES (?, ?)
 		ON CONFLICT(path) DO UPDATE SET
@@ -97,7 +96,7 @@ func (s *Sqlite) Set(prefix string, payload any) error {
 	return nil
 }
 
-func (s *Sqlite) Get(prefix string) (storage.Payload, error) {
+func (s *Sqlite) Get(ctx context.Context, prefix string) (storage.Payload, error) {
 	path := filepath.Clean("/" + s.namespace + "/" + prefix)
 
 	var payload storage.Payload
@@ -106,8 +105,7 @@ func (s *Sqlite) Get(prefix string) (storage.Payload, error) {
 	// Use writer instead of reader to work with in-memory databases
 	// where each connection gets its own database.
 	// Use json() to convert JSONB back to regular JSON text.
-	//nolint: noctx
-	err := s.writer.QueryRow(`
+	err := s.writer.QueryRowContext(ctx, `
 		SELECT json(payload) FROM tasks WHERE path = ?
 	`, path).Scan(&payloadBytes)
 	if err != nil {
@@ -125,7 +123,7 @@ func (s *Sqlite) Get(prefix string) (storage.Payload, error) {
 	return payload, nil
 }
 
-func (s *Sqlite) GetAll(prefix string, fields []string) (storage.Results, error) {
+func (s *Sqlite) GetAll(ctx context.Context, prefix string, fields []string) (storage.Results, error) {
 	if len(fields) == 0 {
 		fields = []string{"status"}
 	}
@@ -152,7 +150,7 @@ func (s *Sqlite) GetAll(prefix string, fields []string) (storage.Results, error)
 		`, jsonSelects)
 
 	err := sqlscan.Select(
-		context.Background(),
+		ctx,
 		s.reader,
 		&results,
 		query,
@@ -180,12 +178,11 @@ func (s *Sqlite) Close() error {
 }
 
 // SavePipeline creates or updates a pipeline in the database.
-func (s *Sqlite) SavePipeline(name, content, driverDSN string) (*storage.Pipeline, error) {
+func (s *Sqlite) SavePipeline(ctx context.Context, name, content, driverDSN string) (*storage.Pipeline, error) {
 	id := gonanoid.Must()
 	now := time.Now().UTC()
 
-	//nolint: noctx
-	_, err := s.writer.Exec(`
+	_, err := s.writer.ExecContext(ctx, `
 		INSERT INTO pipelines (id, name, content, driver_dsn, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?)
 	`, id, name, content, driverDSN, now.Format(time.RFC3339), now.Format(time.RFC3339))
@@ -204,12 +201,11 @@ func (s *Sqlite) SavePipeline(name, content, driverDSN string) (*storage.Pipelin
 }
 
 // GetPipeline retrieves a pipeline by its ID.
-func (s *Sqlite) GetPipeline(id string) (*storage.Pipeline, error) {
+func (s *Sqlite) GetPipeline(ctx context.Context, id string) (*storage.Pipeline, error) {
 	var pipeline storage.Pipeline
 	var createdAt, updatedAt string
 
-	//nolint: noctx
-	err := s.writer.QueryRow(`
+	err := s.writer.QueryRowContext(ctx, `
 		SELECT id, name, content, driver_dsn, created_at, updated_at
 		FROM pipelines WHERE id = ?
 	`, id).Scan(&pipeline.ID, &pipeline.Name, &pipeline.Content, &pipeline.DriverDSN, &createdAt, &updatedAt)
@@ -228,9 +224,8 @@ func (s *Sqlite) GetPipeline(id string) (*storage.Pipeline, error) {
 }
 
 // ListPipelines returns all pipelines in the database.
-func (s *Sqlite) ListPipelines() ([]storage.Pipeline, error) {
-	//nolint: noctx
-	rows, err := s.writer.Query(`
+func (s *Sqlite) ListPipelines(ctx context.Context) ([]storage.Pipeline, error) {
+	rows, err := s.writer.QueryContext(ctx, `
 		SELECT id, name, content, driver_dsn, created_at, updated_at
 		FROM pipelines ORDER BY created_at DESC
 	`)
@@ -263,9 +258,8 @@ func (s *Sqlite) ListPipelines() ([]storage.Pipeline, error) {
 }
 
 // DeletePipeline removes a pipeline by its ID.
-func (s *Sqlite) DeletePipeline(id string) error {
-	//nolint: noctx
-	result, err := s.writer.Exec(`DELETE FROM pipelines WHERE id = ?`, id)
+func (s *Sqlite) DeletePipeline(ctx context.Context, id string) error {
+	result, err := s.writer.ExecContext(ctx, `DELETE FROM pipelines WHERE id = ?`, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete pipeline: %w", err)
 	}

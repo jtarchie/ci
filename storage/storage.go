@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bytes"
+	"context"
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
@@ -24,15 +25,15 @@ type Pipeline struct {
 
 type Driver interface {
 	Close() error
-	Set(prefix string, payload any) error
-	Get(prefix string) (Payload, error)
-	GetAll(prefix string, fields []string) (Results, error)
+	Set(ctx context.Context, prefix string, payload any) error
+	Get(ctx context.Context, prefix string) (Payload, error)
+	GetAll(ctx context.Context, prefix string, fields []string) (Results, error)
 
 	// Pipeline CRUD operations
-	SavePipeline(name, content, driverDSN string) (*Pipeline, error)
-	GetPipeline(id string) (*Pipeline, error)
-	ListPipelines() ([]Pipeline, error)
-	DeletePipeline(id string) error
+	SavePipeline(ctx context.Context, name, content, driverDSN string) (*Pipeline, error)
+	GetPipeline(ctx context.Context, id string) (*Pipeline, error)
+	ListPipelines(ctx context.Context) ([]Pipeline, error)
+	DeletePipeline(ctx context.Context, id string) error
 }
 
 type Payload map[string]any

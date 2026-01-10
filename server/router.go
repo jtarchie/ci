@@ -85,7 +85,7 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver) {
 			})
 		}
 
-		pipeline, err := store.SavePipeline(req.Name, req.Content, req.DriverDSN)
+		pipeline, err := store.SavePipeline(ctx.Request().Context(), req.Name, req.Content, req.DriverDSN)
 		if err != nil {
 			return ctx.JSON(http.StatusInternalServerError, map[string]string{
 				"error": fmt.Sprintf("failed to save pipeline: %v", err),
@@ -97,7 +97,7 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver) {
 
 	// GET /api/pipelines - List all pipelines
 	api.GET("/pipelines", func(ctx echo.Context) error {
-		pipelines, err := store.ListPipelines()
+		pipelines, err := store.ListPipelines(ctx.Request().Context())
 		if err != nil {
 			return ctx.JSON(http.StatusInternalServerError, map[string]string{
 				"error": fmt.Sprintf("failed to list pipelines: %v", err),
@@ -115,7 +115,7 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver) {
 	api.GET("/pipelines/:id", func(ctx echo.Context) error {
 		id := ctx.Param("id")
 
-		pipeline, err := store.GetPipeline(id)
+		pipeline, err := store.GetPipeline(ctx.Request().Context(), id)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
 				return ctx.JSON(http.StatusNotFound, map[string]string{
@@ -135,7 +135,7 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver) {
 	api.DELETE("/pipelines/:id", func(ctx echo.Context) error {
 		id := ctx.Param("id")
 
-		err := store.DeletePipeline(id)
+		err := store.DeletePipeline(ctx.Request().Context(), id)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
 				return ctx.JSON(http.StatusNotFound, map[string]string{
