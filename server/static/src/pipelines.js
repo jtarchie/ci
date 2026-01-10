@@ -43,6 +43,17 @@ async function handleTriggerClick(event) {
     // If we're on the pipeline detail page, add the new run to the table
     const runsTable = document.getElementById("runs-table");
     if (runsTable) {
+      // Hide the "No runs yet" message and show the table
+      const noRunsMessage = document.getElementById("no-runs-message");
+      const runsTableContainer = document.getElementById(
+        "runs-table-container"
+      );
+      if (noRunsMessage) {
+        noRunsMessage.classList.add("hidden");
+      }
+      if (runsTableContainer) {
+        runsTableContainer.classList.remove("hidden");
+      }
       addRunToTable(runsTable, result);
     }
   } catch (error) {
@@ -81,12 +92,12 @@ function addRunToTable(table, run) {
     </td>
     <td class="px-6 py-4 text-right">
       <div class="flex items-center justify-end gap-2">
-        <a href="/tasks/${run.run_id}/"
+        <a href="/runs/${run.run_id}/tasks"
           class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded text-sm transition-colors"
           title="View task list">
           Tasks
         </a>
-        <a href="/graph/${run.run_id}/"
+        <a href="/runs/${run.run_id}/graph"
           class="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900 dark:hover:bg-blue-800 text-blue-700 dark:text-blue-200 rounded text-sm transition-colors"
           title="View dependency graph">
           Graph
@@ -123,7 +134,7 @@ function pollRunStatus(runId, pipelineName) {
       } else if (run.status === "failed") {
         showToast(
           `${pipelineName} failed: ${run.error_message || "Unknown error"}`,
-          "error",
+          "error"
         );
         return;
       }
@@ -206,14 +217,14 @@ function showToast(message, type = "info") {
   if (!container) return;
 
   const toast = document.createElement("div");
-  const bgColor = type === "success"
-    ? "bg-green-600"
-    : type === "error"
-    ? "bg-red-600"
-    : "bg-blue-600";
+  const bgColor =
+    type === "success"
+      ? "bg-green-600"
+      : type === "error"
+      ? "bg-red-600"
+      : "bg-blue-600";
 
-  toast.className =
-    `${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 transform transition-all duration-300 translate-x-full`;
+  toast.className = `${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 transform transition-all duration-300 translate-x-full`;
   toast.innerHTML = `
     <span>${message}</span>
     <button class="ml-2 hover:opacity-75" onclick="this.parentElement.remove()">
