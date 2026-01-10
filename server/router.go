@@ -64,6 +64,53 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 		return ctx.String(http.StatusOK, "OK")
 	})
 
+	// Redirect root to pipelines list
+	router.GET("/", func(ctx echo.Context) error {
+		return ctx.Redirect(http.StatusMovedPermanently, "/pipelines/")
+	})
+
+	// Pipeline web UI routes
+	router.GET("/pipelines/", func(ctx echo.Context) error {
+		pipelines, err := store.ListPipelines(ctx.Request().Context())
+		if err != nil {
+			return fmt.Errorf("could not list pipelines: %w", err)
+		}
+
+		if pipelines == nil {
+			pipelines = []storage.Pipeline{}
+		}
+
+		return ctx.Render(http.StatusOK, "pipelines.html", map[string]any{
+			"Pipelines": pipelines,
+		})
+	})
+
+	router.GET("/pipelines/:id/", func(ctx echo.Context) error {
+		id := ctx.Param("id")
+
+		pipeline, err := store.GetPipeline(ctx.Request().Context(), id)
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				return ctx.String(http.StatusNotFound, "Pipeline not found")
+			}
+			return fmt.Errorf("could not get pipeline: %w", err)
+		}
+
+		runs, err := store.ListRunsByPipeline(ctx.Request().Context(), id)
+		if err != nil {
+			return fmt.Errorf("could not list runs: %w", err)
+		}
+
+		if runs == nil {
+			runs = []storage.PipelineRun{}
+		}
+
+		return ctx.Render(http.StatusOK, "pipeline_detail.html", map[string]any{
+			"Pipeline": pipeline,
+			"Runs":     runs,
+		})
+	})
+
 	// Pipeline API endpoints
 	api := router.Group("/api")
 	registerPipelineRoutes(api, store, execService)

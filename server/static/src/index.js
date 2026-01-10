@@ -7,6 +7,9 @@ import { initGraph } from "./graph.js";
 // Import results module
 import { initResults } from "./results.js";
 
+// Import pipelines module
+import { initPipelines } from "./pipelines.js";
+
 // Make AsciinemaPlayer available globally
 window.AsciinemaPlayer = AsciinemaPlayer;
 
@@ -31,6 +34,17 @@ document.addEventListener("DOMContentLoaded", function () {
       initResults();
     } catch (e) {
       console.error("Failed to initialize results:", e);
+    }
+  }
+
+  // Initialize pipelines page if we're on a pipelines page
+  const pipelinesTable = document.getElementById("pipelines-table");
+  const triggerBtn = document.getElementById("trigger-btn");
+  if (pipelinesTable || triggerBtn) {
+    try {
+      initPipelines();
+    } catch (e) {
+      console.error("Failed to initialize pipelines:", e);
     }
   }
 });
