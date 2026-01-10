@@ -52,3 +52,19 @@ tasks:
     desc: Remove leaked Docker containers and volumes
     cmds:
       - ./bin/cleanup.sh
+
+  bump:
+    desc: Bump all Go and npm dependencies to latest versions
+    cmds:
+      - echo "Bumping Go dependencies..."
+      - go get -u ./...
+      - go mod tidy
+      - echo "Bumping npm dependencies in e2e..."
+      - cd e2e && npm update
+      - echo "Bumping npm dependencies in packages/ci..."
+      - cd packages/ci && npm update
+      - echo "Bumping npm dependencies in examples..."
+      - cd examples && npm update
+      - echo "Bumping npm dependencies in server/static..."
+      - cd server/static && npm update
+      - echo "All dependencies bumped! Run 'task' to test."
