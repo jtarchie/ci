@@ -32,12 +32,15 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	execService := NewExecutionService(store, logger, opts.MaxInFlight)
 	router.Pre(middleware.AddTrailingSlashWithConfig(middleware.TrailingSlashConfig{
 		Skipper: func(c echo.Context) bool {
-			// Skip trailing slash middleware for static files and API routes
+			// Skip trailing slash middleware for static files, API routes, and health
 			path := c.Request().URL.Path
 			if len(path) >= 7 && path[:7] == "/static" {
 				return true
 			}
 			if len(path) >= 4 && path[:4] == "/api" {
+				return true
+			}
+			if path == "/health" || path == "/health/" {
 				return true
 			}
 			return false
@@ -61,6 +64,9 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	router.GET("/static/*", echo.WrapHandler(http.StripPrefix("/static/", http.FileServer(http.FS(staticFiles)))))
 
 	router.GET("/health", func(ctx echo.Context) error {
+		return ctx.String(http.StatusOK, "OK")
+	})
+	router.GET("/health/", func(ctx echo.Context) error {
 		return ctx.String(http.StatusOK, "OK")
 	})
 

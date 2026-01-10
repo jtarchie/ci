@@ -1,0 +1,266 @@
+import { type APIRequestContext, expect, test } from "@playwright/test";
+
+// Helper to generate unique pipeline names
+function uniqueName(base: string): string {
+  return `${base}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+}
+
+// Helper to create a pipeline and return its ID
+async function createPipeline(
+  request: APIRequestContext,
+  name: string,
+  content: string,
+  driverDsn: string = "native://",
+): Promise<string> {
+  const response = await request.post("/api/pipelines", {
+    data: { name, content, driver_dsn: driverDsn },
+  });
+  expect(response.ok()).toBeTruthy();
+  const data = await response.json();
+  return data.id;
+}
+
+test.describe("Pipeline Management UI", () => {
+  test.describe("Pipelines List Page", () => {
+    test("shows pipelines page structure", async ({ page }) => {
+      await page.goto("/pipelines/");
+
+      // Should have the pipelines page header (h1 specifically)
+      await expect(page.locator("h1").filter({ hasText: "Pipelines" }))
+        .toBeVisible();
+
+      // Should have either the empty state or a table
+      const hasTable = await page.locator("table").count();
+      const hasEmptyState = await page.getByText("No pipelines yet").count();
+      expect(hasTable > 0 || hasEmptyState > 0).toBeTruthy();
+    });
+
+    test("redirects root to pipelines list", async ({ page }) => {
+      await page.goto("/");
+
+      // Should redirect to /pipelines/
+      await expect(page).toHaveURL(/\/pipelines\//);
+    });
+  });
+
+  test.describe("Pipeline CRUD and Execution", () => {
+    test("displays created pipeline in the list", async ({ page, request }) => {
+      const pipelineName = uniqueName("list-test");
+      await createPipeline(
+        request,
+        pipelineName,
+        `export const pipeline = async () => { console.log("test"); };`,
+        "docker://",
+      );
+
+      await page.goto("/pipelines/");
+
+      // Should show the pipeline in the table
+      await expect(page.getByRole("link", { name: pipelineName }))
+        .toBeVisible();
+      await expect(page.getByText("docker://")).toBeVisible();
+    });
+
+    test("shows trigger button for each pipeline", async ({ page, request }) => {
+      const pipelineName = uniqueName("trigger-btn-test");
+      await createPipeline(
+        request,
+        pipelineName,
+        `export const pipeline = async () => { console.log("test"); };`,
+      );
+
+      await page.goto("/pipelines/");
+
+      // Should have trigger buttons
+      const triggerButton = page.getByRole("button", { name: /trigger/i })
+        .first();
+      await expect(triggerButton).toBeVisible();
+      await expect(triggerButton).toBeEnabled();
+    });
+
+    test("navigates to pipeline detail page", async ({ page, request }) => {
+      const pipelineName = uniqueName("nav-detail-test");
+      await createPipeline(
+        request,
+        pipelineName,
+        `export const pipeline = async () => { console.log("test"); };`,
+      );
+
+      await page.goto("/pipelines/");
+
+      // Click on pipeline name to go to detail page
+      await page.getByRole("link", { name: pipelineName }).click();
+
+      // Should be on the detail page
+      await expect(page).toHaveURL(/\/pipelines\/[^/]+\//);
+      await expect(page.getByRole("heading", { name: pipelineName }))
+        .toBeVisible();
+    });
+
+    test("pipeline detail page shows metadata", async ({ page, request }) => {
+      const pipelineName = uniqueName("metadata-test");
+      await createPipeline(
+        request,
+        pipelineName,
+        `export const pipeline = async () => { console.log("test"); };`,
+        "docker://",
+      );
+
+      await page.goto("/pipelines/");
+      await page.getByRole("link", { name: pipelineName }).click();
+
+      // Should show pipeline metadata
+      await expect(page.getByText("docker://")).toBeVisible();
+      await expect(page.getByText(/Created/)).toBeVisible();
+
+      // Should show the trigger button
+      await expect(page.getByRole("button", { name: /trigger run/i }))
+        .toBeVisible();
+    });
+
+    test("pipeline detail page shows empty runs message", async ({ page, request }) => {
+      const pipelineName = uniqueName("empty-runs-test");
+      await createPipeline(
+        request,
+        pipelineName,
+        `export const pipeline = async () => { console.log("test"); };`,
+      );
+
+      await page.goto("/pipelines/");
+      await page.getByRole("link", { name: pipelineName }).click();
+
+      // Should show empty runs message
+      await expect(page.getByText(/No runs yet/)).toBeVisible();
+    });
+
+    test("can expand pipeline source code", async ({ page, request }) => {
+      const pipelineName = uniqueName("source-expand-test");
+      await createPipeline(
+        request,
+        pipelineName,
+        `export const pipeline = async () => { console.log("source test marker"); };`,
+      );
+
+      await page.goto("/pipelines/");
+      await page.getByRole("link", { name: pipelineName }).click();
+
+      // Click on pipeline source to expand
+      await page.getByText("Pipeline Source").click();
+
+      // Should show the pipeline content
+      await expect(page.getByText("source test marker")).toBeVisible();
+    });
+
+    test("breadcrumb navigation works", async ({ page, request }) => {
+      const pipelineName = uniqueName("breadcrumb-test");
+      await createPipeline(
+        request,
+        pipelineName,
+        `export const pipeline = async () => { console.log("test"); };`,
+      );
+
+      await page.goto("/pipelines/");
+      await page.getByRole("link", { name: pipelineName }).click();
+
+      // Should show breadcrumb with Pipelines link
+      const pipelinesLink = page.locator("nav").getByRole("link", {
+        name: "Pipelines",
+      });
+      await expect(pipelinesLink).toBeVisible();
+
+      // Click Pipelines link to go back
+      await pipelinesLink.click();
+      await expect(page).toHaveURL(/\/pipelines\//);
+    });
+  });
+
+  test.describe("Pipeline Triggering", () => {
+    test("trigger button shows toast on success", async ({ page, request }) => {
+      const pipelineName = uniqueName("trigger-toast-test");
+      await createPipeline(
+        request,
+        pipelineName,
+        `export const pipeline = async () => { console.log("Quick test"); };`,
+      );
+
+      await page.goto("/pipelines/");
+
+      // Find the row with our pipeline and click its trigger button
+      const row = page.locator("tr").filter({ hasText: pipelineName });
+      await row.getByRole("button", { name: /trigger/i }).click();
+
+      // Should show success toast
+      await expect(page.getByText(/triggered successfully/i)).toBeVisible({
+        timeout: 5000,
+      });
+    });
+
+    test("triggering from detail page adds run to table", async ({ page, request }) => {
+      const pipelineName = uniqueName("detail-trigger-test");
+      await createPipeline(
+        request,
+        pipelineName,
+        `export const pipeline = async () => { console.log("Quick test"); };`,
+      );
+
+      await page.goto("/pipelines/");
+      await page.getByRole("link", { name: pipelineName }).click();
+
+      // Should show no runs initially
+      await expect(page.getByText(/No runs yet/)).toBeVisible();
+
+      // Trigger the pipeline
+      await page.getByRole("button", { name: /trigger run/i }).click();
+
+      // Should show success toast
+      await expect(page.getByText(/triggered successfully/i)).toBeVisible({
+        timeout: 5000,
+      });
+
+      // A run should now appear in the table (may need to wait for it)
+      await expect(
+        page.getByText(/queued|running|success|failed/i).first(),
+      ).toBeVisible({ timeout: 10000 });
+    });
+
+    test("run status updates via polling", async ({ page, request }) => {
+      const pipelineName = uniqueName("polling-test");
+      await createPipeline(
+        request,
+        pipelineName,
+        `export const pipeline = async () => { console.log("Quick test"); };`,
+      );
+
+      await page.goto("/pipelines/");
+      await page.getByRole("link", { name: pipelineName }).click();
+
+      // Trigger the pipeline
+      await page.getByRole("button", { name: /trigger run/i }).click();
+
+      // Wait for the run to complete (success or failed)
+      // The status should change from queued -> running -> success/failed
+      await expect(page.getByText(/success|failed/i).first()).toBeVisible({
+        timeout: 30000,
+      });
+    });
+  });
+});
+
+test.describe("Navigation", () => {
+  test("health endpoint returns OK", async ({ request }) => {
+    const response = await request.get("/health");
+    expect(response.ok()).toBeTruthy();
+    expect(await response.text()).toBe("OK");
+  });
+
+  test("pipelines page has proper structure", async ({ page }) => {
+    await page.goto("/pipelines/");
+
+    // Should have the main heading
+    await expect(page.getByRole("heading", { name: "Pipelines" }))
+      .toBeVisible();
+
+    // Should have navigation
+    await expect(page.locator("nav")).toBeVisible();
+  });
+});
