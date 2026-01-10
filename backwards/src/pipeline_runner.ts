@@ -17,11 +17,17 @@ export class PipelineRunner {
       notify.setConfigs(this.config.notifications);
     }
 
+    // Use pipelineContext.runID if available (from server), otherwise fall back to timestamp
+    const buildID =
+      (typeof pipelineContext !== "undefined" && pipelineContext.runID)
+        ? pipelineContext.runID
+        : String(Date.now());
+
     // Initialize notify context with pipeline info
     notify.setContext({
       pipelineName: this.config.jobs[0]?.name || "unknown",
       jobName: "",
-      buildID: String(Date.now()),
+      buildID: buildID,
       status: "pending",
       startTime: new Date().toISOString(),
       endTime: "",

@@ -5,6 +5,10 @@
   aria-label="Pipeline path">
   <a href="/pipelines/"
     class="text-blue-600 dark:text-blue-400 hover:underline">Pipelines</a>
+  {{ if .RunID }}
+  <span class="text-gray-500" aria-hidden="true">/</span>
+  <span class="text-gray-800 dark:text-white">Run: {{ .RunID }}</span>
+  {{ else }}
   <span class="text-gray-500" aria-hidden="true">/</span>
   <a href="/graph/"
     class="text-blue-600 dark:text-blue-400 hover:underline">Graph</a>
@@ -24,16 +28,24 @@
   {{ end }}
   {{ end }}
   {{ end }}
+  {{ end }}
 </nav>
 
 <div class="container mx-auto p-4">
   <div class="flex items-center justify-between mb-4">
     <h1 class="text-2xl font-bold">Pipeline Graph</h1>
     <div class="flex gap-2">
+      {{ if .RunID }}
+      <a href="/runs/{{ .RunID }}/tasks"
+        class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition-colors">
+        List View
+      </a>
+      {{ else }}
       <a href="/tasks{{ .Path }}/"
         class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition-colors">
         List View
       </a>
+      {{ end }}
     </div>
   </div>
 

@@ -105,7 +105,7 @@ function zeroPadWithLength(num, length) {
   const decimalPlaces = String(length).split(".")[1]?.length || 0;
   return zeroPad(num, decimalPlaces);
 }
-var buildID = zeroPad(Date.now(), 20);
+var buildID = typeof pipelineContext !== "undefined" && pipelineContext.runID ? pipelineContext.runID : zeroPad(Date.now(), 20);
 var JobRunner = class {
   constructor(jobConfig, resources, resourceTypes) {
     this.jobConfig = jobConfig;
@@ -684,10 +684,11 @@ var PipelineRunner = class {
     if (this.config.notifications) {
       notify.setConfigs(this.config.notifications);
     }
+    const buildID2 = typeof pipelineContext !== "undefined" && pipelineContext.runID ? pipelineContext.runID : String(Date.now());
     notify.setContext({
       pipelineName: this.config.jobs[0]?.name || "unknown",
       jobName: "",
-      buildID: String(Date.now()),
+      buildID: buildID2,
       status: "pending",
       startTime: (/* @__PURE__ */ new Date()).toISOString(),
       endTime: "",

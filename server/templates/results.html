@@ -5,6 +5,10 @@
   aria-label="Pipeline path">
   <a href="/pipelines/"
     class="text-blue-600 dark:text-blue-400 hover:underline">Pipelines</a>
+  {{ if .RunID }}
+  <span class="text-gray-500" aria-hidden="true">/</span>
+  <span class="text-gray-800 dark:text-white">Run: {{ .RunID }}</span>
+  {{ else }}
   <span class="text-gray-500" aria-hidden="true">/</span>
   <a href="/tasks/"
     class="text-blue-600 dark:text-blue-400 hover:underline">Tasks</a>
@@ -20,6 +24,7 @@
   {{ else }}
   <a href="/tasks{{ $accumulated }}/"
     class="text-blue-600 dark:text-blue-400 hover:underline">{{ $part }}</a>
+  {{ end }}
   {{ end }}
   {{ end }}
   {{ end }}
@@ -49,10 +54,17 @@
             stroke-width="2" d="M5 15l7-7 7 7" />
         </svg>
       </button>
+      {{ if .RunID }}
+      <a href="/runs/{{ .RunID }}/graph"
+        class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
+        Graph View
+      </a>
+      {{ else }}
       <a href="/graph{{ .Path }}/"
         class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
         Graph View
       </a>
+      {{ end }}
     </div>
   </div>
 
@@ -326,7 +338,7 @@ border-indigo-300 dark:border-indigo-600
 {{ $depth := .Depth }}
 {{ $order := .Order }}
 
-{{ if $path.IsGroup }}
+{{ if and $path.IsGroup (ne $path.Name "") }}
 {{ template "renderGroup" dict "Path" $path "Depth" $depth }}
 {{ else if ne $path.Name "" }}
 {{ template "renderTask" dict "Path" $path "Order" $order }}

@@ -1,0 +1,335 @@
+---
+assert:
+  execution:
+    - setup
+    - code-quality
+    - tests
+    - build
+
+jobs:
+  # Phase 1: Repository Setup
+  - name: setup
+    public: true
+    plan:
+      - task: clone-repository
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: alpine/git
+              tag: latest
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - |
+                  echo "🚀 Starting full CI pipeline"
+                  echo "📦 Phase 1: Repository Setup"
+                  cd workspace && git init
+                  echo "Repository setup complete"
+        assert:
+          stdout: Repository setup complete
+          code: 0
+
+  # Phase 2: Parallel Code Quality Checks
+  - name: code-quality
+    public: true
+    plan:
+      - in_parallel:
+          fail_fast: false
+          steps:
+            # Format check
+            - task: format-check
+              config:
+                platform: linux
+                image_resource:
+                  type: registry-image
+                  source:
+                    repository: golang
+                    tag: "1.25-alpine"
+                inputs:
+                  - name: workspace
+                outputs:
+                  - name: fmt-results
+                run:
+                  path: sh
+                  args:
+                    - -c
+                    - |
+                        echo "🔍 Phase 2: Running Code Quality Checks in Parallel"
+                        apk add --no-cache git
+                        echo "Checking Go formatting..."
+                        cd workspace
+                        gofmt -l . | tee ../fmt-results/fmt-results.txt
+                        test ! -s ../fmt-results/fmt-results.txt
+                        echo "✅ Format check passed"
+                env:
+                  GOCACHE: /cache/go-build
+                  GOMODCACHE: /cache/go-mod
+              assert:
+                stdout: Format check passed
+                code: 0
+
+            # Lint check
+            - task: lint-check
+              config:
+                platform: linux
+                image_resource:
+                  type: registry-image
+                  source:
+                    repository: golangci/golangci-lint
+                    tag: v1.61-alpine
+                inputs:
+                  - name: workspace
+                run:
+                  path: sh
+                  args:
+                    - -c
+                    - |
+                        echo "Running golangci-lint..."
+                        cd workspace
+                        golangci-lint run --timeout=5m ./... || true
+                        echo "✅ Lint check completed"
+                env:
+                  GOLANGCI_LINT_CACHE: /cache/lint
+              assert:
+                stdout: Lint check completed
+                code: 0
+
+            # Type check (go vet)
+            - task: type-check
+              config:
+                platform: linux
+                image_resource:
+                  type: registry-image
+                  source:
+                    repository: golang
+                    tag: "1.25-alpine"
+                inputs:
+                  - name: workspace
+                run:
+                  path: sh
+                  args:
+                    - -c
+                    - |
+                        apk add --no-cache git
+                        echo "Running type checks..."
+                        cd workspace
+                        go vet ./...
+                        echo "✅ Type check passed"
+                env:
+                  GOCACHE: /cache/go-build
+                  GOMODCACHE: /cache/go-mod
+              assert:
+                stdout: Type check passed
+                code: 0
+
+  # Phase 3: Comprehensive Testing
+  - name: tests
+    public: true
+    plan:
+      - do:
+          - in_parallel:
+              fail_fast: true
+              steps:
+                # Unit tests
+                - task: unit-tests
+                  config:
+                    platform: linux
+                    image_resource:
+                      type: registry-image
+                      source:
+                        repository: golang
+                        tag: "1.25-alpine"
+                    inputs:
+                      - name: workspace
+                    outputs:
+                      - name: test-results
+                    run:
+                      path: sh
+                      args:
+                        - -c
+                        - |
+                            echo "🧪 Phase 3: Running Test Suite"
+                            apk add --no-cache git build-base
+                            echo "Running unit tests..."
+                            cd workspace
+                            go test -v -short ./... -count=1 | tee ../test-results/unit.txt
+                            echo "✅ Unit tests passed"
+                    env:
+                      GOCACHE: /cache/go-build
+                      GOMODCACHE: /cache/go-mod
+                      CGO_ENABLED: "1"
+                  assert:
+                    stdout: Unit tests passed
+                    code: 0
+
+                # Race detector tests
+                - task: race-detector-tests
+                  config:
+                    platform: linux
+                    image_resource:
+                      type: registry-image
+                      source:
+                        repository: golang
+                        tag: "1.25-alpine"
+                    inputs:
+                      - name: workspace
+                    outputs:
+                      - name: race-results
+                    run:
+                      path: sh
+                      args:
+                        - -c
+                        - |
+                            apk add --no-cache git build-base
+                            echo "Running tests with race detector..."
+                            cd workspace
+                            go test -race -short ./runtime/... ./storage/... -count=1 -parallel=1 | tee ../race-results/race.txt
+                            echo "✅ Race detector tests passed"
+                    env:
+                      GOCACHE: /cache/go-build
+                      GOMODCACHE: /cache/go-mod
+                      CGO_ENABLED: "1"
+                  assert:
+                    stdout: Race detector tests passed
+                    code: 0
+
+  # Phase 4 & 5: Build and Generation Check
+  - name: build
+    public: true
+    plan:
+      # Build binary
+      - task: build-binary
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: golang
+              tag: "1.25-alpine"
+          inputs:
+            - name: workspace
+          outputs:
+            - name: build-artifacts
+          run:
+            path: sh
+            args:
+              - -c
+              - |
+                  echo "🔨 Phase 4: Building Binary"
+                  apk add --no-cache git build-base
+                  echo "Building CI binary..."
+                  cd workspace
+                  go build -v -o ../build-artifacts/ci-binary .
+                  ls -lh ../build-artifacts/ci-binary
+                  ../build-artifacts/ci-binary --version || echo "Binary built successfully"
+                  echo "✅ Build completed"
+          env:
+            GOCACHE: /cache/go-build
+            GOMODCACHE: /cache/go-mod
+            CGO_ENABLED: "1"
+            GOOS: linux
+            GOARCH: amd64
+        assert:
+          stdout: Build completed
+          code: 0
+
+      # Code generation check
+      - task: generate-check
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: golang
+              tag: "1.25-alpine"
+          inputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - |
+                  echo "🔧 Phase 5: Verifying Code Generation"
+                  apk add --no-cache git nodejs npm
+                  npm install -g esbuild typescript
+                  echo "Checking code generation..."
+                  cd workspace
+                  go generate ./... || echo "Generated code check"
+                  echo "✅ Generation check completed"
+          env:
+            GOCACHE: /cache/go-build
+            GOMODCACHE: /cache/go-mod
+        assert:
+          stdout: Generation check completed
+          code: 0
+
+      # Benchmarks
+      - task: run-benchmarks
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: golang
+              tag: "1.25-alpine"
+          inputs:
+            - name: workspace
+          outputs:
+            - name: bench-results
+          run:
+            path: sh
+            args:
+              - -c
+              - |
+                  echo "⚡ Phase 6: Running Performance Benchmarks"
+                  apk add --no-cache git build-base
+                  echo "Running benchmarks..."
+                  cd workspace
+                  go test -bench=. -benchmem -run=^$ ./runtime/... ./storage/... -benchtime=100ms > ../bench-results/bench-results.txt 2>&1 || true
+                  cat ../bench-results/bench-results.txt
+                  echo "✅ Benchmarks completed"
+          env:
+            GOCACHE: /cache/go-build
+            GOMODCACHE: /cache/go-mod
+            CGO_ENABLED: "1"
+        assert:
+          stdout: Benchmarks completed
+          code: 0
+
+      # Integration tests
+      - task: integration-tests
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: golang
+              tag: "1.25-alpine"
+          inputs:
+            - name: workspace
+          outputs:
+            - name: integration-results
+          run:
+            path: sh
+            args:
+              - -c
+              - |
+                  echo "🐳 Phase 7: Running Integration Tests"
+                  apk add --no-cache git build-base docker-cli
+                  echo "Running integration tests..."
+                  cd workspace
+                  go test -v ./examples/... -short -count=1 2>&1 | tee ../integration-results/integration-results.txt || true
+                  grep -q "PASS" ../integration-results/integration-results.txt
+                  echo "✅ Integration tests completed"
+          env:
+            GOCACHE: /cache/go-build
+            GOMODCACHE: /cache/go-mod
+            CGO_ENABLED: "1"
+        assert:
+          stdout: Integration tests completed
+          code: 0

@@ -243,6 +243,160 @@ test.describe("Pipeline Management UI", () => {
         timeout: 30000,
       });
     });
+
+    test("clicking Tasks link navigates to /runs/:id/tasks", async ({ page, request }) => {
+      const pipelineName = uniqueName("tasks-link-test");
+      await createPipeline(
+        request,
+        pipelineName,
+        `export const pipeline = async () => { console.log("test"); };`,
+      );
+
+      await page.goto("/pipelines/");
+      await page.getByRole("link", { name: pipelineName }).click();
+
+      // Trigger the pipeline and wait for it to appear
+      await page.getByRole("button", { name: /trigger run/i }).click();
+      await expect(page.getByText(/triggered successfully/i)).toBeVisible({
+        timeout: 5000,
+      });
+
+      // Wait for the run row to appear with Tasks link
+      const tasksLink = page.getByRole("link", { name: "Tasks" }).first();
+      await expect(tasksLink).toBeVisible({ timeout: 10000 });
+
+      // Click the Tasks link
+      await tasksLink.click();
+
+      // Should navigate to /runs/:id/tasks
+      await expect(page).toHaveURL(/\/runs\/[^/]+\/tasks/);
+
+      // Should show the Pipeline Visualizer page
+      await expect(page.getByRole("heading", { name: /Pipeline Visualizer/i }))
+        .toBeVisible();
+    });
+
+    test("clicking Graph link navigates to /runs/:id/graph", async ({ page, request }) => {
+      const pipelineName = uniqueName("graph-link-test");
+      await createPipeline(
+        request,
+        pipelineName,
+        `export const pipeline = async () => { console.log("test"); };`,
+      );
+
+      await page.goto("/pipelines/");
+      await page.getByRole("link", { name: pipelineName }).click();
+
+      // Trigger the pipeline and wait for it to appear
+      await page.getByRole("button", { name: /trigger run/i }).click();
+      await expect(page.getByText(/triggered successfully/i)).toBeVisible({
+        timeout: 5000,
+      });
+
+      // Wait for the run row to appear with Graph link
+      const graphLink = page.getByRole("link", { name: "Graph" }).first();
+      await expect(graphLink).toBeVisible({ timeout: 10000 });
+
+      // Click the Graph link
+      await graphLink.click();
+
+      // Should navigate to /runs/:id/graph
+      await expect(page).toHaveURL(/\/runs\/[^/]+\/graph/);
+
+      // Should show the Pipeline Graph page
+      await expect(page.getByRole("heading", { name: /Pipeline Graph/i }))
+        .toBeVisible();
+    });
+  });
+});
+
+test.describe("Run Views", () => {
+  test("run tasks view shows Run ID in breadcrumb", async ({ page, request }) => {
+    const pipelineName = uniqueName("run-breadcrumb-test");
+    await createPipeline(
+      request,
+      pipelineName,
+      `export const pipeline = async () => { console.log("test"); };`,
+    );
+
+    await page.goto("/pipelines/");
+    await page.getByRole("link", { name: pipelineName }).click();
+
+    // Trigger the pipeline
+    await page.getByRole("button", { name: /trigger run/i }).click();
+    await expect(page.getByText(/triggered successfully/i)).toBeVisible({
+      timeout: 5000,
+    });
+
+    // Wait for run to appear and click Tasks
+    const tasksLink = page.getByRole("link", { name: "Tasks" }).first();
+    await expect(tasksLink).toBeVisible({ timeout: 10000 });
+    await tasksLink.click();
+
+    // Should show "Run: <runID>" in breadcrumb
+    await expect(page.getByText(/Run:/)).toBeVisible();
+  });
+
+  test("run tasks view has link to graph view", async ({ page, request }) => {
+    const pipelineName = uniqueName("tasks-to-graph-test");
+    await createPipeline(
+      request,
+      pipelineName,
+      `export const pipeline = async () => { console.log("test"); };`,
+    );
+
+    await page.goto("/pipelines/");
+    await page.getByRole("link", { name: pipelineName }).click();
+
+    // Trigger the pipeline
+    await page.getByRole("button", { name: /trigger run/i }).click();
+    await expect(page.getByText(/triggered successfully/i)).toBeVisible({
+      timeout: 5000,
+    });
+
+    // Wait for run to appear and click Tasks
+    const tasksLink = page.getByRole("link", { name: "Tasks" }).first();
+    await expect(tasksLink).toBeVisible({ timeout: 10000 });
+    await tasksLink.click();
+
+    // Should have a "Graph View" link
+    const graphViewLink = page.getByRole("link", { name: /Graph View/i });
+    await expect(graphViewLink).toBeVisible();
+
+    // Click it and verify navigation
+    await graphViewLink.click();
+    await expect(page).toHaveURL(/\/runs\/[^/]+\/graph/);
+  });
+
+  test("run graph view has link to list view", async ({ page, request }) => {
+    const pipelineName = uniqueName("graph-to-tasks-test");
+    await createPipeline(
+      request,
+      pipelineName,
+      `export const pipeline = async () => { console.log("test"); };`,
+    );
+
+    await page.goto("/pipelines/");
+    await page.getByRole("link", { name: pipelineName }).click();
+
+    // Trigger the pipeline
+    await page.getByRole("button", { name: /trigger run/i }).click();
+    await expect(page.getByText(/triggered successfully/i)).toBeVisible({
+      timeout: 5000,
+    });
+
+    // Wait for run to appear and click Graph
+    const graphLink = page.getByRole("link", { name: "Graph" }).first();
+    await expect(graphLink).toBeVisible({ timeout: 10000 });
+    await graphLink.click();
+
+    // Should have a "List View" link
+    const listViewLink = page.getByRole("link", { name: /List View/i });
+    await expect(listViewLink).toBeVisible();
+
+    // Click it and verify navigation
+    await listViewLink.click();
+    await expect(page).toHaveURL(/\/runs\/[^/]+\/tasks/);
   });
 });
 
