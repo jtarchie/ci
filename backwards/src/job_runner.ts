@@ -127,6 +127,39 @@ export class JobRunner {
   }
 
   private async processStep(step: Step, pathContext: string): Promise<void> {
+    // Handle attempts wrapper - retry up to N times
+    const maxAttempts = step.attempts || 1;
+    let lastError: unknown = undefined;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await this.processStepInternal(step, pathContext, attempt, maxAttempts);
+        return; // Success - exit retry loop
+      } catch (error) {
+        lastError = error;
+        // If we haven't reached max attempts, retry
+        if (attempt < maxAttempts) {
+          console.log(`Attempt ${attempt}/${maxAttempts} failed, retrying...`);
+          continue;
+        }
+        // Max attempts reached, throw the error
+        throw error;
+      }
+    }
+  }
+
+  private async processStepInternal(
+    step: Step,
+    pathContext: string,
+    attempt: number = 1,
+    maxAttempts: number = 1,
+  ): Promise<void> {
+    // Handle across wrapper - run step multiple times with different variable combinations
+    if (step.across && step.across.length > 0) {
+      await this.processAcrossStep(step, pathContext);
+      return;
+    }
+
     if ("get" in step) {
       await this.processGetStep(
         step,
@@ -223,6 +256,103 @@ export class JobRunner {
     pathContext: string,
   ): Promise<void> {
     await this.processDoStep(step, pathContext);
+  }
+
+  private async processAcrossStep(
+    step: Step,
+    pathContext: string,
+  ): Promise<void> {
+    // Generate all combinations of variable values
+    const combinations = this.generateAcrossCombinations(step.across!);
+
+    const storageKey = `${this.getBaseStorageKey()}/${pathContext}/across`;
+    storage.set(storageKey, { status: "pending", total: combinations.length });
+
+    let failureOccurred = false;
+
+    for (let i = 0; i < combinations.length; i++) {
+      if (failureOccurred && step.fail_fast) {
+        break; // Stop processing if fail_fast is enabled and a failure occurred
+      }
+
+      const combination = combinations[i];
+      const varContext = Object.entries(combination)
+        .map(([key, value]) => `${key}_${value}`)
+        .join("_");
+
+      // Create a modified step with the across variables injected as env vars
+      const modifiedStep = this.injectAcrossVariables(step, combination);
+
+      try {
+        await this.processStepInternal(
+          modifiedStep,
+          `${pathContext}/across/${i}_${varContext}`,
+        );
+      } catch (error) {
+        failureOccurred = true;
+        if (step.fail_fast) {
+          storage.set(storageKey, { status: "failure", failed_at: i });
+          throw error;
+        }
+        // Continue processing other combinations if fail_fast is not enabled
+        console.error(`Across combination ${i} failed:`, error);
+      }
+    }
+
+    if (failureOccurred && !step.fail_fast) {
+      storage.set(storageKey, { status: "failure" });
+      throw new TaskFailure("One or more across combinations failed");
+    }
+
+    storage.set(storageKey, { status: "success", total: combinations.length });
+  }
+
+  private generateAcrossCombinations(
+    acrossVars: AcrossVar[],
+  ): Record<string, string>[] {
+    // Generate cartesian product of all variable values
+    if (acrossVars.length === 0) {
+      return [{}];
+    }
+
+    const [first, ...rest] = acrossVars;
+    const restCombinations = this.generateAcrossCombinations(rest);
+    const combinations: Record<string, string>[] = [];
+
+    for (const value of first.values) {
+      for (const restCombination of restCombinations) {
+        combinations.push({
+          [first.var]: value,
+          ...restCombination,
+        });
+      }
+    }
+
+    return combinations;
+  }
+
+  private injectAcrossVariables(
+    step: Step,
+    variables: Record<string, string>,
+  ): Step {
+    // Clone the step and inject across variables into task config env
+    const clonedStep = { ...step };
+
+    if ("task" in clonedStep && clonedStep.config) {
+      clonedStep.config = {
+        ...clonedStep.config,
+        env: {
+          ...clonedStep.config.env,
+          ...variables,
+        },
+      };
+    }
+
+    // Remove across fields from cloned step to avoid infinite recursion
+    delete (clonedStep as any).across;
+    delete (clonedStep as any).fail_fast;
+
+    return clonedStep;
   }
 
   private async processTryStep(step: Try, pathContext: string): Promise<void> {
