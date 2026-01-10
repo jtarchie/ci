@@ -23,6 +23,27 @@ type Pipeline struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+// RunStatus represents the status of a pipeline run.
+type RunStatus string
+
+const (
+	RunStatusQueued  RunStatus = "queued"
+	RunStatusRunning RunStatus = "running"
+	RunStatusSuccess RunStatus = "success"
+	RunStatusFailed  RunStatus = "failed"
+)
+
+// PipelineRun represents an execution of a pipeline.
+type PipelineRun struct {
+	ID           string     `json:"id"`
+	PipelineID   string     `json:"pipeline_id"`
+	Status       RunStatus  `json:"status"`
+	StartedAt    *time.Time `json:"started_at,omitempty"`
+	CompletedAt  *time.Time `json:"completed_at,omitempty"`
+	ErrorMessage string     `json:"error_message,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
+}
+
 type Driver interface {
 	Close() error
 	Set(ctx context.Context, prefix string, payload any) error
@@ -34,6 +55,11 @@ type Driver interface {
 	GetPipeline(ctx context.Context, id string) (*Pipeline, error)
 	ListPipelines(ctx context.Context) ([]Pipeline, error)
 	DeletePipeline(ctx context.Context, id string) error
+
+	// Pipeline run operations
+	SaveRun(ctx context.Context, pipelineID string) (*PipelineRun, error)
+	GetRun(ctx context.Context, runID string) (*PipelineRun, error)
+	UpdateRunStatus(ctx context.Context, runID string, status RunStatus, errorMessage string) error
 }
 
 type Payload map[string]any

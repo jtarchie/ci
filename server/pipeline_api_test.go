@@ -35,7 +35,7 @@ func TestPipelineAPI(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				router, err := server.NewRouter(slog.Default(), client)
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				body := map[string]string{
@@ -73,7 +73,7 @@ func TestPipelineAPI(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				router, err := server.NewRouter(slog.Default(), client)
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				body := map[string]string{
@@ -104,7 +104,7 @@ func TestPipelineAPI(t *testing.T) {
 				_, err = client.SavePipeline(context.Background(), "pipeline-1", "content1", "docker://")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client)
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				req := httptest.NewRequest(http.MethodGet, "/api/pipelines", nil)
@@ -134,7 +134,7 @@ func TestPipelineAPI(t *testing.T) {
 				saved, err := client.SavePipeline(context.Background(), "my-pipeline", "content", "docker://")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client)
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				req := httptest.NewRequest(http.MethodGet, "/api/pipelines/"+saved.ID, nil)
@@ -162,7 +162,7 @@ func TestPipelineAPI(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				router, err := server.NewRouter(slog.Default(), client)
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				req := httptest.NewRequest(http.MethodGet, "/api/pipelines/non-existent", nil)
@@ -187,7 +187,7 @@ func TestPipelineAPI(t *testing.T) {
 				saved, err := client.SavePipeline(context.Background(), "to-delete", "content", "docker://")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client)
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				req := httptest.NewRequest(http.MethodDelete, "/api/pipelines/"+saved.ID, nil)
@@ -213,7 +213,7 @@ func TestPipelineAPI(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				router, err := server.NewRouter(slog.Default(), client)
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				req := httptest.NewRequest(http.MethodDelete, "/api/pipelines/non-existent", nil)

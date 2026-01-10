@@ -14,8 +14,9 @@ import (
 )
 
 type Server struct {
-	Port    int    `default:"8080"             help:"Port to run the server on"`
-	Storage string `default:"sqlite://test.db" help:"Path to storage file"      required:""`
+	Port        int    `default:"8080"             help:"Port to run the server on"`
+	Storage     string `default:"sqlite://test.db" help:"Path to storage file"      required:""`
+	MaxInFlight int    `default:"10"               help:"Maximum concurrent pipeline executions"`
 }
 
 func (c *Server) Run(logger *slog.Logger) error {
@@ -30,7 +31,9 @@ func (c *Server) Run(logger *slog.Logger) error {
 	}
 	defer func() { _ = client.Close() }()
 
-	router, err := server.NewRouter(logger, client)
+	router, err := server.NewRouter(logger, client, server.RouterOptions{
+		MaxInFlight: c.MaxInFlight,
+	})
 	if err != nil {
 		return fmt.Errorf("could not create router: %w", err)
 	}
