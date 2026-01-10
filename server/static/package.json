@@ -9,11 +9,11 @@
     "build:js": "esbuild src/index.js --bundle --minify --outfile=dist/bundle.js --format=iife --global-name=CI --target=es2017"
   },
   "dependencies": {
-    "asciinema-player": "^3.13.5"
+    "asciinema-player": "3.14.0"
   },
   "devDependencies": {
-    "@tailwindcss/cli": "^4.1.18",
-    "esbuild": "^0.27.2",
-    "tailwindcss": "^4.1.18"
+    "@tailwindcss/cli": "4.1.18",
+    "esbuild": "0.27.2",
+    "tailwindcss": "4.1.18"
   }
 }

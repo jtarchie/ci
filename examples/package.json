@@ -9,6 +9,6 @@
   "description": "",
   "devDependencies": {
     "@jtarchie/ci": "file:../packages/ci",
-    "typescript": "^5.7.3"
+    "typescript": "5.9.3"
   }
 }
