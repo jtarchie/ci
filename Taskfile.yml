@@ -8,8 +8,8 @@ tasks:
   build:static:
     dir: server/static
     cmds:
-      - yarn install --frozen-lockfile
-      - yarn build
+      - npm install
+      - npm run build
   fmt:
     cmds:
       - deno fmt --ignore=server/templates/,backwards/bundle.js,server/static/dist/bundle.js .

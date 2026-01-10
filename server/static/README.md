@@ -17,8 +17,8 @@ To build the bundled assets:
 
 ```bash
 cd server/static
-yarn install
-yarn build
+npm install
+npm run build
 ```
 
 Or from the project root:

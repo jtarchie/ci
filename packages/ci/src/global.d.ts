@@ -342,4 +342,4 @@ declare global {
   const pipelineContext: PipelineContextType;
 }
 
-export { };
+export {};
