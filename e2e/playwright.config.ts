@@ -6,7 +6,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
-  reporter: "html",
+  reporter: [["html", { open: "never" }]],
   use: {
     baseURL: "http://localhost:8080",
     trace: "on-first-retry",
@@ -20,7 +20,8 @@ export default defineConfig({
   ],
   // Start the CI server before running tests
   webServer: {
-    command: "go run ../main.go server --storage sqlite://:memory: --port 8080",
+    command:
+      "go run ../main.go server --storage sqlite://e2e-test.db --port 8080",
     url: "http://localhost:8080/health",
     reuseExistingServer: !process.env.CI,
     timeout: 30000,

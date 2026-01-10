@@ -28,7 +28,8 @@ tasks:
   test:e2e:
     dir: e2e
     cmds:
-      - npm test
+      - rm -f e2e-test.db
+      - npx playwright test
   # Watch source files only. Exclude generated bundles in server/static/dist and node_modules
   server: "wgo -file .html -file .ts -file .go -dir server/static/src go generate ./... :: go run main.go server --storage sqlite://test.db"
 
