@@ -1,233 +1,164 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pipeline Visualizer</title>
-    <link rel="stylesheet" href="/static/bundle.css">
-    <script src="/static/bundle.js" defer></script>
-  </head>
-  <body class="bg-gray-100 dark:bg-gray-900 min-h-screen">
-    <!-- Breadcrumb navigation -->
-    <nav
-      class="px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2 flex-wrap"
-      aria-label="Pipeline path">
-      <a href="/pipelines/"
-        class="text-blue-600 dark:text-blue-400 hover:underline">Pipelines</a>
-      <span class="text-gray-500" aria-hidden="true">/</span>
-      <a href="/tasks/"
-        class="text-blue-600 dark:text-blue-400 hover:underline">Tasks</a>
-      {{ if and .Path (ne .Path "/") }}
-      {{ $parts := splitList "/" .Path }}
-      {{ $accumulated := "" }}
-      {{ range $i, $part := $parts }}
-      {{ if $part }}
-      {{ $accumulated = printf "%s/%s" $accumulated $part }}
-      <span class="text-gray-500" aria-hidden="true">/</span>
-      {{ if eq $i (sub (len $parts) 1) }}
-      <span class="text-gray-800 dark:text-white">{{ $part }}</span>
-      {{ else }}
-      <a href="/tasks{{ $accumulated }}/"
-        class="text-blue-600 dark:text-blue-400 hover:underline">{{ $part }}</a>
-      {{ end }}
-      {{ end }}
-      {{ end }}
-      {{ end }}
-    </nav>
+{{ template "head" dict "Title" "Pipeline Visualizer" }}
+<!-- Breadcrumb navigation -->
+<nav
+  class="px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2 flex-wrap"
+  aria-label="Pipeline path">
+  <a href="/pipelines/"
+    class="text-blue-600 dark:text-blue-400 hover:underline">Pipelines</a>
+  <span class="text-gray-500" aria-hidden="true">/</span>
+  <a href="/tasks/"
+    class="text-blue-600 dark:text-blue-400 hover:underline">Tasks</a>
+  {{ if and .Path (ne .Path "/") }}
+  {{ $parts := splitList "/" .Path }}
+  {{ $accumulated := "" }}
+  {{ range $i, $part := $parts }}
+  {{ if $part }}
+  {{ $accumulated = printf "%s/%s" $accumulated $part }}
+  <span class="text-gray-500" aria-hidden="true">/</span>
+  {{ if eq $i (sub (len $parts) 1) }}
+  <span class="text-gray-800 dark:text-white">{{ $part }}</span>
+  {{ else }}
+  <a href="/tasks{{ $accumulated }}/"
+    class="text-blue-600 dark:text-blue-400 hover:underline">{{ $part }}</a>
+  {{ end }}
+  {{ end }}
+  {{ end }}
+  {{ end }}
+</nav>
 
-    <div class="container mx-auto p-4">
-      <div class="flex items-center justify-between mb-4">
-        <h1 class="text-3xl font-bold dark:text-white">Pipeline Visualizer</h1>
-        <div class="flex items-center gap-2">
-          <!-- Expand/Collapse All -->
-          <button id="expand-all"
-            class="px-3 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400"
-            title="Expand all tasks">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor"
-              viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round"
-                stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          <button id="collapse-all"
-            class="px-3 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400"
-            title="Collapse all tasks">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor"
-              viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round"
-                stroke-width="2" d="M5 15l7-7 7 7" />
-            </svg>
-          </button>
-          <a href="/graph{{ .Path }}/"
-            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
-            Graph View
-          </a>
-        </div>
-      </div>
+<div class="container mx-auto p-4">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-3xl font-bold dark:text-white">Pipeline Visualizer</h1>
+    <div class="flex items-center gap-2">
+      <!-- Expand/Collapse All -->
+      <button id="expand-all"
+        class="px-3 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400"
+        title="Expand all tasks">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor"
+          viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            stroke-width="2" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      <button id="collapse-all"
+        class="px-3 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400"
+        title="Collapse all tasks">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor"
+          viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            stroke-width="2" d="M5 15l7-7 7 7" />
+        </svg>
+      </button>
+      <a href="/graph{{ .Path }}/"
+        class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
+        Graph View
+      </a>
+    </div>
+  </div>
 
-      <!-- Search and Stats Bar -->
-      <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
-        <!-- Search Box -->
-        <div class="relative flex-1 max-w-md">
-          <svg
-            class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none w-4 h-4"
-            viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd"
-              d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
-              clip-rule="evenodd" />
-          </svg>
-          <input type="text"
-            id="task-search"
-            class="w-full py-2 pr-3 pl-10 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Filter tasks..."
-            aria-label="Filter tasks">
-        </div>
-        <!-- Summary Stats -->
-        <div class="flex items-center gap-3 text-sm">
-          <span
-            class="flex items-center gap-1 text-green-600 dark:text-green-400">
-            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                clip-rule="evenodd" />
-            </svg>
-            <span id="stat-success">0</span>
-          </span>
-          <span class="flex items-center gap-1 text-red-600 dark:text-red-400">
-            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                clip-rule="evenodd" />
-            </svg>
-            <span id="stat-failure">0</span>
-          </span>
-          <span
-            class="flex items-center gap-1 text-gray-500 dark:text-gray-400">
-            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
-                clip-rule="evenodd" />
-            </svg>
-            <span id="stat-pending">0</span>
-          </span>
-          <!-- Keyboard shortcuts help -->
-          <div class="relative">
-            <button id="help-toggle"
-              class="w-8 h-8 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-sm cursor-pointer flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              aria-expanded="false"
-              aria-controls="help-panel"
-              title="Keyboard shortcuts">
-              ?
-            </button>
-            <div id="help-panel"
-              class="hidden absolute top-full right-0 mt-2 p-4 bg-white dark:bg-gray-800 rounded-lg text-gray-800 dark:text-white text-sm z-50 min-w-64 border border-gray-200 dark:border-gray-700 shadow-lg">
-              <h3 class="m-0 mb-3 font-semibold">Keyboard Shortcuts</h3>
-              <dl
-                class="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
-                <dt class="text-gray-500 dark:text-gray-400"><kbd
-                    class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">j</kbd>
-                  / <kbd
-                    class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">↓</kbd></dt>
-                <dd class="m-0">Next task</dd>
-                <dt class="text-gray-500 dark:text-gray-400"><kbd
-                    class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">k</kbd>
-                  / <kbd
-                    class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">↑</kbd></dt>
-                <dd class="m-0">Previous task</dd>
-                <dt class="text-gray-500 dark:text-gray-400"><kbd
-                    class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">Enter</kbd></dt>
-                <dd class="m-0">Toggle task</dd>
-                <dt class="text-gray-500 dark:text-gray-400"><kbd
-                    class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">/</kbd></dt>
-                <dd class="m-0">Search</dd>
-                <dt class="text-gray-500 dark:text-gray-400"><kbd
-                    class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">e</kbd></dt>
-                <dd class="m-0">Expand all</dd>
-                <dt class="text-gray-500 dark:text-gray-400"><kbd
-                    class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">c</kbd></dt>
-                <dd class="m-0">Collapse all</dd>
-                <dt class="text-gray-500 dark:text-gray-400"><kbd
-                    class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">f</kbd></dt>
-                <dd class="m-0">Jump to first failure</dd>
-                <dt class="text-gray-500 dark:text-gray-400"><kbd
-                    class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">Esc</kbd></dt>
-                <dd class="m-0">Clear search</dd>
-              </dl>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6"
-        id="pipeline">
-        <div class="space-y-4" id="tasks-container">
-          {{ template "renderPath" dict "Path" .Tree "Depth" 0 }}
+  <!-- Search and Stats Bar -->
+  <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+    <!-- Search Box -->
+    <div class="relative flex-1 max-w-md">
+      <svg
+        class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none w-4 h-4"
+        viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd"
+          d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+          clip-rule="evenodd" />
+      </svg>
+      <input type="text"
+        id="task-search"
+        class="w-full py-2 pr-3 pl-10 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        placeholder="Filter tasks..."
+        aria-label="Filter tasks">
+    </div>
+    <!-- Summary Stats -->
+    <div class="flex items-center gap-3 text-sm">
+      <span
+        class="flex items-center gap-1 text-green-600 dark:text-green-400">
+        <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd"
+            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+            clip-rule="evenodd" />
+        </svg>
+        <span id="stat-success">0</span>
+      </span>
+      <span class="flex items-center gap-1 text-red-600 dark:text-red-400">
+        <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd"
+            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+            clip-rule="evenodd" />
+        </svg>
+        <span id="stat-failure">0</span>
+      </span>
+      <span
+        class="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+        <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd"
+            d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+            clip-rule="evenodd" />
+        </svg>
+        <span id="stat-pending">0</span>
+      </span>
+      <!-- Keyboard shortcuts help -->
+      <div class="relative">
+        <button id="help-toggle"
+          class="w-8 h-8 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-sm cursor-pointer flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          aria-expanded="false"
+          aria-controls="help-panel"
+          title="Keyboard shortcuts">
+          ?
+        </button>
+        <div id="help-panel"
+          class="hidden absolute top-full right-0 mt-2 p-4 bg-white dark:bg-gray-800 rounded-lg text-gray-800 dark:text-white text-sm z-50 min-w-64 border border-gray-200 dark:border-gray-700 shadow-lg">
+          <h3 class="m-0 mb-3 font-semibold">Keyboard Shortcuts</h3>
+          <dl
+            class="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
+            <dt class="text-gray-500 dark:text-gray-400"><kbd
+                class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">j</kbd>
+              / <kbd
+                class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">↓</kbd></dt>
+            <dd class="m-0">Next task</dd>
+            <dt class="text-gray-500 dark:text-gray-400"><kbd
+                class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">k</kbd>
+              / <kbd
+                class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">↑</kbd></dt>
+            <dd class="m-0">Previous task</dd>
+            <dt class="text-gray-500 dark:text-gray-400"><kbd
+                class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">Enter</kbd></dt>
+            <dd class="m-0">Toggle task</dd>
+            <dt class="text-gray-500 dark:text-gray-400"><kbd
+                class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">/</kbd></dt>
+            <dd class="m-0">Search</dd>
+            <dt class="text-gray-500 dark:text-gray-400"><kbd
+                class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">e</kbd></dt>
+            <dd class="m-0">Expand all</dd>
+            <dt class="text-gray-500 dark:text-gray-400"><kbd
+                class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">c</kbd></dt>
+            <dd class="m-0">Collapse all</dd>
+            <dt class="text-gray-500 dark:text-gray-400"><kbd
+                class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">f</kbd></dt>
+            <dd class="m-0">Jump to first failure</dd>
+            <dt class="text-gray-500 dark:text-gray-400"><kbd
+                class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">Esc</kbd></dt>
+            <dd class="m-0">Clear search</dd>
+          </dl>
         </div>
       </div>
     </div>
-    <footer class="bg-gray-50 dark:bg-gray-900">
-      <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div class="sm:flex sm:items-center sm:justify-between">
-          <div
-            class="flex justify-center text-teal-600 sm:justify-start dark:text-teal-300">
-            <svg
-              class="h-8"
-              viewBox="0 0 100 40"
-              xmlns="http://www.w3.org/2000/svg"
-              role="img"
-              aria-label="CI Status Indicator">
-              <!-- Red LED Circle -->
-              <circle
-                cx="25"
-                cy="20"
-                r="15"
-                fill="#FF3B30"
-                stroke="#CC2D26"
-                stroke-width="2">
-                <!-- Light reflection effect -->
-                <animate attributeName="opacity" from="0.9" to="1" dur="2s"
-                  repeatCount="indefinite" />
-              </circle>
-              <!-- White reflection spot on red LED -->
-              <circle
-                cx="20"
-                cy="15"
-                r="5"
-                fill="white"
-                opacity="0.3" />
+  </div>
 
-              <!-- Green LED Circle -->
-              <circle
-                cx="75"
-                cy="20"
-                r="15"
-                fill="#34C759"
-                stroke="#28A745"
-                stroke-width="2">
-                <!-- Light reflection effect -->
-                <animate attributeName="opacity" from="0.9" to="1" dur="1.5s"
-                  repeatCount="indefinite" />
-              </circle>
-              <!-- White reflection spot on green LED -->
-              <circle
-                cx="70"
-                cy="15"
-                r="5"
-                fill="white"
-                opacity="0.3" />
-            </svg>
-          </div>
-          <p
-            class="mt-4 text-center text-sm text-gray-500 lg:mt-0 lg:text-right dark:text-gray-400">
-            Copyright &copy; <a href="https://github.com/jtarchie/ci"
-              class="hover:text-gray-900 dark:hover:text-white">{{ now |
-              date "2006" }}</a>. All rights reserved.
-          </p>
-        </div>
-      </div>
-    </footer>
-  </body>
-</html>
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6"
+    id="pipeline">
+    <div class="space-y-4" id="tasks-container">
+      {{ template "renderPath" dict "Path" .Tree "Depth" 0 }}
+    </div>
+  </div>
+</div>
+
+{{ template "footer" }}
+{{ template "end" }}
 
 {{/* Helper function to get status color */}}
 {{- define "getStatusColor" -}}

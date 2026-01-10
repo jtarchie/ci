@@ -1,0 +1,74 @@
+{{ define "footer" }}
+    <footer class="bg-gray-50 dark:bg-gray-900">
+      <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div class="sm:flex sm:items-center sm:justify-between">
+          <div
+            class="flex justify-center text-teal-600 sm:justify-start dark:text-teal-300">
+            <svg
+              class="h-8"
+              viewBox="0 0 100 40"
+              xmlns="http://www.w3.org/2000/svg"
+              role="img"
+              aria-label="CI Status Indicator">
+              <!-- Red LED Circle -->
+              <circle
+                cx="25"
+                cy="20"
+                r="15"
+                fill="#FF3B30"
+                stroke="#CC2D26"
+                stroke-width="2">
+                <!-- Light reflection effect -->
+                <animate attributeName="opacity" from="0.9" to="1" dur="2s"
+                  repeatCount="indefinite" />
+              </circle>
+              <!-- White reflection spot on red LED -->
+              <circle
+                cx="20"
+                cy="15"
+                r="5"
+                fill="white"
+                opacity="0.3" />
+
+              <!-- Green LED Circle -->
+              <circle
+                cx="75"
+                cy="20"
+                r="15"
+                fill="#34C759"
+                stroke="#28A745"
+                stroke-width="2">
+                <!-- Light reflection effect -->
+                <animate attributeName="opacity" from="0.9" to="1" dur="1.5s"
+                  repeatCount="indefinite" />
+              </circle>
+              <!-- White reflection spot on green LED -->
+              <circle
+                cx="70"
+                cy="15"
+                r="5"
+                fill="white"
+                opacity="0.3" />
+            </svg>
+          </div>
+          <p
+            class="mt-4 text-center text-sm text-gray-500 lg:mt-0 lg:text-right dark:text-gray-400">
+            Copyright &copy; <a href="https://github.com/jtarchie/ci"
+              class="hover:text-gray-900 dark:hover:text-white">{{ now |
+              date "2006" }}</a>. All rights reserved.
+          </p>
+        </div>
+      </div>
+    </footer>
+{{ end }}
+
+{{ define "toast-container" }}
+    <!-- Toast notification container -->
+    <div id="toast-container"
+      class="fixed bottom-4 right-4 z-50 space-y-2"></div>
+{{ end }}
+
+{{ define "end" }}
+  </body>
+</html>
+{{ end }}
