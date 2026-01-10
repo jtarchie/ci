@@ -86,7 +86,7 @@ const stateStoragePrefix = "_resume/state"
 
 // loadState loads pipeline state from storage.
 func (r *ResumableRunner) loadState(runID string) (*PipelineState, error) {
-	payload, err := r.storage.Get(stateStoragePrefix + "/" + runID)
+	payload, err := r.storage.Get(r.ctx, stateStoragePrefix+"/"+runID)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func (r *ResumableRunner) loadState(runID string) (*PipelineState, error) {
 
 // saveState persists the current pipeline state.
 func (r *ResumableRunner) saveState() error {
-	return r.storage.Set(stateStoragePrefix+"/"+r.state.RunID, r.state)
+	return r.storage.Set(r.ctx, stateStoragePrefix+"/"+r.state.RunID, r.state)
 }
 
 // Run executes a task with resume support.

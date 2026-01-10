@@ -141,7 +141,12 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 		return fmt.Errorf("could not set nativeResources: %w", err)
 	}
 
-	err = jsVM.Set("storage", storage)
+	// Wrap storage to inject context automatically for JavaScript calls
+	storageWrapper := &storageContextWrapper{
+		driver: storage,
+		ctx:    ctx,
+	}
+	err = jsVM.Set("storage", storageWrapper)
 	if err != nil {
 		return fmt.Errorf("could not set storage: %w", err)
 	}
@@ -197,3 +202,50 @@ var (
 	ErrPipelineReturnedNonPromise = errors.New("pipeline did not return a promise")
 	ErrPromiseRejected            = errors.New("promise rejected")
 )
+
+// storageContextWrapper wraps a storage.Driver to automatically inject context
+// for JavaScript calls that don't pass context explicitly.
+type storageContextWrapper struct {
+	driver storage.Driver
+	ctx    context.Context
+}
+
+// Set wraps the storage Set method, injecting context automatically.
+func (w *storageContextWrapper) Set(prefix string, payload any) error {
+	return w.driver.Set(w.ctx, prefix, payload)
+}
+
+// Get wraps the storage Get method, injecting context automatically.
+func (w *storageContextWrapper) Get(prefix string) (storage.Payload, error) {
+	return w.driver.Get(w.ctx, prefix)
+}
+
+// GetAll wraps the storage GetAll method, injecting context automatically.
+func (w *storageContextWrapper) GetAll(prefix string, fields []string) (storage.Results, error) {
+	return w.driver.GetAll(w.ctx, prefix, fields)
+}
+
+// SavePipeline wraps the storage SavePipeline method, injecting context automatically.
+func (w *storageContextWrapper) SavePipeline(name, content, driverDSN string) (*storage.Pipeline, error) {
+	return w.driver.SavePipeline(w.ctx, name, content, driverDSN)
+}
+
+// GetPipeline wraps the storage GetPipeline method, injecting context automatically.
+func (w *storageContextWrapper) GetPipeline(id string) (*storage.Pipeline, error) {
+	return w.driver.GetPipeline(w.ctx, id)
+}
+
+// ListPipelines wraps the storage ListPipelines method, injecting context automatically.
+func (w *storageContextWrapper) ListPipelines() ([]storage.Pipeline, error) {
+	return w.driver.ListPipelines(w.ctx)
+}
+
+// DeletePipeline wraps the storage DeletePipeline method, injecting context automatically.
+func (w *storageContextWrapper) DeletePipeline(id string) error {
+	return w.driver.DeletePipeline(w.ctx, id)
+}
+
+// Close wraps the storage Close method (no context needed).
+func (w *storageContextWrapper) Close() error {
+	return w.driver.Close()
+}

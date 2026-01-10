@@ -41,7 +41,7 @@ func (c *Server) Run(logger *slog.Logger) error {
 			lookupPath = "/" + lookupPath
 		}
 
-		results, err := client.GetAll(lookupPath, []string{"status"})
+		results, err := client.GetAll(ctx.Request().Context(), lookupPath, []string{"status"})
 		if err != nil {
 			return fmt.Errorf("could not get all results: %w", err)
 		}
@@ -58,7 +58,7 @@ func (c *Server) Run(logger *slog.Logger) error {
 			lookupPath = "/" + lookupPath
 		}
 
-		results, err := client.GetAll(lookupPath, []string{"status", "dependsOn"})
+		results, err := client.GetAll(ctx.Request().Context(), lookupPath, []string{"status", "dependsOn"})
 		if err != nil {
 			return fmt.Errorf("could not get all results: %w", err)
 		}
@@ -82,7 +82,7 @@ func (c *Server) Run(logger *slog.Logger) error {
 			lookupPath = "/" + lookupPath
 		}
 
-		results, err := client.GetAll(lookupPath, []string{"stdout"})
+		results, err := client.GetAll(ctx.Request().Context(), lookupPath, []string{"stdout"})
 		if err != nil {
 			return fmt.Errorf("could not get all results: %w", err)
 		}

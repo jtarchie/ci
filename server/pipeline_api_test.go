@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -100,7 +101,7 @@ func TestPipelineAPI(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				_, err = client.SavePipeline("pipeline-1", "content1", "docker://")
+				_, err = client.SavePipeline(context.Background(), "pipeline-1", "content1", "docker://")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				router, err := server.NewRouter(slog.Default(), client)
@@ -130,7 +131,7 @@ func TestPipelineAPI(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				saved, err := client.SavePipeline("my-pipeline", "content", "docker://")
+				saved, err := client.SavePipeline(context.Background(), "my-pipeline", "content", "docker://")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				router, err := server.NewRouter(slog.Default(), client)
@@ -183,7 +184,7 @@ func TestPipelineAPI(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				saved, err := client.SavePipeline("to-delete", "content", "docker://")
+				saved, err := client.SavePipeline(context.Background(), "to-delete", "content", "docker://")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				router, err := server.NewRouter(slog.Default(), client)
@@ -196,7 +197,7 @@ func TestPipelineAPI(t *testing.T) {
 				assert.Expect(rec.Code).To(Equal(http.StatusNoContent))
 
 				// Verify it's deleted
-				_, err = client.GetPipeline(saved.ID)
+				_, err = client.GetPipeline(context.Background(), saved.ID)
 				assert.Expect(err).To(Equal(storage.ErrNotFound))
 			})
 
