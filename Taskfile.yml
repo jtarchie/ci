@@ -29,12 +29,24 @@ tasks:
       - npm test
   # Watch source files only. Exclude generated bundles in server/static/dist and node_modules
   server: "wgo -file .html -file .ts -file .go -dir server/static/src go generate ./... :: go run main.go server --storage sqlite://test.db"
-  cleanup: |
-    removed_containers=$(docker ps -aq | xargs -I {} docker rm -f {} | wc -l)
-    removed_volumes=$(docker volume ls -q | xargs -r docker volume rm -f | wc -l)
-    if [ "$removed_containers" -eq 0 ] && [ "$removed_volumes" -eq 0 ]; then
-      exit 0
-    else
-      docker ps -aq | xargs -I {} docker rm -f {}
-      docker volume ls -q | xargs -r docker volume rm -f
-    fi
+
+  # Benchmark tasks
+  bench:
+    desc: Run all Go benchmarks (micro + pipeline)
+    cmds:
+      - go test -bench=. -benchmem -count=3 ./runtime/... ./storage/... ./examples/...
+    
+  bench:k6:
+    desc: Run k6 API load benchmarks (starts server automatically)
+    cmds:
+      - ./bin/k6-with-server.sh run benchmarks/api_load.js
+
+  bench:k6:smoke:
+    desc: Quick k6 smoke test (starts server automatically)
+    cmds:
+      - ./bin/k6-with-server.sh run --vus 1 --duration 10s benchmarks/api_load.js
+
+  cleanup:
+    desc: Remove leaked Docker containers and volumes
+    cmds:
+      - ./bin/cleanup.sh
