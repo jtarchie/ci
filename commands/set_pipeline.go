@@ -3,7 +3,6 @@ package commands
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -12,9 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dop251/goja"
-	"github.com/evanw/esbuild/pkg/api"
 	"github.com/jtarchie/ci/backwards"
+	"github.com/jtarchie/ci/runtime"
 	"github.com/jtarchie/ci/storage"
 )
 
@@ -83,7 +81,7 @@ func (c *SetPipeline) Run(logger *slog.Logger) error {
 	// Validate the pipeline syntax locally before uploading
 	logger.Info("validating pipeline syntax")
 
-	err = validatePipelineSyntax(finalContent)
+	_, err = runtime.TranspileAndValidate(finalContent)
 	if err != nil {
 		return fmt.Errorf("pipeline validation failed: %w", err)
 	}
@@ -146,44 +144,6 @@ func (c *SetPipeline) Run(logger *slog.Logger) error {
 
 	if c.Driver != "" {
 		fmt.Printf("  Driver: %s\n", c.Driver)
-	}
-
-	return nil
-}
-
-// validatePipelineSyntax checks if the pipeline code is valid JS/TS.
-func validatePipelineSyntax(source string) error {
-	// First, transpile with esbuild to catch syntax errors
-	result := api.Transform(source, api.TransformOptions{
-		Loader:     api.LoaderTS,
-		Format:     api.FormatCommonJS,
-		Target:     api.ES2017,
-		Sourcemap:  api.SourceMapInline,
-		Platform:   api.PlatformNeutral,
-		Sourcefile: "main.js",
-	})
-
-	if len(result.Errors) > 0 {
-		return fmt.Errorf("syntax error: %s", result.Errors[0].Text)
-	}
-
-	// Then compile with goja to ensure it's valid JavaScript
-	lines := strings.Split(strings.TrimSpace(string(result.Code)), "\n")
-
-	if len(lines) == 0 {
-		return errors.New("empty pipeline")
-	}
-
-	var sourceMap string
-
-	sourceMap, lines = lines[len(lines)-1], lines[:len(lines)-1]
-	finalSource := "{(function() { const module = {}; " + strings.Join(lines, "\n") +
-		"; return module.exports.pipeline;}).apply(undefined)}\n" +
-		sourceMap
-
-	_, err := goja.Compile("main.js", finalSource, true)
-	if err != nil {
-		return fmt.Errorf("compilation error: %w", err)
 	}
 
 	return nil

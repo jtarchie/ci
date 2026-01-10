@@ -35,6 +35,42 @@ func NewJS(logger *slog.Logger) *JS {
 	}
 }
 
+// TranspileAndValidate transpiles TypeScript/JavaScript source code to executable JavaScript.
+// It performs esbuild transpilation, wraps the code for module exports, and validates
+// the result can be compiled by goja. Returns the ready-to-execute code or an error.
+func TranspileAndValidate(source string) (string, error) {
+	result := api.Transform(source, api.TransformOptions{
+		Loader:     api.LoaderTS,
+		Format:     api.FormatCommonJS,
+		Target:     api.ES2017,
+		Sourcemap:  api.SourceMapInline,
+		Platform:   api.PlatformNeutral,
+		Sourcefile: "main.js",
+	})
+
+	if len(result.Errors) > 0 {
+		return "", fmt.Errorf("syntax error: %s", result.Errors[0].Text)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(result.Code)), "\n")
+	if len(lines) == 0 {
+		return "", fmt.Errorf("empty pipeline after transpilation: %w", errors.ErrUnsupported)
+	}
+
+	var sourceMap string
+	sourceMap, lines = lines[len(lines)-1], lines[:len(lines)-1]
+	finalSource := "{(function() { const module = {}; " + strings.Join(lines, "\n") +
+		"; return module.exports.pipeline;}).apply(undefined)}\n" +
+		sourceMap
+
+	_, err := goja.Compile("main.js", finalSource, true)
+	if err != nil {
+		return "", fmt.Errorf("compilation error: %w", err)
+	}
+
+	return finalSource, nil
+}
+
 // Execute runs a pipeline with default options (no resume).
 func (j *JS) Execute(ctx context.Context, source string, driver orchestra.Driver, storage storage.Driver) error {
 	return j.ExecuteWithOptions(ctx, source, driver, storage, ExecuteOptions{})
@@ -57,36 +93,10 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 		runner = NewPipelineRunner(ctx, driver, j.logger)
 	}
 
-	result := api.Transform(source, api.TransformOptions{
-		Loader:     api.LoaderTS,
-		Format:     api.FormatCommonJS,
-		Target:     api.ES2017,
-		Sourcemap:  api.SourceMapInline,
-		Platform:   api.PlatformNeutral,
-		Sourcefile: "main.js",
-	})
-
-	if len(result.Errors) > 0 {
-		return &goja.CompilerSyntaxError{
-			CompilerError: goja.CompilerError{
-				Message: result.Errors[0].Text,
-			},
-		}
+	finalSource, err := TranspileAndValidate(source)
+	if err != nil {
+		return err
 	}
-
-	// split lines
-	lines := strings.Split(strings.TrimSpace(string(result.Code)), "\n")
-
-	if len(lines) == 0 {
-		return fmt.Errorf("could not find source map: %w", errors.ErrUnsupported)
-	}
-
-	var sourceMap string
-
-	sourceMap, lines = lines[len(lines)-1], lines[:len(lines)-1]
-	finalSource := "{(function() { const module = {}; " + strings.Join(lines, "\n") +
-		"; return module.exports.pipeline;}).apply(undefined)}\n" +
-		sourceMap
 
 	program, err := goja.Compile(
 		"main.js",
