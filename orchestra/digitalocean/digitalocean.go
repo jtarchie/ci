@@ -86,10 +86,15 @@ func NewDigitalOcean(namespace string, logger *slog.Logger, params map[string]st
 
 	client := godo.NewFromToken(token)
 
+	// Sanitize namespace to ensure it contains only valid hostname characters
+	// This is required because the namespace is used in droplet names, container names,
+	// volume names, and other resources that have hostname restrictions
+	sanitizedNamespace := sanitizeHostname(namespace)
+
 	return &DigitalOcean{
 		client:    client,
 		logger:    logger,
-		namespace: namespace,
+		namespace: sanitizedNamespace,
 		params:    params,
 	}, nil
 }
@@ -119,12 +124,12 @@ func (d *DigitalOcean) ensureDroplet(ctx context.Context, containerLimits orches
 	region := orchestra.GetParam(d.params, "region", "DIGITALOCEAN_REGION", DefaultRegion)
 	size := d.determineDropletSize(containerLimits)
 
-	dropletName := fmt.Sprintf("ci-%s", sanitizeHostname(d.namespace))
+	dropletName := fmt.Sprintf("ci-%s", d.namespace)
 
 	// Build tags list: always include ci and namespace, plus any custom tags
 	tags := []string{
 		"ci",
-		fmt.Sprintf("namespace-%s", sanitizeHostname(d.namespace)),
+		fmt.Sprintf("namespace-%s", d.namespace),
 	}
 
 	// Add custom tags from DSN parameter
@@ -255,7 +260,7 @@ func (d *DigitalOcean) determineDropletSize(limits orchestra.ContainerLimits) st
 
 // ensureSSHKey creates or retrieves an SSH key for droplet access.
 func (d *DigitalOcean) ensureSSHKey(ctx context.Context) (int, string, error) {
-	keyName := fmt.Sprintf("ci-%s", sanitizeHostname(d.namespace))
+	keyName := fmt.Sprintf("ci-%s", d.namespace)
 
 	// Check if SSH key already exists in DO
 	keys, _, err := d.client.Keys.List(ctx, &godo.ListOptions{})
