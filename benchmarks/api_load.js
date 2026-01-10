@@ -163,7 +163,7 @@ export default function () {
         null,
         {
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
 
       pipelineTriggerDuration.add(triggerRes.timings.duration);
@@ -188,7 +188,7 @@ export default function () {
     if (runId) {
       group("Poll Run Status", function () {
         const statusRes = http.get(
-          `${BASE_URL}/api/pipelines/${pipelineId}/runs/${runId}`
+          `${BASE_URL}/api/pipelines/${pipelineId}/runs/${runId}`,
         );
 
         runStatusDuration.add(statusRes.timings.duration);
