@@ -30,7 +30,7 @@ func (c *Server) Run(logger *slog.Logger) error {
 	}
 	defer func() { _ = client.Close() }()
 
-	router, err := server.NewRouter(logger)
+	router, err := server.NewRouter(logger, client)
 	if err != nil {
 		return fmt.Errorf("could not create router: %w", err)
 	}

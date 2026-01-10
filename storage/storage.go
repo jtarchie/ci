@@ -6,16 +6,33 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 )
 
 // ErrNotFound is returned when a requested key does not exist.
 var ErrNotFound = errors.New("not found")
+
+// Pipeline represents a stored pipeline definition.
+type Pipeline struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Content   string    `json:"content"`
+	DriverDSN string    `json:"driver_dsn"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
 
 type Driver interface {
 	Close() error
 	Set(prefix string, payload any) error
 	Get(prefix string) (Payload, error)
 	GetAll(prefix string, fields []string) (Results, error)
+
+	// Pipeline CRUD operations
+	SavePipeline(name, content, driverDSN string) (*Pipeline, error)
+	GetPipeline(id string) (*Pipeline, error)
+	ListPipelines() ([]Pipeline, error)
+	DeletePipeline(id string) error
 }
 
 type Payload map[string]any
