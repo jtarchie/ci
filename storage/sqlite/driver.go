@@ -353,6 +353,58 @@ func (s *Sqlite) GetRun(ctx context.Context, runID string) (*storage.PipelineRun
 	return &run, nil
 }
 
+// ListRunsByPipeline returns all runs for a specific pipeline.
+func (s *Sqlite) ListRunsByPipeline(ctx context.Context, pipelineID string) ([]storage.PipelineRun, error) {
+	rows, err := s.writer.QueryContext(ctx, `
+		SELECT id, pipeline_id, status, started_at, completed_at, error_message, created_at
+		FROM pipeline_runs WHERE pipeline_id = ?
+		ORDER BY created_at DESC
+	`, pipelineID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list runs: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var runs []storage.PipelineRun
+
+	for rows.Next() {
+		var run storage.PipelineRun
+		var status string
+		var createdAt string
+		var startedAt, completedAt, errorMessage sql.NullString
+
+		err := rows.Scan(&run.ID, &run.PipelineID, &status, &startedAt, &completedAt, &errorMessage, &createdAt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan run: %w", err)
+		}
+
+		run.Status = storage.RunStatus(status)
+		run.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+
+		if startedAt.Valid {
+			t, _ := time.Parse(time.RFC3339, startedAt.String)
+			run.StartedAt = &t
+		}
+
+		if completedAt.Valid {
+			t, _ := time.Parse(time.RFC3339, completedAt.String)
+			run.CompletedAt = &t
+		}
+
+		if errorMessage.Valid {
+			run.ErrorMessage = errorMessage.String
+		}
+
+		runs = append(runs, run)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating runs: %w", err)
+	}
+
+	return runs, nil
+}
+
 // UpdateRunStatus updates the status of a pipeline run.
 func (s *Sqlite) UpdateRunStatus(ctx context.Context, runID string, status storage.RunStatus, errorMessage string) error {
 	now := time.Now().UTC()
