@@ -1,23 +1,14 @@
-// Pipelines module - handles toast notifications
-// htmx handles trigger buttons and runs section updates
+// Pipelines module - handles toast notifications for htmx trigger buttons
 
 export function initPipelines() {
   // Listen for htmx events to show toast notifications
-  // htmx:afterRequest fires on the element that made the request
   document.body.addEventListener("htmx:afterRequest", handleHtmxRequest);
   document.body.addEventListener("htmx:responseError", handleHtmxError);
 }
 
 function handleHtmxRequest(event) {
   const trigger = event.detail.elt;
-
-  // Only handle trigger button responses
-  if (!trigger || !trigger.classList.contains("trigger-btn")) {
-    return;
-  }
-
-  // Check if request was successful
-  if (!event.detail.successful) {
+  if (!trigger?.classList.contains("trigger-btn") || !event.detail.successful) {
     return;
   }
 
@@ -26,32 +17,26 @@ function handleHtmxRequest(event) {
 }
 
 function handleHtmxError(event) {
-  const target = event.target;
+  const trigger = event.detail.elt;
+  if (!trigger?.classList.contains("trigger-btn")) return;
 
-  // Only handle trigger button errors
-  if (!target.classList.contains("trigger-btn")) {
-    return;
-  }
-
-  const pipelineName = target.dataset.pipelineName || "Pipeline";
-  const errorMessage = event.detail.xhr?.statusText || "Unknown error";
-
-  showToast(`Failed to trigger ${pipelineName}: ${errorMessage}`, "error");
+  const pipelineName = trigger.dataset.pipelineName || "Pipeline";
+  showToast(`Failed to trigger ${pipelineName}`, "error");
 }
 
-function showToast(message, type = "info") {
+export function showToast(message, type = "info") {
   const container = document.getElementById("toast-container");
   if (!container) return;
 
   const toast = document.createElement("div");
-  const bgColor =
-    type === "success"
-      ? "bg-green-600"
-      : type === "error"
-      ? "bg-red-600"
-      : "bg-blue-600";
+  const bgColor = type === "success"
+    ? "bg-green-600"
+    : type === "error"
+    ? "bg-red-600"
+    : "bg-blue-600";
 
-  toast.className = `${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 transform transition-all duration-300 translate-x-full`;
+  toast.className =
+    `${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 transform transition-all duration-300 translate-x-full`;
   toast.innerHTML = `
     <span>${message}</span>
     <button class="ml-2 hover:opacity-75" onclick="this.parentElement.remove()">
