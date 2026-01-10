@@ -208,4 +208,88 @@ func TestBackwardsCompatibility(t *testing.T) {
 			})
 		}
 	})
+
+	t.Run("mutate step asserts", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		matches, err := filepath.Glob("fixtures/*.yml")
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(matches).NotTo(BeEmpty())
+
+		for _, match := range matches {
+			t.Run(filepath.Base(match), func(t *testing.T) {
+				t.Parallel()
+
+				assert := NewGomegaWithT(t)
+				contents, err := os.ReadFile(match)
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				var config backwards.Config
+
+				err = yaml.UnmarshalWithOptions(contents, &config, yaml.Strict())
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				// Find a step with assertions and mutate it
+				foundAssertion := false
+				for i := range config.Jobs {
+					for j := range config.Jobs[i].Plan {
+						step := &config.Jobs[i].Plan[j]
+						if step.Assert != nil {
+							// Mutate the assertion to make it fail
+							if step.Assert.Code != nil {
+								// Change expected exit code
+								wrongCode := *step.Assert.Code + 1
+								step.Assert.Code = &wrongCode
+								foundAssertion = true
+								break
+							}
+							if step.Assert.Stdout != "" {
+								// Change expected stdout
+								step.Assert.Stdout = "THIS-WILL-NOT-MATCH-" + step.Assert.Stdout
+								foundAssertion = true
+								break
+							}
+							if step.Assert.Stderr != "" {
+								// Change expected stderr
+								step.Assert.Stderr = "THIS-WILL-NOT-MATCH-" + step.Assert.Stderr
+								foundAssertion = true
+								break
+							}
+						}
+					}
+					if foundAssertion {
+						break
+					}
+				}
+
+				// Skip files without step-level assertions
+				if !foundAssertion {
+					t.Skip("No step-level assertions found")
+					return
+				}
+
+				file, err := os.CreateTemp(t.TempDir(), "*.yml")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				defer func() { _ = os.Remove(file.Name()) }()
+
+				contents, err = yaml.MarshalWithOptions(config)
+				assert.Expect(err).NotTo(HaveOccurred())
+				_, err = file.Write(contents)
+				assert.Expect(err).NotTo(HaveOccurred())
+				assert.Expect(file.Close()).NotTo(HaveOccurred())
+
+				runner := commands.Runner{
+					Pipeline: file.Name(),
+					Driver:   "native",
+					Storage:  "sqlite://:memory:",
+				}
+				err = runner.Run(nil)
+
+				assert.Expect(err).To(HaveOccurred())
+				assert.Expect(err.Error()).To(ContainSubstring("assertion failed"))
+			})
+		}
+	})
 }
