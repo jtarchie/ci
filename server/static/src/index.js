@@ -1,3 +1,6 @@
+// Import htmx
+import "htmx.org";
+
 // Import asciinema-player
 import * as AsciinemaPlayer from "asciinema-player";
 

@@ -7,6 +7,12 @@
     <title>{{ .Title }} - CI Server</title>
     <link rel="stylesheet" href="/static/bundle.css">
     <script src="/static/bundle.js" defer></script>
+    <style>
+      /* htmx indicator styles */
+      .htmx-indicator { display: none; }
+      .htmx-request .htmx-indicator { display: inline-flex; }
+      .htmx-request .btn-text { display: none; }
+    </style>
   </head>
   <body
     class="bg-gray-100 dark:bg-gray-900 min-h-screen{{ if .BodyClass }} {{ .BodyClass }}{{ end }}">

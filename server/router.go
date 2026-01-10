@@ -121,6 +121,25 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 		})
 	})
 
+	// GET /pipelines/:id/runs-section - Returns just the runs section partial for htmx
+	router.GET("/pipelines/:id/runs-section", func(ctx echo.Context) error {
+		id := ctx.Param("id")
+
+		runs, err := store.ListRunsByPipeline(ctx.Request().Context(), id)
+		if err != nil {
+			return fmt.Errorf("could not list runs: %w", err)
+		}
+
+		if runs == nil {
+			runs = []storage.PipelineRun{}
+		}
+
+		return ctx.Render(http.StatusOK, "runs-section", map[string]any{
+			"PipelineID": id,
+			"Runs":       runs,
+		})
+	})
+
 	// Pipeline API endpoints
 	api := router.Group("/api")
 	registerPipelineRoutes(api, store, execService)
@@ -262,6 +281,10 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 
 		// Check if we can execute more pipelines
 		if !execService.CanExecute() {
+			// For htmx requests, return error as HTML
+			if ctx.Request().Header.Get("HX-Request") == "true" {
+				return ctx.String(http.StatusTooManyRequests, "Max concurrent executions reached")
+			}
 			return ctx.JSON(http.StatusTooManyRequests, map[string]any{
 				"error":         "max concurrent executions reached",
 				"in_flight":     execService.CurrentInFlight(),
@@ -273,6 +296,9 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 		pipeline, err := store.GetPipeline(ctx.Request().Context(), id)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
+				if ctx.Request().Header.Get("HX-Request") == "true" {
+					return ctx.String(http.StatusNotFound, "Pipeline not found")
+				}
 				return ctx.JSON(http.StatusNotFound, map[string]string{
 					"error": "pipeline not found",
 				})
@@ -288,6 +314,23 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 		if err != nil {
 			return ctx.JSON(http.StatusInternalServerError, map[string]string{
 				"error": fmt.Sprintf("failed to trigger pipeline: %v", err),
+			})
+		}
+
+		// For htmx requests, return the updated runs section
+		if ctx.Request().Header.Get("HX-Request") == "true" {
+			runs, err := store.ListRunsByPipeline(ctx.Request().Context(), id)
+			if err != nil {
+				return fmt.Errorf("could not list runs: %w", err)
+			}
+
+			if runs == nil {
+				runs = []storage.PipelineRun{}
+			}
+
+			return ctx.Render(http.StatusOK, "runs-section", map[string]any{
+				"PipelineID": id,
+				"Runs":       runs,
 			})
 		}
 
