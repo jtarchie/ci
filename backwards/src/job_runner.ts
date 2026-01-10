@@ -16,7 +16,11 @@ function zeroPadWithLength(num: number, length: number): string {
   return zeroPad(num, decimalPlaces);
 }
 
-const buildID = zeroPad(Date.now(), 20);
+// Use pipelineContext.runID if available (from server), otherwise fall back to timestamp
+const buildID =
+  (typeof pipelineContext !== "undefined" && pipelineContext.runID)
+    ? pipelineContext.runID
+    : zeroPad(Date.now(), 20);
 
 export class JobRunner {
   private taskNames: string[] = [];

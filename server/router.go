@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -32,12 +33,15 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	execService := NewExecutionService(store, logger, opts.MaxInFlight)
 	router.Pre(middleware.AddTrailingSlashWithConfig(middleware.TrailingSlashConfig{
 		Skipper: func(c echo.Context) bool {
-			// Skip trailing slash middleware for static files, API routes, and health
+			// Skip trailing slash middleware for static files, API routes, runs, and health
 			path := c.Request().URL.Path
 			if len(path) >= 7 && path[:7] == "/static" {
 				return true
 			}
 			if len(path) >= 4 && path[:4] == "/api" {
+				return true
+			}
+			if len(path) >= 5 && path[:5] == "/runs" {
 				return true
 			}
 			if path == "/health" || path == "/health/" {
@@ -120,6 +124,46 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	// Pipeline API endpoints
 	api := router.Group("/api")
 	registerPipelineRoutes(api, store, execService)
+
+	// Run-specific views that look up tasks at /pipeline/<runID>/...
+	router.GET("/runs/:id/tasks", func(ctx echo.Context) error {
+		runID := ctx.Param("id")
+		lookupPath := "/pipeline/" + runID + "/"
+
+		results, err := store.GetAll(ctx.Request().Context(), lookupPath, []string{"status"})
+		if err != nil {
+			return fmt.Errorf("could not get all results: %w", err)
+		}
+
+		return ctx.Render(http.StatusOK, "results.html", map[string]any{
+			"Tree":  results.AsTree(),
+			"Path":  lookupPath,
+			"RunID": runID,
+		})
+	})
+
+	router.GET("/runs/:id/graph", func(ctx echo.Context) error {
+		runID := ctx.Param("id")
+		lookupPath := "/pipeline/" + runID + "/"
+
+		results, err := store.GetAll(ctx.Request().Context(), lookupPath, []string{"status", "dependsOn"})
+		if err != nil {
+			return fmt.Errorf("could not get all results: %w", err)
+		}
+
+		tree := results.AsTree()
+		treeJSON, err := json.Marshal(tree)
+		if err != nil {
+			return fmt.Errorf("could not marshal tree: %w", err)
+		}
+
+		return ctx.Render(http.StatusOK, "graph.html", map[string]any{
+			"Tree":     tree,
+			"TreeJSON": string(treeJSON),
+			"Path":     lookupPath,
+			"RunID":    runID,
+		})
+	})
 
 	return router, nil
 }

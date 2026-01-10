@@ -170,6 +170,15 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 		return fmt.Errorf("could not set storage: %w", err)
 	}
 
+	// Expose pipeline context to JavaScript (runID, etc.)
+	pipelineContext := map[string]interface{}{
+		"runID": opts.RunID,
+	}
+	err = jsVM.Set("pipelineContext", pipelineContext)
+	if err != nil {
+		return fmt.Errorf("could not set pipelineContext: %w", err)
+	}
+
 	pipeline, err := jsVM.RunProgram(program)
 	if err != nil {
 		defer jsVM.ClearInterrupt()

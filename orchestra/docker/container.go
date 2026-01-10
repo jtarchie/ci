@@ -144,6 +144,8 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 		&container.Config{
 			Image: task.Image,
 			Cmd:   task.Command,
+			// Override entrypoint to ensure our command runs directly, not as args to image's entrypoint
+			Entrypoint: []string{},
 			Labels: map[string]string{
 				"orchestra.namespace": d.namespace,
 			},
