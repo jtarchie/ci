@@ -88,10 +88,15 @@ func NewHetzner(namespace string, logger *slog.Logger, params map[string]string)
 
 	client := hcloud.NewClient(hcloud.WithToken(token))
 
+	// Sanitize namespace to ensure it contains only valid hostname characters
+	// This is required because the namespace is used in server names, container names,
+	// volume names, and other resources that have hostname restrictions
+	sanitizedNamespace := sanitizeHostname(namespace)
+
 	return &Hetzner{
 		client:    client,
 		logger:    logger,
-		namespace: namespace,
+		namespace: sanitizedNamespace,
 		params:    params,
 	}, nil
 }
@@ -121,7 +126,7 @@ func (h *Hetzner) ensureServer(ctx context.Context, containerLimits orchestra.Co
 	location := orchestra.GetParam(h.params, "location", "HETZNER_LOCATION", DefaultLocation)
 	serverType := h.determineServerType(containerLimits)
 
-	serverName := fmt.Sprintf("ci-%s", sanitizeHostname(h.namespace))
+	serverName := fmt.Sprintf("ci-%s", h.namespace)
 
 	// Look up the image
 	imageResult, _, err := h.client.Image.GetByNameAndArchitecture(ctx, image, hcloud.ArchitectureX86)
@@ -156,7 +161,7 @@ func (h *Hetzner) ensureServer(ctx context.Context, containerLimits orchestra.Co
 	// Build labels map: always include ci and namespace, plus any custom labels
 	labels := map[string]string{
 		"ci":        "true",
-		"namespace": sanitizeHostname(h.namespace),
+		"namespace": h.namespace,
 	}
 
 	// Add custom labels from DSN parameter (format: key1=value1,key2=value2)
@@ -284,7 +289,7 @@ func (h *Hetzner) determineServerType(limits orchestra.ContainerLimits) string {
 
 // ensureSSHKey creates or retrieves an SSH key for server access.
 func (h *Hetzner) ensureSSHKey(ctx context.Context) (*hcloud.SSHKey, string, error) {
-	keyName := fmt.Sprintf("ci-%s", sanitizeHostname(h.namespace))
+	keyName := fmt.Sprintf("ci-%s", h.namespace)
 
 	// Check if SSH key already exists in Hetzner
 	existingKey, _, err := h.client.SSHKey.GetByName(ctx, keyName)
