@@ -89,6 +89,54 @@ declare global {
     function stringify(obj: object): string;
   }
 
+  // Notification types
+  interface NotifyConfig {
+    type: "slack" | "teams" | "http";
+    token?: string; // For Slack
+    webhook?: string; // For Teams
+    url?: string; // For HTTP
+    channels?: string[]; // For Slack
+    headers?: Record<string, string>; // For HTTP
+    method?: string; // For HTTP (defaults to POST)
+    recipients?: string[]; // Generic recipients
+  }
+
+  interface NotifyContext {
+    pipelineName: string;
+    jobName: string;
+    buildID: string;
+    status: "pending" | "running" | "success" | "failure" | "error";
+    startTime: string;
+    endTime: string;
+    duration: string;
+    environment: Record<string, string>;
+    taskResults: Record<string, unknown>;
+  }
+
+  interface NotifyInput {
+    name: string; // Config name
+    message: string; // Template message (Go template with Sprig)
+    async?: boolean; // Fire-and-forget mode (default: false)
+  }
+
+  interface NotifyResult {
+    success: boolean;
+    error?: string;
+  }
+
+  namespace notify {
+    function setConfigs(configs: Record<string, NotifyConfig>): void;
+    function setContext(ctx: NotifyContext): void;
+    function updateStatus(status: string): void;
+    function updateJobName(jobName: string): void;
+    function send(input: NotifyInput): Promise<NotifyResult>;
+    function sendMultiple(
+      names: string[],
+      message: string,
+      async?: boolean,
+    ): Promise<NotifyResult>;
+  }
+
   // Native Resources types
   interface ResourceVersion {
     [key: string]: string;
@@ -243,7 +291,17 @@ declare global {
     fail_fast?: boolean;
   }
 
-  type Step = Task | Get | Put | Do | Try | InParallel;
+  // Notify step for sending notifications
+  interface NotifyStep extends StepHooks {
+    notify: string | string[]; // Config name(s)
+    message: string; // Go template message with Sprig functions
+    async?: boolean; // Fire-and-forget mode (default: false)
+    attempts?: number;
+    across?: AcrossVar[];
+    fail_fast?: boolean;
+  }
+
+  type Step = Task | Get | Put | Do | Try | InParallel | NotifyStep;
 
   // Pipeline configuration
   interface Job extends StepHooks {
@@ -271,9 +329,10 @@ declare global {
   interface PipelineConfig {
     assert: AssertionBase;
     jobs: Job[];
+    notifications?: Record<string, NotifyConfig>; // Top-level notification configs
     resource_types: ResourceType[];
     resources: Resource[];
   }
 }
 
-export {};
+export { };
