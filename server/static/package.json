@@ -9,7 +9,8 @@
     "build:js": "esbuild src/index.js --bundle --minify --outfile=dist/bundle.js --format=iife --global-name=CI --target=es2017"
   },
   "dependencies": {
-    "asciinema-player": "3.14.0"
+    "asciinema-player": "3.14.0",
+    "htmx.org": "^2.0.8"
   },
   "devDependencies": {
     "@tailwindcss/cli": "4.1.18",
