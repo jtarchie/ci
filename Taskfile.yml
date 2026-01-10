@@ -13,7 +13,7 @@ tasks:
   fmt:
     cmds:
       - deno fmt --ignore=server/templates/,backwards/bundle.js,server/static/dist/bundle.js .
-      - deno lint --rules-exclude=no-window,no-process-global --ignore=server/static/dist/,server/templates/,backwards/bundle.js .
+      - deno lint --rules-exclude=no-window,no-process-global,no-node-globals --ignore=server/static/dist/,server/templates/,backwards/bundle.js .
       - gofmt -w .
       - golangci-lint run ./... --fix
   default:
