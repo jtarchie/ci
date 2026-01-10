@@ -155,6 +155,13 @@ declare global {
     timeout?: string;
   }
 
+  // Across modifier type
+  interface AcrossVar {
+    var: string;
+    values: string[];
+    max_in_flight?: number;
+  }
+
   // Resource related interfaces
   interface ResourceBase {
     name: string;
@@ -186,6 +193,9 @@ declare global {
     file?: string;
     privileged?: boolean;
     assert?: TaskAssertion;
+    attempts?: number;
+    across?: AcrossVar[];
+    fail_fast?: boolean;
   }
 
   interface Get extends StepHooks {
@@ -195,16 +205,25 @@ declare global {
     trigger: boolean;
     version: string;
     passed?: string[];
+    attempts?: number;
+    across?: AcrossVar[];
+    fail_fast?: boolean;
   }
 
   interface Put extends StepHooks {
     put: string;
     resource: string;
     params: ParamsConfig;
+    attempts?: number;
+    across?: AcrossVar[];
+    fail_fast?: boolean;
   }
 
   interface Do extends StepHooks {
     do: Step[];
+    attempts?: number;
+    across?: AcrossVar[];
+    fail_fast?: boolean;
   }
 
   interface InParallel extends StepHooks {
@@ -213,10 +232,15 @@ declare global {
       limit?: number;
       fail_fast?: boolean;
     };
+    attempts?: number;
+    across?: AcrossVar[];
   }
 
   interface Try extends StepHooks {
     try: Step[];
+    attempts?: number;
+    across?: AcrossVar[];
+    fail_fast?: boolean;
   }
 
   type Step = Task | Get | Put | Do | Try | InParallel;
@@ -252,4 +276,4 @@ declare global {
   }
 }
 
-export {};
+export { };

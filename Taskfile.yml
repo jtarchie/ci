@@ -14,13 +14,13 @@ tasks:
     cmds:
       - deno fmt --ignore=server/templates/,backwards/bundle.js,server/static/dist/bundle.js .
       - deno lint --rules-exclude=no-window,no-process-global,no-node-globals --ignore=server/static/dist/,server/templates/,backwards/bundle.js .
+      - deno check backwards/src/ examples/both/
       - gofmt -w .
       - golangci-lint run ./... --fix
   default:
     cmds:
       - task: build
       - task: fmt
-      - deno check backwards/src/ examples/both/
       - go test -race ./... -count=1 -parallel=1
       - task: test:e2e
   test:e2e:

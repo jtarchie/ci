@@ -202,13 +202,11 @@ var JobRunner = class {
   }
   async processStep(step, pathContext) {
     const maxAttempts = step.attempts || 1;
-    let lastError = void 0;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        await this.processStepInternal(step, pathContext, attempt, maxAttempts);
+        await this.processStepInternal(step, pathContext);
         return;
       } catch (error) {
-        lastError = error;
         if (attempt < maxAttempts) {
           console.log(`Attempt ${attempt}/${maxAttempts} failed, retrying...`);
           continue;
@@ -217,7 +215,7 @@ var JobRunner = class {
       }
     }
   }
-  async processStepInternal(step, pathContext, attempt = 1, maxAttempts = 1) {
+  async processStepInternal(step, pathContext) {
     if (step.across && step.across.length > 0) {
       await this.processAcrossStep(step, pathContext);
       return;
@@ -314,8 +312,9 @@ var JobRunner = class {
     const storageKey = `${this.getBaseStorageKey()}/${pathContext}/across`;
     storage.set(storageKey, { status: "pending", total: combinations.length });
     let failureOccurred = false;
+    const failFast = step.fail_fast || false;
     for (let i = 0; i < combinations.length; i++) {
-      if (failureOccurred && step.fail_fast) {
+      if (failureOccurred && failFast) {
         break;
       }
       const combination = combinations[i];
@@ -328,14 +327,14 @@ var JobRunner = class {
         );
       } catch (error) {
         failureOccurred = true;
-        if (step.fail_fast) {
+        if (failFast) {
           storage.set(storageKey, { status: "failure", failed_at: i });
           throw error;
         }
         console.error(`Across combination ${i} failed:`, error);
       }
     }
-    if (failureOccurred && !step.fail_fast) {
+    if (failureOccurred && !failFast) {
       storage.set(storageKey, { status: "failure" });
       throw new TaskFailure("One or more across combinations failed");
     }
