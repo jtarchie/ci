@@ -116,6 +116,11 @@ export class JobRunner {
       return "try";
     } else if ("in_parallel" in step) {
       return "in_parallel";
+    } else if ("notify" in step) {
+      const name = Array.isArray(step.notify)
+        ? step.notify.join("-")
+        : step.notify;
+      return `notify/${name}`;
     }
     return "unknown";
   }
@@ -183,6 +188,11 @@ export class JobRunner {
       );
     } else if ("in_parallel" in step) {
       await this.processParallelSteps(
+        step,
+        `${pathContext}/${this.getStepIdentifier(step)}`,
+      );
+    } else if ("notify" in step) {
+      await this.processNotifyStep(
         step,
         `${pathContext}/${this.getStepIdentifier(step)}`,
       );
@@ -360,6 +370,63 @@ export class JobRunner {
     } finally {
       // always successful
       storage.set(pathContext, { status: "success" });
+    }
+  }
+
+  private async processNotifyStep(
+    step: NotifyStep,
+    pathContext: string,
+  ): Promise<void> {
+    const storageKey = `${this.getBaseStorageKey()}/${pathContext}`;
+    let failure: unknown = undefined;
+
+    try {
+      storage.set(storageKey, { status: "pending" });
+
+      // Update notify context with current job info
+      notify.updateJobName(this.jobConfig.name);
+      notify.updateStatus("running");
+
+      // Send to single or multiple notification configs
+      const names = Array.isArray(step.notify) ? step.notify : [step.notify];
+
+      if (step.async) {
+        // Fire-and-forget mode
+        for (const name of names) {
+          notify.send({ name, message: step.message, async: true });
+        }
+        storage.set(storageKey, { status: "success" });
+      } else {
+        // Synchronous mode - wait for result
+        if (names.length === 1) {
+          await notify.send({
+            name: names[0],
+            message: step.message,
+            async: false,
+          });
+        } else {
+          await notify.sendMultiple(names, step.message, false);
+        }
+        storage.set(storageKey, { status: "success" });
+      }
+    } catch (error) {
+      failure = error;
+      storage.set(storageKey, { status: "failure" });
+    }
+
+    // Handle step hooks
+    if (failure === undefined && step.on_success) {
+      await this.processStep(step.on_success, `${pathContext}/on_success`);
+    } else if (failure && step.on_failure) {
+      await this.processStep(step.on_failure, `${pathContext}/on_failure`);
+    }
+
+    if (step.ensure) {
+      await this.processStep(step.ensure, `${pathContext}/ensure`);
+    }
+
+    if (failure) {
+      throw new TaskFailure(`Notification failed: ${failure}`);
     }
   }
 

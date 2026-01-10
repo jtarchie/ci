@@ -143,6 +143,15 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 		return fmt.Errorf("could not set runtime: %w", err)
 	}
 
+	// Set up notification runtime
+	notifier := NewNotifier(j.logger)
+	notifyRuntime := NewNotifyRuntime(ctx, jsVM, notifier, runtime.promises, runtime.tasks)
+
+	err = jsVM.Set("notify", notifyRuntime)
+	if err != nil {
+		return fmt.Errorf("could not set notify: %w", err)
+	}
+
 	// Set up native resource runner
 	resourceRunner := NewResourceRunner(ctx, j.logger)
 

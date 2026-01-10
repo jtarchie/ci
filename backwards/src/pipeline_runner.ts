@@ -8,6 +8,27 @@ export class PipelineRunner {
 
   constructor(private config: PipelineConfig) {
     this.validatePipelineConfig();
+    this.initializeNotifications();
+  }
+
+  private initializeNotifications(): void {
+    // Set up notification configs if present
+    if (this.config.notifications) {
+      notify.setConfigs(this.config.notifications);
+    }
+
+    // Initialize notify context with pipeline info
+    notify.setContext({
+      pipelineName: this.config.jobs[0]?.name || "unknown",
+      jobName: "",
+      buildID: String(Date.now()),
+      status: "pending",
+      startTime: new Date().toISOString(),
+      endTime: "",
+      duration: "",
+      environment: {},
+      taskResults: {},
+    });
   }
 
   private validatePipelineConfig(): void {

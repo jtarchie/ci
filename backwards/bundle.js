@@ -192,6 +192,9 @@ var JobRunner = class {
       return "try";
     } else if ("in_parallel" in step) {
       return "in_parallel";
+    } else if ("notify" in step) {
+      const name = Array.isArray(step.notify) ? step.notify.join("-") : step.notify;
+      return `notify/${name}`;
     }
     return "unknown";
   }
@@ -247,6 +250,11 @@ var JobRunner = class {
       );
     } else if ("in_parallel" in step) {
       await this.processParallelSteps(
+        step,
+        `${pathContext}/${this.getStepIdentifier(step)}`
+      );
+    } else if ("notify" in step) {
+      await this.processNotifyStep(
         step,
         `${pathContext}/${this.getStepIdentifier(step)}`
       );
@@ -378,6 +386,47 @@ var JobRunner = class {
     } catch (_err) {
     } finally {
       storage.set(pathContext, { status: "success" });
+    }
+  }
+  async processNotifyStep(step, pathContext) {
+    const storageKey = `${this.getBaseStorageKey()}/${pathContext}`;
+    let failure = void 0;
+    try {
+      storage.set(storageKey, { status: "pending" });
+      notify.updateJobName(this.jobConfig.name);
+      notify.updateStatus("running");
+      const names = Array.isArray(step.notify) ? step.notify : [step.notify];
+      if (step.async) {
+        for (const name of names) {
+          notify.send({ name, message: step.message, async: true });
+        }
+        storage.set(storageKey, { status: "success" });
+      } else {
+        if (names.length === 1) {
+          await notify.send({
+            name: names[0],
+            message: step.message,
+            async: false
+          });
+        } else {
+          await notify.sendMultiple(names, step.message, false);
+        }
+        storage.set(storageKey, { status: "success" });
+      }
+    } catch (error) {
+      failure = error;
+      storage.set(storageKey, { status: "failure" });
+    }
+    if (failure === void 0 && step.on_success) {
+      await this.processStep(step.on_success, `${pathContext}/on_success`);
+    } else if (failure && step.on_failure) {
+      await this.processStep(step.on_failure, `${pathContext}/on_failure`);
+    }
+    if (step.ensure) {
+      await this.processStep(step.ensure, `${pathContext}/ensure`);
+    }
+    if (failure) {
+      throw new TaskFailure(`Notification failed: ${failure}`);
     }
   }
   async processDoStep(step, pathContext) {
@@ -627,9 +676,26 @@ var PipelineRunner = class {
   constructor(config) {
     this.config = config;
     this.validatePipelineConfig();
+    this.initializeNotifications();
   }
   jobResults = /* @__PURE__ */ new Map();
   executedJobs = [];
+  initializeNotifications() {
+    if (this.config.notifications) {
+      notify.setConfigs(this.config.notifications);
+    }
+    notify.setContext({
+      pipelineName: this.config.jobs[0]?.name || "unknown",
+      jobName: "",
+      buildID: String(Date.now()),
+      status: "pending",
+      startTime: (/* @__PURE__ */ new Date()).toISOString(),
+      endTime: "",
+      duration: "",
+      environment: {},
+      taskResults: {}
+    });
+  }
   validatePipelineConfig() {
     assert.truthy(
       this.config.jobs.length > 0,
