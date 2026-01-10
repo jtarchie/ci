@@ -69,8 +69,8 @@ jobs:
             args:
               - -c
               - |
-                echo "This task always fails"
-                exit 1
+                  echo "This task always fails"
+                  exit 1
         assert:
           code: 1
     on_failure:

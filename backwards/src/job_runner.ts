@@ -129,14 +129,12 @@ export class JobRunner {
   private async processStep(step: Step, pathContext: string): Promise<void> {
     // Handle attempts wrapper - retry up to N times
     const maxAttempts = step.attempts || 1;
-    let lastError: unknown = undefined;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        await this.processStepInternal(step, pathContext, attempt, maxAttempts);
+        await this.processStepInternal(step, pathContext);
         return; // Success - exit retry loop
       } catch (error) {
-        lastError = error;
         // If we haven't reached max attempts, retry
         if (attempt < maxAttempts) {
           console.log(`Attempt ${attempt}/${maxAttempts} failed, retrying...`);
@@ -151,8 +149,6 @@ export class JobRunner {
   private async processStepInternal(
     step: Step,
     pathContext: string,
-    attempt: number = 1,
-    maxAttempts: number = 1,
   ): Promise<void> {
     // Handle across wrapper - run step multiple times with different variable combinations
     if (step.across && step.across.length > 0) {
@@ -349,8 +345,8 @@ export class JobRunner {
     }
 
     // Remove across fields from cloned step to avoid infinite recursion
-    delete (clonedStep as any).across;
-    delete (clonedStep as any).fail_fast;
+    delete (clonedStep as Record<string, unknown>).across;
+    delete (clonedStep as Record<string, unknown>).fail_fast;
 
     return clonedStep;
   }
