@@ -18,12 +18,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v5
       - uses: denoland/setup-deno@v1
       - name: start minikube
         id: minikube
         uses: medyagh/setup-minikube@latest
         with:
           feature-gates: "PodLogsQuerySplitStreams=true"
+      - name: Install Playwright Browsers
+        run: |
+          cd e2e/
+          npm install
+          npx playwright install --with-deps
       - uses: actions/setup-go@v6
         with:
           check-latest: true
@@ -36,9 +42,5 @@ jobs:
       - run: task build:static
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v8
-      - name: Set up Docker
-        uses: docker/setup-qemu-action@v3
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
       - name: Task
         run: task
