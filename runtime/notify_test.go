@@ -1,8 +1,15 @@
 package runtime_test
 
 import (
+	"context"
+	"encoding/json"
+	"io"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/jtarchie/ci/runtime"
 	. "github.com/onsi/gomega"
@@ -128,4 +135,217 @@ func TestNotifySetConfigs(t *testing.T) {
 	config, exists := notifier.GetConfig("test")
 	assert.Expect(exists).To(BeTrue())
 	assert.Expect(config.Type).To(Equal("http"))
+}
+
+func TestNotifyHTTPIntegration(t *testing.T) {
+	t.Parallel()
+
+	assert := NewGomegaWithT(t)
+
+	// Track received notifications
+	var mu sync.Mutex
+	var receivedRequests []struct {
+		Method      string
+		ContentType string
+		Body        map[string]string
+		Headers     http.Header
+	}
+
+	// Start a test HTTP server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() { _ = r.Body.Close() }()
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "Failed to read body", http.StatusBadRequest)
+			return
+		}
+
+		var payload map[string]string
+		if err := json.Unmarshal(body, &payload); err != nil {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		mu.Lock()
+		receivedRequests = append(receivedRequests, struct {
+			Method      string
+			ContentType string
+			Body        map[string]string
+			Headers     http.Header
+		}{
+			Method:      r.Method,
+			ContentType: r.Header.Get("Content-Type"),
+			Body:        payload,
+			Headers:     r.Header.Clone(),
+		})
+		mu.Unlock()
+
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	// Create notifier with HTTP config pointing to test server
+	logger := slog.Default()
+	notifier := runtime.NewNotifier(logger)
+
+	notifier.SetConfigs(map[string]runtime.NotifyConfig{
+		"test-webhook": {
+			Type:   "http",
+			URL:    server.URL,
+			Method: "POST",
+			Headers: map[string]string{
+				"X-Custom-Header": "test-value",
+				"Authorization":   "Bearer test-token",
+			},
+		},
+	})
+
+	// Set up context for template rendering
+	notifier.SetContext(runtime.NotifyContext{
+		PipelineName: "integration-test-pipeline",
+		JobName:      "build-job",
+		BuildID:      "build-123",
+		Status:       "success",
+		StartTime:    "2026-01-10T12:00:00Z",
+		EndTime:      "2026-01-10T12:05:00Z",
+		Duration:     "5m0s",
+		Environment: map[string]string{
+			"BRANCH": "main",
+		},
+		TaskResults: map[string]any{},
+	})
+
+	// Send a notification with template
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := notifier.Send(ctx, "test-webhook", "Build {{ .JobName }} completed: {{ .Status | upper }}")
+	assert.Expect(err).NotTo(HaveOccurred())
+
+	// Verify the server received the notification
+	mu.Lock()
+	defer mu.Unlock()
+
+	assert.Expect(receivedRequests).To(HaveLen(1))
+
+	req := receivedRequests[0]
+	assert.Expect(req.Method).To(Equal("POST"))
+	assert.Expect(req.ContentType).To(Equal("application/json"))
+	assert.Expect(req.Headers.Get("X-Custom-Header")).To(Equal("test-value"))
+	assert.Expect(req.Headers.Get("Authorization")).To(Equal("Bearer test-token"))
+
+	// Verify the payload contains rendered message
+	assert.Expect(req.Body["subject"]).To(Equal("Pipeline Notification"))
+	assert.Expect(req.Body["message"]).To(Equal("Build build-job completed: SUCCESS"))
+}
+
+func TestNotifyHTTPIntegrationWithMultipleNotifications(t *testing.T) {
+	t.Parallel()
+
+	assert := NewGomegaWithT(t)
+
+	// Track received notifications
+	var mu sync.Mutex
+	var receivedCount int
+
+	// Start a test HTTP server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		receivedCount++
+		mu.Unlock()
+
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	// Create notifier with multiple HTTP configs
+	logger := slog.Default()
+	notifier := runtime.NewNotifier(logger)
+
+	notifier.SetConfigs(map[string]runtime.NotifyConfig{
+		"webhook-1": {
+			Type: "http",
+			URL:  server.URL + "/webhook1",
+		},
+		"webhook-2": {
+			Type: "http",
+			URL:  server.URL + "/webhook2",
+		},
+	})
+
+	notifier.SetContext(runtime.NotifyContext{
+		PipelineName: "multi-notify-pipeline",
+		JobName:      "deploy",
+		Status:       "success",
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Send to first webhook
+	err := notifier.Send(ctx, "webhook-1", "First notification")
+	assert.Expect(err).NotTo(HaveOccurred())
+
+	// Send to second webhook
+	err = notifier.Send(ctx, "webhook-2", "Second notification")
+	assert.Expect(err).NotTo(HaveOccurred())
+
+	// Verify both were received
+	mu.Lock()
+	defer mu.Unlock()
+	assert.Expect(receivedCount).To(Equal(2))
+}
+
+func TestNotifyHTTPIntegrationServerError(t *testing.T) {
+	t.Parallel()
+
+	assert := NewGomegaWithT(t)
+
+	// Start a test HTTP server that returns errors
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("Internal Server Error"))
+	}))
+	defer server.Close()
+
+	logger := slog.Default()
+	notifier := runtime.NewNotifier(logger)
+
+	notifier.SetConfigs(map[string]runtime.NotifyConfig{
+		"failing-webhook": {
+			Type: "http",
+			URL:  server.URL,
+		},
+	})
+
+	notifier.SetContext(runtime.NotifyContext{
+		PipelineName: "error-test",
+		Status:       "failure",
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Send should fail due to server error
+	err := notifier.Send(ctx, "failing-webhook", "This should fail")
+	assert.Expect(err).To(HaveOccurred())
+	assert.Expect(err.Error()).To(ContainSubstring("could not send notification"))
+}
+
+func TestNotifyHTTPIntegrationMissingConfig(t *testing.T) {
+	t.Parallel()
+
+	assert := NewGomegaWithT(t)
+
+	logger := slog.Default()
+	notifier := runtime.NewNotifier(logger)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Send to non-existent config should fail
+	err := notifier.Send(ctx, "nonexistent-webhook", "This should fail")
+	assert.Expect(err).To(HaveOccurred())
+	assert.Expect(err.Error()).To(ContainSubstring("notification config \"nonexistent-webhook\" not found"))
 }
