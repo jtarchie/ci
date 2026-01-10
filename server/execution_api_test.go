@@ -32,7 +32,6 @@ func TestExecutionAPI(t *testing.T) {
 
 				client, err := init(buildFile.Name(), "namespace", slog.Default())
 				assert.Expect(err).NotTo(HaveOccurred())
-				defer func() { _ = client.Close() }()
 
 				// Create a simple pipeline that will fail quickly (no actual execution in test)
 				pipeline, err := client.SavePipeline(context.Background(), "test-pipeline", "export const pipeline = async () => {};", "native://")
@@ -54,6 +53,9 @@ func TestExecutionAPI(t *testing.T) {
 				assert.Expect(resp["pipeline_id"]).To(Equal(pipeline.ID))
 				assert.Expect(resp["status"]).To(Equal("queued"))
 				assert.Expect(resp["message"]).To(Equal("pipeline execution started"))
+
+				// Close database connections before temp directory cleanup
+				_ = client.Close()
 			})
 
 			t.Run("POST /api/pipelines/:id/trigger returns 404 for non-existent pipeline", func(t *testing.T) {
