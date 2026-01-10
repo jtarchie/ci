@@ -1,1 +1,5 @@
 brew 'go-task'
+brew 'go'
+brew 'deno'
+brew 'shellcheck'
+brew 'shfmt'
