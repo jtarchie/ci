@@ -57,6 +57,12 @@ type PutConfig struct {
 	NoGet     bool              `yaml:"no_get,omitempty"`
 }
 
+type AcrossVar struct {
+	Var          string   `yaml:"var,omitempty"`
+	Values       []string `yaml:"values,omitempty"`
+	MaxInFlight  int      `yaml:"max_in_flight,omitempty"`
+}
+
 type Step struct {
 	Assert *struct {
 		Code   *int   `yaml:"code,omitempty"`
@@ -90,7 +96,11 @@ type Step struct {
 		FailFast bool  `yaml:"fail_fast,omitempty"`
 	} `yaml:"in_parallel,omitempty"`
 
-	Timeout time.Duration `yaml:"timeout,omitempty"`
+	Across []AcrossVar `yaml:"across,omitempty"`
+	AcrossFailFast bool `yaml:"fail_fast,omitempty"`
+
+	Attempts int           `yaml:"attempts,omitempty"`
+	Timeout  time.Duration `yaml:"timeout,omitempty"`
 }
 
 type Steps []Step

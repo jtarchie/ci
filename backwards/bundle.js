@@ -201,6 +201,27 @@ var JobRunner = class {
     return `${basePath}/${currentPath}/${stepId}`;
   }
   async processStep(step, pathContext) {
+    const maxAttempts = step.attempts || 1;
+    let lastError = void 0;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await this.processStepInternal(step, pathContext, attempt, maxAttempts);
+        return;
+      } catch (error) {
+        lastError = error;
+        if (attempt < maxAttempts) {
+          console.log(`Attempt ${attempt}/${maxAttempts} failed, retrying...`);
+          continue;
+        }
+        throw error;
+      }
+    }
+  }
+  async processStepInternal(step, pathContext, attempt = 1, maxAttempts = 1) {
+    if (step.across && step.across.length > 0) {
+      await this.processAcrossStep(step, pathContext);
+      return;
+    }
     if ("get" in step) {
       await this.processGetStep(
         step,
@@ -287,6 +308,70 @@ var JobRunner = class {
   }
   async processParallelSteps(step, pathContext) {
     await this.processDoStep(step, pathContext);
+  }
+  async processAcrossStep(step, pathContext) {
+    const combinations = this.generateAcrossCombinations(step.across);
+    const storageKey = `${this.getBaseStorageKey()}/${pathContext}/across`;
+    storage.set(storageKey, { status: "pending", total: combinations.length });
+    let failureOccurred = false;
+    for (let i = 0; i < combinations.length; i++) {
+      if (failureOccurred && step.fail_fast) {
+        break;
+      }
+      const combination = combinations[i];
+      const varContext = Object.entries(combination).map(([key, value]) => `${key}_${value}`).join("_");
+      const modifiedStep = this.injectAcrossVariables(step, combination);
+      try {
+        await this.processStepInternal(
+          modifiedStep,
+          `${pathContext}/across/${i}_${varContext}`
+        );
+      } catch (error) {
+        failureOccurred = true;
+        if (step.fail_fast) {
+          storage.set(storageKey, { status: "failure", failed_at: i });
+          throw error;
+        }
+        console.error(`Across combination ${i} failed:`, error);
+      }
+    }
+    if (failureOccurred && !step.fail_fast) {
+      storage.set(storageKey, { status: "failure" });
+      throw new TaskFailure("One or more across combinations failed");
+    }
+    storage.set(storageKey, { status: "success", total: combinations.length });
+  }
+  generateAcrossCombinations(acrossVars) {
+    if (acrossVars.length === 0) {
+      return [{}];
+    }
+    const [first, ...rest] = acrossVars;
+    const restCombinations = this.generateAcrossCombinations(rest);
+    const combinations = [];
+    for (const value of first.values) {
+      for (const restCombination of restCombinations) {
+        combinations.push({
+          [first.var]: value,
+          ...restCombination
+        });
+      }
+    }
+    return combinations;
+  }
+  injectAcrossVariables(step, variables) {
+    const clonedStep = { ...step };
+    if ("task" in clonedStep && clonedStep.config) {
+      clonedStep.config = {
+        ...clonedStep.config,
+        env: {
+          ...clonedStep.config.env,
+          ...variables
+        }
+      };
+    }
+    delete clonedStep.across;
+    delete clonedStep.fail_fast;
+    return clonedStep;
   }
   async processTryStep(step, pathContext) {
     try {
