@@ -54,13 +54,49 @@ declare global {
 
   interface VolumeResult {
     error: string;
+    name: string;
+    path: string; // Absolute path to the volume directory
   }
 
   type KnownMounts = Record<string, VolumeResult>;
 
+  // Pipeline context provided by the runtime
+  interface PipelineContext {
+    runID?: string;
+    pipelineID?: string;
+  }
+  const pipelineContext: PipelineContext;
+
   // Utility namespaces
+  interface StoredResourceVersion {
+    id: number;
+    resource_name: string;
+    version: { [key: string]: string };
+    fetched_at: string;
+    job_name?: string;
+  }
+
   namespace storage {
     function set(key: string, value: unknown): Promise<void>;
+    function get(key: string): unknown;
+
+    // Resource version operations
+    function saveResourceVersion(
+      resourceName: string,
+      version: { [key: string]: string },
+      jobName: string,
+    ): StoredResourceVersion;
+    function getLatestResourceVersion(
+      resourceName: string,
+    ): StoredResourceVersion | null;
+    function listResourceVersions(
+      resourceName: string,
+      limit: number,
+    ): StoredResourceVersion[];
+    function getVersionsAfter(
+      resourceName: string,
+      afterVersion: { [key: string]: string } | null,
+    ): StoredResourceVersion[];
   }
 
   namespace runtime {
@@ -251,7 +287,7 @@ declare global {
     resource: string;
     params: ParamsConfig;
     trigger: boolean;
-    version: string;
+    version: string | ResourceVersion; // "latest" | "every" | {key: "value"} for pinned
     passed?: string[];
     attempts?: number;
     across?: AcrossVar[];
@@ -342,4 +378,4 @@ declare global {
   const pipelineContext: PipelineContextType;
 }
 
-export {};
+export { };

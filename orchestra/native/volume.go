@@ -21,6 +21,11 @@ func (n *Volume) Name() string {
 	return n.name
 }
 
+// Path implements orchestra.Volume.
+func (n *Volume) Path() string {
+	return n.path
+}
+
 // Cleanup implements orchestra.Volume.
 func (n *Volume) Cleanup(_ context.Context) error {
 	return nil

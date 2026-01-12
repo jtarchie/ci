@@ -12,6 +12,7 @@ import (
 	"github.com/jtarchie/ci/backwards"
 	"github.com/jtarchie/ci/commands"
 	_ "github.com/jtarchie/ci/orchestra/native"
+	_ "github.com/jtarchie/ci/resources/mock"
 	_ "github.com/jtarchie/ci/storage/sqlite"
 	. "github.com/onsi/gomega"
 )
@@ -312,5 +313,18 @@ func TestBackwardsCompatibility(t *testing.T) {
 				}
 			})
 		}
+	})
+
+	t.Run("resource versions", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		runner := commands.Runner{
+			Pipeline: "fixtures/versions.yml",
+			Driver:   "native",
+			Storage:  "sqlite://:memory:",
+		}
+		err := runner.Run(nil)
+		assert.Expect(err).NotTo(HaveOccurred())
 	})
 }

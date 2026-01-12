@@ -17,6 +17,9 @@ type ExecutorOptions struct {
 	// RunID is the unique identifier for this pipeline run.
 	// If resuming, this should match the previous run's ID.
 	RunID string
+	// PipelineID is the unique identifier for this pipeline.
+	// Used to scope resource versions to a specific pipeline.
+	PipelineID string
 }
 
 // ExecutePipeline executes a pipeline with the given content and driver DSN.

@@ -94,3 +94,9 @@ func (k *K8s) CreateVolume(ctx context.Context, name string, size int) (orchestr
 func (v *Volume) Name() string {
 	return v.volumeName
 }
+
+// Path implements orchestra.Volume.
+// For K8s volumes, this returns the mount path inside pods.
+func (v *Volume) Path() string {
+	return "/" + v.volumeName
+}

@@ -96,7 +96,8 @@ func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *stor
 
 	// Execute the pipeline
 	opts := runtime.ExecutorOptions{
-		RunID: run.ID,
+		RunID:      run.ID,
+		PipelineID: pipeline.ID,
 	}
 
 	err = runtime.ExecutePipeline(ctx, pipeline.Content, driverDSN, s.store, logger, opts)

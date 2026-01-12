@@ -46,7 +46,45 @@ type GetConfig struct {
 	Passed   []string          `yaml:"passed,omitempty"`
 	Params   map[string]string `yaml:"params,omitempty"`
 	Trigger  bool              `yaml:"trigger,omitempty"`
-	Version  string            `yaml:"version,omitempty"`
+	Version  interface{}       `yaml:"version,omitempty"` // "latest" | "every" | map[string]string (pinned)
+}
+
+// GetVersionMode returns the version mode: "latest", "every", or "pinned".
+func (g *GetConfig) GetVersionMode() string {
+	if g.Version == nil {
+		return "latest"
+	}
+
+	if str, ok := g.Version.(string); ok {
+		if str == "every" {
+			return "every"
+		}
+
+		return "latest"
+	}
+
+	return "pinned"
+}
+
+// GetPinnedVersion returns the pinned version map, or nil if not pinned.
+func (g *GetConfig) GetPinnedVersion() map[string]string {
+	if m, ok := g.Version.(map[string]interface{}); ok {
+		result := make(map[string]string)
+
+		for k, v := range m {
+			if str, ok := v.(string); ok {
+				result[k] = str
+			}
+		}
+
+		return result
+	}
+
+	if m, ok := g.Version.(map[string]string); ok {
+		return m
+	}
+
+	return nil
 }
 
 type PutConfig struct {

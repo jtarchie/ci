@@ -77,6 +77,23 @@ func NewSqlite(dsn string, namespace string, _ *slog.Logger) (storage.Driver, er
 		return nil, fmt.Errorf("failed to create pipeline_runs table: %w", err)
 	}
 
+	//nolint: noctx
+	_, err = writer.Exec(`
+		CREATE TABLE IF NOT EXISTS resource_versions (
+			id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+			resource_name TEXT NOT NULL,
+			version BLOB NOT NULL,
+			job_name TEXT,
+			fetched_at TEXT DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(resource_name, version)
+		) STRICT;
+		CREATE INDEX IF NOT EXISTS idx_resource_versions_name ON resource_versions(resource_name);
+		CREATE INDEX IF NOT EXISTS idx_resource_versions_fetched ON resource_versions(resource_name, fetched_at DESC);
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create resource_versions table: %w", err)
+	}
+
 	writer.SetMaxIdleConns(1)
 	writer.SetMaxOpenConns(1)
 
@@ -439,6 +456,201 @@ func (s *Sqlite) UpdateRunStatus(ctx context.Context, runID string, status stora
 	}
 
 	return nil
+}
+
+// SaveResourceVersion saves a new resource version to the database.
+// If the version already exists for the resource, it updates the job_name and fetched_at.
+func (s *Sqlite) SaveResourceVersion(ctx context.Context, resourceName string, version map[string]string, jobName string) (*storage.ResourceVersion, error) {
+	versionBytes, err := json.Marshal(version)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal version: %w", err)
+	}
+
+	now := time.Now().UTC()
+
+	result, err := s.writer.ExecContext(ctx, `
+		INSERT INTO resource_versions (resource_name, version, job_name, fetched_at)
+		VALUES (?, jsonb(?), ?, ?)
+		ON CONFLICT(resource_name, version) DO UPDATE SET
+			job_name = excluded.job_name,
+			fetched_at = excluded.fetched_at
+	`, resourceName, versionBytes, jobName, now.Format(time.RFC3339))
+	if err != nil {
+		return nil, fmt.Errorf("failed to save resource version: %w", err)
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		// On conflict update doesn't return last insert id, fetch it
+		var fetchedID int64
+		err = s.writer.QueryRowContext(ctx, `
+			SELECT id FROM resource_versions WHERE resource_name = ? AND version = jsonb(?)
+		`, resourceName, versionBytes).Scan(&fetchedID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get version id: %w", err)
+		}
+		id = fetchedID
+	}
+
+	return &storage.ResourceVersion{
+		ID:           id,
+		ResourceName: resourceName,
+		Version:      version,
+		FetchedAt:    now,
+		JobName:      jobName,
+	}, nil
+}
+
+// GetLatestResourceVersion returns the most recently fetched version for a resource.
+func (s *Sqlite) GetLatestResourceVersion(ctx context.Context, resourceName string) (*storage.ResourceVersion, error) {
+	var rv storage.ResourceVersion
+	var versionBytes []byte
+	var fetchedAt string
+	var jobName sql.NullString
+
+	err := s.writer.QueryRowContext(ctx, `
+		SELECT id, resource_name, json(version), job_name, fetched_at
+		FROM resource_versions
+		WHERE resource_name = ?
+		ORDER BY fetched_at DESC
+		LIMIT 1
+	`, resourceName).Scan(&rv.ID, &rv.ResourceName, &versionBytes, &jobName, &fetchedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to get latest version: %w", err)
+	}
+
+	if err := json.Unmarshal(versionBytes, &rv.Version); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal version: %w", err)
+	}
+
+	rv.FetchedAt, _ = time.Parse(time.RFC3339, fetchedAt)
+	if jobName.Valid {
+		rv.JobName = jobName.String
+	}
+
+	return &rv, nil
+}
+
+// ListResourceVersions returns the most recent versions for a resource, up to limit.
+func (s *Sqlite) ListResourceVersions(ctx context.Context, resourceName string, limit int) ([]storage.ResourceVersion, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
+	rows, err := s.writer.QueryContext(ctx, `
+		SELECT id, resource_name, json(version), job_name, fetched_at
+		FROM resource_versions
+		WHERE resource_name = ?
+		ORDER BY fetched_at DESC
+		LIMIT ?
+	`, resourceName, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list versions: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var versions []storage.ResourceVersion
+
+	for rows.Next() {
+		var rv storage.ResourceVersion
+		var versionBytes []byte
+		var fetchedAt string
+		var jobName sql.NullString
+
+		err := rows.Scan(&rv.ID, &rv.ResourceName, &versionBytes, &jobName, &fetchedAt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan version: %w", err)
+		}
+
+		if err := json.Unmarshal(versionBytes, &rv.Version); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal version: %w", err)
+		}
+
+		rv.FetchedAt, _ = time.Parse(time.RFC3339, fetchedAt)
+		if jobName.Valid {
+			rv.JobName = jobName.String
+		}
+
+		versions = append(versions, rv)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating versions: %w", err)
+	}
+
+	return versions, nil
+}
+
+// GetVersionsAfter returns all versions for a resource that were fetched after the given version.
+// If afterVersion is nil, returns all versions.
+func (s *Sqlite) GetVersionsAfter(ctx context.Context, resourceName string, afterVersion map[string]string) ([]storage.ResourceVersion, error) {
+	if afterVersion == nil {
+		return s.ListResourceVersions(ctx, resourceName, 0)
+	}
+
+	afterVersionBytes, err := json.Marshal(afterVersion)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal after version: %w", err)
+	}
+
+	// First find the fetched_at time of the afterVersion
+	var afterFetchedAt string
+	err = s.writer.QueryRowContext(ctx, `
+		SELECT fetched_at FROM resource_versions
+		WHERE resource_name = ? AND version = jsonb(?)
+	`, resourceName, afterVersionBytes).Scan(&afterFetchedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// Version not found, return all versions
+			return s.ListResourceVersions(ctx, resourceName, 0)
+		}
+		return nil, fmt.Errorf("failed to find after version: %w", err)
+	}
+
+	rows, err := s.writer.QueryContext(ctx, `
+		SELECT id, resource_name, json(version), job_name, fetched_at
+		FROM resource_versions
+		WHERE resource_name = ? AND fetched_at > ?
+		ORDER BY fetched_at ASC
+	`, resourceName, afterFetchedAt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get versions after: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var versions []storage.ResourceVersion
+
+	for rows.Next() {
+		var rv storage.ResourceVersion
+		var versionBytes []byte
+		var fetchedAt string
+		var jobName sql.NullString
+
+		err := rows.Scan(&rv.ID, &rv.ResourceName, &versionBytes, &jobName, &fetchedAt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan version: %w", err)
+		}
+
+		if err := json.Unmarshal(versionBytes, &rv.Version); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal version: %w", err)
+		}
+
+		rv.FetchedAt, _ = time.Parse(time.RFC3339, fetchedAt)
+		if jobName.Valid {
+			rv.JobName = jobName.String
+		}
+
+		versions = append(versions, rv)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating versions: %w", err)
+	}
+
+	return versions, nil
 }
 
 func init() {

@@ -188,3 +188,4 @@ dist
 .env
 .envrc
 *.db
+ci*

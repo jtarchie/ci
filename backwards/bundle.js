@@ -557,71 +557,156 @@ var JobRunner = class {
   async processGetStep(step, pathContext) {
     const resource = this.findResource(step.get);
     const resourceType = this.findResourceType(resource?.type);
-    const checkResult = await this.runTask(
-      {
-        task: `check-${resource?.name}`,
-        config: {
-          image_resource: {
-            type: "registry-image",
-            source: {
-              repository: resourceType?.source.repository
-            }
+    const versionMode = this.getVersionMode(step);
+    const isNative = nativeResources.isNative(resource?.type);
+    const scopedResourceName = this.getScopedResourceName(resource?.name);
+    let lastKnownVersion;
+    if (versionMode === "every") {
+      try {
+        const stored = storage.getLatestResourceVersion(scopedResourceName);
+        lastKnownVersion = stored?.version;
+      } catch (_e) {
+      }
+    }
+    let versionToFetch;
+    if (versionMode === "pinned") {
+      versionToFetch = step.version;
+    } else {
+      let versions;
+      if (isNative) {
+        const checkResult = nativeResources.check({
+          type: resource?.type,
+          source: resource?.source,
+          version: lastKnownVersion
+        });
+        versions = checkResult.versions;
+      } else {
+        const checkResult = await this.runTask(
+          {
+            task: `check-${resource?.name}`,
+            config: {
+              image_resource: {
+                type: "registry-image",
+                source: {
+                  repository: resourceType?.source.repository
+                }
+              },
+              run: {
+                path: "/opt/resource/check"
+              }
+            },
+            assert: {
+              code: 0
+            },
+            ensure: step.ensure,
+            on_success: step.on_success,
+            on_failure: step.on_failure,
+            on_error: step.on_error,
+            on_abort: step.on_abort,
+            timeout: step.timeout
           },
-          run: {
-            path: "/opt/resource/check"
-          }
-        },
-        assert: {
-          code: 0
-        },
-        ensure: step.ensure,
-        on_success: step.on_success,
-        on_failure: step.on_failure,
-        on_error: step.on_error,
-        on_abort: step.on_abort,
-        timeout: step.timeout
-      },
-      JSON.stringify({
-        source: resource?.source
-      }),
-      `${pathContext}/check`
-    );
-    const checkPayload = JSON.parse(checkResult.stdout);
-    const version = checkPayload[0];
-    await this.runTask(
-      {
-        task: `get-${resource?.name}`,
-        config: {
-          image_resource: {
-            type: "registry-image",
-            source: {
-              repository: resourceType?.source.repository
-            }
-          },
-          outputs: [
-            { name: resource?.name }
-          ],
-          run: {
-            path: "/opt/resource/in",
-            args: [`./${resource?.name}`]
-          }
-        },
-        assert: {
-          code: 0
-        },
-        ensure: step.ensure,
-        on_success: step.on_success,
-        on_failure: step.on_failure,
-        on_error: step.on_error,
-        on_abort: step.on_abort,
-        timeout: step.timeout
-      },
-      JSON.stringify({
+          JSON.stringify({
+            source: resource?.source,
+            version: lastKnownVersion
+          }),
+          `${pathContext}/check`
+        );
+        const checkPayload = JSON.parse(checkResult.stdout);
+        versions = checkPayload;
+      }
+      if (versions.length === 0) {
+        throw new Error(`No versions found for resource ${resource?.name}`);
+      }
+      if (versionMode === "every") {
+        const storedVersions = storage.getVersionsAfter(
+          scopedResourceName,
+          lastKnownVersion ?? null
+        );
+        const processedVersionSet = new Set(
+          storedVersions.map((sv) => JSON.stringify(sv.version))
+        );
+        const newVersions = versions.filter(
+          (v) => !processedVersionSet.has(JSON.stringify(v))
+        );
+        if (newVersions.length === 0) {
+          versionToFetch = versions[versions.length - 1];
+        } else {
+          versionToFetch = newVersions[0];
+        }
+      } else {
+        versionToFetch = versions[versions.length - 1];
+      }
+    }
+    if (isNative) {
+      const volume = await runtime.createVolume({ name: resource?.name });
+      this.taskRunner.getKnownMounts()[resource?.name] = volume;
+      nativeResources.fetch({
+        type: resource?.type,
         source: resource?.source,
-        version
-      }),
-      `${pathContext}/get`
+        version: versionToFetch,
+        params: step.params,
+        destDir: volume.path
+      });
+      const storageKey = `${this.getBaseStorageKey()}/${pathContext}`;
+      storage.set(storageKey, {
+        status: "success",
+        version: versionToFetch,
+        resource: resource?.name
+      });
+    } else {
+      await this.runTask(
+        {
+          task: `get-${resource?.name}`,
+          config: {
+            image_resource: {
+              type: "registry-image",
+              source: {
+                repository: resourceType?.source.repository
+              }
+            },
+            outputs: [{ name: resource?.name }],
+            run: {
+              path: "/opt/resource/in",
+              args: [`./${resource?.name}`]
+            }
+          },
+          assert: {
+            code: 0
+          },
+          ensure: step.ensure,
+          on_success: step.on_success,
+          on_failure: step.on_failure,
+          on_error: step.on_error,
+          on_abort: step.on_abort,
+          timeout: step.timeout
+        },
+        JSON.stringify({
+          source: resource?.source,
+          version: versionToFetch
+        }),
+        `${pathContext}/get`
+      );
+    }
+    storage.saveResourceVersion(
+      scopedResourceName,
+      versionToFetch,
+      this.jobConfig.name
     );
+  }
+  getVersionMode(step) {
+    if (!step.version) {
+      return "latest";
+    }
+    if (typeof step.version === "string") {
+      return step.version === "every" ? "every" : "latest";
+    }
+    return "pinned";
+  }
+  // Generate a pipeline-scoped resource name to ensure resource versions
+  // are isolated per pipeline and not shared globally
+  getScopedResourceName(resourceName) {
+    const pipelineID = typeof pipelineContext !== "undefined" && pipelineContext.pipelineID ? pipelineContext.pipelineID : "default";
+    return `${pipelineID}/${resourceName}`;
   }
   findResource(resourceName) {
     const resource = this.resources.find(

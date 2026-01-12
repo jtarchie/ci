@@ -44,6 +44,15 @@ type PipelineRun struct {
 	CreatedAt    time.Time  `json:"created_at"`
 }
 
+// ResourceVersion represents a stored resource version.
+type ResourceVersion struct {
+	ID           int64             `json:"id"`
+	ResourceName string            `json:"resource_name"`
+	Version      map[string]string `json:"version"`
+	FetchedAt    time.Time         `json:"fetched_at"`
+	JobName      string            `json:"job_name,omitempty"` // For passed constraints
+}
+
 type Driver interface {
 	Close() error
 	Set(ctx context.Context, prefix string, payload any) error
@@ -61,6 +70,12 @@ type Driver interface {
 	GetRun(ctx context.Context, runID string) (*PipelineRun, error)
 	ListRunsByPipeline(ctx context.Context, pipelineID string) ([]PipelineRun, error)
 	UpdateRunStatus(ctx context.Context, runID string, status RunStatus, errorMessage string) error
+
+	// Resource version operations
+	SaveResourceVersion(ctx context.Context, resourceName string, version map[string]string, jobName string) (*ResourceVersion, error)
+	GetLatestResourceVersion(ctx context.Context, resourceName string) (*ResourceVersion, error)
+	ListResourceVersions(ctx context.Context, resourceName string, limit int) ([]ResourceVersion, error)
+	GetVersionsAfter(ctx context.Context, resourceName string, afterVersion map[string]string) ([]ResourceVersion, error)
 }
 
 type Payload map[string]any
