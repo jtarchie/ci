@@ -37,7 +37,9 @@ type VolumeInput struct {
 }
 
 type VolumeResult struct {
-	orchestra.Volume `json:"volume,omitempty"`
+	volume orchestra.Volume
+	Name   string `json:"name"`
+	Path   string `json:"path"`
 }
 
 func (c *PipelineRunner) CreateVolume(input VolumeInput) (*VolumeResult, error) {
@@ -54,7 +56,9 @@ func (c *PipelineRunner) CreateVolume(input VolumeInput) (*VolumeResult, error) 
 	}
 
 	return &VolumeResult{
-		Volume: volume,
+		volume: volume,
+		Name:   volume.Name(),
+		Path:   volume.Path(),
 	}, nil
 }
 
@@ -120,7 +124,7 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 	var mounts orchestra.Mounts
 	for path, volume := range input.Mounts {
 		mounts = append(mounts, orchestra.Mount{
-			Name: volume.Name(),
+			Name: volume.Name,
 			Path: path,
 		})
 	}

@@ -205,7 +205,7 @@ func (r *ResumableRunner) runStep(stepID string, input RunInput) (*RunResult, er
 	var mounts orchestra.Mounts
 	for path, volume := range input.Mounts {
 		mounts = append(mounts, orchestra.Mount{
-			Name: volume.Name(),
+			Name: volume.Name,
 			Path: path,
 		})
 	}

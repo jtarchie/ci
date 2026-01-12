@@ -23,6 +23,9 @@ type ExecuteOptions struct {
 	// RunID is the unique identifier for this pipeline run.
 	// If resuming, this should match the previous run's ID.
 	RunID string
+	// PipelineID is the unique identifier for this pipeline.
+	// Used to scope resource versions to a specific pipeline.
+	PipelineID string
 }
 
 type JS struct {
@@ -170,9 +173,10 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 		return fmt.Errorf("could not set storage: %w", err)
 	}
 
-	// Expose pipeline context to JavaScript (runID, etc.)
+	// Expose pipeline context to JavaScript (runID, pipelineID, etc.)
 	pipelineContext := map[string]interface{}{
-		"runID": opts.RunID,
+		"runID":      opts.RunID,
+		"pipelineID": opts.PipelineID,
 	}
 	err = jsVM.Set("pipelineContext", pipelineContext)
 	if err != nil {
@@ -276,4 +280,24 @@ func (w *storageContextWrapper) DeletePipeline(id string) error {
 // Close wraps the storage Close method (no context needed).
 func (w *storageContextWrapper) Close() error {
 	return w.driver.Close()
+}
+
+// SaveResourceVersion wraps the storage SaveResourceVersion method.
+func (w *storageContextWrapper) SaveResourceVersion(resourceName string, version map[string]string, jobName string) (*storage.ResourceVersion, error) {
+	return w.driver.SaveResourceVersion(w.ctx, resourceName, version, jobName)
+}
+
+// GetLatestResourceVersion wraps the storage GetLatestResourceVersion method.
+func (w *storageContextWrapper) GetLatestResourceVersion(resourceName string) (*storage.ResourceVersion, error) {
+	return w.driver.GetLatestResourceVersion(w.ctx, resourceName)
+}
+
+// ListResourceVersions wraps the storage ListResourceVersions method.
+func (w *storageContextWrapper) ListResourceVersions(resourceName string, limit int) ([]storage.ResourceVersion, error) {
+	return w.driver.ListResourceVersions(w.ctx, resourceName, limit)
+}
+
+// GetVersionsAfter wraps the storage GetVersionsAfter method.
+func (w *storageContextWrapper) GetVersionsAfter(resourceName string, afterVersion map[string]string) ([]storage.ResourceVersion, error) {
+	return w.driver.GetVersionsAfter(w.ctx, resourceName, afterVersion)
 }

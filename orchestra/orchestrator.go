@@ -25,6 +25,10 @@ type Container interface {
 type Volume interface {
 	Cleanup(ctx context.Context) error
 	Name() string
+	// Path returns the absolute path to the volume directory.
+	// For native volumes, this is the actual filesystem path.
+	// For container-based volumes, this is the mount path inside containers.
+	Path() string
 }
 
 type Driver interface {

@@ -46,3 +46,9 @@ func (d *Docker) CreateVolume(ctx context.Context, name string, _ int) (orchestr
 func (d *Volume) Name() string {
 	return d.volumeName
 }
+
+// Path implements orchestra.Volume.
+// For Docker volumes, this returns the mount path inside containers.
+func (d *Volume) Path() string {
+	return "/" + d.volumeName
+}
