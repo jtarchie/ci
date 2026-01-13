@@ -618,9 +618,10 @@ var JobRunner = class {
         throw new Error(`No versions found for resource ${resource?.name}`);
       }
       if (versionMode === "every") {
-        const storedVersions = storage.getVersionsAfter(
+        const storedVersions = storage.listResourceVersions(
           scopedResourceName,
-          lastKnownVersion ?? null
+          0
+          // 0 = no limit, get all versions
         );
         const processedVersionSet = new Set(
           storedVersions.map((sv) => JSON.stringify(sv.version))

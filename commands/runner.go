@@ -139,8 +139,9 @@ func (c *Runner) Run(logger *slog.Logger) error {
 	js := runtime.NewJS(logger)
 
 	opts := runtime.ExecuteOptions{
-		Resume: c.Resume,
-		RunID:  c.RunID,
+		Resume:     c.Resume,
+		RunID:      c.RunID,
+		PipelineID: runtimeID,
 	}
 
 	// If resuming but no RunID provided, use the runtime ID for consistency
