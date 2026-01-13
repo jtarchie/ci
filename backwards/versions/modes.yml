@@ -92,7 +92,10 @@ jobs:
             - name: every-resource
           run:
             path: sh
-            args: ["-c", "cat every-resource/version && test -f every-resource/version"]
+            args: [
+              "-c",
+              "cat every-resource/version && test -f every-resource/version",
+            ]
         assert:
           code: 0
     assert:

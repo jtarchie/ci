@@ -369,13 +369,6 @@ declare global {
     resource_types: ResourceType[];
     resources: Resource[];
   }
-
-  // Pipeline context provided by the runtime
-  interface PipelineContextType {
-    runID: string;
-  }
-
-  const pipelineContext: PipelineContextType;
 }
 
 export { };
