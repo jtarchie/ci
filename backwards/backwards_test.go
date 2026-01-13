@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/goccy/go-yaml"
 	"github.com/jtarchie/ci/backwards"
@@ -349,15 +348,10 @@ func TestBackwardsCompatibility(t *testing.T) {
 	})
 }
 
-func TestVersionsWithDocker(t *testing.T) {
+func TestVersionEveryWithMock(t *testing.T) {
 	t.Parallel()
 
-	// Skip if docker is not available
-	if os.Getenv("CI_TEST_DOCKER") == "" {
-		t.Skip("Skipping docker-based tests. Set CI_TEST_DOCKER=1 to enable.")
-	}
-
-	t.Run("version every with time-resource", func(t *testing.T) {
+	t.Run("version every with mock resource", func(t *testing.T) {
 		t.Parallel()
 
 		assert := NewGomegaWithT(t)
@@ -366,73 +360,70 @@ func TestVersionsWithDocker(t *testing.T) {
 		dbPath := filepath.Join(tempDir, "test.db")
 		storageURL := fmt.Sprintf("sqlite://%s", dbPath)
 
-		pipelineFile := "versions/time-resource.yml"
+		pipelineFile := "versions/mock-every.yml"
 
-		// Run 1: Should fetch the first time version
+		// Helper to query stored versions with a fresh connection
+		queryVersions := func() []storage.ResourceVersion {
+			pipelinePath, err := filepath.Abs(pipelineFile)
+			assert.Expect(err).NotTo(HaveOccurred())
+			runtimeID := youtubeIDStyle(pipelinePath)
+
+			initStorage, found := storage.GetFromDSN(storageURL)
+			assert.Expect(found).To(BeTrue())
+
+			store, err := initStorage(storageURL, runtimeID, nil)
+			assert.Expect(err).NotTo(HaveOccurred())
+			defer func() { _ = store.Close() }()
+
+			scopedResourceName := fmt.Sprintf("%s/%s", runtimeID, "counter")
+			versions, err := store.ListResourceVersions(context.Background(), scopedResourceName, 100)
+			assert.Expect(err).NotTo(HaveOccurred())
+
+			return versions
+		}
+
+		// Run 1: Should fetch the first version
 		runner1 := commands.Runner{
 			Pipeline: pipelineFile,
-			Driver:   "docker",
+			Driver:   "native",
 			Storage:  storageURL,
 		}
 		err := runner1.Run(nil)
 		assert.Expect(err).NotTo(HaveOccurred())
 
-		// Open storage to check version count
-		pipelinePath, err := filepath.Abs(pipelineFile)
-		assert.Expect(err).NotTo(HaveOccurred())
-		runtimeID := youtubeIDStyle(pipelinePath)
-
-		initStorage, found := storage.GetFromDSN(storageURL)
-		assert.Expect(found).To(BeTrue())
-
-		store, err := initStorage(storageURL, runtimeID, nil)
-		assert.Expect(err).NotTo(HaveOccurred())
-		defer func() { _ = store.Close() }()
-
-		ctx := context.Background()
-		scopedResourceName := fmt.Sprintf("%s/%s", runtimeID, "timer")
-
 		// Verify a version was saved after run 1
-		versions1, err := store.ListResourceVersions(ctx, scopedResourceName, 100)
-		assert.Expect(err).NotTo(HaveOccurred())
+		versions1 := queryVersions()
 		assert.Expect(versions1).To(HaveLen(1))
 		firstVersion := versions1[0].Version
 
-		// Wait for the interval to pass so new versions are available
-		time.Sleep(3 * time.Second)
-
-		// Run 2: Should fetch a NEW time version (not the same one)
+		// Run 2: Should fetch a NEW version (mock increments counter each Check)
 		runner2 := commands.Runner{
 			Pipeline: pipelineFile,
-			Driver:   "docker",
+			Driver:   "native",
 			Storage:  storageURL,
 		}
 		err = runner2.Run(nil)
 		assert.Expect(err).NotTo(HaveOccurred())
 
 		// Verify we now have 2 distinct versions
-		versions2, err := store.ListResourceVersions(ctx, scopedResourceName, 100)
-		assert.Expect(err).NotTo(HaveOccurred())
+		versions2 := queryVersions()
 		assert.Expect(versions2).To(HaveLen(2))
 
-		// Verify the versions are different
-		secondVersion := versions2[0].Version // Most recent first
+		// Verify the versions are different (versions are ordered by ID ascending, so newest is last)
+		secondVersion := versions2[len(versions2)-1].Version // Most recent is last
 		assert.Expect(secondVersion).NotTo(Equal(firstVersion))
 
-		// Run 3: Wait and get another version
-		time.Sleep(3 * time.Second)
-
+		// Run 3: Get another version
 		runner3 := commands.Runner{
 			Pipeline: pipelineFile,
-			Driver:   "docker",
+			Driver:   "native",
 			Storage:  storageURL,
 		}
 		err = runner3.Run(nil)
 		assert.Expect(err).NotTo(HaveOccurred())
 
 		// Verify we now have 3 distinct versions
-		versions3, err := store.ListResourceVersions(ctx, scopedResourceName, 100)
-		assert.Expect(err).NotTo(HaveOccurred())
+		versions3 := queryVersions()
 		assert.Expect(versions3).To(HaveLen(3))
 	})
 }
