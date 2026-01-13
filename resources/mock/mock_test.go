@@ -85,4 +85,55 @@ func TestMockResource(t *testing.T) {
 		assert.Expect(err).NotTo(HaveOccurred())
 		assert.Expect(outResp.Version["version"]).To(Equal("2.0.0"))
 	})
+
+	t.Run("check with no version returns version 1", func(t *testing.T) {
+		assert := NewGomegaWithT(t)
+
+		res, err := resources.Get("mock")
+		assert.Expect(err).NotTo(HaveOccurred())
+
+		ctx := context.Background()
+		resp, err := res.Check(ctx, resources.CheckRequest{
+			Source: map[string]interface{}{},
+		})
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(resp).To(HaveLen(1))
+		assert.Expect(resp[0]["version"]).To(Equal("1"))
+	})
+
+	t.Run("check with previous version increments", func(t *testing.T) {
+		assert := NewGomegaWithT(t)
+
+		res, err := resources.Get("mock")
+		assert.Expect(err).NotTo(HaveOccurred())
+
+		ctx := context.Background()
+		resp, err := res.Check(ctx, resources.CheckRequest{
+			Source: map[string]interface{}{},
+			Version: resources.Version{"version": "5"},
+		})
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(resp).To(HaveLen(2))
+		assert.Expect(resp[0]["version"]).To(Equal("5"))
+		assert.Expect(resp[1]["version"]).To(Equal("6"))
+	})
+
+	t.Run("check with force_version and previous version returns both", func(t *testing.T) {
+		assert := NewGomegaWithT(t)
+
+		res, err := resources.Get("mock")
+		assert.Expect(err).NotTo(HaveOccurred())
+
+		ctx := context.Background()
+		resp, err := res.Check(ctx, resources.CheckRequest{
+			Source: map[string]interface{}{
+				"force_version": "fixed-v1",
+			},
+			Version: resources.Version{"version": "fixed-v1"},
+		})
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(resp).To(HaveLen(2))
+		assert.Expect(resp[0]["version"]).To(Equal("fixed-v1"))
+		assert.Expect(resp[1]["version"]).To(Equal("fixed-v1"))
+	})
 }
