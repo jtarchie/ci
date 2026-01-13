@@ -512,7 +512,7 @@ func (s *Sqlite) GetLatestResourceVersion(ctx context.Context, resourceName stri
 		SELECT id, resource_name, json(version), job_name, fetched_at
 		FROM resource_versions
 		WHERE resource_name = ?
-		ORDER BY fetched_at DESC
+		ORDER BY id DESC
 		LIMIT 1
 	`, resourceName).Scan(&rv.ID, &rv.ResourceName, &versionBytes, &jobName, &fetchedAt)
 	if err != nil {

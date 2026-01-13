@@ -21,21 +21,50 @@ func (m *Mock) Name() string {
 }
 
 // Check returns the current version based on force_version from source.
+// When no force_version is set and a previous version is provided, it generates
+// a new version by incrementing the previous version number.
 func (m *Mock) Check(_ context.Context, req resources.CheckRequest) (resources.CheckResponse, error) {
 	forceVersion := ""
 	if fv, ok := req.Source["force_version"].(string); ok {
 		forceVersion = fv
 	}
 
-	if forceVersion == "" {
-		forceVersion = fmt.Sprintf("%d", m.versionCounter.Add(1))
+	if forceVersion != "" {
+		// Forced version mode - always return the forced version
+		version := resources.Version{
+			"version": forceVersion,
+		}
+
+		if req.Version != nil && req.Version["version"] != "" {
+			return resources.CheckResponse{req.Version, version}, nil
+		}
+
+		return resources.CheckResponse{version}, nil
+	}
+
+	// Dynamic version mode - generate incrementing versions
+	var newVersion int64
+
+	if req.Version != nil && req.Version["version"] != "" {
+		// Parse the previous version and increment it
+		var prevVersion int64
+
+		if _, err := fmt.Sscanf(req.Version["version"], "%d", &prevVersion); err == nil {
+			newVersion = prevVersion + 1
+		} else {
+			// If previous version isn't a number, use counter
+			newVersion = m.versionCounter.Add(1)
+		}
+	} else {
+		// First check - use counter
+		newVersion = m.versionCounter.Add(1)
 	}
 
 	version := resources.Version{
-		"version": forceVersion,
+		"version": fmt.Sprintf("%d", newVersion),
 	}
 
-	// If a version was provided, include it and the current version
+	// If a version was provided, include it and the new version
 	if req.Version != nil && req.Version["version"] != "" {
 		return resources.CheckResponse{req.Version, version}, nil
 	}

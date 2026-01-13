@@ -282,22 +282,68 @@ func (w *storageContextWrapper) Close() error {
 	return w.driver.Close()
 }
 
+// toJSResourceVersion converts a storage.ResourceVersion to a map with lowercase keys
+// that JavaScript can access correctly. Goja exposes Go struct fields with their
+// Go names (uppercase), but JS code expects lowercase field names.
+func toJSResourceVersion(rv *storage.ResourceVersion) map[string]interface{} {
+	if rv == nil {
+		return nil
+	}
+
+	return map[string]interface{}{
+		"id":            rv.ID,
+		"resource_name": rv.ResourceName,
+		"version":       rv.Version,
+		"fetched_at":    rv.FetchedAt.Format(time.RFC3339),
+		"job_name":      rv.JobName,
+	}
+}
+
+func toJSResourceVersions(rvs []storage.ResourceVersion) []map[string]interface{} {
+	result := make([]map[string]interface{}, len(rvs))
+	for i := range rvs {
+		result[i] = toJSResourceVersion(&rvs[i])
+	}
+
+	return result
+}
+
 // SaveResourceVersion wraps the storage SaveResourceVersion method.
-func (w *storageContextWrapper) SaveResourceVersion(resourceName string, version map[string]string, jobName string) (*storage.ResourceVersion, error) {
-	return w.driver.SaveResourceVersion(w.ctx, resourceName, version, jobName)
+func (w *storageContextWrapper) SaveResourceVersion(resourceName string, version map[string]string, jobName string) (map[string]interface{}, error) {
+	rv, err := w.driver.SaveResourceVersion(w.ctx, resourceName, version, jobName)
+	if err != nil {
+		return nil, err
+	}
+
+	return toJSResourceVersion(rv), nil
 }
 
 // GetLatestResourceVersion wraps the storage GetLatestResourceVersion method.
-func (w *storageContextWrapper) GetLatestResourceVersion(resourceName string) (*storage.ResourceVersion, error) {
-	return w.driver.GetLatestResourceVersion(w.ctx, resourceName)
+func (w *storageContextWrapper) GetLatestResourceVersion(resourceName string) (map[string]interface{}, error) {
+	rv, err := w.driver.GetLatestResourceVersion(w.ctx, resourceName)
+	if err != nil {
+		return nil, err
+	}
+
+	return toJSResourceVersion(rv), nil
 }
 
 // ListResourceVersions wraps the storage ListResourceVersions method.
-func (w *storageContextWrapper) ListResourceVersions(resourceName string, limit int) ([]storage.ResourceVersion, error) {
-	return w.driver.ListResourceVersions(w.ctx, resourceName, limit)
+func (w *storageContextWrapper) ListResourceVersions(resourceName string, limit int) ([]map[string]interface{}, error) {
+	rvs, err := w.driver.ListResourceVersions(w.ctx, resourceName, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	return toJSResourceVersions(rvs), nil
 }
 
 // GetVersionsAfter wraps the storage GetVersionsAfter method.
-func (w *storageContextWrapper) GetVersionsAfter(resourceName string, afterVersion map[string]string) ([]storage.ResourceVersion, error) {
-	return w.driver.GetVersionsAfter(w.ctx, resourceName, afterVersion)
+func (w *storageContextWrapper) GetVersionsAfter(resourceName string, afterVersion map[string]string) ([]map[string]interface{}, error) {
+	rvs, err := w.driver.GetVersionsAfter(w.ctx, resourceName, afterVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	return toJSResourceVersions(rvs), nil
 }

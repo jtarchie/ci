@@ -667,6 +667,7 @@ export class JobRunner {
         const processedVersionSet = new Set(
           storedVersions.map((sv) => JSON.stringify(sv.version)),
         );
+
         const newVersions = versions.filter(
           (v) => !processedVersionSet.has(JSON.stringify(v)),
         );
