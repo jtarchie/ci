@@ -656,10 +656,11 @@ export class JobRunner {
       }
 
       if (versionMode === "every") {
-        // For 'every' mode, get versions after the last known one from storage
-        const storedVersions = storage.getVersionsAfter(
+        // For 'every' mode, get ALL stored versions to filter against
+        // This ensures we don't re-process versions we've already seen
+        const storedVersions = storage.listResourceVersions(
           scopedResourceName,
-          lastKnownVersion ?? null,
+          0, // 0 = no limit, get all versions
         );
 
         // Filter discovered versions against what we've already processed
