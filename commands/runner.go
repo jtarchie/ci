@@ -16,6 +16,7 @@ import (
 	"github.com/evanw/esbuild/pkg/api"
 	"github.com/jtarchie/ci/backwards"
 	"github.com/jtarchie/ci/orchestra"
+	"github.com/jtarchie/ci/orchestra/cache"
 	"github.com/jtarchie/ci/runtime"
 	"github.com/jtarchie/ci/storage"
 )
@@ -129,6 +130,12 @@ func (c *Runner) Run(logger *slog.Logger) error {
 		return fmt.Errorf("could not create orchestrator client: %w", err)
 	}
 	defer func() { _ = driver.Close() }()
+
+	// Wrap driver with caching if cache parameters are present
+	driver, err = cache.WrapWithCaching(driver, driverConfig.Params, logger)
+	if err != nil {
+		return fmt.Errorf("could not initialize cache layer: %w", err)
+	}
 
 	storage, err := initStorage(c.Storage, runtimeID, logger)
 	if err != nil {

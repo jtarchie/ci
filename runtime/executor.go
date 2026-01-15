@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/jtarchie/ci/orchestra"
+	"github.com/jtarchie/ci/orchestra/cache"
 	"github.com/jtarchie/ci/storage"
 	gonanoid "github.com/matoous/go-nanoid/v2"
 )
@@ -64,6 +65,12 @@ func ExecutePipeline(
 		return fmt.Errorf("could not create orchestrator client: %w", err)
 	}
 	defer func() { _ = driver.Close() }()
+
+	// Wrap driver with caching if cache parameters are present
+	driver, err = cache.WrapWithCaching(driver, driverConfig.Params, logger)
+	if err != nil {
+		return fmt.Errorf("could not initialize cache layer: %w", err)
+	}
 
 	logger.Info("executing pipeline")
 
