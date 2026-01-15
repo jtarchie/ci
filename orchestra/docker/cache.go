@@ -1,0 +1,134 @@
+package docker
+
+import (
+	"context"
+	"fmt"
+	"io"
+
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/docker/client"
+	"github.com/jtarchie/ci/orchestra/cache"
+)
+
+const cacheHelperImage = "busybox:latest"
+
+// CopyToVolume implements cache.VolumeDataAccessor.
+// Creates a temporary container to extract tar data into the volume.
+func (d *Docker) CopyToVolume(ctx context.Context, volumeName string, reader io.Reader) error {
+	fullVolumeName := fmt.Sprintf("%s-%s", d.namespace, volumeName)
+
+	// Ensure busybox image is available
+	_, err := d.client.ImagePull(ctx, cacheHelperImage, image.PullOptions{})
+	if err != nil {
+		// Try to continue anyway, image might already exist
+		d.logger.Debug("failed to pull cache helper image", "error", err)
+	}
+
+	// Create a temporary container with the volume mounted
+	resp, err := d.client.ContainerCreate(ctx,
+		&container.Config{
+			Image: cacheHelperImage,
+			Cmd:   []string{"sh", "-c", "cat > /dev/null"}, // Just consume stdin
+		},
+		&container.HostConfig{
+			Mounts: []mount.Mount{
+				{
+					Type:   mount.TypeVolume,
+					Source: fullVolumeName,
+					Target: "/volume",
+				},
+			},
+		},
+		nil, nil, "",
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create cache helper container: %w", err)
+	}
+
+	defer func() {
+		_ = d.client.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true})
+	}()
+
+	// Copy tar data to the volume mount path
+	err = d.client.CopyToContainer(ctx, resp.ID, "/volume", reader, container.CopyToContainerOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to copy data to volume: %w", err)
+	}
+
+	return nil
+}
+
+// CopyFromVolume implements cache.VolumeDataAccessor.
+// Creates a temporary container to read tar data from the volume.
+func (d *Docker) CopyFromVolume(ctx context.Context, volumeName string) (io.ReadCloser, error) {
+	fullVolumeName := fmt.Sprintf("%s-%s", d.namespace, volumeName)
+
+	// Ensure busybox image is available
+	_, err := d.client.ImagePull(ctx, cacheHelperImage, image.PullOptions{})
+	if err != nil {
+		// Try to continue anyway, image might already exist
+		d.logger.Debug("failed to pull cache helper image", "error", err)
+	}
+
+	// Create a temporary container with the volume mounted
+	resp, err := d.client.ContainerCreate(ctx,
+		&container.Config{
+			Image: cacheHelperImage,
+			Cmd:   []string{"sleep", "infinity"},
+		},
+		&container.HostConfig{
+			Mounts: []mount.Mount{
+				{
+					Type:   mount.TypeVolume,
+					Source: fullVolumeName,
+					Target: "/volume",
+				},
+			},
+		},
+		nil, nil, "",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cache helper container: %w", err)
+	}
+
+	// Start the container so we can copy from it
+	if err := d.client.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+		_ = d.client.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true})
+
+		return nil, fmt.Errorf("failed to start cache helper container: %w", err)
+	}
+
+	// Copy tar data from the volume mount path
+	reader, _, err := d.client.CopyFromContainer(ctx, resp.ID, "/volume/.")
+	if err != nil {
+		_ = d.client.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true})
+
+		return nil, fmt.Errorf("failed to copy data from volume: %w", err)
+	}
+
+	// Return a wrapper that cleans up the container when closed
+	return &dockerCopyReader{
+		ReadCloser:  reader,
+		containerID: resp.ID,
+		client:      d.client,
+		ctx:         ctx,
+	}, nil
+}
+
+type dockerCopyReader struct {
+	io.ReadCloser
+	containerID string
+	client      *client.Client
+	ctx         context.Context
+}
+
+func (r *dockerCopyReader) Close() error {
+	err := r.ReadCloser.Close()
+	_ = r.client.ContainerRemove(r.ctx, r.containerID, container.RemoveOptions{Force: true})
+
+	return err
+}
+
+var _ cache.VolumeDataAccessor = (*Docker)(nil)
