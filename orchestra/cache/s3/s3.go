@@ -1,6 +1,7 @@
 package s3
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -140,10 +141,17 @@ func (s *S3Store) Restore(ctx context.Context, key string) (io.ReadCloser, error
 func (s *S3Store) Persist(ctx context.Context, key string, reader io.Reader) error {
 	fullKey := s.fullKey(key)
 
-	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(fullKey),
-		Body:   reader,
+	// Buffer the reader to make it seekable - required by AWS SDK v2 for checksums
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return fmt.Errorf("failed to read data: %w", err)
+	}
+
+	_, err = s.client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:        aws.String(s.bucket),
+		Key:           aws.String(fullKey),
+		Body:          bytes.NewReader(data),
+		ContentLength: aws.Int64(int64(len(data))),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to put object to S3: %w", err)
