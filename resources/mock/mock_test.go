@@ -109,7 +109,7 @@ func TestMockResource(t *testing.T) {
 
 		ctx := context.Background()
 		resp, err := res.Check(ctx, resources.CheckRequest{
-			Source: map[string]interface{}{},
+			Source:  map[string]interface{}{},
 			Version: resources.Version{"version": "5"},
 		})
 		assert.Expect(err).NotTo(HaveOccurred())
