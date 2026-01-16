@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/phayes/freeport"
+
 	"github.com/jtarchie/ci/orchestra"
 	"github.com/jtarchie/ci/orchestra/cache"
 	_ "github.com/jtarchie/ci/orchestra/cache/s3"
@@ -34,7 +36,9 @@ func startMinIO(t *testing.T) *minioServer {
 	dataDir, err := os.MkdirTemp("", "minio-test-*")
 	assert.Expect(err).NotTo(gomega.HaveOccurred())
 
-	port := 9000 + (time.Now().UnixNano() % 1000)
+	// Get a free port from the OS to avoid conflicts
+	port, err := freeport.GetFreePort()
+	assert.Expect(err).NotTo(gomega.HaveOccurred())
 	endpoint := fmt.Sprintf("http://localhost:%d", port)
 
 	cmd := exec.Command("minio", "server", dataDir, "--address", fmt.Sprintf(":%d", port), "--quiet")

@@ -136,6 +136,20 @@ func TestBackwardsCompatibility(t *testing.T) {
 		assert.Expect(strings.Count(logs.String(), `assert`)).To(Equal(21))
 	})
 
+	t.Run("caches", func(t *testing.T) {
+		t.Parallel()
+
+		_, logger := createLogger()
+		assert := NewGomegaWithT(t)
+		runner := commands.Runner{
+			Pipeline: "steps/caches.yml",
+			Driver:   "native",
+			Storage:  "sqlite://:memory:",
+		}
+		err := runner.Run(logger)
+		assert.Expect(err).NotTo(HaveOccurred())
+	})
+
 	t.Run("on_error", func(t *testing.T) {
 		t.Parallel()
 

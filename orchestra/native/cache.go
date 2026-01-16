@@ -57,12 +57,12 @@ func (n *Native) CopyToVolume(_ context.Context, volumeName string, reader io.Re
 			}
 
 			if _, err := io.Copy(file, tr); err != nil {
-				file.Close()
+				_ = file.Close()
 
 				return fmt.Errorf("failed to write file: %w", err)
 			}
 
-			file.Close()
+			_ = file.Close()
 		case tar.TypeSymlink:
 			// Ensure parent directory exists
 			if err := os.MkdirAll(filepath.Dir(target), os.ModePerm); err != nil {
@@ -138,7 +138,9 @@ func (n *Native) CopyFromVolume(_ context.Context, volumeName string) (io.ReadCl
 					return fmt.Errorf("failed to open file: %w", err)
 				}
 
-				defer file.Close()
+				defer func() {
+					_ = file.Close()
+				}()
 
 				if _, err := io.Copy(tw, file); err != nil {
 					return fmt.Errorf("failed to write file to tar: %w", err)
@@ -149,7 +151,7 @@ func (n *Native) CopyFromVolume(_ context.Context, volumeName string) (io.ReadCl
 		})
 
 		if err != nil {
-			tw.Close()
+			_ = tw.Close()
 			pw.CloseWithError(err)
 
 			return
@@ -161,7 +163,7 @@ func (n *Native) CopyFromVolume(_ context.Context, volumeName string) (io.ReadCl
 			return
 		}
 
-		pw.Close()
+		_ = pw.Close()
 	}()
 
 	return pr, nil

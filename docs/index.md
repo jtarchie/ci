@@ -5,6 +5,10 @@
 This is a development repository for CI/CD system. These notes can probably be
 inferred from the `git` commit messages. I'm journaling for my own benefit.
 
+- 2026-01-15:
+  - Added S3-backed volume caching with zstd/gzip compression. See
+    [caching.md](caching.md) for details.
+  - Added `caches` field to YAML task configs for declarative cache paths.
 - 2025-03-10:
   - Support for task level `on_success`, `on_failure`, `on_error`, and
     `on_abort`.

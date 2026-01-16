@@ -31,7 +31,15 @@ type ContainerLimits struct {
 	Memory int64 `yaml:"memory,omitempty"`
 }
 
+// Cache represents a cached path for task execution.
+type Cache struct {
+	Path string `validate:"required" yaml:"path,omitempty"`
+}
+
+type Caches []Cache
+
 type TaskConfig struct {
+	Caches          Caches            `yaml:"caches,omitempty"`
 	ContainerLimits ContainerLimits   `yaml:"container_limits,omitempty"`
 	Env             map[string]string `yaml:"env,omitempty"`
 	ImageResource   ImageResource     `yaml:"image_resource,omitempty"`

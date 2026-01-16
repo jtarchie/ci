@@ -62,6 +62,7 @@ var TaskRunner = class {
     const mounts = {};
     const inputs = step.config.inputs || [];
     const outputs = step.config.outputs || [];
+    const caches = step.config.caches || [];
     for (const mount of inputs) {
       this.knownMounts[mount.name] ||= await runtime.createVolume();
       mounts[mount.name] = this.knownMounts[mount.name];
@@ -70,7 +71,19 @@ var TaskRunner = class {
       this.knownMounts[mount.name] ||= await runtime.createVolume();
       mounts[mount.name] = this.knownMounts[mount.name];
     }
+    for (const cache of caches) {
+      const cacheName = this.pathToCacheName(cache.path);
+      this.knownMounts[cacheName] ||= await runtime.createVolume({
+        name: cacheName
+      });
+      const mountPath = cache.path.replace(/^\/+/, "");
+      mounts[mountPath] = this.knownMounts[cacheName];
+    }
     return mounts;
+  }
+  // Convert a cache path to a safe volume name
+  pathToCacheName(path) {
+    return "cache-" + path.replace(/^\/+/, "").replace(/[^a-zA-Z0-9]+/g, "-").replace(/-+/g, "-").replace(/-$/, "").toLowerCase();
   }
   validateTaskResult(step, result) {
     if (step.assert?.stdout && step.assert.stdout.trim() !== "") {

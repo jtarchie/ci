@@ -28,6 +28,12 @@ func WrapWithCaching(
 		return driver, nil
 	}
 
+	// URL-decode the cache URL in case it was encoded to avoid DSN parsing issues
+	decodedURL, err := url.QueryUnescape(cacheURL)
+	if err == nil {
+		cacheURL = decodedURL
+	}
+
 	logger.Info("initializing cache layer",
 		"cache_url", cacheURL,
 		"driver", driver.Name(),

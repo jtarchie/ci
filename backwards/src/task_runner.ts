@@ -81,6 +81,7 @@ export class TaskRunner {
 
     const inputs = step.config.inputs || [];
     const outputs = step.config.outputs || [];
+    const caches = step.config.caches || [];
 
     for (const mount of inputs) {
       this.knownMounts[mount.name] ||= await runtime.createVolume();
@@ -92,7 +93,31 @@ export class TaskRunner {
       mounts[mount.name] = this.knownMounts[mount.name];
     }
 
+    // Caches use a stable name based on path so they persist across pipeline runs.
+    // The path is normalized to create a safe volume name (e.g., "/cache/go-build" -> "cache-go-build")
+    for (const cache of caches) {
+      const cacheName = this.pathToCacheName(cache.path);
+      // Use a global cache registry to share caches across tasks
+      this.knownMounts[cacheName] ||= await runtime.createVolume({
+        name: cacheName,
+      });
+      // Mount at the cache path - strip leading slash as mounts are relative to workdir
+      const mountPath = cache.path.replace(/^\/+/, "");
+      mounts[mountPath] = this.knownMounts[cacheName];
+    }
+
     return mounts;
+  }
+
+  // Convert a cache path to a safe volume name
+  private pathToCacheName(path: string): string {
+    // Remove leading slashes and replace special chars with dashes
+    return "cache-" + path
+      .replace(/^\/+/, "")
+      .replace(/[^a-zA-Z0-9]+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/-$/, "")
+      .toLowerCase();
   }
 
   private validateTaskResult(step: Task, result: RunTaskResult): void {
