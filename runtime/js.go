@@ -215,6 +215,13 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 		return fmt.Errorf("pipeline did not successfully execute: %w", err)
 	}
 
+	// Cleanup volumes after pipeline completes - this triggers cache persistence
+	err = runner.CleanupVolumes()
+	if err != nil {
+		j.logger.Error("volume.cleanup", "err", err)
+		// Don't fail the pipeline on volume cleanup errors, just log
+	}
+
 	if promise.State() == goja.PromiseStateRejected {
 		res := promise.Result()
 		if resObj, ok := res.(*goja.Object); ok {

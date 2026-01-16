@@ -23,6 +23,27 @@ func TestDrivers(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
+			// Skip k8s tests if cluster is not available
+			if name == "k8s" {
+				client, err := init("test-probe", slog.Default(), map[string]string{})
+				if err != nil {
+					t.Skipf("Kubernetes cluster not available: %v", err)
+				}
+
+				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+				_, err = client.RunContainer(ctx, orchestra.Task{
+					ID:      "test-probe",
+					Image:   "busybox",
+					Command: []string{"true"},
+				})
+				cancel()
+				_ = client.Close()
+
+				if err != nil {
+					t.Skipf("Kubernetes cluster not reachable: %v", err)
+				}
+			}
+
 			t.Run("with stdin", func(t *testing.T) {
 				t.Parallel()
 

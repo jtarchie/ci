@@ -14,9 +14,10 @@ import (
 )
 
 type PipelineRunner struct {
-	client orchestra.Driver
-	ctx    context.Context //nolint: containedctx
-	logger *slog.Logger
+	client  orchestra.Driver
+	ctx     context.Context //nolint: containedctx
+	logger  *slog.Logger
+	volumes []orchestra.Volume
 }
 
 func NewPipelineRunner(
@@ -25,9 +26,10 @@ func NewPipelineRunner(
 	logger *slog.Logger,
 ) *PipelineRunner {
 	return &PipelineRunner{
-		client: client,
-		ctx:    ctx,
-		logger: logger.WithGroup("pipeline.runner"),
+		client:  client,
+		ctx:     ctx,
+		logger:  logger.WithGroup("pipeline.runner"),
+		volumes: []orchestra.Volume{},
 	}
 }
 
@@ -54,6 +56,9 @@ func (c *PipelineRunner) CreateVolume(input VolumeInput) (*VolumeResult, error) 
 
 		return nil, fmt.Errorf("could not create volume: %w", err)
 	}
+
+	// Track volume for cleanup
+	c.volumes = append(c.volumes, volume)
 
 	return &VolumeResult{
 		volume: volume,
@@ -216,4 +221,32 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 		Stderr: stderr.String(),
 		Code:   containerStatus.ExitCode(),
 	}, nil
+}
+
+// CleanupVolumes cleans up all tracked volumes.
+// This triggers cache persistence for CachingVolume wrappers.
+func (c *PipelineRunner) CleanupVolumes() error {
+	logger := c.logger
+	ctx := c.ctx
+
+	var errs []error
+
+	for _, volume := range c.volumes {
+		logger.Debug("volume.cleanup", "name", volume.Name())
+
+		err := volume.Cleanup(ctx)
+		if err != nil {
+			logger.Error("volume.cleanup", "name", volume.Name(), "err", err)
+			errs = append(errs, err)
+		}
+	}
+
+	// Clear the slice
+	c.volumes = nil
+
+	if len(errs) > 0 {
+		return fmt.Errorf("failed to cleanup %d volumes: %w", len(errs), errors.Join(errs...))
+	}
+
+	return nil
 }

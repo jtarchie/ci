@@ -5,6 +5,7 @@ package runtime
 type Runner interface {
 	Run(input RunInput) (*RunResult, error)
 	CreateVolume(input VolumeInput) (*VolumeResult, error)
+	CleanupVolumes() error
 }
 
 // Ensure both runners implement the interface.

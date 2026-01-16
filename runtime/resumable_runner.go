@@ -393,6 +393,11 @@ func (r *ResumableRunner) CreateVolume(input VolumeInput) (*VolumeResult, error)
 	return r.runner.CreateVolume(input)
 }
 
+// CleanupVolumes cleans up all tracked volumes (passthrough to underlying runner).
+func (r *ResumableRunner) CleanupVolumes() error {
+	return r.runner.CleanupVolumes()
+}
+
 // State returns the current pipeline state.
 func (r *ResumableRunner) State() *PipelineState {
 	return r.state

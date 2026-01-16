@@ -1,0 +1,50 @@
+---
+# Example pipeline demonstrating cache usage.
+# Caches persist across pipeline runs and are backed by S3 when configured.
+
+jobs:
+  - name: build-with-cache
+    plan:
+      - task: first-build
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: busybox
+          caches:
+            - path: cache
+          run:
+            path: sh
+            args:
+              - -c
+              - |
+                  echo "First build"
+                  echo "Cache before: $(ls -la ./cache 2>&1)"
+                  echo "hello" > ./cache/data.txt
+                  echo "Cache after: $(cat ./cache/data.txt)"
+                  echo "Done"
+        assert:
+          stdout: Done
+          code: 0
+
+      - task: second-build
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: busybox
+          caches:
+            - path: cache
+          run:
+            path: sh
+            args:
+              - -c
+              - |
+                  echo "Second build"
+                  echo "Cache contents: $(cat ./cache/data.txt)"
+                  echo "Cache persisted!"
+        assert:
+          stdout: Cache persisted!
+          code: 0

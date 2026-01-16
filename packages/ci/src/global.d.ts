@@ -258,7 +258,12 @@ declare global {
     source: SourceConfig;
   }
 
+  interface CacheConfig {
+    path: string;
+  }
+
   interface TaskConfig {
+    caches?: CacheConfig[];
     container_limits?: ContainerLimits;
     env?: EnvVars;
     platform?: string;

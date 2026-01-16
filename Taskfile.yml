@@ -23,6 +23,8 @@ tasks:
     cmds:
       - task: build
       - task: fmt
+      - task: cleanup
+      - defer: { task: cleanup }
       - go test -race ./... -count=1 -parallel=1
       - task: test:e2e
   test:e2e:

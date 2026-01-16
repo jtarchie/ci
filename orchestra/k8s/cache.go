@@ -199,7 +199,7 @@ func (k *K8s) CopyFromVolume(ctx context.Context, volumeName string) (io.ReadClo
 		if err != nil {
 			pw.CloseWithError(fmt.Errorf("failed to stream from pod: %w (stderr: %s)", err, stderr.String()))
 		} else {
-			pw.Close()
+			_ = pw.Close()
 		}
 
 		// Clean up the pod after streaming is done
@@ -265,8 +265,12 @@ func newTarPathStripper(src io.Reader, prefix string) io.ReadCloser {
 }
 
 func (t *tarPathStripper) run() {
-	defer t.pw.Close()
-	defer t.writer.Close()
+	defer func() {
+		_ = t.pw.Close()
+	}()
+	defer func() {
+		_ = t.writer.Close()
+	}()
 
 	for {
 		header, err := t.reader.Next()

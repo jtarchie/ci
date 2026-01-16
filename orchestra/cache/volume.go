@@ -64,7 +64,9 @@ func (v *CachingVolume) RestoreFromCache(ctx context.Context) error {
 		return nil // Cache miss, nothing to restore
 	}
 
-	defer reader.Close()
+	defer func() {
+		_ = reader.Close()
+	}()
 
 	v.logger.Info("restoring volume from cache",
 		"volume", v.inner.Name(),
@@ -77,7 +79,9 @@ func (v *CachingVolume) RestoreFromCache(ctx context.Context) error {
 		return fmt.Errorf("failed to decompress cache data: %w", err)
 	}
 
-	defer decompressed.Close()
+	defer func() {
+		_ = decompressed.Close()
+	}()
 
 	// Copy tar data to volume
 	err = v.accessor.CopyToVolume(ctx, v.inner.Name(), decompressed)
@@ -104,7 +108,9 @@ func (v *CachingVolume) PersistToCache(ctx context.Context) error {
 		return fmt.Errorf("failed to copy data from volume: %w", err)
 	}
 
-	defer reader.Close()
+	defer func() {
+		_ = reader.Close()
+	}()
 
 	// Create a pipe for compression
 	pipeReader, pipeWriter := newPipe()
@@ -113,7 +119,9 @@ func (v *CachingVolume) PersistToCache(ctx context.Context) error {
 	errChan := make(chan error, 1)
 
 	go func() {
-		defer pipeWriter.Close()
+		defer func() {
+			_ = pipeWriter.Close()
+		}()
 
 		compressedWriter, err := v.compressor.Compress(pipeWriter)
 		if err != nil {
@@ -122,7 +130,9 @@ func (v *CachingVolume) PersistToCache(ctx context.Context) error {
 			return
 		}
 
-		defer compressedWriter.Close()
+		defer func() {
+			_ = compressedWriter.Close()
+		}()
 
 		_, err = copyBuffer(compressedWriter, reader)
 		errChan <- err
