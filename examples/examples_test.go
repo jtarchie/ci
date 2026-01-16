@@ -7,7 +7,7 @@ import (
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/jtarchie/ci/commands"
 	_ "github.com/jtarchie/ci/orchestra/docker"
-	_ "github.com/jtarchie/ci/orchestra/k8s"
+	"github.com/jtarchie/ci/orchestra/k8s"
 	_ "github.com/jtarchie/ci/orchestra/native"
 	_ "github.com/jtarchie/ci/storage/sqlite"
 	. "github.com/onsi/gomega"
@@ -21,7 +21,11 @@ func TestExamplesDocker(t *testing.T) {
 	matches, err := doublestar.FilepathGlob("docker/*.{js,ts,yml,yaml}")
 	assert.Expect(err).NotTo(HaveOccurred())
 
-	drivers := []string{"docker", "k8s"}
+	// Check if k8s is available
+	drivers := []string{"docker"}
+	if k8s.IsAvailable() {
+		drivers = append(drivers, "k8s")
+	}
 
 	for _, match := range matches {
 		examplePath, err := filepath.Abs(match)

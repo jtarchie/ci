@@ -16,24 +16,9 @@ import (
 func TestK8s(t *testing.T) {
 	t.Parallel()
 
-	// Try to create a client and verify k8s is available by attempting a lightweight operation
-	testClient, err := k8s.NewK8s("test-probe", slog.Default(), map[string]string{})
-	if err != nil {
-		t.Skipf("Kubernetes cluster not available: %v", err)
-	}
-	defer func() { _ = testClient.Close() }()
-
-	// Try a simple container operation to verify connectivity
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	_, err = testClient.RunContainer(ctx, orchestra.Task{
-		ID:      "test-probe",
-		Image:   "busybox",
-		Command: []string{"true"},
-	})
-	if err != nil {
-		t.Skipf("Kubernetes cluster not reachable: %v", err)
+	// Check if k8s is available
+	if !k8s.IsAvailable() {
+		t.Skip("Kubernetes cluster not available")
 	}
 
 	t.Run("with a user", func(t *testing.T) {

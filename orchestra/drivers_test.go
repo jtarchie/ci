@@ -10,7 +10,7 @@ import (
 
 	"github.com/jtarchie/ci/orchestra"
 	_ "github.com/jtarchie/ci/orchestra/docker"
-	_ "github.com/jtarchie/ci/orchestra/k8s"
+	"github.com/jtarchie/ci/orchestra/k8s"
 	_ "github.com/jtarchie/ci/orchestra/native"
 	gonanoid "github.com/matoous/go-nanoid/v2"
 	. "github.com/onsi/gomega"
@@ -24,24 +24,8 @@ func TestDrivers(t *testing.T) {
 			t.Parallel()
 
 			// Skip k8s tests if cluster is not available
-			if name == "k8s" {
-				client, err := init("test-probe", slog.Default(), map[string]string{})
-				if err != nil {
-					t.Skipf("Kubernetes cluster not available: %v", err)
-				}
-
-				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-				_, err = client.RunContainer(ctx, orchestra.Task{
-					ID:      "test-probe",
-					Image:   "busybox",
-					Command: []string{"true"},
-				})
-				cancel()
-				_ = client.Close()
-
-				if err != nil {
-					t.Skipf("Kubernetes cluster not reachable: %v", err)
-				}
+			if name == "k8s" && !k8s.IsAvailable() {
+				t.Skip("Kubernetes cluster not available")
 			}
 
 			t.Run("with stdin", func(t *testing.T) {
