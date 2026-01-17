@@ -1,18 +1,12 @@
 package backwards_test
 
 import (
-	"context"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/url"
 	"os"
 	"os/exec"
-	"strings"
 	"testing"
-	"time"
-
-	"github.com/phayes/freeport"
 
 	gonanoid "github.com/matoous/go-nanoid/v2"
 
@@ -21,6 +15,7 @@ import (
 	_ "github.com/jtarchie/ci/orchestra/docker"
 	_ "github.com/jtarchie/ci/orchestra/native"
 	_ "github.com/jtarchie/ci/storage/sqlite"
+	"github.com/jtarchie/ci/testhelpers"
 	. "github.com/onsi/gomega"
 )
 
@@ -32,27 +27,11 @@ func TestCacheS3Persistence(t *testing.T) {
 		t.Skip("minio not installed, skipping S3 cache integration test")
 	}
 
-	assert := NewGomegaWithT(t)
-
-	// Create a unique bucket name for this test
-	bucketName := "testcache" + strings.ToLower(strings.ReplaceAll(gonanoid.Must(), "_", ""))
-
 	// Start MinIO server
-	minioCmd, dataDir, cleanup, endpoint := startMinIOServerBackwards(t)
-	defer cleanup()
+	minio := testhelpers.StartMinIO(t)
+	defer minio.Stop()
 
-	// Give MinIO time to start
-	time.Sleep(500 * time.Millisecond)
-
-	// Create the bucket by making a directory (MinIO uses filesystem as backend)
-	bucketPath := dataDir + "/" + bucketName
-	err := os.MkdirAll(bucketPath, 0755)
-	assert.Expect(err).NotTo(HaveOccurred())
-
-	// Verify MinIO is running
-	assert.Expect(minioCmd.Process).NotTo(BeNil())
-
-	cacheURL := fmt.Sprintf("s3://%s?endpoint=%s&region=us-east-1", bucketName, endpoint)
+	cacheURL := minio.CacheURL()
 
 	// Create a unique cache value so we know it came from S3
 	cacheValue := gonanoid.Must()
@@ -156,47 +135,4 @@ jobs:
 	}
 	err = runner2.Run(logger)
 	assert.Expect(err).NotTo(HaveOccurred(), "Read pipeline should succeed - cache should be restored from S3")
-}
-
-func startMinIOServerBackwards(t *testing.T) (*exec.Cmd, string, func(), string) {
-	t.Helper()
-
-	// Create temp directory for MinIO data
-	dataDir := t.TempDir()
-
-	// Get a free port from the OS to avoid conflicts
-	port, err := freeport.GetFreePort()
-	if err != nil {
-		t.Fatalf("failed to get free port: %v", err)
-	}
-	endpoint := fmt.Sprintf("http://localhost:%d", port)
-
-	// Start MinIO
-	ctx, cancel := context.WithCancel(context.Background())
-	cmd := exec.CommandContext(ctx, "minio", "server", dataDir, "--address", fmt.Sprintf(":%d", port), "--quiet")
-	cmd.Env = append(os.Environ(),
-		"MINIO_ROOT_USER=minioadmin",
-		"MINIO_ROOT_PASSWORD=minioadmin",
-	)
-	cmd.Stdout = io.Discard
-	cmd.Stderr = io.Discard
-
-	err = cmd.Start()
-	if err != nil {
-		t.Fatalf("failed to start minio: %v", err)
-	}
-
-	// Set AWS credentials for S3 client
-	t.Setenv("AWS_ACCESS_KEY_ID", "minioadmin")
-	t.Setenv("AWS_SECRET_ACCESS_KEY", "minioadmin")
-
-	// Wait for MinIO to be ready
-	time.Sleep(500 * time.Millisecond)
-
-	cleanup := func() {
-		cancel()
-		_ = cmd.Wait()
-	}
-
-	return cmd, dataDir, cleanup, endpoint
 }
