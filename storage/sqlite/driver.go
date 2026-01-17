@@ -544,7 +544,7 @@ func (s *Sqlite) ListResourceVersions(ctx context.Context, resourceName string, 
 		SELECT id, resource_name, json(version), job_name, fetched_at
 		FROM resource_versions
 		WHERE resource_name = ?
-		ORDER BY fetched_at DESC
+		ORDER BY id ASC
 		LIMIT ?
 	`, resourceName, limit)
 	if err != nil {

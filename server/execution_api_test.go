@@ -55,7 +55,8 @@ func TestExecutionAPI(t *testing.T) {
 				assert.Expect(resp["message"]).To(Equal("pipeline execution started"))
 
 				// Close database connections before temp directory cleanup
-				_ = client.Close()
+				err = client.Close()
+				assert.Expect(err).NotTo(HaveOccurred())
 			})
 
 			t.Run("POST /api/pipelines/:id/trigger returns 404 for non-existent pipeline", func(t *testing.T) {
