@@ -4,100 +4,24 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"os/exec"
 	"strings"
 	"testing"
-	"time"
-
-	"github.com/phayes/freeport"
 
 	"github.com/jtarchie/ci/orchestra"
 	"github.com/jtarchie/ci/orchestra/cache"
 	_ "github.com/jtarchie/ci/orchestra/cache/s3"
 	_ "github.com/jtarchie/ci/orchestra/docker"
 	_ "github.com/jtarchie/ci/orchestra/native"
+	"github.com/jtarchie/ci/testhelpers"
 	gonanoid "github.com/matoous/go-nanoid/v2"
 	"github.com/onsi/gomega"
 )
-
-type minioServer struct {
-	cmd      *exec.Cmd
-	dataDir  string
-	endpoint string
-	bucket   string
-}
-
-func startMinIO(t *testing.T) *minioServer {
-	t.Helper()
-
-	assert := gomega.NewGomegaWithT(t)
-
-	dataDir, err := os.MkdirTemp("", "minio-test-*")
-	assert.Expect(err).NotTo(gomega.HaveOccurred())
-
-	// Get a free port from the OS to avoid conflicts
-	port, err := freeport.GetFreePort()
-	assert.Expect(err).NotTo(gomega.HaveOccurred())
-	endpoint := fmt.Sprintf("http://localhost:%d", port)
-
-	cmd := exec.Command("minio", "server", dataDir, "--address", fmt.Sprintf(":%d", port), "--quiet")
-	cmd.Env = append(os.Environ(),
-		"MINIO_ROOT_USER=minioadmin",
-		"MINIO_ROOT_PASSWORD=minioadmin",
-	)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	err = cmd.Start()
-	assert.Expect(err).NotTo(gomega.HaveOccurred())
-
-	bucket := "testcache" + strings.ReplaceAll(strings.ToLower(gonanoid.Must()), "_", "")
-
-	server := &minioServer{
-		cmd:      cmd,
-		dataDir:  dataDir,
-		endpoint: endpoint,
-		bucket:   bucket,
-	}
-
-	assert.Eventually(func() bool {
-		bucketPath := dataDir + "/" + bucket
-		if err := os.MkdirAll(bucketPath, 0755); err != nil {
-			return false
-		}
-		return true
-	}, "10s", "100ms").Should(gomega.BeTrue(), "MinIO should start")
-
-	time.Sleep(500 * time.Millisecond)
-
-	return server
-}
-
-func (m *minioServer) stop(t *testing.T) {
-	t.Helper()
-
-	if m.cmd != nil && m.cmd.Process != nil {
-		_ = m.cmd.Process.Kill()
-		_ = m.cmd.Wait()
-	}
-
-	if m.dataDir != "" {
-		_ = os.RemoveAll(m.dataDir)
-	}
-}
-
-func (m *minioServer) cacheURL() string {
-	return fmt.Sprintf("s3://%s?endpoint=%s&region=us-east-1", m.bucket, m.endpoint)
-}
 
 func TestCacheIntegration(t *testing.T) {
 	if _, err := exec.LookPath("minio"); err != nil {
 		t.Skip("minio not installed, skipping integration test")
 	}
-
-	t.Setenv("AWS_ACCESS_KEY_ID", "minioadmin")
-	t.Setenv("AWS_SECRET_ACCESS_KEY", "minioadmin")
 
 	drivers := []string{"native", "docker"}
 
@@ -107,8 +31,8 @@ func TestCacheIntegration(t *testing.T) {
 			ctx := context.Background()
 			logger := slog.Default()
 
-			minio := startMinIO(t)
-			defer minio.stop(t)
+			minio := testhelpers.StartMinIO(t)
+			defer minio.Stop()
 
 			initFunc, ok := orchestra.Get(driverName)
 			assert.Expect(ok).To(gomega.BeTrue(), "driver should exist")
@@ -123,7 +47,7 @@ func TestCacheIntegration(t *testing.T) {
 				assert.Expect(err).NotTo(gomega.HaveOccurred())
 
 				cacheParams := map[string]string{
-					"cache":             minio.cacheURL(),
+					"cache":             minio.CacheURL(),
 					"cache_compression": "zstd",
 					"cache_prefix":      "integration-test",
 				}
@@ -211,7 +135,7 @@ func TestCacheIntegration(t *testing.T) {
 				defer func() { _ = driver.Close() }()
 
 				cacheParams := map[string]string{
-					"cache":             minio.cacheURL(),
+					"cache":             minio.CacheURL(),
 					"cache_compression": "zstd",
 				}
 				driver, err = cache.WrapWithCaching(driver, cacheParams, logger)
