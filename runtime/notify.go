@@ -168,7 +168,7 @@ func (n *Notifier) Send(ctx context.Context, name string, message string) error 
 	// Send the notification
 	err = notifier.Send(ctx, "Pipeline Notification", renderedMessage)
 	if err != nil {
-		n.logger.Error("notification.send.failed",
+		n.logger.Error("notification.send.sync.failed",
 			"name", name,
 			"type", config.Type,
 			"error", err,
@@ -315,7 +315,7 @@ func (nr *NotifyRuntime) Send(input NotifyInput) *goja.Promise {
 		go func() {
 			err := nr.notifier.Send(nr.ctx, input.Name, input.Message)
 			if err != nil {
-				nr.notifier.logger.Error("notification.send.failed",
+				nr.notifier.logger.Error("notification.send.async.failed",
 					"name", input.Name,
 					"error", err,
 				)

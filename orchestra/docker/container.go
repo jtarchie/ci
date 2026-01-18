@@ -90,14 +90,14 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 
 	reader, err := d.client.ImagePull(ctx, task.Image, image.PullOptions{})
 	if err != nil {
-		logger.Error("image.pull", "image", task.Image, "err", err)
+		logger.Error("image.pull.initiate", "image", task.Image, "err", err)
 
 		return nil, fmt.Errorf("failed to initiate pull image: %w", err)
 	}
 
 	_, err = io.Copy(io.Discard, reader)
 	if err != nil {
-		logger.Error("image.pull", "image", task.Image, "err", err)
+		logger.Error("image.pull.copy", "image", task.Image, "err", err)
 
 		return nil, fmt.Errorf("failed to pull image: %w", err)
 	}
@@ -109,7 +109,7 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 	for _, taskMount := range task.Mounts {
 		volume, err := d.CreateVolume(ctx, taskMount.Name, 0)
 		if err != nil {
-			logger.Error("volume.create", "name", taskMount.Name, "err", err)
+			logger.Error("volume.create.docker.error", "name", taskMount.Name, "err", err)
 
 			return nil, fmt.Errorf("failed to create volume: %w", err)
 		}
@@ -163,7 +163,7 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 		containerName,
 	)
 	if err != nil && errdefs.IsConflict(err) {
-		logger.Error("container.create", "name", containerName, "err", err, "conflict", true)
+		logger.Error("container.create.conflict", "name", containerName, "err", err, "conflict", true)
 
 		filter := filters.NewArgs()
 		filter.Add("name", containerName)
@@ -185,7 +185,7 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 			task:   task,
 		}, nil
 	} else if err != nil {
-		logger.Error("container.create", "name", containerName, "err", err)
+		logger.Error("container.create.error", "name", containerName, "err", err)
 
 		return nil, fmt.Errorf("failed to create container: %w", err)
 	}

@@ -83,7 +83,7 @@ func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *stor
 	// Update status to running
 	err := s.store.UpdateRunStatus(ctx, run.ID, storage.RunStatusRunning, "")
 	if err != nil {
-		logger.Error("run.update.failed", "error", err)
+		logger.Error("run.update.failed.to_running", "error", err)
 		return
 	}
 
@@ -107,7 +107,7 @@ func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *stor
 
 		updateErr := s.store.UpdateRunStatus(ctx, run.ID, storage.RunStatusFailed, err.Error())
 		if updateErr != nil {
-			logger.Error("run.update.failed", "error", updateErr)
+			logger.Error("run.update.failed.to_failed", "error", updateErr)
 		}
 
 		return
@@ -116,7 +116,7 @@ func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *stor
 	// Update status to success
 	err = s.store.UpdateRunStatus(ctx, run.ID, storage.RunStatusSuccess, "")
 	if err != nil {
-		logger.Error("run.update.failed", "error", err)
+		logger.Error("run.update.failed.to_success", "error", err)
 		return
 	}
 

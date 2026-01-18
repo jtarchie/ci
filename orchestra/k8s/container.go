@@ -304,7 +304,7 @@ func (k *K8s) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.
 	for _, taskMount := range task.Mounts {
 		volume, err := k.CreateVolume(ctx, taskMount.Name, 0)
 		if err != nil {
-			logger.Error("volume.create", "name", taskMount.Name, "err", err)
+			logger.Error("volume.create.k8s.error", "name", taskMount.Name, "err", err)
 			return nil, fmt.Errorf("failed to create volume: %w", err)
 		}
 

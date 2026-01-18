@@ -92,7 +92,7 @@ func (n *Native) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 	for _, mount := range task.Mounts {
 		volume, err := n.CreateVolume(ctx, mount.Name, 0)
 		if err != nil {
-			logger.Error("volume.create.failed", "name", mount.Name, "err", err)
+			logger.Error("volume.create.native.volume.error", "name", mount.Name, "err", err)
 
 			return nil, fmt.Errorf("failed to create volume: %w", err)
 		}
@@ -101,7 +101,7 @@ func (n *Native) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 
 		err = os.Symlink(nativeVolume.path, filepath.Join(dir, mount.Path))
 		if err != nil {
-			logger.Error("volume.create.failed", "name", mount.Name, "err", err)
+			logger.Error("volume.create.native.symlink.error", "name", mount.Name, "err", err)
 
 			return nil, fmt.Errorf("failed to create symlink: %w", err)
 		}

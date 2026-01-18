@@ -256,7 +256,7 @@ func (r *ResumableRunner) runStep(stepID string, input RunInput) (*RunResult, er
 	// Update step with container ID for potential reattachment
 	step.ContainerID = container.ID()
 	if err := r.saveState(); err != nil {
-		r.logger.Error("resume.save.failed", "stepID", stepID, "err", err)
+		r.logger.Error("resume.save_state_failed.container_set", "stepID", stepID, "err", err)
 	}
 
 	// Wait for container to complete
@@ -377,7 +377,7 @@ func (r *ResumableRunner) reattachToContainer(step *StepState) (*RunResult, erro
 	}
 
 	if err := r.saveState(); err != nil {
-		r.logger.Error("resume.save.failed", "stepID", step.StepID, "err", err)
+		r.logger.Error("resume.save_state_failed.reattach", "stepID", step.StepID, "err", err)
 	}
 
 	// Clean up container
