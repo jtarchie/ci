@@ -48,11 +48,11 @@ func (c *PipelineRunner) CreateVolume(input VolumeInput) (*VolumeResult, error) 
 	ctx := c.ctx
 
 	logger := c.logger
-	logger.Debug("volume.create.request", "input", input)
+	logger.Debug("volume.create.pipeline.request", "input", input)
 
 	volume, err := c.client.CreateVolume(ctx, input.Name, input.Size)
 	if err != nil {
-		logger.Error("volume.create.error", "err", err)
+		logger.Error("volume.create.pipeline.error", "err", err)
 
 		return nil, fmt.Errorf("could not create volume: %w", err)
 	}
