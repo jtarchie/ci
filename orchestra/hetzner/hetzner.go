@@ -593,7 +593,7 @@ func (h *Hetzner) Close() error {
 	// Delete local SSH key file
 	if h.sshKeyPath != "" {
 		if err := os.Remove(h.sshKeyPath); err != nil && !os.IsNotExist(err) {
-			h.logger.Warn("hetzner.ssh_key.local_delete_error", "err", err)
+			h.logger.Warn("hetzner.ssh_key.local.delete.error", "err", err)
 		}
 	}
 
@@ -622,13 +622,13 @@ func CleanupOrphanedResources(ctx context.Context, token string, logger *slog.Lo
 	}
 
 	for _, server := range servers {
-		logger.Info("hetzner.cleanup.deleting_server", "id", server.ID, "name", server.Name, "selector", labelSelector)
+		logger.Info("hetzner.cleanup.server.deleting", "id", server.ID, "name", server.Name, "selector", labelSelector)
 
 		_, _, err := client.Server.DeleteWithResult(ctx, server)
 		if err != nil {
-			logger.Warn("hetzner.cleanup.server_delete_error", "id", server.ID, "err", err)
+			logger.Warn("hetzner.cleanup.server.delete.error", "id", server.ID, "err", err)
 		} else {
-			logger.Info("hetzner.cleanup.server_deleted", "id", server.ID)
+			logger.Info("hetzner.cleanup.server.delete.success", "id", server.ID)
 		}
 	}
 
@@ -656,11 +656,11 @@ func CleanupOrphanedResources(ctx context.Context, token string, logger *slog.Lo
 
 	for _, key := range keys {
 		if strings.HasPrefix(key.Name, keyPrefix) {
-			logger.Info("hetzner.cleanup.deleting_ssh_key", "id", key.ID, "name", key.Name)
+			logger.Info("hetzner.cleanup.deleting_ssh_key.start", "id", key.ID, "name", key.Name)
 
 			_, err := client.SSHKey.Delete(ctx, key)
 			if err != nil {
-				logger.Warn("hetzner.cleanup.ssh_key_delete_error", "id", key.ID, "err", err)
+				logger.Warn("hetzner.cleanup.ssh_key.delete.error", "id", key.ID, "err", err)
 			} else {
 				logger.Info("hetzner.cleanup.ssh_key_deleted", "id", key.ID)
 			}

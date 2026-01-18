@@ -61,7 +61,7 @@ func (c *Runner) Run(logger *slog.Logger) error {
 		logger = slog.Default()
 	}
 
-	logger = logger.WithGroup("runner").With(
+	logger = logger.WithGroup("runner.run").With(
 		"id", runtimeID,
 		"pipeline", c.Pipeline,
 		"orchestrator", c.Driver,

@@ -11,15 +11,15 @@ type printer struct {
 }
 
 func (p *printer) Error(message string) {
-	p.logger.Error(message)
+	p.logger.Error("runtime.error", "message", message)
 }
 
 func (p *printer) Log(message string) {
-	p.logger.Info(message)
+	p.logger.Info("runtime.info", "message", message)
 }
 
 func (p *printer) Warn(message string) {
-	p.logger.Warn(message)
+	p.logger.Warn("runtime.warn", "message", message)
 }
 
 var _ console.Printer = (*printer)(nil)

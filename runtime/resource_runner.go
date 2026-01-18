@@ -19,7 +19,7 @@ type ResourceRunner struct {
 func NewResourceRunner(ctx context.Context, logger *slog.Logger) *ResourceRunner {
 	return &ResourceRunner{
 		ctx:    ctx,
-		logger: logger.WithGroup("resource.runner"),
+		logger: logger.WithGroup("resource.run"),
 	}
 }
 
@@ -37,7 +37,7 @@ type ResourceCheckResult struct {
 
 // Check discovers new versions of a resource.
 func (r *ResourceRunner) Check(input ResourceCheckInput) (*ResourceCheckResult, error) {
-	logger := r.logger.With("type", input.Type, "operation", "check")
+	logger := r.logger.With("type", input.Type, "operation", "resource.check")
 	logger.Debug("resource.check")
 
 	res, err := resources.Get(input.Type)
@@ -52,7 +52,7 @@ func (r *ResourceRunner) Check(input ResourceCheckInput) (*ResourceCheckResult, 
 
 	resp, err := res.Check(r.ctx, req)
 	if err != nil {
-		logger.Error("resource.check", "err", err)
+		logger.Error("resource.check.failed", "err", err)
 
 		return nil, fmt.Errorf("check failed: %w", err)
 	}
@@ -85,7 +85,7 @@ type ResourceFetchResult struct {
 
 // Fetch retrieves a specific version of a resource (equivalent to 'in' or 'get').
 func (r *ResourceRunner) Fetch(input ResourceFetchInput) (*ResourceFetchResult, error) {
-	logger := r.logger.With("type", input.Type, "operation", "fetch", "destDir", input.DestDir)
+	logger := r.logger.With("type", input.Type, "operation", "resource.fetch", "destDir", input.DestDir)
 	logger.Debug("resource.fetch")
 
 	res, err := resources.Get(input.Type)
@@ -101,7 +101,7 @@ func (r *ResourceRunner) Fetch(input ResourceFetchInput) (*ResourceFetchResult, 
 
 	resp, err := res.In(r.ctx, input.DestDir, req)
 	if err != nil {
-		logger.Error("resource.fetch", "err", err)
+		logger.Error("resource.fetch.failed", "err", err)
 
 		return nil, fmt.Errorf("fetch failed: %w", err)
 	}
@@ -139,7 +139,7 @@ type ResourcePushResult struct {
 
 // Push publishes a new version of a resource (equivalent to 'out' or 'put').
 func (r *ResourceRunner) Push(input ResourcePushInput) (*ResourcePushResult, error) {
-	logger := r.logger.With("type", input.Type, "operation", "push", "srcDir", input.SrcDir)
+	logger := r.logger.With("type", input.Type, "operation", "resource.push", "srcDir", input.SrcDir)
 	logger.Debug("resource.push")
 
 	res, err := resources.Get(input.Type)
@@ -154,7 +154,7 @@ func (r *ResourceRunner) Push(input ResourcePushInput) (*ResourcePushResult, err
 
 	resp, err := res.Out(r.ctx, input.SrcDir, req)
 	if err != nil {
-		logger.Error("resource.push", "err", err)
+		logger.Error("resource.push.failed", "err", err)
 
 		return nil, fmt.Errorf("push failed: %w", err)
 	}

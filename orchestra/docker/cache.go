@@ -23,7 +23,7 @@ func (d *Docker) CopyToVolume(ctx context.Context, volumeName string, reader io.
 	_, err := d.client.ImagePull(ctx, cacheHelperImage, image.PullOptions{})
 	if err != nil {
 		// Try to continue anyway, image might already exist
-		d.logger.Debug("failed to pull cache helper image", "error", err)
+		d.logger.Debug("cache.helper.pull.failed", "error", err)
 	}
 
 	// Create a temporary container with the volume mounted
@@ -69,7 +69,7 @@ func (d *Docker) CopyFromVolume(ctx context.Context, volumeName string) (io.Read
 	_, err := d.client.ImagePull(ctx, cacheHelperImage, image.PullOptions{})
 	if err != nil {
 		// Try to continue anyway, image might already exist
-		d.logger.Debug("failed to pull cache helper image", "error", err)
+		d.logger.Debug("cache.helper.pull.failed", "error", err)
 	}
 
 	// Create a temporary container with the volume mounted

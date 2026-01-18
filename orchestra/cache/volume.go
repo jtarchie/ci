@@ -47,7 +47,7 @@ func (v *CachingVolume) RestoreFromCache(ctx context.Context) error {
 
 	v.restored = true
 
-	v.logger.Debug("checking cache for volume",
+	v.logger.Debug("volume.check",
 		"volume", v.inner.Name(),
 		"cache_key", v.cacheKey,
 	)
@@ -59,7 +59,7 @@ func (v *CachingVolume) RestoreFromCache(ctx context.Context) error {
 	}
 
 	if reader == nil {
-		v.logger.Debug("cache miss for volume", "volume", v.inner.Name())
+		v.logger.Debug("volume.cache.miss", "volume", v.inner.Name())
 
 		return nil // Cache miss, nothing to restore
 	}
@@ -68,7 +68,7 @@ func (v *CachingVolume) RestoreFromCache(ctx context.Context) error {
 		_ = reader.Close()
 	}()
 
-	v.logger.Info("restoring volume from cache",
+	v.logger.Info("volume.restore",
 		"volume", v.inner.Name(),
 		"cache_key", v.cacheKey,
 	)
@@ -89,7 +89,7 @@ func (v *CachingVolume) RestoreFromCache(ctx context.Context) error {
 		return fmt.Errorf("failed to copy data to volume: %w", err)
 	}
 
-	v.logger.Info("volume restored from cache", "volume", v.inner.Name())
+	v.logger.Info("volume.restore.success", "volume", v.inner.Name())
 
 	return nil
 }
@@ -97,7 +97,7 @@ func (v *CachingVolume) RestoreFromCache(ctx context.Context) error {
 // PersistToCache saves volume contents to the cache.
 // This should be called before volume cleanup.
 func (v *CachingVolume) PersistToCache(ctx context.Context) error {
-	v.logger.Info("persisting volume to cache",
+	v.logger.Info("volume.persist",
 		"volume", v.inner.Name(),
 		"cache_key", v.cacheKey,
 	)
@@ -149,7 +149,7 @@ func (v *CachingVolume) PersistToCache(ctx context.Context) error {
 		return fmt.Errorf("compression failed: %w", compressErr)
 	}
 
-	v.logger.Info("volume persisted to cache", "volume", v.inner.Name())
+	v.logger.Info("volume.persisted.success", "volume", v.inner.Name())
 
 	return nil
 }
@@ -159,7 +159,7 @@ func (v *CachingVolume) PersistToCache(ctx context.Context) error {
 func (v *CachingVolume) Cleanup(ctx context.Context) error {
 	// Persist to cache before cleanup
 	if err := v.PersistToCache(ctx); err != nil {
-		v.logger.Warn("failed to persist volume to cache",
+		v.logger.Warn("volume.persist.failed",
 			"volume", v.inner.Name(),
 			"error", err,
 		)

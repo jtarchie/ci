@@ -109,7 +109,7 @@ func (d *DigitalOcean) ensureDroplet(ctx context.Context, containerLimits orches
 		return nil
 	}
 
-	d.logger.Info("digitalocean.droplet.creating")
+	d.logger.Info("digitalocean.droplet.create")
 
 	// Generate SSH key for this session
 	sshKeyID, sshKeyPath, err := d.ensureSSHKey(ctx)
@@ -171,7 +171,7 @@ func (d *DigitalOcean) ensureDroplet(ctx context.Context, containerLimits orches
 	// Store droplet immediately so Close() can clean it up even if subsequent steps fail
 	d.droplet = droplet
 
-	d.logger.Info("digitalocean.droplet.created", "id", droplet.ID, "name", dropletName)
+	d.logger.Info("droplet.create.success", "id", droplet.ID, "name", dropletName)
 
 	// Wait for droplet to become active and get its public IP
 	droplet, err = d.waitForDroplet(ctx, droplet.ID)
@@ -200,7 +200,7 @@ func (d *DigitalOcean) ensureDroplet(ctx context.Context, containerLimits orches
 	}
 
 	// Create docker driver connected to the droplet via Go's SSH library
-	d.logger.Info("digitalocean.docker.connecting", "ip", publicIP)
+	d.logger.Info("digitalocean.docker.connect", "ip", publicIP)
 
 	dockerDriver, err := docker.NewDockerWithSSH(d.namespace, d.logger, d.sshClient)
 	if err != nil {
@@ -208,7 +208,7 @@ func (d *DigitalOcean) ensureDroplet(ctx context.Context, containerLimits orches
 	}
 
 	d.dockerDriver = dockerDriver
-	d.logger.Info("digitalocean.docker.connected")
+	d.logger.Info("digitalocean.docker.connected.success")
 
 	return nil
 }
@@ -233,7 +233,7 @@ func (d *DigitalOcean) determineDropletSize(limits orchestra.ContainerLimits) st
 	memoryMB := limits.Memory / (1024 * 1024) // Convert bytes to MB
 	cpuShares := limits.CPU
 
-	d.logger.Debug("digitalocean.size.auto",
+	d.logger.Debug("digitalocean.size",
 		"memory_mb", memoryMB,
 		"cpu_shares", cpuShares,
 	)
@@ -281,7 +281,7 @@ func (d *DigitalOcean) ensureSSHKey(ctx context.Context) (int, string, error) {
 			// Key exists in DO but not locally, delete and recreate
 			_, err = d.client.Keys.DeleteByID(ctx, key.ID)
 			if err != nil {
-				d.logger.Warn("digitalocean.ssh_key.delete_failed", "err", err)
+				d.logger.Warn("digitalocean.ssh_key.delete.failed", "err", err)
 			}
 
 			break
@@ -324,7 +324,7 @@ func (d *DigitalOcean) ensureSSHKey(ctx context.Context) (int, string, error) {
 		return 0, "", fmt.Errorf("failed to create SSH key in DO: %w", err)
 	}
 
-	d.logger.Info("digitalocean.ssh_key.created", "name", keyName, "id", key.ID)
+	d.logger.Info("digitalocean.ssh_key.create.success", "name", keyName, "id", key.ID)
 
 	return key.ID, sshKeyPath, nil
 }
@@ -345,12 +345,12 @@ func (d *DigitalOcean) waitForDroplet(ctx context.Context, dropletID int) (*godo
 		case <-ticker.C:
 			droplet, _, err := d.client.Droplets.Get(ctx, dropletID)
 			if err != nil {
-				d.logger.Warn("digitalocean.droplet.poll_error", "err", err)
+				d.logger.Warn("digitalocean.droplet.poll.error", "err", err)
 
 				continue
 			}
 
-			d.logger.Debug("digitalocean.droplet.status", "status", droplet.Status)
+			d.logger.Debug("digitalocean.droplet.poll", "status", droplet.Status)
 
 			if droplet.Status == "active" {
 				return droplet, nil
@@ -408,7 +408,7 @@ func (d *DigitalOcean) waitForSSH(ctx context.Context, ip string) error {
 
 		conn, err := ssh.Dial("tcp", ip+":22", config)
 		if err != nil {
-			d.logger.Debug("digitalocean.ssh.connecting", "ip", ip, "err", err)
+			d.logger.Debug("digitalocean.ssh.connect.error", "ip", ip, "err", err)
 			time.Sleep(5 * time.Second)
 
 			continue
@@ -416,7 +416,7 @@ func (d *DigitalOcean) waitForSSH(ctx context.Context, ip string) error {
 
 		// Store the connection for reuse by waitForDocker
 		d.sshClient = conn
-		d.logger.Info("digitalocean.ssh.connected")
+		d.logger.Info("digitalocean.ssh.connect.success")
 
 		return nil
 	}
@@ -425,7 +425,7 @@ func (d *DigitalOcean) waitForSSH(ctx context.Context, ip string) error {
 // waitForDocker polls until Docker is accessible on the droplet.
 // Uses the existing SSH client connection established in waitForSSH.
 func (d *DigitalOcean) waitForDocker(ctx context.Context) error {
-	d.logger.Info("digitalocean.docker.waiting")
+	d.logger.Info("digitalocean.docker.wait")
 
 	// Get configurable timeout
 	dockerTimeoutStr := orchestra.GetParam(d.params, "docker_timeout", "DIGITALOCEAN_DOCKER_TIMEOUT", "")
@@ -456,7 +456,7 @@ func (d *DigitalOcean) waitForDocker(ctx context.Context) error {
 
 		session, err := d.sshClient.NewSession()
 		if err != nil {
-			d.logger.Debug("digitalocean.docker.session_error", "err", err)
+			d.logger.Debug("digitalocean.docker.session.error", "err", err)
 			time.Sleep(5 * time.Second)
 
 			continue
@@ -466,13 +466,13 @@ func (d *DigitalOcean) waitForDocker(ctx context.Context) error {
 		_ = session.Close()
 
 		if err != nil {
-			d.logger.Debug("digitalocean.docker.check_error", "err", err, "output", string(output))
+			d.logger.Debug("digitalocean.docker.check.error", "err", err, "output", string(output))
 			time.Sleep(5 * time.Second)
 
 			continue
 		}
 
-		d.logger.Info("digitalocean.docker.ready")
+		d.logger.Info("digitalocean.docker.ready.success")
 
 		return nil
 	}
@@ -509,7 +509,7 @@ func (d *DigitalOcean) CreateVolume(ctx context.Context, name string, size int) 
 
 		parsedSize, err := strconv.Atoi(diskSizeStr)
 		if err != nil {
-			d.logger.Warn("digitalocean.volume.invalid_disk_size", "value", diskSizeStr, "err", err)
+			d.logger.Warn("digitalocean.volume.parse.error", "value", diskSizeStr, "err", err)
 			parsedSize = DefaultDiskSizeGB
 		}
 
@@ -528,43 +528,43 @@ func (d *DigitalOcean) Close() error {
 	// Close docker driver first
 	if d.dockerDriver != nil {
 		if err := d.dockerDriver.Close(); err != nil {
-			d.logger.Warn("digitalocean.docker.close_error", "err", err)
+			d.logger.Warn("digitalocean.docker.close.error", "err", err)
 		}
 	}
 
 	// Close SSH client
 	if d.sshClient != nil {
 		if err := d.sshClient.Close(); err != nil {
-			d.logger.Warn("digitalocean.ssh.close_error", "err", err)
+			d.logger.Warn("digitalocean.ssh.close.error", "err", err)
 		}
 	}
 
 	// Delete droplet
 	if d.droplet != nil {
-		d.logger.Info("digitalocean.droplet.deleting", "id", d.droplet.ID)
+		d.logger.Info("digitalocean.droplet.delete", "id", d.droplet.ID)
 
 		_, err := d.client.Droplets.Delete(ctx, d.droplet.ID)
 		if err != nil {
-			d.logger.Error("digitalocean.droplet.delete_error", "err", err)
+			d.logger.Error("digitalocean.droplet.delete.error", "err", err)
 
 			return fmt.Errorf("failed to delete droplet: %w", err)
 		}
 
-		d.logger.Info("digitalocean.droplet.deleted", "id", d.droplet.ID)
+		d.logger.Info("digitalocean.droplet.delete.success", "id", d.droplet.ID)
 	}
 
 	// Delete SSH key from Digital Ocean
 	if d.sshKeyID != 0 {
 		_, err := d.client.Keys.DeleteByID(ctx, d.sshKeyID)
 		if err != nil {
-			d.logger.Warn("digitalocean.ssh_key.delete_error", "err", err)
+			d.logger.Warn("digitalocean.ssh_key.delete.failed", "err", err)
 		}
 	}
 
 	// Delete local SSH key file
 	if d.sshKeyPath != "" {
 		if err := os.Remove(d.sshKeyPath); err != nil && !os.IsNotExist(err) {
-			d.logger.Warn("digitalocean.ssh_key.local_delete_error", "err", err)
+			d.logger.Warn("digitalocean.ssh_key.delete.failed", "err", err)
 		}
 	}
 
@@ -589,13 +589,13 @@ func CleanupOrphanedResources(ctx context.Context, token string, logger *slog.Lo
 	}
 
 	for _, droplet := range droplets {
-		logger.Info("digitalocean.cleanup.deleting_droplet", "id", droplet.ID, "name", droplet.Name, "tag", tag)
+		logger.Info("digitalocean.cleanup.delete", "id", droplet.ID, "name", droplet.Name, "tag", tag)
 
 		_, err := client.Droplets.Delete(ctx, droplet.ID)
 		if err != nil {
-			logger.Warn("digitalocean.cleanup.droplet_delete_error", "id", droplet.ID, "err", err)
+			logger.Warn("digitalocean.cleanup.droplet.delete.error", "id", droplet.ID, "err", err)
 		} else {
-			logger.Info("digitalocean.cleanup.droplet_deleted", "id", droplet.ID)
+			logger.Info("digitalocean.cleanup.droplet.deleted.success", "id", droplet.ID)
 		}
 	}
 
@@ -613,13 +613,13 @@ func CleanupOrphanedResources(ctx context.Context, token string, logger *slog.Lo
 
 	for _, key := range keys {
 		if strings.HasPrefix(key.Name, keyPrefix) {
-			logger.Info("digitalocean.cleanup.deleting_ssh_key", "id", key.ID, "name", key.Name)
+			logger.Info("digitalocean.cleanup.ssh_key.delete", "id", key.ID, "name", key.Name)
 
 			_, err := client.Keys.DeleteByID(ctx, key.ID)
 			if err != nil {
-				logger.Warn("digitalocean.cleanup.ssh_key_delete_error", "id", key.ID, "err", err)
+				logger.Warn("digitalocean.cleanup.ssh_key.delete.error", "id", key.ID, "err", err)
 			} else {
-				logger.Info("digitalocean.cleanup.ssh_key_deleted", "id", key.ID)
+				logger.Info("digitalocean.cleanup.ssh_key.delete.success", "id", key.ID)
 			}
 		}
 	}

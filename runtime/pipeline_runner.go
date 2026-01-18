@@ -28,7 +28,7 @@ func NewPipelineRunner(
 	return &PipelineRunner{
 		client:  client,
 		ctx:     ctx,
-		logger:  logger.WithGroup("pipeline.runner"),
+		logger:  logger.WithGroup("pipeline.run"),
 		volumes: []orchestra.Volume{},
 	}
 }
@@ -122,7 +122,7 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 
 	taskID := gonanoid.Must()
 
-	logger = c.logger.With("taskID", taskID, "name", input.Name, "privileged", input.Privileged)
+	logger = c.logger.With("task.id", taskID, "task.name", input.Name, "task.privileged", input.Privileged)
 
 	logger.Debug("container.run")
 
@@ -163,7 +163,7 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 		},
 	)
 	if err != nil {
-		logger.Error("container.run", "err", err)
+		logger.Error("container.run.error", "err", err)
 
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 			return &RunResult{Status: RunAbort}, nil
@@ -196,7 +196,7 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 	defer func() {
 		err := container.Cleanup(ctx)
 		if err != nil {
-			logger.Error("container.cleanup", "err", err)
+			logger.Error("container.cleanup.error", "err", err)
 		}
 	}()
 
@@ -204,7 +204,7 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 
 	err = container.Logs(ctx, stdout, stderr)
 	if err != nil {
-		logger.Error("container.logs", "err", err)
+		logger.Error("container.logs.error", "err", err)
 
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 			return &RunResult{Status: RunAbort}, nil
@@ -236,7 +236,7 @@ func (c *PipelineRunner) CleanupVolumes() error {
 
 		err := volume.Cleanup(ctx)
 		if err != nil {
-			logger.Error("volume.cleanup", "name", volume.Name(), "err", err)
+			logger.Error("volume.cleanup.error", "name", volume.Name(), "err", err)
 			errs = append(errs, err)
 		}
 	}
