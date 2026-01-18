@@ -29,8 +29,8 @@ func (r *Resource) Run(logger *slog.Logger) error {
 		return fmt.Errorf("failed to get resource: %w", err)
 	}
 
-	logger = logger.With("resource", r.Type, "operation", r.Operation)
-	logger.Debug("executing resource operation")
+	logger = logger.With("resource", r.Type, "operation", r.Operation, "event", fmt.Sprintf("%s.%s", r.Type, r.Operation))
+	logger.Debug("resource.operation.executing")
 
 	// Read request from stdin
 	input, err := io.ReadAll(os.Stdin)

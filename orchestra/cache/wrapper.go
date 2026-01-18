@@ -34,7 +34,7 @@ func WrapWithCaching(
 		cacheURL = decodedURL
 	}
 
-	logger.Info("initializing cache layer",
+	logger.Info("cache.initializing",
 		"cache_url", cacheURL,
 		"driver", driver.Name(),
 	)
@@ -72,7 +72,7 @@ func WrapWithCaching(
 
 	// Check if driver supports volume data access
 	if _, ok := driver.(VolumeDataAccessor); !ok {
-		logger.Warn("driver does not support volume data access, caching disabled",
+		logger.Warn("driver.volumeDataAccess.unsupported",
 			"driver", driver.Name(),
 		)
 

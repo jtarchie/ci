@@ -29,7 +29,7 @@ func NewAssert(vm *goja.Runtime, logger *slog.Logger) *Assert {
 	logger.Debug("handler.created")
 
 	return &Assert{
-		logger: logger.WithGroup("assert"),
+		logger: logger.WithGroup("assert.created"),
 		vm:     vm,
 	}
 }
@@ -134,7 +134,7 @@ func (a *Assert) ContainsElement(array []interface{}, element interface{}, messa
 }
 
 func (a *Assert) fail(message string) {
-	a.logger.Error("assertion.failed", "err", message)
+	a.logger.Error("assertion.fail.failed", "err", message)
 	a.vm.Interrupt(fmt.Errorf("%w: %s", ErrAssertion, message))
 }
 

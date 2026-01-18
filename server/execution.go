@@ -27,7 +27,7 @@ func NewExecutionService(store storage.Driver, logger *slog.Logger, maxInFlight 
 
 	return &ExecutionService{
 		store:       store,
-		logger:      logger.WithGroup("executor"),
+		logger:      logger.WithGroup("executor.run"),
 		maxInFlight: maxInFlight,
 	}
 }
@@ -74,6 +74,7 @@ func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *stor
 
 	ctx := context.Background()
 	logger := s.logger.With(
+		"event", "pipeline.execute",
 		"run_id", run.ID,
 		"pipeline_id", pipeline.ID,
 		"pipeline_name", pipeline.Name,
@@ -82,11 +83,11 @@ func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *stor
 	// Update status to running
 	err := s.store.UpdateRunStatus(ctx, run.ID, storage.RunStatusRunning, "")
 	if err != nil {
-		logger.Error("failed to update run status to running", "error", err)
+		logger.Error("run.update.failed", "error", err)
 		return
 	}
 
-	logger.Info("starting pipeline execution")
+	logger.Info("pipeline.execute.start")
 
 	// Determine driver DSN - use pipeline's if set, otherwise default to docker
 	driverDSN := pipeline.DriverDSN
@@ -102,11 +103,11 @@ func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *stor
 
 	err = runtime.ExecutePipeline(ctx, pipeline.Content, driverDSN, s.store, logger, opts)
 	if err != nil {
-		logger.Error("pipeline execution failed", "error", err)
+		logger.Error("pipeline.execute.failed", "error", err)
 
 		updateErr := s.store.UpdateRunStatus(ctx, run.ID, storage.RunStatusFailed, err.Error())
 		if updateErr != nil {
-			logger.Error("failed to update run status to failed", "error", updateErr)
+			logger.Error("run.update.failed", "error", updateErr)
 		}
 
 		return
@@ -115,9 +116,9 @@ func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *stor
 	// Update status to success
 	err = s.store.UpdateRunStatus(ctx, run.ID, storage.RunStatusSuccess, "")
 	if err != nil {
-		logger.Error("failed to update run status to success", "error", err)
+		logger.Error("run.update.failed", "error", err)
 		return
 	}
 
-	logger.Info("pipeline execution completed successfully")
+	logger.Info("pipeline.execute.success")
 }

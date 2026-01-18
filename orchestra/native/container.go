@@ -92,7 +92,7 @@ func (n *Native) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 	for _, mount := range task.Mounts {
 		volume, err := n.CreateVolume(ctx, mount.Name, 0)
 		if err != nil {
-			logger.Error("volume.create", "name", mount.Name, "err", err)
+			logger.Error("volume.create.failed", "name", mount.Name, "err", err)
 
 			return nil, fmt.Errorf("failed to create volume: %w", err)
 		}
@@ -101,7 +101,7 @@ func (n *Native) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 
 		err = os.Symlink(nativeVolume.path, filepath.Join(dir, mount.Path))
 		if err != nil {
-			logger.Error("volume.create", "name", mount.Name, "err", err)
+			logger.Error("volume.create.failed", "name", mount.Name, "err", err)
 
 			return nil, fmt.Errorf("failed to create symlink: %w", err)
 		}
@@ -130,21 +130,21 @@ func (n *Native) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 	}
 
 	if task.Image != "" {
-		logger.Warn("orchestra.native", "warn", "image is not supported in native mode", "image", task.Image)
+		logger.Warn("orchestra.native.image.unsupported", "image", task.Image)
 	}
 
 	if task.User != "" {
-		logger.Warn("orchestra.native", "warn", "user is not supported in native mode", "user", task.User)
+		logger.Warn("orchestra.native.user.unsupported", "user", task.User)
 	}
 
 	if task.Privileged {
-		logger.Warn("orchestra.native", "warn", "privileged is not supported in native mode")
+		logger.Warn("orchestra.native.privileged.unsupported", "msg", "privileged is not supported in native mode")
 	}
 
 	go func() {
 		err := command.Run()
 		if err != nil {
-			logger.Error("orchestra.native", "err", err)
+			logger.Error("orchestra.native.run.failed", "err", err)
 
 			errChan <- fmt.Errorf("failed to run command: %w", err)
 

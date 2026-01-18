@@ -31,7 +31,7 @@ type pipelineRequest struct {
 }
 
 func (c *SetPipeline) Run(logger *slog.Logger) error {
-	logger = logger.WithGroup("set-pipeline")
+	logger = logger.WithGroup("pipeline.set")
 
 	// Determine pipeline name from filename if not provided
 	name := c.Name
@@ -41,7 +41,7 @@ func (c *SetPipeline) Run(logger *slog.Logger) error {
 		name = strings.TrimSuffix(base, ext)
 	}
 
-	logger.Info("reading pipeline", "file", c.Pipeline, "name", name)
+	logger.Info("pipeline.read", "file", c.Pipeline, "name", name)
 
 	// Read the pipeline file
 	content, err := os.ReadFile(c.Pipeline)
@@ -57,7 +57,7 @@ func (c *SetPipeline) Run(logger *slog.Logger) error {
 	switch ext {
 	case ".yml", ".yaml":
 		// Transpile YAML to TypeScript first
-		logger.Info("transpiling YAML to TypeScript")
+		logger.Info("pipeline.transpile")
 
 		tsContent, err := backwards.NewPipeline(c.Pipeline)
 		if err != nil {
@@ -79,20 +79,20 @@ func (c *SetPipeline) Run(logger *slog.Logger) error {
 	}
 
 	// Validate the pipeline syntax locally before uploading
-	logger.Info("validating pipeline syntax")
+	logger.Info("pipeline.validate")
 
 	_, err = runtime.TranspileAndValidate(finalContent)
 	if err != nil {
 		return fmt.Errorf("pipeline validation failed: %w", err)
 	}
 
-	logger.Info("pipeline syntax is valid")
+	logger.Info("pipeline.validate.success")
 
 	// Upload to server
 	serverURL := strings.TrimSuffix(c.ServerURL, "/")
 	endpoint := serverURL + "/api/pipelines"
 
-	logger.Info("uploading pipeline to server", "url", endpoint)
+	logger.Info("pipeline.upload", "url", endpoint)
 
 	reqBody := pipelineRequest{
 		Name:      name,
@@ -133,7 +133,7 @@ func (c *SetPipeline) Run(logger *slog.Logger) error {
 		return fmt.Errorf("could not parse response: %w", err)
 	}
 
-	logger.Info("pipeline uploaded successfully",
+	logger.Info("pipeline.upload.success",
 		"id", pipeline.ID,
 		"name", pipeline.Name,
 	)

@@ -485,7 +485,7 @@ skipUser:
 			FieldSelector: fmt.Sprintf("metadata.name=%s", podName),
 		})
 		if err != nil {
-			logger.Error("pod.watch", "name", podName, "err", err)
+			logger.Error("pod.watch.failed", "name", podName, "err", err)
 			return nil, fmt.Errorf("failed to watch pod: %w", err)
 		}
 		defer watcher.Stop()
@@ -499,7 +499,7 @@ skipUser:
 					continue
 				}
 
-				logger.Debug("pod.status", "name", podName, "phase", p.Status.Phase, "containers", len(p.Status.ContainerStatuses))
+				logger.Debug("pod.status.update", "name", podName, "phase", p.Status.Phase, "containers", len(p.Status.ContainerStatuses))
 
 				// Check if pod is running and at least one container is ready
 				if p.Status.Phase == corev1.PodRunning {
@@ -518,7 +518,7 @@ skipUser:
 				// If the pod completed very quickly (before we could see it running),
 				// that's okay - we can still attach (though stdin may not work)
 				if p.Status.Phase == corev1.PodSucceeded {
-					logger.Debug("pod.completed.quickly", "name", podName)
+					logger.Debug("pod.completed", "name", podName, "state", "quickly")
 					podRunning = true
 					break
 				}
@@ -556,7 +556,7 @@ skipUser:
 
 		exec, err := remotecommand.NewSPDYExecutor(k.config, "POST", req.URL())
 		if err != nil {
-			logger.Error("pod.attach.executor", "name", podName, "err", err)
+			logger.Error("pod.attach.executor.errored", "name", podName, "err", err)
 			return nil, fmt.Errorf("failed to create attach executor: %w", err)
 		}
 
@@ -565,7 +565,7 @@ skipUser:
 			Stdin: task.Stdin,
 		})
 		if err != nil {
-			logger.Error("pod.attach.stream", "name", podName, "err", err)
+			logger.Error("pod.attach.stream.errored", "name", podName, "err", err)
 			return nil, fmt.Errorf("failed to stream stdin: %w", err)
 		}
 

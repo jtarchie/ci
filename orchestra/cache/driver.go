@@ -28,7 +28,7 @@ func NewCachingDriver(
 ) *CachingDriver {
 	// Check if driver supports volume data access
 	if _, ok := inner.(VolumeDataAccessor); !ok {
-		logger.Warn("driver does not support volume data access, caching disabled",
+		logger.Warn("driver.cache.disabled",
 			"driver", inner.Name(),
 		)
 	}
@@ -76,7 +76,7 @@ func (d *CachingDriver) CreateVolume(ctx context.Context, name string, size int)
 
 	// Eagerly restore from cache
 	if err := cachingVol.RestoreFromCache(ctx); err != nil {
-		d.logger.Warn("failed to restore volume from cache",
+		d.logger.Warn("volume.restore.failed",
 			"volume", name,
 			"error", err,
 		)

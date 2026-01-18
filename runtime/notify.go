@@ -67,7 +67,7 @@ type Notifier struct {
 func NewNotifier(logger *slog.Logger) *Notifier {
 	return &Notifier{
 		configs: make(map[string]NotifyConfig),
-		logger:  logger.WithGroup("notify"),
+		logger:  logger.WithGroup("notifier.send"),
 	}
 }
 
@@ -141,7 +141,7 @@ func (n *Notifier) Send(ctx context.Context, name string, message string) error 
 		return fmt.Errorf("could not render message template: %w", err)
 	}
 
-	n.logger.Debug("sending notification",
+	n.logger.Debug("notification.sending",
 		"name", name,
 		"type", config.Type,
 		"message_length", len(renderedMessage),
@@ -168,7 +168,7 @@ func (n *Notifier) Send(ctx context.Context, name string, message string) error 
 	// Send the notification
 	err = notifier.Send(ctx, "Pipeline Notification", renderedMessage)
 	if err != nil {
-		n.logger.Error("notification failed",
+		n.logger.Error("notification.send.failed",
 			"name", name,
 			"type", config.Type,
 			"error", err,
@@ -177,7 +177,7 @@ func (n *Notifier) Send(ctx context.Context, name string, message string) error 
 		return fmt.Errorf("could not send notification: %w", err)
 	}
 
-	n.logger.Info("notification sent",
+	n.logger.Info("notification.send.success",
 		"name", name,
 		"type", config.Type,
 	)
@@ -315,7 +315,7 @@ func (nr *NotifyRuntime) Send(input NotifyInput) *goja.Promise {
 		go func() {
 			err := nr.notifier.Send(nr.ctx, input.Name, input.Message)
 			if err != nil {
-				nr.notifier.logger.Error("async notification failed",
+				nr.notifier.logger.Error("notification.send.failed",
 					"name", input.Name,
 					"error", err,
 				)

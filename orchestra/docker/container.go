@@ -214,7 +214,7 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 
 	err = d.client.ContainerStart(ctx, response.ID, container.StartOptions{})
 	if err != nil {
-		logger.Error("container.start", "name", containerName, "err", err)
+		logger.Error("container.start.error", "name", containerName, "err", err)
 
 		return nil, fmt.Errorf("failed to start container: %w", err)
 	}

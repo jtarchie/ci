@@ -124,7 +124,7 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 	registry := require.NewRegistry()
 	registry.Enable(jsVM)
 	registry.RegisterNativeModule("console", console.RequireWithPrinter(&printer{
-		logger: j.logger.WithGroup("console"),
+		logger: j.logger.WithGroup("console.log"),
 	}))
 
 	_ = jsVM.Set("console", require.Require(jsVM, "console"))
@@ -218,7 +218,7 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 	// Cleanup volumes after pipeline completes - this triggers cache persistence
 	err = runner.CleanupVolumes()
 	if err != nil {
-		j.logger.Error("volume.cleanup", "err", err)
+		j.logger.Error("volume.cleanup.failed", "err", err)
 		// Don't fail the pipeline on volume cleanup errors, just log
 	}
 

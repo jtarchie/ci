@@ -48,7 +48,7 @@ func ExecutePipeline(
 		"driver", driverDSN,
 	)
 
-	logger.Info("initializing driver")
+	logger.Info("driver.initialize")
 
 	driverConfig, orchestrator, err := orchestra.GetFromDSN(driverDSN)
 	if err != nil {
@@ -72,7 +72,7 @@ func ExecutePipeline(
 		return fmt.Errorf("could not initialize cache layer: %w", err)
 	}
 
-	logger.Info("executing pipeline")
+	logger.Info("pipeline.executing")
 
 	js := NewJS(logger)
 
@@ -83,7 +83,7 @@ func ExecutePipeline(
 		return fmt.Errorf("could not execute pipeline: %w", err)
 	}
 
-	logger.Info("pipeline completed successfully")
+	logger.Info("pipeline.completed.success")
 
 	return nil
 }
