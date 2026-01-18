@@ -48,11 +48,11 @@ func (c *PipelineRunner) CreateVolume(input VolumeInput) (*VolumeResult, error) 
 	ctx := c.ctx
 
 	logger := c.logger
-	logger.Debug("volume.create", "input", input)
+	logger.Debug("volume.create.request", "input", input)
 
 	volume, err := c.client.CreateVolume(ctx, input.Name, input.Size)
 	if err != nil {
-		logger.Error("volume.create", "err", err)
+		logger.Error("volume.create.error", "err", err)
 
 		return nil, fmt.Errorf("could not create volume: %w", err)
 	}
@@ -124,7 +124,7 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 
 	logger = c.logger.With("task.id", taskID, "task.name", input.Name, "task.privileged", input.Privileged)
 
-	logger.Debug("container.run")
+	logger.Debug("container.run.start")
 
 	var mounts orchestra.Mounts
 	for path, volume := range input.Mounts {
@@ -134,7 +134,7 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 		})
 	}
 
-	logger.Debug("container.run", "mounts", mounts)
+	logger.Debug("container.run.mounts", "mounts", mounts)
 
 	command := []string{input.Command.Path}
 	command = append(command, input.Command.Args...)
@@ -163,7 +163,7 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 		},
 	)
 	if err != nil {
-		logger.Error("container.run.error", "err", err)
+		logger.Error("container.run.create_error", "err", err)
 
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 			return &RunResult{Status: RunAbort}, nil

@@ -281,7 +281,7 @@ func (d *DigitalOcean) ensureSSHKey(ctx context.Context) (int, string, error) {
 			// Key exists in DO but not locally, delete and recreate
 			_, err = d.client.Keys.DeleteByID(ctx, key.ID)
 			if err != nil {
-				d.logger.Warn("digitalocean.ssh_key.delete.failed", "err", err)
+				d.logger.Warn("digitalocean.ssh_key.delete.remote_failed", "err", err)
 			}
 
 			break
@@ -557,14 +557,14 @@ func (d *DigitalOcean) Close() error {
 	if d.sshKeyID != 0 {
 		_, err := d.client.Keys.DeleteByID(ctx, d.sshKeyID)
 		if err != nil {
-			d.logger.Warn("digitalocean.ssh_key.delete.failed", "err", err)
+			d.logger.Warn("digitalocean.ssh_key.delete.remote_failed_on_close", "err", err)
 		}
 	}
 
 	// Delete local SSH key file
 	if d.sshKeyPath != "" {
 		if err := os.Remove(d.sshKeyPath); err != nil && !os.IsNotExist(err) {
-			d.logger.Warn("digitalocean.ssh_key.delete.failed", "err", err)
+			d.logger.Warn("digitalocean.ssh_key.delete.local_failed", "err", err)
 		}
 	}
 
