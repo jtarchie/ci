@@ -11,7 +11,7 @@ require (
 	github.com/containerd/errdefs v1.0.0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/digitalocean/godo v1.172.0
-	github.com/docker/cli v29.1.4+incompatible
+	github.com/docker/cli v29.1.5+incompatible
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/dop251/goja v0.0.0-20260106131823-651366fbe6e3
 	github.com/dop251/goja_nodejs v0.0.0-20251015164255-5e94316bedaf
@@ -21,8 +21,8 @@ require (
 	github.com/go-playground/validator/v10 v10.30.1
 	github.com/go-task/slim-sprig/v3 v3.0.0
 	github.com/goccy/go-yaml v1.19.2
-	github.com/hetznercloud/hcloud-go/v2 v2.34.0
-	github.com/klauspost/compress v1.18.2
+	github.com/hetznercloud/hcloud-go/v2 v2.35.0
+	github.com/klauspost/compress v1.18.3
 	github.com/labstack/echo/v4 v4.15.0
 	github.com/lmittmann/tint v1.1.2
 	github.com/matoous/go-nanoid/v2 v2.1.0
@@ -37,7 +37,7 @@ require (
 	k8s.io/apimachinery v0.35.0
 	k8s.io/client-go v0.35.0
 	k8s.io/utils v0.0.0-20260108192941-914a6e750570
-	modernc.org/sqlite v1.44.0
+	modernc.org/sqlite v1.44.2
 )
 
 require (
@@ -103,7 +103,7 @@ require (
 	github.com/google/gnostic-models v0.7.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/go-querystring v1.2.0 // indirect
-	github.com/google/pprof v0.0.0-20260111202518-71be6bfdd440 // indirect
+	github.com/google/pprof v0.0.0-20260115054156-294ebfa9ad83 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
@@ -136,7 +136,7 @@ require (
 	github.com/prometheus/procfs v0.19.2 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/sergi/go-diff v1.4.0 // indirect
-	github.com/sirupsen/logrus v1.9.3 // indirect
+	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/skeema/knownhosts v1.3.2 // indirect
 	github.com/slack-go/slack v0.17.3 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
@@ -170,7 +170,7 @@ require (
 	gotest.tools/v3 v3.4.0 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20251125145642-4e65d59e963e // indirect
-	modernc.org/libc v1.67.4 // indirect
+	modernc.org/libc v1.67.6 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
