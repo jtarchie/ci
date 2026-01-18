@@ -198,7 +198,7 @@ func (r *ResumableRunner) runStep(stepID string, input RunInput) (*RunResult, er
 	}
 	r.state.SetStep(step)
 	if err := r.saveState(); err != nil {
-		r.logger.Error("resume.save_state_failed", "stepID", stepID, "err", err)
+		r.logger.Error("resume.save_state_failed.running", "stepID", stepID, "err", err)
 	}
 
 	// Build mounts
@@ -239,7 +239,7 @@ func (r *ResumableRunner) runStep(stepID string, input RunInput) (*RunResult, er
 		},
 	)
 	if err != nil {
-		r.logger.Error("container.run.failed", "err", err)
+		r.logger.Error("container.run.create_failed", "err", err)
 
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 			step.Status = StepStatusAborted
@@ -316,7 +316,7 @@ func (r *ResumableRunner) runStep(stepID string, input RunInput) (*RunResult, er
 	}
 
 	if err := r.saveState(); err != nil {
-		r.logger.Error("resume.save_state_failed", "stepID", stepID, "err", err)
+		r.logger.Error("resume.save_state_failed.completed", "stepID", stepID, "err", err)
 	}
 
 	// Clean up container
