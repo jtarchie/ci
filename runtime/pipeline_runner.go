@@ -7,29 +7,37 @@ import (
 	"io"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jtarchie/ci/orchestra"
-	gonanoid "github.com/matoous/go-nanoid/v2"
 )
 
 type PipelineRunner struct {
-	client  orchestra.Driver
-	ctx     context.Context //nolint: containedctx
-	logger  *slog.Logger
-	volumes []orchestra.Volume
+	client    orchestra.Driver
+	ctx       context.Context //nolint: containedctx
+	logger    *slog.Logger
+	volumes   []orchestra.Volume
+	namespace string
+	runID     string
+	mu        sync.Mutex // Protects callIndex
+	callIndex int        // Tracks how many times Run() has been called
 }
 
 func NewPipelineRunner(
 	ctx context.Context,
 	client orchestra.Driver,
 	logger *slog.Logger,
+	namespace string,
+	runID string,
 ) *PipelineRunner {
 	return &PipelineRunner{
-		client:  client,
-		ctx:     ctx,
-		logger:  logger.WithGroup("pipeline.run"),
-		volumes: []orchestra.Volume{},
+		client:    client,
+		ctx:       ctx,
+		logger:    logger.WithGroup("pipeline.run"),
+		volumes:   []orchestra.Volume{},
+		namespace: namespace,
+		runID:     runID,
 	}
 }
 
@@ -120,7 +128,13 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 		}
 	}
 
-	taskID := gonanoid.Must()
+	// Create deterministic task ID for consistent container naming
+	// Use callIndex to ensure uniqueness even when task names are reused
+	c.mu.Lock()
+	stepID := fmt.Sprintf("%d-%s", c.callIndex, input.Name)
+	c.callIndex++
+	c.mu.Unlock()
+	taskID := DeterministicTaskID(c.namespace, c.runID, stepID, input.Name)
 
 	logger = c.logger.With("task.id", taskID, "task.name", input.Name, "task.privileged", input.Privileged)
 

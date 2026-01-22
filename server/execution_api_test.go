@@ -152,9 +152,9 @@ func TestExecutionAPI(t *testing.T) {
 				defer func() { _ = client.Close() }()
 
 				// Create multiple pipelines
-				pipeline1, err := client.SavePipeline(context.Background(), "pipeline-1", "export const pipeline = async () => {};", "docker://")
+				pipeline1, err := client.SavePipeline(context.Background(), "pipeline-1", "export const pipeline = async () => { console.log('pipeline 1'); };", "docker://")
 				assert.Expect(err).NotTo(HaveOccurred())
-				pipeline2, err := client.SavePipeline(context.Background(), "pipeline-2", "export const pipeline = async () => {};", "docker://")
+				pipeline2, err := client.SavePipeline(context.Background(), "pipeline-2", "export const pipeline = async () => { console.log('pipeline 2'); };", "docker://")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				// Set max-in-flight to 0 - should reject all new executions

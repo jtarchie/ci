@@ -8,7 +8,6 @@ import (
 	"github.com/jtarchie/ci/orchestra"
 	"github.com/jtarchie/ci/orchestra/cache"
 	"github.com/jtarchie/ci/storage"
-	gonanoid "github.com/matoous/go-nanoid/v2"
 )
 
 // ExecutorOptions configures pipeline execution.
@@ -21,6 +20,8 @@ type ExecutorOptions struct {
 	// PipelineID is the unique identifier for this pipeline.
 	// Used to scope resource versions to a specific pipeline.
 	PipelineID string
+	// Namespace is the namespace for this execution (internal use).
+	Namespace string
 }
 
 // ExecutePipeline executes a pipeline with the given content and driver DSN.
@@ -38,7 +39,7 @@ func ExecutePipeline(
 	}
 
 	// Generate a namespace for this execution
-	namespace := "ci-" + gonanoid.Must()
+	namespace := "ci-" + UniqueID()
 	if opts.RunID != "" {
 		namespace = "ci-" + opts.RunID
 	}
@@ -77,6 +78,7 @@ func ExecutePipeline(
 	js := NewJS(logger)
 
 	executeOpts := ExecuteOptions(opts)
+	executeOpts.Namespace = namespace
 
 	err = js.ExecuteWithOptions(ctx, content, driver, store, executeOpts)
 	if err != nil {

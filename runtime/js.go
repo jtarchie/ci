@@ -26,6 +26,8 @@ type ExecuteOptions struct {
 	// PipelineID is the unique identifier for this pipeline.
 	// Used to scope resource versions to a specific pipeline.
 	PipelineID string
+	// Namespace is the namespace for this execution.
+	Namespace string
 }
 
 type JS struct {
@@ -84,7 +86,7 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 	var runner Runner
 
 	if opts.Resume {
-		resumableRunner, err := NewResumableRunner(ctx, driver, storage, j.logger, ResumeOptions{
+		resumableRunner, err := NewResumableRunner(ctx, driver, storage, j.logger, opts.Namespace, ResumeOptions{
 			RunID:  opts.RunID,
 			Resume: opts.Resume,
 		})
@@ -93,7 +95,7 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 		}
 		runner = resumableRunner
 	} else {
-		runner = NewPipelineRunner(ctx, driver, j.logger)
+		runner = NewPipelineRunner(ctx, driver, j.logger, opts.Namespace, opts.RunID)
 	}
 
 	finalSource, err := TranspileAndValidate(source)
@@ -139,7 +141,7 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 		return fmt.Errorf("could not set YAML: %w", err)
 	}
 
-	runtime := NewRuntime(jsVM, runner)
+	runtime := NewRuntime(jsVM, runner, opts.Namespace, opts.RunID)
 
 	err = jsVM.Set("runtime", runtime)
 	if err != nil {

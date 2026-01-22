@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/georgysavva/scany/v2/sqlscan"
+	"github.com/jtarchie/ci/runtime"
 	"github.com/jtarchie/ci/storage"
-	gonanoid "github.com/matoous/go-nanoid/v2"
 	"github.com/samber/lo"
 	_ "modernc.org/sqlite"
 )
@@ -213,7 +213,7 @@ func (s *Sqlite) Close() error {
 
 // SavePipeline creates or updates a pipeline in the database.
 func (s *Sqlite) SavePipeline(ctx context.Context, name, content, driverDSN string) (*storage.Pipeline, error) {
-	id := gonanoid.Must()
+	id := runtime.PipelineID(content)
 	now := time.Now().UTC()
 
 	_, err := s.writer.ExecContext(ctx, `
@@ -312,7 +312,7 @@ func (s *Sqlite) DeletePipeline(ctx context.Context, id string) error {
 
 // SaveRun creates a new pipeline run record.
 func (s *Sqlite) SaveRun(ctx context.Context, pipelineID string) (*storage.PipelineRun, error) {
-	id := gonanoid.Must()
+	id := runtime.UniqueID()
 	now := time.Now().UTC()
 
 	_, err := s.writer.ExecContext(ctx, `
