@@ -5,28 +5,35 @@ import (
 	"sync"
 
 	"github.com/dop251/goja"
-	gonanoid "github.com/matoous/go-nanoid/v2"
 )
 
 type Runtime struct {
-	jsVM     *goja.Runtime
-	promises *sync.WaitGroup
-	runner   Runner
-	tasks    chan func() error
+	jsVM        *goja.Runtime
+	promises    *sync.WaitGroup
+	runner      Runner
+	tasks       chan func() error
+	namespace   string
+	runID       string
+	mu          sync.Mutex // Protects volumeIndex
+	volumeIndex int        // Counter for unnamed volumes
 }
 
 func NewRuntime(
 	jsVM *goja.Runtime,
 	runner Runner,
+	namespace string,
+	runID string,
 ) *Runtime {
 	promises := &sync.WaitGroup{}
 	tasks := make(chan func() error, 1)
 
 	return &Runtime{
-		jsVM:     jsVM,
-		promises: promises,
-		runner:   runner,
-		tasks:    tasks,
+		jsVM:      jsVM,
+		promises:  promises,
+		runner:    runner,
+		tasks:     tasks,
+		namespace: namespace,
+		runID:     runID,
 	}
 }
 
@@ -64,7 +71,12 @@ func (r *Runtime) Run(input RunInput) *goja.Promise {
 
 func (r *Runtime) CreateVolume(input VolumeInput) *goja.Promise {
 	if input.Name == "" {
-		input.Name = gonanoid.Must()
+		// Generate deterministic volume name using counter
+		r.mu.Lock()
+		volumeID := fmt.Sprintf("vol-%d", r.volumeIndex)
+		r.volumeIndex++
+		r.mu.Unlock()
+		input.Name = DeterministicVolumeID(r.namespace, fmt.Sprintf("%s-%s", r.runID, volumeID))
 	}
 
 	promise, resolve, reject := r.jsVM.NewPromise()

@@ -36,7 +36,7 @@ func TestResumeSkipsCompletedSteps(t *testing.T) {
 	t.Run("first run executes all steps", func(t *testing.T) {
 		assert := NewGomegaWithT(t)
 
-		runner, err := runtime.NewResumableRunner(ctx, driver, store, logger, runtime.ResumeOptions{
+		runner, err := runtime.NewResumableRunner(ctx, driver, store, logger, "resume-test-ns", runtime.ResumeOptions{
 			RunID:  runID,
 			Resume: true,
 		})
@@ -85,7 +85,7 @@ func TestResumeSkipsCompletedSteps(t *testing.T) {
 	t.Run("resume skips completed steps", func(t *testing.T) {
 		assert := NewGomegaWithT(t)
 
-		runner, err := runtime.NewResumableRunner(ctx, driver, store, logger, runtime.ResumeOptions{
+		runner, err := runtime.NewResumableRunner(ctx, driver, store, logger, "resume-test-ns", runtime.ResumeOptions{
 			RunID:  runID,
 			Resume: true,
 		})

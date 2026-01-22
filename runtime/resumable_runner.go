@@ -12,7 +12,6 @@ import (
 
 	"github.com/jtarchie/ci/orchestra"
 	storagelib "github.com/jtarchie/ci/storage"
-	gonanoid "github.com/matoous/go-nanoid/v2"
 )
 
 // ResumableRunner wraps PipelineRunner with state persistence and resume capability.
@@ -41,13 +40,15 @@ func NewResumableRunner(
 	client orchestra.Driver,
 	store storagelib.Driver,
 	logger *slog.Logger,
+	namespace string,
 	opts ResumeOptions,
 ) (*ResumableRunner, error) {
-	runner := NewPipelineRunner(ctx, client, logger)
 	runID := opts.RunID
 	if runID == "" {
-		runID = gonanoid.Must()
+		runID = UniqueID()
 	}
+
+	runner := NewPipelineRunner(ctx, client, logger, namespace, runID)
 
 	resumableLogger := logger.WithGroup("resumable.runner").With("runID", runID)
 
@@ -185,8 +186,8 @@ func (r *ResumableRunner) runStep(stepID string, input RunInput) (*RunResult, er
 		}
 	}
 
-	// Create task ID for container tracking
-	taskID := gonanoid.Must()
+	// Create task ID for container tracking (deterministic for consistency across resumes)
+	taskID := DeterministicTaskID(r.runner.namespace, r.state.RunID, stepID, input.Name)
 
 	// Create and persist step state as running
 	step := &StepState{
