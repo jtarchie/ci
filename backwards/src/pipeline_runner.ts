@@ -7,8 +7,26 @@ export class PipelineRunner {
   private executedJobs: string[] = [];
 
   constructor(private config: PipelineConfig) {
+    this.addBuiltInResourceTypes();
     this.validatePipelineConfig();
     this.initializeNotifications();
+  }
+
+  private addBuiltInResourceTypes(): void {
+    // Only registry-image is built-in as it's required for image_resource in tasks
+    const registryImageType: ResourceType = {
+      name: "registry-image",
+      type: "registry-image",
+      source: { repository: "concourse/registry-image-resource" },
+    };
+
+    const exists = this.config.resource_types.some(
+      (type) => type.name === "registry-image",
+    );
+
+    if (!exists) {
+      this.config.resource_types.push(registryImageType);
+    }
   }
 
   private initializeNotifications(): void {

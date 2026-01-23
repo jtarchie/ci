@@ -26,12 +26,24 @@ type RouterOptions struct {
 	MaxInFlight int
 }
 
+// Router wraps echo.Echo and provides access to the execution service.
+type Router struct {
+	*echo.Echo
+	execService *ExecutionService
+}
+
+// WaitForExecutions blocks until all in-flight pipeline executions have completed.
+// This is useful for graceful shutdown or testing.
+func (r *Router) WaitForExecutions() {
+	r.execService.Wait()
+}
+
 // isHtmxRequest checks if the request is from htmx.
 func isHtmxRequest(ctx echo.Context) bool {
 	return ctx.Request().Header.Get("HX-Request") == "true"
 }
 
-func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*echo.Echo, error) {
+func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*Router, error) {
 	router := echo.New()
 
 	// Create execution service
@@ -189,7 +201,7 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 		})
 	})
 
-	return router, nil
+	return &Router{Echo: router, execService: execService}, nil
 }
 
 func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *ExecutionService) {

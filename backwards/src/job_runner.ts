@@ -33,7 +33,7 @@ export class JobRunner {
     private resourceTypes: ResourceType[],
   ) {
     this.buildID = buildID;
-    this.taskRunner = new TaskRunner(this.taskNames);
+    this.taskRunner = new TaskRunner(this.taskNames, this.resources);
   }
 
   async run(): Promise<void> {
@@ -440,6 +440,7 @@ export class JobRunner {
   ): Promise<void> {
     const storageKey = `${this.getBaseStorageKey()}/${pathContext}`;
     let failure: unknown = undefined;
+    const isTryStep = "try" in step;
 
     try {
       storage.set(storageKey, { status: "pending" });
@@ -490,7 +491,8 @@ export class JobRunner {
       await this.processStep(step.ensure, `${pathContext}/ensure`);
     }
 
-    if (failure) {
+    // try steps swallow failures; other steps always re-throw
+    if (failure && !isTryStep) {
       throw failure;
     }
   }
@@ -580,7 +582,8 @@ export class JobRunner {
     // Determine version mode: "latest", "every", or "pinned"
     const versionMode = this.getVersionMode(step);
 
-    // Check if this is a native resource by checking the resource type name
+    // Check if this is a native resource - native resources take priority
+    // even if there's a resource_type definition (e.g., mock resource in native mode)
     const isNative = nativeResources.isNative(resource?.type);
 
     // Scope resource name to pipeline to avoid cross-pipeline version sharing
@@ -694,22 +697,38 @@ export class JobRunner {
       // Register the volume for use by subsequent tasks
       this.taskRunner.getKnownMounts()[resource?.name!] = volume;
 
-      // Use native resource fetch with the volume's absolute path
-      nativeResources.fetch({
-        type: resource?.type!,
-        source: resource?.source!,
-        version: versionToFetch,
-        params: step.params as { [key: string]: unknown },
-        destDir: volume.path,
-      });
-
       // Store in task storage for tracking
       const storageKey = `${this.getBaseStorageKey()}/${pathContext}`;
       storage.set(storageKey, {
-        status: "success",
-        version: versionToFetch,
+        status: "pending",
         resource: resource?.name,
       });
+
+      try {
+        // Use native resource fetch with the volume's absolute path
+        nativeResources.fetch({
+          type: resource?.type!,
+          source: resource?.source!,
+          version: versionToFetch,
+          params: step.params as { [key: string]: unknown },
+          destDir: volume.path,
+        });
+
+        storage.set(storageKey, {
+          status: "success",
+          version: versionToFetch,
+          resource: resource?.name,
+        });
+      } catch (error) {
+        storage.set(storageKey, {
+          status: "error",
+          resource: resource?.name,
+          error: String(error),
+        });
+        throw new Error(
+          `Failed to fetch resource '${resource?.name}': ${error}`,
+        );
+      }
     } else {
       // Container-based resource
       await this.runTask(

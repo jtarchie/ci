@@ -120,6 +120,7 @@ type Step struct {
 	TaskConfig      *TaskConfig      `yaml:"config,omitempty"`
 	ContainerLimits *ContainerLimits `yaml:"container_limits,omitempty"`
 	File            string           `yaml:"file,omitempty"`
+	Image           string           `yaml:"image,omitempty"`
 	Privileged      bool             `yaml:"privileged,omitempty"`
 
 	Get       string    `yaml:"get,omitempty"`
@@ -156,7 +157,12 @@ type Job struct {
 		Execution []string `yaml:"execution,omitempty"`
 	} `yaml:"assert,omitempty"`
 
-	Name      string        `validate:"required,min=5"      yaml:"name,omitempty"`
+	BuildLogRetention *struct {
+		Builds int `yaml:"builds,omitempty"`
+		Days   int `yaml:"days,omitempty"`
+	} `yaml:"build_log_retention,omitempty"`
+
+	Name      string        `validate:"required,min=3"      yaml:"name,omitempty"`
 	Plan      Steps         `validate:"required,min=1,dive" yaml:"plan,omitempty"`
 	Public    bool          `yaml:"public,omitempty"`
 	Ensure    *Step         `yaml:"ensure,omitempty"`
@@ -179,6 +185,7 @@ type ResourceTypes []ResourceType
 
 type Resource struct {
 	Name   string                 `validate:"required"     yaml:"name,omitempty"`
+	Icon   string                 `yaml:"icon,omitempty"`
 	Source map[string]interface{} `yaml:"source,omitempty"`
 	Type   string                 `validate:"required"     yaml:"type,omitempty"`
 }

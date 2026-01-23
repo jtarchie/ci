@@ -17,6 +17,7 @@ type ExecutionService struct {
 	maxInFlight int
 	inFlight    atomic.Int32
 	mu          sync.Mutex
+	wg          sync.WaitGroup
 }
 
 // NewExecutionService creates a new execution service.
@@ -30,6 +31,12 @@ func NewExecutionService(store storage.Driver, logger *slog.Logger, maxInFlight 
 		logger:      logger.WithGroup("executor.run"),
 		maxInFlight: maxInFlight,
 	}
+}
+
+// Wait blocks until all in-flight pipeline executions have completed.
+// This is useful for graceful shutdown or testing.
+func (s *ExecutionService) Wait() {
+	s.wg.Wait()
 }
 
 // CanExecute returns true if a new pipeline can be started.
@@ -60,8 +67,9 @@ func (s *ExecutionService) TriggerPipeline(ctx context.Context, pipeline *storag
 		return nil, err
 	}
 
-	// Increment in-flight counter
+	// Increment in-flight counter and WaitGroup
 	s.inFlight.Add(1)
+	s.wg.Add(1)
 
 	// Launch execution goroutine
 	go s.executePipeline(pipeline, run)
@@ -71,6 +79,7 @@ func (s *ExecutionService) TriggerPipeline(ctx context.Context, pipeline *storag
 
 func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *storage.PipelineRun) {
 	defer s.inFlight.Add(-1)
+	defer s.wg.Done()
 
 	ctx := context.Background()
 	logger := s.logger.With(

@@ -5,6 +5,7 @@ export class TaskRunner {
 
   constructor(
     private taskNames: string[],
+    private resources: Resource[],
   ) {}
 
   async runTask(
@@ -26,6 +27,25 @@ export class TaskRunner {
 
     let result: RunTaskResult;
 
+    // Determine which image to use
+    let image: string;
+    if (step.image) {
+      // Look up the resource and use its repository
+      const resource = this.resources.find((r) => r.name === step.image);
+      if (!resource) {
+        throw new Error(`Image resource '${step.image}' not found`);
+      }
+      if (resource.type !== "registry-image") {
+        throw new Error(
+          `Image resource '${step.image}' must be of type 'registry-image', got '${resource.type}'`,
+        );
+      }
+      image = resource.source.repository;
+    } else {
+      // Fall back to image_resource in config
+      image = step.config?.image_resource.source.repository!;
+    }
+
     try {
       result = await runtime.run({
         command: {
@@ -35,7 +55,7 @@ export class TaskRunner {
         },
         container_limits: step.config.container_limits,
         env: step.config.env,
-        image: step.config?.image_resource.source.repository!,
+        image: image,
         name: step.task,
         mounts: mounts,
         privileged: step.privileged ?? false,

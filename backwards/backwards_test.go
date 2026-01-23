@@ -440,4 +440,44 @@ func TestVersionEveryWithMock(t *testing.T) {
 		versions3 := queryVersions()
 		assert.Expect(versions3).To(HaveLen(3))
 	})
+
+	t.Run("validates undefined resource types", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+
+		// Test that pipeline with undefined resource type fails validation
+		runner := commands.Runner{
+			Pipeline: "validation/undefined-resource-type.yml",
+			Driver:   "native",
+			Storage:  "sqlite://:memory:",
+		}
+		err := runner.Run(nil)
+		assert.Expect(err).To(HaveOccurred())
+		assert.Expect(err.Error()).To(ContainSubstring("resource type"))
+	})
+
+	t.Run("validates resource type is defined", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+
+		// Test that pipeline with properly defined resource type passes validation
+		// We're just testing that validation doesn't reject it
+		pipeline, err := backwards.NewPipeline("validation/valid-with-resource-type.yml")
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(pipeline).NotTo(BeEmpty())
+	})
+
+	t.Run("validates explicitly defined resource types are recognized", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+
+		// Test that pipeline with explicitly defined git resource type passes validation
+		// This should not fail during validation
+		pipeline, err := backwards.NewPipeline("validation/valid-with-default-resource-type.yml")
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(pipeline).NotTo(BeEmpty())
+	})
 }
