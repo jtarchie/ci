@@ -938,6 +938,7 @@ var PipelineRunner = class {
     );
   }
   async run() {
+    this.writeAllJobsAsPending();
     const jobsWithNoDeps = this.findJobsWithNoDependencies();
     for (const job of jobsWithNoDeps) {
       await this.runJob(job);
@@ -945,6 +946,30 @@ var PipelineRunner = class {
     if (this.config.assert?.execution) {
       assert.equal(this.executedJobs, this.config.assert.execution);
     }
+  }
+  writeAllJobsAsPending() {
+    const buildID2 = this.getBuildID();
+    for (const job of this.config.jobs) {
+      const dependsOn = this.getJobDependencies(job);
+      const storageKey = `/pipeline/${buildID2}/jobs/${job.name}`;
+      storage.set(storageKey, { status: "pending", dependsOn });
+    }
+  }
+  getBuildID() {
+    return typeof pipelineContext !== "undefined" && pipelineContext.runID ? pipelineContext.runID : String(Date.now());
+  }
+  getJobDependencies(job) {
+    const dependencies = [];
+    for (const step of job.plan) {
+      if ("get" in step && step.passed) {
+        for (const passedJob of step.passed) {
+          if (!dependencies.includes(passedJob)) {
+            dependencies.push(passedJob);
+          }
+        }
+      }
+    }
+    return dependencies;
   }
   findJobsWithNoDependencies() {
     return this.config.jobs.filter((job) => {

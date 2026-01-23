@@ -177,6 +177,9 @@ export class PipelineRunner {
   }
 
   async run(): Promise<void> {
+    // Pre-write all jobs as pending for graph visualization
+    this.writeAllJobsAsPending();
+
     // Find jobs with no dependencies
     const jobsWithNoDeps = this.findJobsWithNoDependencies();
 
@@ -189,6 +192,35 @@ export class PipelineRunner {
       // this assures that the outputs are in the same order as the job
       assert.equal(this.executedJobs, this.config.assert.execution);
     }
+  }
+
+  private writeAllJobsAsPending(): void {
+    const buildID = this.getBuildID();
+    for (const job of this.config.jobs) {
+      const dependsOn = this.getJobDependencies(job);
+      const storageKey = `/pipeline/${buildID}/jobs/${job.name}`;
+      storage.set(storageKey, { status: "pending", dependsOn });
+    }
+  }
+
+  private getBuildID(): string {
+    return (typeof pipelineContext !== "undefined" && pipelineContext.runID)
+      ? pipelineContext.runID
+      : String(Date.now());
+  }
+
+  private getJobDependencies(job: Job): string[] {
+    const dependencies: string[] = [];
+    for (const step of job.plan) {
+      if ("get" in step && step.passed) {
+        for (const passedJob of step.passed) {
+          if (!dependencies.includes(passedJob)) {
+            dependencies.push(passedJob);
+          }
+        }
+      }
+    }
+    return dependencies;
   }
 
   private findJobsWithNoDependencies(): Job[] {
