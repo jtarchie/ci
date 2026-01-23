@@ -60,6 +60,7 @@ export class TaskRunner {
         mounts: mounts,
         privileged: step.privileged ?? false,
         stdin: stdin ?? "",
+        storageKey: taskStorageKey,
         timeout: step.timeout,
       });
 

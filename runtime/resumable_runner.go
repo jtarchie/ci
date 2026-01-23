@@ -48,7 +48,7 @@ func NewResumableRunner(
 		runID = UniqueID()
 	}
 
-	runner := NewPipelineRunner(ctx, client, logger, namespace, runID)
+	runner := NewPipelineRunner(ctx, client, store, logger, namespace, runID)
 
 	resumableLogger := logger.WithGroup("resumable.runner").With("runID", runID)
 
@@ -283,7 +283,7 @@ func (r *ResumableRunner) runStep(stepID string, input RunInput) (*RunResult, er
 
 	// Get logs
 	stdout, stderr := &strings.Builder{}, &strings.Builder{}
-	err = container.Logs(ctx, stdout, stderr)
+	err = container.Logs(ctx, stdout, stderr, false)
 	if err != nil {
 		r.logger.Error("container.logs.failed", "err", err)
 
@@ -356,7 +356,7 @@ func (r *ResumableRunner) reattachToContainer(step *StepState) (*RunResult, erro
 
 	// Get logs
 	stdout, stderr := &strings.Builder{}, &strings.Builder{}
-	err = container.Logs(r.ctx, stdout, stderr)
+	err = container.Logs(r.ctx, stdout, stderr, false)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 			return &RunResult{Status: RunAbort}, nil

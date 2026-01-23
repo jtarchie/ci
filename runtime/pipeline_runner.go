@@ -11,10 +11,12 @@ import (
 	"time"
 
 	"github.com/jtarchie/ci/orchestra"
+	"github.com/jtarchie/ci/storage"
 )
 
 type PipelineRunner struct {
 	client    orchestra.Driver
+	storage   storage.Driver
 	ctx       context.Context //nolint: containedctx
 	logger    *slog.Logger
 	volumes   []orchestra.Volume
@@ -27,12 +29,14 @@ type PipelineRunner struct {
 func NewPipelineRunner(
 	ctx context.Context,
 	client orchestra.Driver,
+	storageClient storage.Driver,
 	logger *slog.Logger,
 	namespace string,
 	runID string,
 ) *PipelineRunner {
 	return &PipelineRunner{
 		client:    client,
+		storage:   storageClient,
 		ctx:       ctx,
 		logger:    logger.WithGroup("pipeline.run"),
 		volumes:   []orchestra.Volume{},
@@ -99,6 +103,9 @@ type RunInput struct {
 	Name       string                  `json:"name"`
 	Privileged bool                    `json:"privileged"`
 	Stdin      string                  `json:"stdin"`
+	// StorageKey is the key where task output should be streamed to.
+	// If provided, logs will be streamed to storage while the container runs.
+	StorageKey string `json:"storageKey"`
 	// has to be string because goja doesn't support string -> time.Duration
 	Timeout string `json:"timeout"`
 }
@@ -188,11 +195,31 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 
 	var containerStatus orchestra.ContainerStatus
 
+	// Create a streaming writer that updates storage periodically
+	streamCtx, cancelStream := context.WithCancel(ctx)
+	defer cancelStream()
+
+	stdout, stderr := &strings.Builder{}, &strings.Builder{}
+	var streamWg sync.WaitGroup
+
+	// Start streaming logs if storage key is provided
+	if input.StorageKey != "" && c.storage != nil {
+		streamWg.Add(1)
+
+		go func() {
+			defer streamWg.Done()
+			c.streamLogsToStorage(streamCtx, container, input.StorageKey, stdout, stderr)
+		}()
+	}
+
+	// Wait for container to complete
 	for {
 		var err error
 
 		containerStatus, err = container.Status(ctx)
 		if err != nil {
+			cancelStream()
+
 			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 				return &RunResult{Status: RunAbort}, nil
 			}
@@ -203,7 +230,14 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 		if containerStatus.IsDone() {
 			break
 		}
+
+		// Small sleep to avoid busy loop
+		time.Sleep(100 * time.Millisecond)
 	}
+
+	// Cancel streaming and wait for it to finish
+	cancelStream()
+	streamWg.Wait()
 
 	logger.Debug("container.status", "exitCode", containerStatus.ExitCode())
 
@@ -214,17 +248,18 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 		}
 	}()
 
-	stdout, stderr := &strings.Builder{}, &strings.Builder{}
+	// Get final logs (if we weren't streaming, or to ensure we have complete output)
+	if input.StorageKey == "" || c.storage == nil {
+		err = container.Logs(ctx, stdout, stderr, false)
+		if err != nil {
+			logger.Error("container.logs.error", "err", err)
 
-	err = container.Logs(ctx, stdout, stderr)
-	if err != nil {
-		logger.Error("container.logs.error", "err", err)
+			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+				return &RunResult{Status: RunAbort}, nil
+			}
 
-		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
-			return &RunResult{Status: RunAbort}, nil
+			return nil, fmt.Errorf("could not get container logs: %w", err)
 		}
-
-		return nil, fmt.Errorf("could not get container logs: %w", err)
 	}
 
 	logger.Debug("container.logs", "stdout", stdout.String(), "stderr", stderr.String())
@@ -235,6 +270,66 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 		Stderr: stderr.String(),
 		Code:   containerStatus.ExitCode(),
 	}, nil
+}
+
+// streamLogsToStorage streams container logs to storage periodically.
+func (c *PipelineRunner) streamLogsToStorage(
+	ctx context.Context,
+	container orchestra.Container,
+	storageKey string,
+	stdout, stderr *strings.Builder,
+) {
+	logger := c.logger.With("storageKey", storageKey)
+
+	// Use a pipe to capture streaming output and write to both the builder and storage
+	pr, pw := io.Pipe()
+
+	var streamWg sync.WaitGroup
+
+	streamWg.Add(1)
+
+	go func() {
+		defer streamWg.Done()
+		defer func() { _ = pw.Close() }()
+
+		err := container.Logs(ctx, pw, io.Discard, true)
+		if err != nil && ctx.Err() == nil {
+			logger.Debug("container.streamLogs.error", "err", err)
+		}
+	}()
+
+	// Read from pipe in chunks and update storage
+	buf := make([]byte, 4096)
+
+	for {
+		n, err := pr.Read(buf)
+		if n > 0 {
+			chunk := string(buf[:n])
+			stdout.WriteString(chunk)
+
+			// Update storage with current output using main context (not stream context)
+			// Only update if stream context is still active
+			if ctx.Err() == nil {
+				if updateErr := c.storage.Set(c.ctx, storageKey, map[string]any{
+					"status": "running",
+					"stdout": stdout.String(),
+					"stderr": stderr.String(),
+				}); updateErr != nil {
+					logger.Debug("storage.update.error", "err", updateErr)
+				}
+			}
+		}
+
+		if err != nil {
+			if err != io.EOF && ctx.Err() == nil {
+				logger.Debug("container.streamLogs.read.error", "err", err)
+			}
+
+			break
+		}
+	}
+
+	streamWg.Wait()
 }
 
 // CleanupVolumes cleans up all tracked volumes.

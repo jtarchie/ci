@@ -95,7 +95,7 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 		}
 		runner = resumableRunner
 	} else {
-		runner = NewPipelineRunner(ctx, driver, j.logger, opts.Namespace, opts.RunID)
+		runner = NewPipelineRunner(ctx, driver, storage, j.logger, opts.Namespace, opts.RunID)
 	}
 
 	finalSource, err := TranspileAndValidate(source)

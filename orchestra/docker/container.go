@@ -43,10 +43,13 @@ func (d *Container) Status(ctx context.Context) (orchestra.ContainerStatus, erro
 	}, nil
 }
 
-func (d *Container) Logs(ctx context.Context, stdout, stderr io.Writer) error {
+// Logs retrieves container logs. When follow is false, returns all logs up to now.
+// When follow is true, streams logs in real-time until the context is cancelled.
+func (d *Container) Logs(ctx context.Context, stdout, stderr io.Writer, follow bool) error {
 	options := container.LogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
+		Follow:     follow,
 	}
 
 	logs, err := d.client.ContainerLogs(ctx, d.id, options)
@@ -54,7 +57,15 @@ func (d *Container) Logs(ctx context.Context, stdout, stderr io.Writer) error {
 		return fmt.Errorf("failed to get container logs: %w", err)
 	}
 
+	if follow {
+		defer func() { _ = logs.Close() }()
+	}
+
 	_, err = stdcopy.StdCopy(stdout, stderr, logs)
+	if err != nil && (follow && ctx.Err() != nil) {
+		// Expected error when following and context cancelled
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("failed to copy logs: %w", err)
 	}

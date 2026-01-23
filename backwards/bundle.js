@@ -45,6 +45,7 @@ var TaskRunner = class {
         mounts,
         privileged: step.privileged ?? false,
         stdin: stdin ?? "",
+        storageKey: taskStorageKey,
         timeout: step.timeout
       });
       let status = "success";

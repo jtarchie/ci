@@ -30,7 +30,15 @@ func (n *Container) Cleanup(_ context.Context) error {
 	return nil
 }
 
-func (n *Container) Logs(_ context.Context, stdout io.Writer, _ io.Writer) error {
+// Logs retrieves container logs. When follow is false, returns all logs up to now.
+// When follow is true, waits for context cancellation then writes accumulated output.
+// Note: Native driver buffers output and doesn't support true real-time streaming.
+func (n *Container) Logs(ctx context.Context, stdout io.Writer, _ io.Writer, follow bool) error {
+	if follow {
+		// Wait for the context to be cancelled (container finished or timeout)
+		<-ctx.Done()
+	}
+
 	_, err := io.WriteString(stdout, n.stdout.String())
 	if err != nil {
 		return fmt.Errorf("failed to copy stdout: %w", err)

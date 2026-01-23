@@ -120,7 +120,7 @@ func TestCacheIntegration(t *testing.T) {
 				assert.Eventually(func() bool {
 					stdout := &strings.Builder{}
 					stderr := &strings.Builder{}
-					_ = container2.Logs(ctx, stdout, stderr)
+					_ = container2.Logs(ctx, stdout, stderr, false)
 					return strings.Contains(stdout.String(), testData)
 				}, "10s", "100ms").Should(gomega.BeTrue(), "cached data should be restored")
 			})
@@ -169,7 +169,7 @@ func TestCacheIntegration(t *testing.T) {
 				assert.Eventually(func() bool {
 					stdout := &strings.Builder{}
 					stderr := &strings.Builder{}
-					_ = container.Logs(ctx, stdout, stderr)
+					_ = container.Logs(ctx, stdout, stderr, false)
 					return strings.Contains(stdout.String(), "new data")
 				}, "10s", "100ms").Should(gomega.BeTrue())
 			})
