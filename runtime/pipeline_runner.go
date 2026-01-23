@@ -87,6 +87,10 @@ type RunResult struct {
 	Status RunStatus `json:"status"`
 }
 
+// OutputCallback is called with streaming output chunks.
+// stream is either "stdout" or "stderr", data is the output chunk.
+type OutputCallback func(stream string, data string)
+
 type RunInput struct {
 	Command struct {
 		Path string   `json:"path"`
@@ -103,9 +107,9 @@ type RunInput struct {
 	Name       string                  `json:"name"`
 	Privileged bool                    `json:"privileged"`
 	Stdin      string                  `json:"stdin"`
-	// StorageKey is the key where task output should be streamed to.
-	// If provided, logs will be streamed to storage while the container runs.
-	StorageKey string `json:"storageKey"`
+	// OnOutput is called with streaming output chunks as the container runs.
+	// If provided, the callback receives (stream, data) where stream is "stdout" or "stderr".
+	OnOutput OutputCallback `json:"-"` // Not serialized from JS, set programmatically
 	// has to be string because goja doesn't support string -> time.Duration
 	Timeout string `json:"timeout"`
 }
@@ -195,20 +199,20 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 
 	var containerStatus orchestra.ContainerStatus
 
-	// Create a streaming writer that updates storage periodically
+	// Create a streaming writer that calls the callback
 	streamCtx, cancelStream := context.WithCancel(ctx)
 	defer cancelStream()
 
 	stdout, stderr := &strings.Builder{}, &strings.Builder{}
 	var streamWg sync.WaitGroup
 
-	// Start streaming logs if storage key is provided
-	if input.StorageKey != "" && c.storage != nil {
+	// Start streaming logs if callback is provided
+	if input.OnOutput != nil {
 		streamWg.Add(1)
 
 		go func() {
 			defer streamWg.Done()
-			c.streamLogsToStorage(streamCtx, container, input.StorageKey, stdout, stderr)
+			c.streamLogsWithCallback(streamCtx, container, input.OnOutput, stdout, stderr)
 		}()
 	}
 
@@ -249,7 +253,7 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 	}()
 
 	// Get final logs (if we weren't streaming, or to ensure we have complete output)
-	if input.StorageKey == "" || c.storage == nil {
+	if input.OnOutput == nil {
 		err = container.Logs(ctx, stdout, stderr, false)
 		if err != nil {
 			logger.Error("container.logs.error", "err", err)
@@ -272,16 +276,16 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 	}, nil
 }
 
-// streamLogsToStorage streams container logs to storage periodically.
-func (c *PipelineRunner) streamLogsToStorage(
+// streamLogsWithCallback streams container logs and invokes the callback with each chunk.
+func (c *PipelineRunner) streamLogsWithCallback(
 	ctx context.Context,
 	container orchestra.Container,
-	storageKey string,
+	callback OutputCallback,
 	stdout, stderr *strings.Builder,
 ) {
-	logger := c.logger.With("storageKey", storageKey)
+	logger := c.logger
 
-	// Use a pipe to capture streaming output and write to both the builder and storage
+	// Use a pipe to capture streaming output
 	pr, pw := io.Pipe()
 
 	var streamWg sync.WaitGroup
@@ -298,7 +302,7 @@ func (c *PipelineRunner) streamLogsToStorage(
 		}
 	}()
 
-	// Read from pipe in chunks and update storage
+	// Read from pipe in chunks and invoke callback
 	buf := make([]byte, 4096)
 
 	for {
@@ -307,16 +311,10 @@ func (c *PipelineRunner) streamLogsToStorage(
 			chunk := string(buf[:n])
 			stdout.WriteString(chunk)
 
-			// Update storage with current output using main context (not stream context)
-			// Only update if stream context is still active
+			// Invoke callback with the chunk
+			// Only invoke if stream context is still active
 			if ctx.Err() == nil {
-				if updateErr := c.storage.Set(c.ctx, storageKey, map[string]any{
-					"status": "running",
-					"stdout": stdout.String(),
-					"stderr": stderr.String(),
-				}); updateErr != nil {
-					logger.Debug("storage.update.error", "err", updateErr)
-				}
+				callback("stdout", chunk)
 			}
 		}
 

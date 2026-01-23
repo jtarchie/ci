@@ -37,8 +37,51 @@ func NewRuntime(
 	}
 }
 
-func (r *Runtime) Run(input RunInput) *goja.Promise {
+// Run executes a container task. Accepts an object with optional onOutput callback.
+func (r *Runtime) Run(call goja.FunctionCall) goja.Value {
 	promise, resolve, reject := r.jsVM.NewPromise()
+
+	// Extract input from the first argument
+	if len(call.Arguments) == 0 {
+		_ = reject(r.jsVM.NewGoError(fmt.Errorf("run requires an input object")))
+		return r.jsVM.ToValue(promise)
+	}
+
+	inputObj := call.Arguments[0].ToObject(r.jsVM)
+
+	// Parse the input struct (goja will map fields by json tags)
+	var input RunInput
+	if err := r.jsVM.ExportTo(inputObj, &input); err != nil {
+		_ = reject(r.jsVM.NewGoError(fmt.Errorf("invalid input: %w", err)))
+		return r.jsVM.ToValue(promise)
+	}
+
+	// Check for onOutput callback
+	onOutputVal := inputObj.Get("onOutput")
+	var onOutputFunc goja.Callable
+	if onOutputVal != nil && !goja.IsUndefined(onOutputVal) && !goja.IsNull(onOutputVal) {
+		var ok bool
+		onOutputFunc, ok = goja.AssertFunction(onOutputVal)
+		if !ok {
+			_ = reject(r.jsVM.NewGoError(fmt.Errorf("onOutput must be a function")))
+			return r.jsVM.ToValue(promise)
+		}
+	}
+
+	// If callback provided, wrap it to safely invoke through the tasks channel
+	if onOutputFunc != nil {
+		input.OnOutput = func(stream string, data string) {
+			// Queue the callback invocation on the main JS thread via tasks channel
+			r.tasks <- func() error {
+				_, err := onOutputFunc(goja.Undefined(), r.jsVM.ToValue(stream), r.jsVM.ToValue(data))
+				if err != nil {
+					// Log but don't fail - callbacks shouldn't break the task
+					return nil
+				}
+				return nil
+			}
+		}
+	}
 
 	r.promises.Add(1)
 
@@ -66,7 +109,7 @@ func (r *Runtime) Run(input RunInput) *goja.Promise {
 		}
 	}()
 
-	return promise
+	return r.jsVM.ToValue(promise)
 }
 
 func (r *Runtime) CreateVolume(input VolumeInput) *goja.Promise {

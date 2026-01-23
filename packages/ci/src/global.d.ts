@@ -26,6 +26,9 @@ declare global {
     code?: number | null;
   }
 
+  // Callback for streaming output from container
+  type OutputCallback = (stream: "stdout" | "stderr", data: string) => void;
+
   // Runtime types
   interface RunTaskConfig {
     command: CommandConfig;
@@ -36,7 +39,8 @@ declare global {
     name: string;
     privileged?: boolean;
     stdin?: string;
-    storageKey?: string;
+    // Callback invoked with streaming output chunks as the container runs
+    onOutput?: OutputCallback;
     timeout?: string;
   }
 
