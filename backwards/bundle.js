@@ -602,7 +602,8 @@ var JobRunner = class {
     const resource = this.findResource(step.get);
     const resourceType = this.findResourceType(resource?.type);
     const versionMode = this.getVersionMode(step);
-    const isNative = nativeResources.isNative(resource?.type);
+    const isNativeDriver = typeof pipelineContext !== "undefined" && pipelineContext.driverName === "native";
+    const isNative = isNativeDriver && nativeResources.isNative(resource?.type);
     const scopedResourceName = this.getScopedResourceName(resource?.name);
     let lastKnownVersion;
     if (versionMode === "every") {

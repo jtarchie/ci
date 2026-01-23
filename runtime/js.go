@@ -180,6 +180,9 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 		"runID":      opts.RunID,
 		"pipelineID": opts.PipelineID,
 	}
+	if driver != nil {
+		pipelineContext["driverName"] = driver.Name()
+	}
 	err = jsVM.Set("pipelineContext", pipelineContext)
 	if err != nil {
 		return fmt.Errorf("could not set pipelineContext: %w", err)

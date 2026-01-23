@@ -1,5 +1,5 @@
 resource_types:
-  - name: git-resource
+  - name: git
     type: registry-image
     source:
       repository: concourse/git-resource

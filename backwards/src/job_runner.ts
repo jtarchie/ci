@@ -584,7 +584,10 @@ export class JobRunner {
 
     // Check if this is a native resource - native resources take priority
     // even if there's a resource_type definition (e.g., mock resource in native mode)
-    const isNative = nativeResources.isNative(resource?.type);
+    // Only use native resources when the driver is "native" to avoid path issues
+    const isNativeDriver = typeof pipelineContext !== "undefined" &&
+      pipelineContext.driverName === "native";
+    const isNative = isNativeDriver && nativeResources.isNative(resource?.type);
 
     // Scope resource name to pipeline to avoid cross-pipeline version sharing
     const scopedResourceName = this.getScopedResourceName(resource?.name!);
