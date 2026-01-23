@@ -293,6 +293,67 @@ func TestDrivers(t *testing.T) {
 					return strings.Contains(stdout.String(), "HELLO=WORLD\n") && !strings.Contains(stdout.String(), "IGNORE")
 				}, "10s").Should(BeTrue())
 			})
+
+			t.Run("streaming logs with follow", func(t *testing.T) {
+				t.Parallel()
+
+				assert := NewGomegaWithT(t)
+
+				client, err := init("test-"+gonanoid.Must(), slog.Default(), map[string]string{})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				defer func() { _ = client.Close() }()
+
+				taskID := gonanoid.Must()
+
+				// Use a command that outputs multiple lines with delays
+				container, err := client.RunContainer(
+					context.Background(),
+					orchestra.Task{
+						ID:      taskID,
+						Image:   "busybox",
+						Command: []string{"sh", "-c", "echo line1; sleep 0.1; echo line2; sleep 0.1; echo line3"},
+					},
+				)
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				// Start streaming logs before container finishes
+				stdout, stderr := &strings.Builder{}, &strings.Builder{}
+				streamCtx, streamCancel := context.WithCancel(context.Background())
+
+				streamDone := make(chan error, 1)
+				go func() {
+					streamDone <- container.Logs(streamCtx, stdout, stderr, true)
+				}()
+
+				// Wait for container to complete
+				assert.Eventually(func() bool {
+					status, err := container.Status(context.Background())
+					assert.Expect(err).NotTo(HaveOccurred())
+
+					return status.IsDone() && status.ExitCode() == 0
+				}, "10s").Should(BeTrue())
+
+				// Cancel the stream context after container is done
+				streamCancel()
+
+				// Wait for stream goroutine to finish
+				select {
+				case <-streamDone:
+					// Stream finished
+				case <-time.After(5 * time.Second):
+					t.Fatal("stream did not finish in time")
+				}
+
+				// Verify all lines were captured
+				output := stdout.String()
+				assert.Expect(output).To(ContainSubstring("line1"))
+				assert.Expect(output).To(ContainSubstring("line2"))
+				assert.Expect(output).To(ContainSubstring("line3"))
+
+				err = client.Close()
+				assert.Expect(err).NotTo(HaveOccurred())
+			})
 		})
 	})
 }
