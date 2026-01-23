@@ -1,0 +1,45 @@
+resource_types:
+  - name: git-resource
+    type: registry-image
+    source:
+      repository: concourse/git-resource
+
+resources:
+  - name: apache-kafka
+    type: git
+    icon: github
+    source:
+      uri: https://github.com/apache/kafka.git
+      branch: trunk
+
+jobs:
+  - name: test
+    public: true
+    build_log_retention:
+      builds: 50
+    plan:
+      - get: apache-kafka
+        trigger: true
+      - task: run-tests
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: gradle
+              tag: jdk17
+          caches:
+            - path: $HOME/.m2/repository
+            - path: $HOME/.gradle/caches/
+            - path: $HOME/.gradle/wrapper/
+          inputs:
+            - name: apache-kafka
+          run:
+            user: root
+            path: /bin/sh
+            args:
+              - -ce
+              - |
+                  cd apache-kafka
+
+                  ./gradlew clients:test --tests RequestResponseTest

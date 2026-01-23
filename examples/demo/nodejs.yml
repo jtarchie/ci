@@ -1,0 +1,45 @@
+---
+resource_types:
+  - name: git-resource
+    type: registry-image
+    source:
+      repository: concourse/git-resource
+
+resources:
+  - name: repo
+    type: git
+    icon: github
+    source:
+      uri: https://github.com/nodejs/nodejs.org.git
+
+  - name: node-image
+    type: registry-image
+    icon: docker
+    source:
+      repository: node
+      tag: 22-slim
+
+jobs:
+  - name: test
+    public: true
+    build_log_retention:
+      builds: 50
+    plan:
+      - get: node-image
+      - get: repo
+        trigger: true
+      - task: test
+        image: node-image
+        config:
+          inputs:
+            - name: repo
+          platform: linux
+          run:
+            path: bash
+            dir: repo
+            args:
+              - -cex
+              - |
+                  npm install -g pnpm
+                  pnpm install --frozen-lockfile
+                  pnpm run test

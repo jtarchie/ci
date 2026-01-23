@@ -54,7 +54,8 @@ func TestExecutionAPI(t *testing.T) {
 				assert.Expect(resp["status"]).To(Equal("queued"))
 				assert.Expect(resp["message"]).To(Equal("pipeline execution started"))
 
-				// Close database connections before temp directory cleanup
+				// Wait for background goroutines to complete before cleanup
+				router.WaitForExecutions()
 				err = client.Close()
 				assert.Expect(err).NotTo(HaveOccurred())
 			})
@@ -149,7 +150,6 @@ func TestExecutionAPI(t *testing.T) {
 
 				client, err := init(buildFile.Name(), "namespace", slog.Default())
 				assert.Expect(err).NotTo(HaveOccurred())
-				defer func() { _ = client.Close() }()
 
 				// Create multiple pipelines
 				pipeline1, err := client.SavePipeline(context.Background(), "pipeline-1", "export const pipeline = async () => { console.log('pipeline 1'); };", "docker://")
@@ -191,6 +191,11 @@ func TestExecutionAPI(t *testing.T) {
 				err = json.Unmarshal(rec2.Body.Bytes(), &resp)
 				assert.Expect(err).NotTo(HaveOccurred())
 				assert.Expect(resp["error"]).To(Equal("max concurrent executions reached"))
+
+				// Wait for background goroutines to complete before cleanup
+				router2.WaitForExecutions()
+				err = client.Close()
+				assert.Expect(err).NotTo(HaveOccurred())
 			})
 		})
 	})

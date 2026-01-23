@@ -280,6 +280,7 @@ declare global {
     config: TaskConfig;
     container_limits?: ContainerLimits;
     file?: string;
+    image?: string;
     privileged?: boolean;
     assert?: TaskAssertion;
     attempts?: number;

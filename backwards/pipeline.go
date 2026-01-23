@@ -21,7 +21,7 @@ func NewPipeline(filename string) (string, error) {
 		return "", fmt.Errorf("could not read pipeline: %w", err)
 	}
 
-	err = yaml.UnmarshalWithOptions(contents, &config, yaml.Strict())
+	err = yaml.Unmarshal(contents, &config)
 	if err != nil {
 		return "", fmt.Errorf("could not unmarshal pipeline: %w", err)
 	}

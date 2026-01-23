@@ -1,7 +1,8 @@
 // src/task_runner.ts
 var TaskRunner = class {
-  constructor(taskNames) {
+  constructor(taskNames, resources) {
     this.taskNames = taskNames;
+    this.resources = resources;
   }
   knownMounts = {};
   async runTask(step, stdin, storageKey) {
@@ -15,6 +16,21 @@ var TaskRunner = class {
       }
     );
     let result;
+    let image;
+    if (step.image) {
+      const resource = this.resources.find((r) => r.name === step.image);
+      if (!resource) {
+        throw new Error(`Image resource '${step.image}' not found`);
+      }
+      if (resource.type !== "registry-image") {
+        throw new Error(
+          `Image resource '${step.image}' must be of type 'registry-image', got '${resource.type}'`
+        );
+      }
+      image = resource.source.repository;
+    } else {
+      image = step.config?.image_resource.source.repository;
+    }
     try {
       result = await runtime.run({
         command: {
@@ -24,7 +40,7 @@ var TaskRunner = class {
         },
         container_limits: step.config.container_limits,
         env: step.config.env,
-        image: step.config?.image_resource.source.repository,
+        image,
         name: step.task,
         mounts,
         privileged: step.privileged ?? false,
@@ -125,7 +141,7 @@ var JobRunner = class {
     this.resources = resources;
     this.resourceTypes = resourceTypes;
     this.buildID = buildID;
-    this.taskRunner = new TaskRunner(this.taskNames);
+    this.taskRunner = new TaskRunner(this.taskNames, this.resources);
   }
   taskNames = [];
   taskRunner;
@@ -445,6 +461,7 @@ var JobRunner = class {
   async processDoStep(step, pathContext) {
     const storageKey = `${this.getBaseStorageKey()}/${pathContext}`;
     let failure = void 0;
+    const isTryStep = "try" in step;
     try {
       storage.set(storageKey, { status: "pending" });
       let steps = [];
@@ -489,7 +506,7 @@ var JobRunner = class {
     if (step.ensure) {
       await this.processStep(step.ensure, `${pathContext}/ensure`);
     }
-    if (failure) {
+    if (failure && !isTryStep) {
       throw failure;
     }
   }
@@ -654,19 +671,34 @@ var JobRunner = class {
     if (isNative) {
       const volume = await runtime.createVolume({ name: resource?.name });
       this.taskRunner.getKnownMounts()[resource?.name] = volume;
-      nativeResources.fetch({
-        type: resource?.type,
-        source: resource?.source,
-        version: versionToFetch,
-        params: step.params,
-        destDir: volume.path
-      });
       const storageKey = `${this.getBaseStorageKey()}/${pathContext}`;
       storage.set(storageKey, {
-        status: "success",
-        version: versionToFetch,
+        status: "pending",
         resource: resource?.name
       });
+      try {
+        nativeResources.fetch({
+          type: resource?.type,
+          source: resource?.source,
+          version: versionToFetch,
+          params: step.params,
+          destDir: volume.path
+        });
+        storage.set(storageKey, {
+          status: "success",
+          version: versionToFetch,
+          resource: resource?.name
+        });
+      } catch (error) {
+        storage.set(storageKey, {
+          status: "error",
+          resource: resource?.name,
+          error: String(error)
+        });
+        throw new Error(
+          `Failed to fetch resource '${resource?.name}': ${error}`
+        );
+      }
     } else {
       await this.runTask(
         {
@@ -774,11 +806,25 @@ var JobRunner = class {
 var PipelineRunner = class {
   constructor(config) {
     this.config = config;
+    this.addBuiltInResourceTypes();
     this.validatePipelineConfig();
     this.initializeNotifications();
   }
   jobResults = /* @__PURE__ */ new Map();
   executedJobs = [];
+  addBuiltInResourceTypes() {
+    const registryImageType = {
+      name: "registry-image",
+      type: "registry-image",
+      source: { repository: "concourse/registry-image-resource" }
+    };
+    const exists = this.config.resource_types.some(
+      (type) => type.name === "registry-image"
+    );
+    if (!exists) {
+      this.config.resource_types.push(registryImageType);
+    }
+  }
   initializeNotifications() {
     if (this.config.notifications) {
       notify.setConfigs(this.config.notifications);

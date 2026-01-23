@@ -1,0 +1,76 @@
+---
+resource_types:
+  - name: git-resource
+    type: registry-image
+    source:
+      repository: concourse/git-resource
+
+resources:
+  - name: golang-1.20.x-image
+    type: registry-image
+    icon: docker
+    source:
+      repository: golang
+      tag: 1.20-alpine
+
+  - name: golang-1.21.x-image
+    type: registry-image
+    icon: docker
+    source:
+      repository: golang
+      tag: 1.21-alpine
+
+  - name: golang-1.22.x-image
+    type: registry-image
+    icon: docker
+    source:
+      repository: golang
+      tag: 1.22-alpine
+
+task-config: &task-config
+  platform: linux
+  run:
+    path: /bin/sh
+    args:
+      - -c
+      - |
+          GOPATH=$PWD/go
+
+          go version
+
+jobs:
+  - name: golang-1.20
+    public: true
+    build_log_retention:
+      builds: 50
+    plan:
+      - get: golang-1.20.x-image
+        trigger: true
+      - task: run-tests
+        image: golang-1.20.x-image
+        config:
+          <<: *task-config
+
+  - name: golang-1.21
+    public: true
+    build_log_retention:
+      builds: 50
+    plan:
+      - get: golang-1.21.x-image
+        trigger: true
+      - task: run-tests
+        image: golang-1.21.x-image
+        config:
+          <<: *task-config
+
+  - name: golang-1.22
+    public: true
+    build_log_retention:
+      builds: 50
+    plan:
+      - get: golang-1.22.x-image
+        trigger: true
+      - task: run-tests
+        image: golang-1.22.x-image
+        config:
+          <<: *task-config
