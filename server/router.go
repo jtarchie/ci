@@ -38,6 +38,11 @@ func (r *Router) WaitForExecutions() {
 	r.execService.Wait()
 }
 
+// ExecutionService returns the execution service for testing purposes.
+func (r *Router) ExecutionService() *ExecutionService {
+	return r.execService
+}
+
 // isHtmxRequest checks if the request is from htmx.
 func isHtmxRequest(ctx echo.Context) bool {
 	return ctx.Request().Header.Get("HX-Request") == "true"

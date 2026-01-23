@@ -69,6 +69,7 @@ declare global {
   interface PipelineContext {
     runID?: string;
     pipelineID?: string;
+    driverName?: string;
   }
   const pipelineContext: PipelineContext;
 

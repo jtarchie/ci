@@ -122,12 +122,41 @@ func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *stor
 		return
 	}
 
-	// Update status to success
-	err = s.store.UpdateRunStatus(ctx, run.ID, storage.RunStatusSuccess, "")
+	// Check if any jobs failed by querying job statuses
+	finalStatus := s.determineRunStatus(ctx, run.ID, logger)
+
+	err = s.store.UpdateRunStatus(ctx, run.ID, finalStatus, "")
 	if err != nil {
-		logger.Error("run.update.failed.to_success", "error", err)
+		logger.Error("run.update.failed.to_final", "error", err)
 		return
 	}
 
-	logger.Info("pipeline.execute.success")
+	if finalStatus == storage.RunStatusSuccess {
+		logger.Info("pipeline.execute.success")
+	} else {
+		logger.Info("pipeline.execute.completed_with_failures")
+	}
+}
+
+// determineRunStatus checks job statuses to determine the final run status.
+func (s *ExecutionService) determineRunStatus(ctx context.Context, runID string, logger *slog.Logger) storage.RunStatus {
+	// Query all job statuses for this run
+	prefix := "/pipeline/" + runID + "/jobs"
+	results, err := s.store.GetAll(ctx, prefix, []string{"status"})
+	if err != nil {
+		logger.Warn("failed to query job statuses, assuming success", "error", err)
+		return storage.RunStatusSuccess
+	}
+
+	// Check if any job has a failed/error status
+	for _, result := range results {
+		if status, ok := result.Payload["status"].(string); ok {
+			switch status {
+			case "failure", "error", "abort":
+				return storage.RunStatusFailed
+			}
+		}
+	}
+
+	return storage.RunStatusSuccess
 }
