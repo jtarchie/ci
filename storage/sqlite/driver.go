@@ -213,7 +213,7 @@ func (s *Sqlite) Close() error {
 
 // SavePipeline creates or updates a pipeline in the database.
 func (s *Sqlite) SavePipeline(ctx context.Context, name, content, driverDSN string) (*storage.Pipeline, error) {
-	id := runtime.PipelineID(content)
+	id := runtime.PipelineID(name, content)
 	now := time.Now().UTC()
 
 	_, err := s.writer.ExecContext(ctx, `
