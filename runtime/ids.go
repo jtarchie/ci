@@ -27,12 +27,14 @@ func DeterministicTaskID(namespace, runID, stepID, taskName string) string {
 	return hex.EncodeToString(hash[:4]) // 4 bytes = 8 hex chars
 }
 
-// PipelineID generates a deterministic pipeline ID based on pipeline content.
+// PipelineID generates a deterministic pipeline ID based on pipeline name and content.
 // This enables caching and deduplication - identical pipelines will have identical IDs.
+// Both name and content are included so different pipelines with the same content get unique IDs.
 //
 // Returns a 32-character hexadecimal string.
-func PipelineID(content string) string {
-	hash := sha256.Sum256([]byte(content))
+func PipelineID(name, content string) string {
+	input := fmt.Sprintf("%s:%s", name, content)
+	hash := sha256.Sum256([]byte(input))
 
 	return hex.EncodeToString(hash[:16]) // 16 bytes = 32 hex chars
 }
