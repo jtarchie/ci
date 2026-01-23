@@ -52,7 +52,7 @@ func TestDocker(t *testing.T) {
 			defer cancel()
 
 			stdout, stderr := &strings.Builder{}, &strings.Builder{}
-			_ = container.Logs(ctx, stdout, stderr)
+			_ = container.Logs(ctx, stdout, stderr, false)
 
 			return strings.Contains(stdout.String(), "nobody")
 		}, "1s").Should(BeTrue())
@@ -138,7 +138,7 @@ func TestDocker(t *testing.T) {
 			defer cancel()
 
 			stdout, stderr := &strings.Builder{}, &strings.Builder{}
-			err = container.Logs(ctx, stdout, stderr)
+			err = container.Logs(ctx, stdout, stderr, false)
 			assert.Expect(err).NotTo(HaveOccurred())
 
 			output := strings.TrimSpace(stdout.String())
@@ -179,7 +179,7 @@ func TestDocker(t *testing.T) {
 			defer cancel()
 
 			stdout, stderr := &strings.Builder{}, &strings.Builder{}
-			err = container.Logs(ctx, stdout, stderr)
+			err = container.Logs(ctx, stdout, stderr, false)
 			assert.Expect(err).NotTo(HaveOccurred())
 
 			output := stdout.String()

@@ -36,6 +36,7 @@ declare global {
     name: string;
     privileged?: boolean;
     stdin?: string;
+    storageKey?: string;
     timeout?: string;
   }
 

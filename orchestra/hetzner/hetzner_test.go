@@ -73,7 +73,7 @@ func TestHetzner(t *testing.T) {
 			defer cancel()
 
 			stdout, stderr := &strings.Builder{}, &strings.Builder{}
-			_ = container.Logs(ctx, stdout, stderr)
+			_ = container.Logs(ctx, stdout, stderr, false)
 
 			return strings.Contains(stdout.String(), "hello from hetzner")
 		}, "30s", "2s").Should(BeTrue())
@@ -127,7 +127,7 @@ func TestHetzner(t *testing.T) {
 			defer cancel()
 
 			stdout, stderr := &strings.Builder{}, &strings.Builder{}
-			_ = container.Logs(ctx, stdout, stderr)
+			_ = container.Logs(ctx, stdout, stderr, false)
 
 			return strings.Contains(stdout.String(), "MemTotal")
 		}, "30s", "2s").Should(BeTrue())

@@ -57,7 +57,7 @@ func TestK8s(t *testing.T) {
 			defer cancel()
 
 			stdout, stderr := &strings.Builder{}, &strings.Builder{}
-			_ = container.Logs(ctx, stdout, stderr)
+			_ = container.Logs(ctx, stdout, stderr, false)
 
 			// Check that the UID is 65534
 			return strings.Contains(stdout.String(), "65534")
@@ -148,7 +148,7 @@ func TestK8s(t *testing.T) {
 				defer cancel()
 
 				stdout, stderr := &strings.Builder{}, &strings.Builder{}
-				_ = container.Logs(ctx, stdout, stderr)
+				_ = container.Logs(ctx, stdout, stderr, false)
 
 				output := stdout.String()
 

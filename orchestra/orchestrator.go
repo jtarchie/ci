@@ -16,7 +16,9 @@ type ContainerStatus interface {
 
 type Container interface {
 	Cleanup(ctx context.Context) error
-	Logs(ctx context.Context, stdout, stderr io.Writer) error
+	// Logs retrieves container logs. When follow is false, returns all logs up to now.
+	// When follow is true, streams logs in real-time until the context is cancelled.
+	Logs(ctx context.Context, stdout, stderr io.Writer, follow bool) error
 	Status(ctx context.Context) (ContainerStatus, error)
 	// ID returns a unique identifier for this container (driver-specific).
 	ID() string

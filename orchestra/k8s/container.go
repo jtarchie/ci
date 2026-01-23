@@ -175,7 +175,13 @@ func (c *Container) Status(ctx context.Context) (orchestra.ContainerStatus, erro
 	return status, nil
 }
 
-func (c *Container) Logs(ctx context.Context, stdout, stderr io.Writer) error {
+// Logs retrieves container logs. When follow is false, returns all logs up to now.
+// When follow is true, streams logs in real-time until the context is cancelled.
+func (c *Container) Logs(ctx context.Context, stdout, stderr io.Writer, follow bool) error {
+	if follow {
+		return c.streamLogs(ctx, stdout)
+	}
+
 	// Kubernetes 1.32+ supports separate stdout/stderr streams via the PodLogsQuerySplitStreams feature gate
 	// If the feature gate is not enabled, this will fall back to interleaved logs
 
@@ -240,6 +246,31 @@ func (c *Container) Logs(ctx context.Context, stdout, stderr io.Writer) error {
 	streamStderr := "Stderr"
 	if err := fetchStream(&streamStderr, stderr); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+// streamLogs follows container logs in real-time until the context is cancelled.
+func (c *Container) streamLogs(ctx context.Context, stdout io.Writer) error {
+	req := c.clientset.CoreV1().Pods(c.k8sNamespace).GetLogs(c.podName, &corev1.PodLogOptions{
+		Container: "task",
+		Follow:    true,
+	})
+
+	podLogs, err := req.Stream(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get pod logs stream: %w", err)
+	}
+	defer func() {
+		if closeErr := podLogs.Close(); closeErr != nil && ctx.Err() == nil {
+			c.logger.Warn("failed to close pod logs stream", "err", closeErr)
+		}
+	}()
+
+	_, err = io.Copy(stdout, podLogs)
+	if err != nil && ctx.Err() == nil {
+		return fmt.Errorf("failed to copy logs: %w", err)
 	}
 
 	return nil

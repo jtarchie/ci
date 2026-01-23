@@ -63,7 +63,7 @@ func TestDrivers(t *testing.T) {
 					defer cancel()
 
 					stdout, stderr := &strings.Builder{}, &strings.Builder{}
-					_ = container.Logs(ctx, stdout, stderr)
+					_ = container.Logs(ctx, stdout, stderr, false)
 
 					return strings.Contains(stdout.String(), "hello")
 				}, "10s").Should(BeTrue())
@@ -146,7 +146,7 @@ func TestDrivers(t *testing.T) {
 					defer cancel()
 
 					stdout, stderr := &strings.Builder{}, &strings.Builder{}
-					_ = container.Logs(ctx, stdout, stderr)
+					_ = container.Logs(ctx, stdout, stderr, false)
 					// assert.Expect(err).NotTo(HaveOccurred())
 
 					return strings.Contains(stdout.String(), "hello")
@@ -172,7 +172,7 @@ func TestDrivers(t *testing.T) {
 
 				assert.Eventually(func() bool {
 					stdout, stderr := &strings.Builder{}, &strings.Builder{}
-					err := container.Logs(context.Background(), stdout, stderr)
+					err := container.Logs(context.Background(), stdout, stderr, false)
 					assert.Expect(err).NotTo(HaveOccurred())
 
 					return strings.Contains(stdout.String(), "hello")
@@ -242,7 +242,7 @@ func TestDrivers(t *testing.T) {
 					defer cancel()
 
 					stdout, stderr := &strings.Builder{}, &strings.Builder{}
-					_ = container.Logs(ctx, stdout, stderr)
+					_ = container.Logs(ctx, stdout, stderr, false)
 
 					return strings.Contains(stdout.String(), "world")
 				}, "10s").Should(BeTrue())
@@ -288,7 +288,7 @@ func TestDrivers(t *testing.T) {
 					defer cancel()
 
 					stdout, stderr := &strings.Builder{}, &strings.Builder{}
-					_ = container.Logs(ctx, stdout, stderr)
+					_ = container.Logs(ctx, stdout, stderr, false)
 
 					return strings.Contains(stdout.String(), "HELLO=WORLD\n") && !strings.Contains(stdout.String(), "IGNORE")
 				}, "10s").Should(BeTrue())
