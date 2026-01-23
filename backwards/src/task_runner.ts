@@ -13,7 +13,6 @@ export class TaskRunner {
     stdin: string | undefined,
     storageKey: string,
   ): Promise<RunTaskResult> {
-    // Use provided storage key or default to a simple task name key
     const taskStorageKey = storageKey;
     const mounts = await this.prepareMounts(step);
     this.taskNames.push(step.task);
@@ -46,6 +45,10 @@ export class TaskRunner {
       image = step.config?.image_resource.source.repository!;
     }
 
+    // Accumulate stdout/stderr for streaming updates
+    let accumulatedStdout = "";
+    let accumulatedStderr = "";
+
     try {
       result = await runtime.run({
         command: {
@@ -60,8 +63,19 @@ export class TaskRunner {
         mounts: mounts,
         privileged: step.privileged ?? false,
         stdin: stdin ?? "",
-        storageKey: taskStorageKey,
         timeout: step.timeout,
+        onOutput: (stream: "stdout" | "stderr", data: string) => {
+          if (stream === "stdout") {
+            accumulatedStdout += data;
+          } else {
+            accumulatedStderr += data;
+          }
+          storage.set(taskStorageKey, {
+            status: "running",
+            stdout: accumulatedStdout,
+            stderr: accumulatedStderr,
+          });
+        },
       });
 
       let status = "success";

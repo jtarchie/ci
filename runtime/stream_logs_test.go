@@ -3,6 +3,7 @@ package runtime_test
 import (
 	"context"
 	"log/slog"
+	"sync"
 	"testing"
 	"time"
 
@@ -12,10 +13,10 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestStreamLogsToStorage(t *testing.T) {
+func TestStreamLogsWithCallback(t *testing.T) {
 	t.Parallel()
 
-	t.Run("streams logs to storage while container runs", func(t *testing.T) {
+	t.Run("streams logs via callback while container runs", func(t *testing.T) {
 		t.Parallel()
 		assert := NewGomegaWithT(t)
 
@@ -33,14 +34,17 @@ func TestStreamLogsToStorage(t *testing.T) {
 		defer func() { _ = driver.Close() }()
 
 		runID := "stream-test-run"
-		storageKey := "/pipeline/test/jobs/streaming-job"
 
-		// Create pipeline runner with storage
+		// Create pipeline runner
 		runner := runtime.NewPipelineRunner(ctx, driver, store, logger, "stream-test-ns", runID)
 		defer func() { _ = runner.CleanupVolumes() }()
 
+		// Track callback invocations
+		var mu sync.Mutex
+		var stdoutChunks []string
+		var callbackCount int
+
 		// Run a task that produces output with small delays
-		// This simulates real-world streaming behavior
 		result, err := runner.Run(runtime.RunInput{
 			Name:  "streaming-task",
 			Image: "busybox",
@@ -52,28 +56,40 @@ func TestStreamLogsToStorage(t *testing.T) {
 				Path: "sh",
 				Args: []string{"-c", "echo line1; sleep 0.1; echo line2; sleep 0.1; echo line3"},
 			},
-			StorageKey: storageKey,
+			OnOutput: func(stream string, data string) {
+				mu.Lock()
+				defer mu.Unlock()
+				callbackCount++
+				if stream == "stdout" {
+					stdoutChunks = append(stdoutChunks, data)
+				}
+			},
 		})
 		assert.Expect(err).NotTo(HaveOccurred())
 		assert.Expect(result.Status).To(Equal(runtime.RunComplete))
 		assert.Expect(result.Code).To(Equal(0))
 
-		// Verify final output contains all lines
+		// Verify callback was invoked
+		mu.Lock()
+		assert.Expect(callbackCount).To(BeNumerically(">", 0))
+		fullStdout := ""
+		for _, chunk := range stdoutChunks {
+			fullStdout += chunk
+		}
+		mu.Unlock()
+
+		// Verify all lines were captured
+		assert.Expect(fullStdout).To(ContainSubstring("line1"))
+		assert.Expect(fullStdout).To(ContainSubstring("line2"))
+		assert.Expect(fullStdout).To(ContainSubstring("line3"))
+
+		// Verify final result also has all output
 		assert.Expect(result.Stdout).To(ContainSubstring("line1"))
 		assert.Expect(result.Stdout).To(ContainSubstring("line2"))
 		assert.Expect(result.Stdout).To(ContainSubstring("line3"))
-
-		// Verify storage was updated
-		payload, err := store.Get(ctx, storageKey)
-		assert.Expect(err).NotTo(HaveOccurred())
-
-		assert.Expect(payload).NotTo(BeNil())
-		assert.Expect(payload["stdout"]).To(ContainSubstring("line1"))
-		assert.Expect(payload["stdout"]).To(ContainSubstring("line2"))
-		assert.Expect(payload["stdout"]).To(ContainSubstring("line3"))
 	})
 
-	t.Run("storage key is optional", func(t *testing.T) {
+	t.Run("callback is optional", func(t *testing.T) {
 		t.Parallel()
 		assert := NewGomegaWithT(t)
 
@@ -92,11 +108,11 @@ func TestStreamLogsToStorage(t *testing.T) {
 
 		runID := "stream-test-optional"
 
-		// Create pipeline runner with storage
+		// Create pipeline runner
 		runner := runtime.NewPipelineRunner(ctx, driver, store, logger, "stream-test-ns-optional", runID)
 		defer func() { _ = runner.CleanupVolumes() }()
 
-		// Run a task WITHOUT storage key - should still work
+		// Run a task WITHOUT callback - should still work
 		result, err := runner.Run(runtime.RunInput{
 			Name:  "no-streaming-task",
 			Image: "busybox",
@@ -108,15 +124,11 @@ func TestStreamLogsToStorage(t *testing.T) {
 				Path: "echo",
 				Args: []string{"hello without streaming"},
 			},
-			// No StorageKey provided
+			// No OnOutput callback provided
 		})
 		assert.Expect(err).NotTo(HaveOccurred())
 		assert.Expect(result.Status).To(Equal(runtime.RunComplete))
 		assert.Expect(result.Stdout).To(ContainSubstring("hello without streaming"))
-
-		// Verify no storage key was written (storage.Get should fail or return empty)
-		_, err = store.Get(ctx, "/pipeline/test/jobs/no-streaming-task")
-		assert.Expect(err).To(HaveOccurred()) // Should not exist
 	})
 
 	t.Run("handles container errors during streaming", func(t *testing.T) {
@@ -137,11 +149,14 @@ func TestStreamLogsToStorage(t *testing.T) {
 		defer func() { _ = driver.Close() }()
 
 		runID := "stream-error-run"
-		storageKey := "/pipeline/test/jobs/error-job"
 
-		// Create pipeline runner with storage
+		// Create pipeline runner
 		runner := runtime.NewPipelineRunner(ctx, driver, store, logger, "stream-error-ns", runID)
 		defer func() { _ = runner.CleanupVolumes() }()
+
+		// Track callback invocations
+		var mu sync.Mutex
+		var capturedStdout string
 
 		// Run a task that outputs then fails
 		result, err := runner.Run(runtime.RunInput{
@@ -155,17 +170,23 @@ func TestStreamLogsToStorage(t *testing.T) {
 				Path: "sh",
 				Args: []string{"-c", "echo before-error; exit 1"},
 			},
-			StorageKey: storageKey,
+			OnOutput: func(stream string, data string) {
+				mu.Lock()
+				defer mu.Unlock()
+				if stream == "stdout" {
+					capturedStdout += data
+				}
+			},
 		})
 		assert.Expect(err).NotTo(HaveOccurred())
 		assert.Expect(result.Status).To(Equal(runtime.RunComplete))
 		assert.Expect(result.Code).To(Equal(1))
 		assert.Expect(result.Stdout).To(ContainSubstring("before-error"))
 
-		// Verify storage captured output even with error
-		payload, err := store.Get(ctx, storageKey)
-		assert.Expect(err).NotTo(HaveOccurred())
-		assert.Expect(payload["stdout"]).To(ContainSubstring("before-error"))
+		// Verify callback captured output even with error
+		mu.Lock()
+		assert.Expect(capturedStdout).To(ContainSubstring("before-error"))
+		mu.Unlock()
 	})
 
 	t.Run("context cancellation stops streaming", func(t *testing.T) {
@@ -185,15 +206,13 @@ func TestStreamLogsToStorage(t *testing.T) {
 		assert.Expect(err).NotTo(HaveOccurred())
 		defer func() { _ = driver.Close() }()
 
-		// Create a context that will be cancelled - give enough time for image pull
-		// but not enough for the full 10 second sleep
+		// Create a context that will be cancelled
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 
 		runID := "stream-cancel-run-" + time.Now().Format("150405")
-		storageKey := "/pipeline/test/jobs/cancel-job"
 
-		// Create pipeline runner with storage
+		// Create pipeline runner
 		runner := runtime.NewPipelineRunner(ctx, driver, store, logger, uniqueNS, runID)
 		defer func() { _ = runner.CleanupVolumes() }()
 
@@ -209,13 +228,13 @@ func TestStreamLogsToStorage(t *testing.T) {
 				Path: "sh",
 				Args: []string{"-c", "echo before-cancel; sleep 10; echo after-cancel"},
 			},
-			StorageKey: storageKey,
+			OnOutput: func(stream string, data string) {
+				// Callback may or may not be called depending on timing
+			},
 		})
 
 		// The task should be aborted due to context cancellation
 		assert.Expect(err).NotTo(HaveOccurred())
 		assert.Expect(result.Status).To(Equal(runtime.RunAbort))
-		// Note: Partial output may or may not be captured depending on timing
-		// The important assertion is that the run was aborted properly
 	})
 }

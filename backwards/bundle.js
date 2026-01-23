@@ -31,6 +31,8 @@ var TaskRunner = class {
     } else {
       image = step.config?.image_resource.source.repository;
     }
+    let accumulatedStdout = "";
+    let accumulatedStderr = "";
     try {
       result = await runtime.run({
         command: {
@@ -45,8 +47,19 @@ var TaskRunner = class {
         mounts,
         privileged: step.privileged ?? false,
         stdin: stdin ?? "",
-        storageKey: taskStorageKey,
-        timeout: step.timeout
+        timeout: step.timeout,
+        onOutput: (stream, data) => {
+          if (stream === "stdout") {
+            accumulatedStdout += data;
+          } else {
+            accumulatedStderr += data;
+          }
+          storage.set(taskStorageKey, {
+            status: "running",
+            stdout: accumulatedStdout,
+            stderr: accumulatedStderr
+          });
+        }
       });
       let status = "success";
       if (result.status == "abort") {
