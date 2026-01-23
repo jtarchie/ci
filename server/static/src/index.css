@@ -80,6 +80,21 @@
   stroke: #4b5563;
 }
 
+.node-rect.running {
+  fill: #eab308;
+  stroke: #ca8a04;
+  animation: pulse-running 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-running {
+  0%, 100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.3);
+  }
+}
+
 .node-rect.abort {
   fill: #9ca3af;
   stroke: #6b7280;
