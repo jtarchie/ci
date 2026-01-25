@@ -1007,4 +1007,33 @@ export function initGraph(graphData, _currentPath) {
   announcer.textContent =
     `Pipeline graph loaded with ${nodesLayer.children.length} nodes. Use Tab to navigate between nodes, arrow keys to pan, and plus/minus to zoom.`;
   document.body.appendChild(announcer);
+
+  // Listen for htmx swaps on the graph data element for live updates
+  document.body.addEventListener("htmx:afterSwap", (event) => {
+    const target = event.detail.target;
+    if (!target || target.id !== "graph-data") return;
+
+    try {
+      // Parse the new graph data
+      const newData = JSON.parse(target.textContent);
+      // Re-layout and render with updated data preserving current zoom/pan
+      const { nodes: newNodes, edges: newEdges } = layoutGraph(newData);
+      allNodes = newNodes;
+      renderGraphWithNodes(newNodes, newEdges);
+    } catch (e) {
+      console.error("Failed to update graph from htmx swap:", e);
+    }
+  });
+
+  // Helper to re-render with existing nodes
+  function renderGraphWithNodes(nodes, edges) {
+    nodesLayer.innerHTML = "";
+    edgesLayer.innerHTML = "";
+
+    renderEdges(edges);
+    renderNodes(nodes);
+    updateMinimapNodes(nodes);
+    updateTransform();
+    updateMinimapViewport();
+  }
 }

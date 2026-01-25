@@ -5,7 +5,11 @@
  * - Keyboard navigation
  * - Stats display
  * - Help panel
+ * - Live polling with state preservation
  */
+
+// Track expanded task state across htmx swaps
+const expandedTasks = new Set();
 
 export function initResults() {
   const searchInput = document.getElementById("task-search");
@@ -17,6 +21,15 @@ export function initResults() {
 
   // Bail if required elements don't exist
   if (!tasksContainer) return;
+
+  // Restore expanded state from previous swap
+  restoreExpandedState(tasksContainer);
+
+  // Listen for htmx before swap to save state
+  document.body.addEventListener("htmx:beforeSwap", handleBeforeSwap);
+
+  // Listen for htmx after swap to restore state
+  document.body.addEventListener("htmx:afterSwap", handleAfterSwap);
 
   // Help panel toggle
   if (helpToggle && helpPanel) {
@@ -198,4 +211,79 @@ export function initResults() {
         break;
     }
   });
+}
+
+// Handle htmx beforeSwap - save expanded state
+function handleBeforeSwap(event) {
+  const target = event.detail.target;
+  if (!target || target.id !== "tasks-container") return;
+
+  // Save expanded task state
+  saveExpandedState(target);
+}
+
+// Handle htmx afterSwap - restore expanded state and reinitialize
+function handleAfterSwap(event) {
+  const target = event.detail.target;
+  if (!target || target.id !== "tasks-container") return;
+
+  // Restore expanded state
+  restoreExpandedState(target);
+
+  // Update stats
+  updateStatsForContainer(target);
+}
+
+// Save which tasks are expanded
+function saveExpandedState(container) {
+  expandedTasks.clear();
+  const tasks = container.querySelectorAll(".task-item[open]");
+  tasks.forEach((task) => {
+    const taskName = task.querySelector(".font-medium")?.textContent?.trim();
+    if (taskName) {
+      expandedTasks.add(taskName);
+    }
+  });
+}
+
+// Restore expanded state to tasks
+function restoreExpandedState(container) {
+  if (expandedTasks.size === 0) return;
+
+  const tasks = container.querySelectorAll(".task-item");
+  tasks.forEach((task) => {
+    const taskName = task.querySelector(".font-medium")?.textContent?.trim();
+    if (taskName && expandedTasks.has(taskName)) {
+      task.setAttribute("open", "");
+    }
+  });
+}
+
+// Update stats for a given container
+function updateStatsForContainer(container) {
+  const tasks = container.querySelectorAll(".task-item");
+  let success = 0,
+    failure = 0,
+    pending = 0;
+  tasks.forEach((task) => {
+    if (
+      task.classList.contains("bg-green-100") ||
+      task.classList.contains("dark:bg-green-900/30")
+    ) {
+      success++;
+    } else if (
+      task.classList.contains("bg-red-100") ||
+      task.classList.contains("dark:bg-red-900/30")
+    ) {
+      failure++;
+    } else {
+      pending++;
+    }
+  });
+  const successEl = document.getElementById("stat-success");
+  const failureEl = document.getElementById("stat-failure");
+  const pendingEl = document.getElementById("stat-pending");
+  if (successEl) successEl.textContent = success;
+  if (failureEl) failureEl.textContent = failure;
+  if (pendingEl) pendingEl.textContent = pending;
 }
