@@ -2,10 +2,29 @@
 <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden"
   id="runs-section"
   hx-get="/pipelines/{{ .PipelineID }}/runs-section"
-  hx-trigger="every 2s [document.querySelector('[data-run-status=running], [data-run-status=queued]')]"
+  hx-trigger="every 3s [document.querySelector('[data-run-status=running], [data-run-status=queued]')]"
   hx-swap="outerHTML">
-  <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+  <div
+    class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
     <h2 class="text-xl font-semibold dark:text-white">Pipeline Runs</h2>
+    {{ $hasActive := false }}
+    {{ range .Runs }}
+    {{ if or (eq .Status "running") (eq .Status "queued") }}
+    {{ $hasActive = true }}
+    {{ end }}
+    {{ end }}
+    {{ if $hasActive }}
+    <span
+      class="flex items-center gap-2 text-sm text-yellow-600 dark:text-yellow-400">
+      <span class="relative flex h-2 w-2">
+        <span
+          class="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+        <span
+          class="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
+      </span>
+      Live
+    </span>
+    {{ end }}
   </div>
 
   {{ if eq (len .Runs) 0 }}

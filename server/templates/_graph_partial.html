@@ -1,0 +1,11 @@
+{{ define "graph-partial" }}
+<!-- Graph data partial - used for htmx polling -->
+<script type="application/json" id="graph-data"
+  data-path="{{ .Path }}"
+  data-run-active="{{ if .IsActive }}true{{ else }}false{{ end }}"
+  {{ if and .RunID .IsActive }}
+  hx-get="/runs/{{ .RunID }}/graph-data"
+  hx-trigger="every 3s"
+  hx-swap="outerHTML"
+  {{ end }}>{{ .TreeJSON }}</script>
+{{ end }}
