@@ -10,6 +10,7 @@ require (
 	github.com/bmatcuk/doublestar/v4 v4.10.0
 	github.com/containerd/errdefs v1.0.0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
+	github.com/digitalocean/go-qemu v0.0.0-20250212194115-ee9b0668d242
 	github.com/digitalocean/godo v1.175.0
 	github.com/docker/cli v29.2.1+incompatible
 	github.com/docker/docker v28.5.2+incompatible
@@ -22,6 +23,7 @@ require (
 	github.com/go-task/slim-sprig/v3 v3.0.0
 	github.com/goccy/go-yaml v1.19.2
 	github.com/hetznercloud/hcloud-go/v2 v2.36.0
+	github.com/kdomanski/iso9660 v0.4.0
 	github.com/klauspost/compress v1.18.4
 	github.com/labstack/echo/v4 v4.15.0
 	github.com/lmittmann/tint v1.1.3
@@ -68,6 +70,7 @@ require (
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/cyphar/filepath-securejoin v0.6.1 // indirect
+	github.com/digitalocean/go-libvirt v0.0.0-20220804181439-8648fbde413e // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/docker/go-connections v0.6.0 // indirect

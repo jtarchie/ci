@@ -332,7 +332,10 @@ When implementing for a specific platform, consider:
 7. **Cleanup**: Whether cleanup requires specific ordering (containers before
    volumes)
 
-## Reference Implementation
+## Reference Implementations
 
-See `orchestra/docker/` for a complete, production-ready implementation that can
-serve as a reference.
+- `orchestra/docker/` — Production-ready container-based driver using the Docker
+  API. Good reference for standard container orchestration patterns.
+- `orchestra/qemu/` — VM-based driver that executes commands via the QEMU Guest
+  Agent (QGA). Good reference for non-container drivers that manage full virtual
+  machines, including lazy boot, 9p volume sharing, and cloud-init guest setup.

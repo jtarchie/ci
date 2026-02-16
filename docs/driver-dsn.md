@@ -252,6 +252,87 @@ for more granular resource management and targeted cleanup.
 connect to the server. Both the key and server are cleaned up when the driver is
 closed.
 
+### QEMU Driver
+
+The QEMU driver runs tasks inside a local QEMU virtual machine. Commands are
+executed inside the guest via the QEMU Guest Agent (QGA), and volumes are shared
+between host and guest via 9p virtfs. The VM is lazily booted on first use and
+automatically destroyed when the driver is closed.
+
+| Parameter     | Description                       | Default                             | Example                                        |
+| ------------- | --------------------------------- | ----------------------------------- | ---------------------------------------------- |
+| `memory`      | VM memory in MB                   | `2048`                              | `qemu:memory=4096`                             |
+| `cpus`        | Number of vCPUs                   | `2`                                 | `qemu:cpus=4`                                  |
+| `accel`       | Acceleration backend              | `hvf` (macOS), `kvm` (Linux), `tcg` | `qemu:accel=tcg`                               |
+| `qemu_binary` | Path to QEMU binary               | `qemu-system-x86_64` or `aarch64`   | `qemu:qemu_binary=/usr/bin/qemu-system-x86_64` |
+| `cache_dir`   | Directory for cached cloud images | `~/.cache/ci/qemu`                  | `qemu:cache_dir=/tmp/qemu-cache`               |
+| `image`       | Path to a custom qcow2 base image | Auto-downloads Ubuntu cloud image   | `qemu:image=/path/to/image.qcow2`              |
+
+**Acceleration**:
+
+- **macOS**: Defaults to `hvf` (Hypervisor.framework) for near-native
+  performance
+- **Linux**: Defaults to `kvm` if `/dev/kvm` is available, otherwise `tcg`
+  (software emulation)
+- **Other**: Defaults to `tcg`
+
+**Architecture**: The driver auto-detects the host architecture and selects the
+appropriate QEMU binary (`qemu-system-x86_64` or `qemu-system-aarch64`) and
+machine type.
+
+**Examples**:
+
+```bash
+# Basic usage with defaults
+--driver=qemu
+
+# Custom memory and CPU
+--driver=qemu:memory=4096,cpus=4
+
+# URL-style with namespace
+--driver=qemu://my-namespace?memory=4096&cpus=4
+
+# Custom base image
+--driver=qemu:image=/path/to/custom.qcow2
+
+# Software emulation (no hardware acceleration)
+--driver=qemu:accel=tcg
+```
+
+**Environment Variables**:
+
+| Variable         | Description                   |
+| ---------------- | ----------------------------- |
+| `QEMU_MEMORY`    | Default VM memory in MB       |
+| `QEMU_CPUS`      | Default number of vCPUs       |
+| `QEMU_ACCEL`     | Default acceleration backend  |
+| `QEMU_BINARY`    | Default QEMU binary path      |
+| `QEMU_CACHE_DIR` | Default image cache directory |
+| `QEMU_IMAGE`     | Default base image path       |
+
+**How it works**:
+
+1. Downloads an Ubuntu cloud image (cached locally) or uses a provided image
+2. Creates a copy-on-write overlay so the base image is never modified
+3. Generates a cloud-init seed ISO to configure the guest (SSH keys, QGA
+   install)
+4. Boots the VM with QMP monitor, QGA channel (TCP), and 9p volume sharing
+5. Waits for cloud-init to complete and QGA to become responsive
+6. Executes task commands via QGA `guest-exec` / `guest-exec-status`
+7. Volumes are shared via 9p virtfs, mounted at `/mnt/volumes/<name>` in the
+   guest
+
+**Prerequisites**:
+
+- QEMU installed (`brew install qemu` on macOS, `apt install qemu-system` on
+  Linux)
+- `qemu-img` and `genisoimage`/`mkisofs` available on PATH
+- For hardware acceleration: KVM support on Linux, or Hypervisor.framework on
+  macOS
+
+**Note**: The VM and all temporary files (overlay disk, seed ISO, volumes) are
+cleaned up when the driver is closed.
+
 ## Examples
 
 ### Development
