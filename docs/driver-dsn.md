@@ -333,6 +333,116 @@ machine type.
 **Note**: The VM and all temporary files (overlay disk, seed ISO, volumes) are
 cleaned up when the driver is closed.
 
+### Apple Virtualization (VZ) Driver
+
+The VZ driver runs tasks inside a local virtual machine using Apple's
+Virtualization.framework (macOS only). Commands are executed inside the guest
+via a custom vsock-based agent, and volumes are shared between host and guest
+via virtiofs. The VM is lazily booted on first use and automatically destroyed
+when the driver is closed.
+
+| Parameter   | Description                       | Default               | Example                       |
+| ----------- | --------------------------------- | --------------------- | ----------------------------- |
+| `memory`    | VM memory in MB                   | `2048`                | `vz:memory=4096`              |
+| `cpus`      | Number of vCPUs                   | `2`                   | `vz:cpus=4`                   |
+| `cache_dir` | Directory for cached cloud images | `~/.cache/ci/vz`      | `vz:cache_dir=/tmp/vz-cache`  |
+| `image`     | Path to a custom raw base image   | Auto-downloads Ubuntu | `vz:image=/path/to/image.raw` |
+
+**Examples**:
+
+```bash
+# Basic usage with defaults
+--driver=vz
+
+# Custom memory and CPU
+--driver=vz:memory=4096,cpus=4
+
+# URL-style with namespace
+--driver=vz://my-namespace?memory=4096&cpus=4
+
+# Custom base image
+--driver=vz:image=/path/to/custom.raw
+```
+
+**Environment Variables**:
+
+| Variable       | Description                   |
+| -------------- | ----------------------------- |
+| `VZ_MEMORY`    | Default VM memory in MB       |
+| `VZ_CPUS`      | Default number of vCPUs       |
+| `VZ_CACHE_DIR` | Default image cache directory |
+| `VZ_IMAGE`     | Default base image path       |
+
+**How it works**:
+
+1. Downloads an Ubuntu cloud image (cached locally) or uses a provided image
+2. Converts the image to raw format (Apple VZ requires raw disk images)
+3. Creates a writable copy so the base image is never modified
+4. Generates a cloud-init seed ISO to configure the guest (vsock agent,
+   virtiofs)
+5. Boots the VM with EFI boot loader, virtiofs sharing, and vsock communication
+6. Waits for cloud-init to complete and the vsock agent to become responsive
+7. Executes task commands via the vsock agent protocol
+8. Volumes are shared via virtiofs, mounted at `/mnt/volumes/<name>` in the
+   guest
+
+**Prerequisites**:
+
+- macOS 13 (Ventura) or later
+- Binary must be codesigned with `com.apple.security.virtualization` entitlement
+- `qemu-img` available on PATH (for qcow2 → raw image conversion)
+- Go toolchain available for cross-compiling the guest agent
+
+**Entitlements Setup**:
+
+Apple's Virtualization.framework requires executables to be codesigned with the
+`com.apple.security.virtualization` entitlement before VMs can be created.
+Without this, the driver will fail with error:
+`"The process doesn't have the
+'com.apple.security.virtualization' entitlement."`
+
+To enable VZ driver support:
+
+1. Create an `entitlements.plist` file:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.virtualization</key>
+    <true/>
+</dict>
+</plist>
+```
+
+2. Codesign your binary:
+
+```bash
+# After building
+go build -o ci .
+codesign -s - -f --entitlements entitlements.plist ./ci
+
+# For test binaries
+go test -c ./orchestra/vz
+codesign -s - -f --entitlements entitlements.plist ./vz.test
+./vz.test -test.v
+```
+
+**Note**: The `-s -` flag uses ad-hoc signing (no certificate required). For
+distribution, use a valid Developer ID certificate:
+`-s "Developer ID
+Application: Your Name (TEAM_ID)"`.
+
+**Architecture**: The driver always uses hardware-accelerated virtualization via
+Apple's Hypervisor.framework. On Apple Silicon Macs, the guest runs arm64 Linux.
+
+**Note**: The `task.Image` field (e.g., "busybox") is ignored — commands run
+directly in the guest OS, similar to the QEMU and native drivers.
+
+**Note**: The VM and all temporary files (disk copy, seed ISO, volumes) are
+cleaned up when the driver is closed.
+
 ## Examples
 
 ### Development
