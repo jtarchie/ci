@@ -59,7 +59,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to listen on vsock port %d: %v", vsockPort, err)
 	}
-	defer listener.Close()
+	defer listener.Close() //nolint:errcheck
 
 	log.Printf("listening on vsock port %d", vsockPort)
 
@@ -76,7 +76,7 @@ func main() {
 }
 
 func handleConnection(conn net.Conn) {
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck
 
 	decoder := json.NewDecoder(conn)
 	encoder := json.NewEncoder(conn)
