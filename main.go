@@ -11,6 +11,7 @@ import (
 	_ "github.com/jtarchie/ci/orchestra/docker"
 	_ "github.com/jtarchie/ci/orchestra/k8s"
 	_ "github.com/jtarchie/ci/orchestra/native"
+	_ "github.com/jtarchie/ci/orchestra/qemu"
 	_ "github.com/jtarchie/ci/resources/git"
 	_ "github.com/jtarchie/ci/resources/mock"
 	_ "github.com/jtarchie/ci/storage/sqlite"

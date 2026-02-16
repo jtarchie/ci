@@ -5,6 +5,10 @@
 This is a development repository for CI/CD system. These notes can probably be
 inferred from the `git` commit messages. I'm journaling for my own benefit.
 
+- 2026-02-16:
+  - Added QEMU driver for running pipelines inside local VMs. Uses QGA for
+    command execution, 9p virtfs for volumes, and cloud-init for guest setup.
+    See [driver-dsn.md](driver-dsn.md) for configuration details.
 - 2026-01-15:
   - Added S3-backed volume caching with zstd/gzip compression. See
     [caching.md](caching.md) for details.
