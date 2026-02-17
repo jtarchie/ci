@@ -2,448 +2,802 @@
 
 ## Overview
 
-Integrate
-[Charm Bracelet's fantasy library](https://github.com/charmbracelet/fantasy) to
-enable AI agent steps in YAML and TS/JS pipelines. Agents perform autonomous
-multi-step tasks using available tools (container operations, file checks, API
-calls), with traces stored in the pipeline's hierarchical storage tree.
+Add AI agent steps to pipelines using
+[Charm Bracelet's fantasy library](https://github.com/charmbracelet/fantasy).
+Agents debug failures, analyze output, and perform multi-step tasks within
+containers.
+
+**Design principle**: Minimal configuration for common cases, optional overrides
+for advanced use.
+
+## Core Primitive
+
+A single new step type: `agent`. It gets:
+
+- **Prompt**: What to do
+- **Container**: Where to execute (defaults to previous step's image)
+- **Tools**: Basic tools (`exec`, `read_file`, `read_output`) + composable tools
+  (containers, agents)
+- **Context**: Automatic access to previous step's results and volumes
+- **Composability**: Containers and agents are tools that can be added to agents
 
 ## Goals
 
-- Delegate complex debugging/analysis tasks to AI agents within pipelines
-- Provide safe, sandboxed tool access with explicit whitelists
-- Store structured agent execution traces for auditability
-- Support iterative command execution via persistent sandbox containers
-- Maintain backward compatibility with existing Concourse YAML syntax
+- Zero-config agent debugging: `agent: "Debug the failure"` just works
+- Safe execution within existing container boundaries
+- Visible traces in storage tree
 
 ## Non-Goals
 
-- Unsupervised agent execution
-- Real-time streaming UI (batch execution for MVP)
-- Agent access to host file system outside pipeline volumes
+- Complex tool whitelisting (agents get standard tools only)
+- Arbitrary host access (container-scoped only)
+- Infinite recursion (sub-agent depth limited to 3 levels)
 
 ## YAML Syntax
 
+### Minimal (90% use case)
+
 ```yaml
 jobs:
-  - name: debug-and-fix
+  - name: debug-test
     plan:
-      - task: failing-test
+      - task: test
         config:
           platform: linux
           image_resource:
             type: registry-image
             source: { repository: golang, tag: "1.22" }
           run:
-            path: sh
-            args: ["-c", "go test ./... || exit 1"]
+            path: go
+            args: ["test", "./..."]
 
-      - agent: investigate-failure
-        prompt: |
-          The previous task failed. Investigate by:
-          1. Check test output for missing dependencies
-          2. List files in the workspace
-          3. Run diagnostic commands in the sandbox
-          4. Suggest a fix
-        model: anthropic/claude-sonnet-4 # Format: provider/model-name
-        system: "You are a CI debugging assistant."
-        tools:
-          - read_file # Read from mounted volumes
-          - list_directory # List workspace contents
-          - read_output # Read previous step stdout/stderr
-          - container_start # Start persistent container
-          - container_exec # Execute in persistent container
-        sandbox:
-          # Sandbox uses same config as task
-          platform: linux
-          image_resource:
-            type: registry-image
-            source: { repository: golang, tag: "1.22" }
-          inputs:
-            - name: workspace # Mount workspace input
-            - name: cache # Mount cache from previous step
-          outputs:
-            - name: analysis # Write analysis results
-          caches:
-            - path: /go/pkg/mod # Persist Go module cache
-          params:
-            GO111MODULE: "on"
-            GOCACHE: "/go/pkg/mod"
-          container_limits:
-            cpu: 2000
-            memory: 2147483648 # 2GB
-          run:
-            path: sh
-            args: ["-c", "go version"] # Initialization command
-        max_steps: 10 # Stop after 10 tool calls
-        timeout: 5m # Agent execution timeout
-        output: analysis # Store result for chaining
-        on_failure: # Nested agent on failure
-          agent: create-github-issue
-          prompt: "Create issue with debug details"
-          tools: [http_request]
+      - agent: "Debug the test failure. Check logs and suggest a fix."
 ```
 
-**Key Features:**
+**What happens automatically:**
 
-- **Sandbox = Task config**: Sandbox uses same configuration as tasks (inputs,
-  outputs, caches, params, run command)
-- **Initialization command**: `run` executes once on container start for setup
-- **Persistent container**: Container stays alive for iterative `container_exec`
-  calls (Docker/K8s only)
-- **Output chaining**: Store agent results as pipeline inputs via `output` field
-- **Failure handling**: Nested agents via `on_failure`
-- **Tool whitelist**: Explicit `tools` list enforces security boundaries
+- Agent runs in `golang:1.22` image (inherits from previous step)
+- Gets basic tools: `exec(cmd)`, `read_file(path)`, `read_output(step)`
+- Previous step's volumes auto-mounted as `/workspace`
+- Uses Claude Sonnet 4 (via `ANTHROPIC_API_KEY`)
+- Stops after 20 tool calls or 10 minutes
+- Result stored at `/pipeline/{run}/agent-{name}/`
 
+### With Overrides
+
+```yaml
+- agent: investigate
+  prompt: "Analyze the memory leak."
+  image: golang:1.22-debug # Use different image
+  model: openai/gpt-4 # Override model (needs OPENAI_API_KEY)
+  params: { DEBUG: "true" } # Add env vars
+  max_steps: 50 # More tool calls
+  timeout: 30m # Longer timeout
+```
+
+**Override options (all optional):**
+
+- `image`: Container image (default: previous step's image)
+- `model`: Provider/model format `openai/gpt-4`, `anthropic/claude-sonnet-4`
+  (default: `anthropic/claude-sonnet-4`)
+- `params`: Environment variables (default: inherits from previous step)
+- `max_steps`: Tool call limit (default: 20)
+- `timeout`: Execution timeout (default: 10m)
+- `max_depth`: Sub-agent nesting limit (default: 3)
+
+### Advanced: Adding Container and Agent Tools
+
+```yaml
+- agent: complex-analysis
+  prompt: |
+    Analyze this codebase:
+    1. Run tests in multiple containers (Go, Python, Node)
+    2. Delegate security analysis to a specialized sub-agent
+    3. Compile results
+  tools:
+    - container:
+        name: golang_runner
+        image: golang:1.22
+        description: Run Go commands
+        persistent: true  # Container stays alive for multiple commands
+    - container:
+        name: python_runner
+        image: python:3.12
+        description: Run Python commands
+        persistent: true
+    - agent:
+        name: security_specialist
+        prompt_prefix: "You are a security expert. "
+        image: security-scanner:latest
+        max_steps: 30
+  max_steps: 100
+  timeout: 30m
+```
+
+**Two types of container tools:**
+
+````yaml
+# One-shot container (default: persistent: false):
+# golang_runner({ command: "go", args: ["test", "./..."] })
+# → Spins up container, runs command, exits, returns { stdout, stderr, exitCode }
+
+# Persistent container (persistent: true):
+# golang_runner({ command: "go", args: ["test", "./..."] })
+# → First call: starts container, runs command, keeps alive
+# → Subsequent calls: reuses same container, runs command
+# → Returns { stdout, stderr, exitCode } each time
+
+# Example usage:
+# Call 1: golang_runner({ command: "go", args: ["mod", "download"] })
+# Call 2: golang_runner({ command: "go", args: ["test", "./.."] })
+# Call 3: golang_runner({ command: "go", args: ["build"] })
+# All run in same container, preserving state (downloaded modules, build cache, etc.)
+
+# Agent tools:
+# security_specialist({ prompt: "Check for SQL injection vulnerabilities" })
+# → Delegates to sub-agent with security context, returns { text, tokensUsed }
 ## TypeScript/JavaScript API
 
+### Minimal
+
 ```typescript
-// examples/both/agent-debug.ts
-import { Agent } from "@charmbracelet/fantasy";
-
 const pipeline = async () => {
-  const workspace = await runtime.createVolume();
-  const cache = await runtime.createVolume();
-
-  // Run failing test
-  let testResult = await runtime.run({
-    name: "failing-test",
+  // Run test
+  let result = await runtime.run({
+    name: "test",
     image: "golang:1.22",
     command: { path: "go", args: ["test", "./..."] },
-    mounts: { "/workspace": workspace },
   });
 
-  // Start persistent sandbox container for agent
-  const sandbox = await runtime.startContainer({
-    name: "agent-sandbox",
-    image: "golang:1.22",
-    command: { path: "sh", args: ["-c", "go version"] }, // Initialization
-    mounts: {
-      "/workspace": workspace,
-      "/go/pkg/mod": cache,
-    },
-    env: { GO111MODULE: "on" },
-    keepAlive: true, // Don't exit after init command
+  // Agent automatically gets context from previous step
+  let analysis = await runtime.agent({
+    prompt: "Debug the test failure. Check logs and suggest a fix.",
   });
 
-  // Create agent with container tools
-  const agent = new Agent({
-    model: "anthropic/claude-sonnet-4",
-    system: "You are a CI debugging assistant.",
-  });
-
-  // Register CI tools
-  agent.addTool({
-    name: "read_file",
-    description: "Read file from workspace",
-    parameters: { path: "string" },
-    fn: async ({ path }) => {
-      const result = await sandbox.exec(["cat", `/workspace/${path}`]);
-      return result.stdout;
-    },
-  });
-
-  agent.addTool({
-    name: "container_exec",
-    description: "Execute command in sandbox",
-    parameters: { command: "string", args: "string[]" },
-    fn: async ({ command, args }) => {
-      const result = await sandbox.exec([command, ...args]);
-      return `stdout: ${result.stdout}\nstderr: ${result.stderr}\nexit: ${result.exitCode}`;
-    },
-  });
-
-  agent.addTool({
-    name: "read_previous_output",
-    description: "Read output from previous step",
-    parameters: { step: "string" },
-    fn: async ({ step }) => {
-      return testResult.stdout + "\n" + testResult.stderr;
-    },
-  });
-
-  // Run agent
-  const result = await agent.generate(
-    `The previous test failed. Investigate by checking files and running diagnostics. Suggest a fix.`,
-    { maxSteps: 10 },
+  console.log(analysis.text);
+  console.log(
+    `Used ${analysis.tokensUsed} tokens in ${analysis.steps.length} steps`,
   );
-
-  console.log(result.text);
-  console.log(`Tokens: ${result.tokensUsed}, Steps: ${result.steps.length}`);
-
-  // Cleanup
-  await sandbox.cleanup();
 };
 export { pipeline };
+````
+
+### With Overrides
+
+```typescript
+let analysis = await runtime.agent({
+  prompt: "Analyze the memory leak in detail.",
+  image: "golang:1.22-debug", // Override image
+  model: "openai/gpt-4", // Override model
+  env: { DEBUG: "true" }, // Add env vars
+  maxSteps: 50, // More tool calls
+  timeout: "30m", // Longer timeout
+  context: {
+    // Explicit context instead of auto-inherit
+    previousResult: result,
+    extraFiles: ["/app/config.yaml"],
+  },
+});
 ```
 
-**Key Changes:**
+**Built-in tools (always available):**
 
-- **JavaScript-driven agent**: Agent logic lives in JavaScript using fantasy
-  library directly
-- **`runtime.startContainer`**: Low-level primitive returns container handle
-  with `exec()` method
-- **Tool registration**: JavaScript registers tools that interact with container
-  via `exec()`
-- **Explicit lifecycle**: JavaScript controls container start, agent execution,
-  and cleanup
+```typescript
+// Basic tools - no registration needed:
+{
+  exec: (command: string[]) => { stdout, stderr, exitCode },
+  read_file: (path: string) => string,
+  read_output: (stepName: string) => { stdout, stderr },
+  list_files: (path: string) => string[],
+}
+```
+
+**Composable tools (add as needed):**
+
+```typescript
+let analysis = await runtime.agent({
+  prompt: "Analyze the codebase",
+  tools: [
+    // One-shot container tool
+    {
+      type: "container",
+      name: "quick_test",
+      image: "golang:1.22",
+      description: "Run single Go command",
+      persistent: false, // Default: runs command and exits
+    },
+    // Persistent container tool
+    {
+      type: "container",
+      name: "golang_env",
+      image: "golang:1.22",
+      description: "Interactive Go environment",
+      persistent: true, // Stays alive for multiple commands
+    },
+    // Agent tool
+    {
+      type: "agent",
+      name: "security_specialist",
+      promptPrefix: "You are a security expert. ",
+      image: "security-scanner:latest",
+      maxSteps: 30,
+    },
+  ],
+});
+
+// In agent execution, tools are available as:
+// - quick_test({ command: "go", args: ["test", "./..."] }) // New container each call
+// - golang_env({ command: "go", args: ["mod", "download"] }) // 1st call: starts container
+// - golang_env({ command: "go", args: ["test", "./..."] })    // 2nd call: reuses container
+// - golang_env({ command: "go", args: ["build"] })             // 3rd call: reuses container
+// - security_specialist({ prompt: "Check for SQL injection" })
+```
+
+**When to use persistent vs one-shot containers:**
+
+| Use Persistent (`persistent: true`)             | Use One-Shot (`persistent: false`, default) |
+| ----------------------------------------------- | ------------------------------------------- |
+| Multiple related commands in same environment   | Single command per tool invocation          |
+| Preserve state (installed deps, build cache)   | Stateless operations (scans, linters)       |
+| Interactive debugging workflows                 | Parallel tool execution                     |
+| Example: `npm install` then `npm test`          | Example: `trivy scan`, `golangci-lint run`  |
+| Example: `go mod download` then `go test`       | Example: One-off database queries           |
+| Agent decides when to reuse same container      | Fresh container every time                  |
+
+**Key benefit:** Persistent containers let agents build up state across multiple
+tool calls, like a human would in a shell session. The agent can install
+dependencies once, then run multiple tests/builds without reinstalling.
+
+### Advanced Example: Multi-Container Analysis
+
+```typescript
+const pipeline = async () => {
+  // Initial failing test
+  await runtime.run({
+    name: "test",
+    image: "golang:1.22",
+    command: { path: "go", args: ["test", "./..."] },
+  });
+
+  // Agent with container and agent tools
+  let result = await runtime.agent({
+    prompt: `
+      This test failed. Perform comprehensive analysis:
+      1. Run 'go test -v' using go_tester
+      2. Run linter using linter_runner
+      3. Delegate database migration check to db_specialist
+      4. Summarize findings
+    `,
+    tools: [
+      {
+        type: "container",
+        name: "go_tester",
+        image: "golang:1.22",
+        description: "Run Go tests and commands",
+        persistent: true, // Reuse container across multiple test runs
+      },
+      {
+        type: "container",
+        name: "linter_runner",
+        image: "golangci/golangci-lint:latest",
+        description: "Run golangci-lint",
+        persistent: false, // One-shot linter run
+      },
+      {
+        type: "agent",
+        name: "db_specialist",
+        promptPrefix: "You are a database expert. ",
+        image: "postgres:15",
+        maxSteps: 20,
+      },
+    ],
+    maxSteps: 100,
+  });
+
+  console.log(result.text);
+  // Agent will internally call:
+  // - go_tester({ command: "go", args: ["mod", "download"] }) // 1st: start container
+  // - go_tester({ command: "go", args: ["test", "-v"] })      // 2nd: reuse container
+  // - go_tester({ command: "go", args: ["test", "-race"] })   // 3rd: reuse container
+  // - linter_runner({ command: "golangci-lint", args: ["run"] }) // Fresh container
+  // - db_specialist({ prompt: "Check migration..." })
+};
+```
+
+## Use Cases
+
+### 1. Multi-Language Test Analysis
+
+Agent runs tests across different language environments:
+
+```yaml
+- agent: test-all-services
+  prompt: |
+    Run tests for all services and report which ones fail:
+    - Frontend: Use node_runner for 'npm test'
+    - Backend API: Use go_runner for 'go test ./...'
+    - Worker: Use python_runner for 'pytest'
+    Summarize all failures with recommendations.
+  tools:
+    - container:
+        name: node_runner
+        image: node:20
+        persistent: true
+    - container:
+        name: go_runner
+        image: golang:1.22
+        persistent: true
+    - container:
+        name: python_runner
+        image: python:3.12
+        persistent: true
+  max_steps: 50
+```
+
+**Why persistent matters here:** Agent might run `npm install` then `npm test`,
+reusing installed dependencies.
+
+### 2. Security Audit with Delegation
+
+Agent coordinates security checks across multiple tools:
+
+```yaml
+- agent: security-audit
+  prompt: |
+    Perform comprehensive security audit:
+    1. Use trivy_scanner to scan images
+    2. Delegate to dependency_auditor for npm audit
+    3. Delegate to sast_analyzer for static analysis
+    4. Compile findings into priority-ranked report
+  tools:
+    - container:
+        name: trivy_scanner
+        image: aquasec/trivy:latest
+        description: Scan container images for vulnerabilities
+        persistent: false  # One-shot scanner
+    - agent:
+        name: dependency_auditor
+        prompt_prefix: "You are a dependency security expert. "
+        image: node:20
+        max_steps: 30
+    - agent:
+        name: sast_analyzer
+        prompt_prefix: "You are a static analysis expert. "
+        image: scanner:latest
+        max_steps: 40
+  max_steps: 100
+  timeout: 30m
+```
+
+**Note:** Security scanners are one-shot (persistent: false) since they typically
+run once per scan target.
+
+### 3. Gradual Debugging Escalation
+
+```typescript
+const pipeline = async () => {
+  let testResult = await runtime.run({
+    name: "integration-test",
+    image: "app:latest",
+    command: { path: "npm", args: ["test"] },
+  });
+
+  if (testResult.exitCode !== 0) {
+    // First-level agent: Quick diagnosis
+    let quickDiag = await runtime.agent({
+      prompt:
+        "Quickly check if this is a known issue. Review logs and workspace files.",
+      maxSteps: 10,
+    });
+
+    if (quickDiag.text.includes("needs deeper analysis")) {
+      // Second-level: Add specialized tools
+      let deepDiag = await runtime.agent({
+        prompt: `
+          Perform deep analysis:
+          1. Use db_checker to verify migrations
+          2. Use api_tester for health checks
+          3. Use dep_checker for dependencies
+          4. If uncertain, delegate to security_expert
+        `,
+        tools: [
+          { type: "container", name: "db_checker", image: "postgres:15" },
+          { type: "container", name: "api_tester", image: "curl/curl:latest" },
+          { type: "container", name: "dep_checker", image: "node:20" },
+          {
+            type: "agent",
+            name: "security_expert",
+            promptPrefix: "You are a security specialist. ",
+            maxSteps: 30,
+          },
+        ],
+        maxSteps: 50,
+      });
+
+      console.log("Deep analysis:", deepDiag.text);
+    }
+  }
+};
+```
 
 ## Implementation Overview
+
+### Philosophy
+
+**The agent is just another pipeline step with a container that runs commands.**
+No new abstractions needed - reuse existing container infrastructure.
 
 ### Architecture
 
 ```
-backwards/src/index.ts     → AgentStep interface (YAML → JS transpilation)
-runtime/container.go       → StartContainer(config) -> Container
-orchestra/orchestrator.go  → Container interface with Exec() method
-runtime/js.go              → Expose Container.Exec() to Goja VM
-storage/                   → Persist agent traces via JS storage API
+runtime/agent.go           → runtime.Agent(config) using existing Container
+runtime/agent_tools.go     → Built-in tool implementations (exec, read_file, etc.)
+backwards/src/agent.ts     → YAML transpilation (agent: "prompt" → runtime.agent())
 ```
 
-**Philosophy**: Agent execution is JavaScript-driven. Go runtime provides
-low-level container primitives (`startContainer`, `container.exec`), and
-JavaScript uses fantasy library to orchestrate agent behavior.
+**No new:** Driver interfaces, container types, or lifecycle management. Use
+existing `runtime.run()` internals.
 
-### Core Components
+### Core Implementation
 
-**1. Container Start Configuration**
+**1. Agent Config (Simple)**
 
 ```go
-// runtime/container.go
-type StartContainerConfig struct {
-  Name            string                 `json:"name"`
-  Image           string                 `json:"image"`
-  Command         *Command               `json:"command"`        // Init command
-  Mounts          map[string]VolumeResult `json:"mounts"`
-  Env             map[string]string      `json:"env"`
-  ContainerLimits ContainerLimits        `json:"containerLimits"`
-  KeepAlive       bool                   `json:"keepAlive"`      // Don't exit after command
+// runtime/agent.go
+type AgentConfig struct {
+  Name      string            `json:"name"`
+  Prompt    string            `json:"prompt"`
+  Image     string            `json:"image"`     // Optional: defaults to previous step
+  Model     string            `json:"model"`     // Optional: default "anthropic/claude-sonnet-4"
+  Env       map[string]string `json:"env"`       // Optional: inherits from previous
+  MaxSteps  int               `json:"maxSteps"`  // Default: 20
+  Timeout   string            `json:"timeout"`   // Default: "10m"
+  Tools     []Tool            `json:"tools"`     // Optional: container and agent tools
 }
 
-// Returns Container with Exec() method
-func (r *Runtime) StartContainer(ctx context.Context, config StartContainerConfig) (Container, error)
-```
-
-**Note**: Sandbox in YAML uses full task config
-(inputs/outputs/caches/params/run) which transpiles to `StartContainerConfig` +
-volume setup.
-
-**2. Container Interface with Exec**
-
-Containers expose `Exec()` for running commands without restarting:
-
-```go
-// Returned by runtime.startContainer (exposed to Goja VM)
-type Container interface {
-  Exec(ctx context.Context, command []string) (ExecResult, error)
-  Cleanup(ctx context.Context) error
-  ID() string
+type Tool struct {
+  Type         string            `json:"type"`          // "container" or "agent"
+  Name         string            `json:"name"`          // Tool call name
+  Description  string            `json:"description"`   // For container tools
+  Image        string            `json:"image"`         // Container image or agent image
+  Persistent   bool              `json:"persistent"`    // For container tools: keep alive
+  PromptPrefix string            `json:"promptPrefix"`  // For agent tools
+  MaxSteps     int               `json:"maxSteps"`      // For agent tools
+  Env          map[string]string `json:"env"`           // For container tools
 }
 
-type ExecResult struct {
-  Stdout   string `json:"stdout"`
-  Stderr   string `json:"stderr"`
-  ExitCode int    `json:"exitCode"`
+type AgentResult struct {
+  Text        string      `json:"text"`
+  TokensUsed  int         `json:"tokensUsed"`
+  Steps       []ToolCall  `json:"steps"`
+  Duration    string      `json:"duration"`
 }
-```
 
-**JavaScript usage**:
+func (r *Runtime) Agent(ctx context.Context, config AgentConfig) (AgentResult, error) {
+  return r.agentWithDepth(ctx, config, 0)
+}
 
-```typescript
-const container = await runtime.startContainer({
-  image: "alpine",
-  keepAlive: true,
-});
-const result = await container.exec(["ls", "-la"]);
-console.log(result.stdout);
-await container.cleanup();
-```
-
-**3. Orchestra Driver Implementation**
-
-```go
-// orchestra/orchestrator.go - Container interface extension
-type Container interface {
-  Cleanup(ctx context.Context) error
-  Logs(ctx context.Context, stdout, stderr io.Writer) error
-  Status(ctx context.Context) (ContainerStatus, error)
-  ID() string
+func (r *Runtime) agentWithDepth(ctx context.Context, config AgentConfig, depth int) (AgentResult, error) {
+  // 1. Start agent's main container
+  container := r.startAgentContainer(ctx, config)
+  defer container.Cleanup(ctx)
   
-  // New: Execute commands in running container
-  Exec(ctx context.Context, command []string) (ExecResult, error)
-}
-
-type ExecResult struct {
-  Stdout   string
-  Stderr   string
-  ExitCode int
+  // 2. Create tools: basic tools + container tools (persistent or one-shot) + agent tools
+  tools := createAllTools(r, config, container, depth)
+  
+  // 3. Create fantasy agent with all tools
+  agent := fantasy.NewAgent(config.Model, tools)
+  
+  // 4. Execute agent
+  result := agent.Generate(ctx, config.Prompt, config.MaxSteps)
+  
+  // 5. Cleanup all persistent containers
+  for _, tool := range tools {
+    if tool.Cleanup != nil {
+      tool.Cleanup()
+    }
+  }
+  
+  // 6. Store trace and return result
+  return result, nil
 }
 ```
 
-**Docker implementation** (`orchestra/docker/docker.go`):
+**2. Tool System**
 
 ```go
-func (c *Container) Exec(ctx context.Context, command []string) (ExecResult, error) {
-  execConfig := types.ExecConfig{Cmd: command, AttachStdout: true, AttachStderr: true}
-  execID, err := c.client.ContainerExecCreate(ctx, c.id, execConfig)
-  // ... attach, run, collect output
+// runtime/agent_tools.go
+
+// Basic tools - always available
+func createBasicTools(container Container) []fantasy.Tool {
+  return []fantasy.Tool{
+    {
+      Name: "exec",
+      Description: "Execute command in agent's container",
+      Fn: func(command []string) (string, error) {
+        result := container.Exec(ctx, command)
+        return fmt.Sprintf("stdout: %s\nstderr: %s\nexit: %d", 
+                result.Stdout, result.Stderr, result.ExitCode), nil
+      },
+    },
+    {
+      Name: "read_file",
+      Description: "Read file from workspace",
+      Fn: func(path string) (string, error) {
+        result := container.Exec(ctx, []string{"cat", filepath.Join("/workspace", path)})
+        return result.Stdout, nil
+      },
+    },
+    {
+      Name: "read_output",
+      Description: "Read previous step output from pipeline storage",
+      Fn: func(stepName string) (string, error) {
+        return r.storage.Get(fmt.Sprintf("/pipeline/%s/stdout", stepName))
+      },
+    },
+    {
+      Name: "list_files",
+      Description: "List files in directory",  
+      Fn: func(path string) ([]string, error) {
+        result := container.Exec(ctx, []string{"ls", "-1", filepath.Join("/workspace", path)})
+        return strings.Split(result.Stdout, "\n"), nil
+      },
+    },
+  }
+}
+
+// Create container tool from config
+func createContainerTool(r *Runtime, tool Tool, baseVolumes map[string]Volume) fantasy.Tool {
+  var persistentContainer Container // Nil if not persistent
+  
+  return fantasy.Tool{
+    Name: tool.Name,
+    Description: tool.Description,
+    Parameters: map[string]string{
+      "command": "Command to run",
+      "args": "Command arguments",
+    },
+    Fn: func(command string, args []string) (RunResult, error) {
+      if tool.Persistent {
+        // Start container on first call, reuse thereafter
+        if persistentContainer == nil {
+          persistentContainer = r.StartContainer(ctx, StartContainerConfig{
+            Name:   tool.Name,
+            Image:  tool.Image,
+            Env:    tool.Env,
+            Mounts: baseVolumes,
+          })
+        }
+        // Execute in persistent container
+        result := persistentContainer.Exec(ctx, append([]string{command}, args...))
+        return RunResult{
+          Stdout:   result.Stdout,
+          Stderr:   result.Stderr,
+          ExitCode: result.ExitCode,
+        }, nil
+      } else {
+        // One-shot: start container, run command, exit
+        return r.Run(ctx, RunConfig{
+          Name:    tool.Name,
+          Image:   tool.Image,
+          Command: &Command{Path: command, Args: args},
+          Env:     tool.Env,
+          Mounts:  baseVolumes,
+        })
+      }
+    },
+    // Cleanup function called when agent finishes
+    Cleanup: func() error {
+      if persistentContainer != nil {
+        return persistentContainer.Cleanup(ctx)
+      }
+      return nil
+    },
+  }
+}
+
+// Create agent tool from config
+func createAgentTool(r *Runtime, tool Tool, depth int) fantasy.Tool {
+  return fantasy.Tool{
+    Name: tool.Name,
+    Description: fmt.Sprintf("Delegate to %s sub-agent", tool.Name),
+    Parameters: map[string]string{
+      "prompt": "Task description for the sub-agent",
+    },
+    Fn: func(prompt string) (AgentResult, error) {
+      if depth >= 3 {
+        return AgentResult{}, fmt.Errorf("max agent depth reached")
+      }
+      // Prepend context to prompt
+      fullPrompt := tool.PromptPrefix + prompt
+      return r.agentWithDepth(ctx, AgentConfig{
+        Prompt:   fullPrompt,
+        Image:    tool.Image,
+        MaxSteps: tool.MaxSteps,
+      }, depth+1)
+    },
+  }
+}
+
+// Combine all tools
+func createAllTools(r *Runtime, config AgentConfig, container Container, depth int) []fantasy.Tool {
+  tools := createBasicTools(container)
+  
+  // Add container and agent tools from config
+  for _, tool := range config.Tools {
+    switch tool.Type {
+    case "container":
+      tools = append(tools, createContainerTool(r, tool, container.Volumes()))
+    case "agent":
+      tools = append(tools, createAgentTool(r, tool, depth))
+    }
+  }
+  
+  return tools
 }
 ```
 
-Native driver returns `orchestra.ErrNotSupported`.
+**3. Container Reuse**
+
+```go
+// Reuse existing Container interface - no changes needed
+// orchestra/orchestrator.go already has Exec():
+
+type Container interface {
+  Exec(ctx context.Context, command []string) (ExecResult, error)
+  Cleanup(ctx context.Context) error
+  // ... existing methods
+}
+```
+
+**Docker driver already implements Exec()** via `ContainerExecCreate`. **Native
+driver** returns `ErrNotSupported` (agents unavailable).
 
 **4. YAML Transpilation**
 
-Backwards compatibility layer transpiles agent YAML to JavaScript:
-
 ```typescript
-// backwards/src/agent_runner.ts
-async function processAgentStep(step: AgentStep) {
-  // Setup sandbox container from task-like config
-  const sandbox = await setupSandboxFromConfig(step.sandbox);
+// backwards/src/agent.ts
+function transpileAgentStep(step: string | AgentStep): string {
+  const config = typeof step === "string"
+    ? { prompt: step } // Shorthand: agent: "prompt text"
+    : step; // Full: agent: { prompt: "...", image: "..." }
 
-  // Create agent with whitelisted tools
-  const agent = createAgentWithTools(
-    step.model,
-    step.system,
-    step.tools,
-    sandbox,
-  );
-
-  // Execute agent
-  const result = await agent.generate(step.prompt, { maxSteps: step.maxSteps });
-
-  // Store results and cleanup
-  await storeAgentTrace(result);
-  await sandbox.cleanup();
-}
-
-function setupSandboxFromConfig(config: TaskConfig): Promise<Container> {
-  // Convert task config (inputs/outputs/caches/params) to container config
-  // Run initialization command from config.run
-  // Return container handle with exec() exposed
-}
-```
-
-**5. Runtime API Additions**
-
-```go
-// runtime/runtime.go - New methods exposed to Goja VM
-
-func (r *Runtime) StartContainer(ctx context.Context, config StartContainerConfig) (Container, error) {
-  // Create container with keepAlive=true (overrides entrypoint with sleep infinity)
-  // Run initialization command
-  // Return container handle
-}
-```
-
-```typescript
-// Available in Goja VM
-interface Runtime {
-  startContainer(config: StartContainerConfig): Promise<Container>;
-  createVolume(): Promise<Volume>;
-  run(config: RunConfig): Promise<RunResult>;
-  // ... existing methods
-}
-
-interface Container {
-  exec(command: string[]): Promise<ExecResult>;
-  cleanup(): Promise<void>;
-  id: string;
-}
-```
-
-**6. Storage Structure**
-
-```
-/pipeline/{runID}/jobs/{job}/agent-{name}/
-  ├── prompt         (string)
-  ├── response       (string)
-  ├── steps          (JSON array of tool calls)
-  ├── finishReason   (string: "stop", "max_steps", "error")
-  ├── tokensUsed     (int)
-  └── duration       (duration)
-```
-
-Tool call format:
-
-```json
-{
-  "tool": "sandbox_exec",
-  "input": { "command": "go", "args": ["test", "./..."] },
-  "output": "PASS\nok github.com/example 0.123s",
-  "exitCode": 0,
-  "duration": "1.2s"
+  return `
+    await runtime.agent({
+      prompt: ${JSON.stringify(config.prompt)},
+      ${config.image ? `image: "${config.image}",` : ""}
+      ${config.model ? `model: "${config.model}",` : ""}
+      ${config.params ? `env: ${JSON.stringify(config.params)},` : ""}
+      ${config.max_steps ? `maxSteps: ${config.max_steps},` : ""}
+      ${config.timeout ? `timeout: "${config.timeout}",` : ""}
+    });
+  `;
 }
 ```
 
 ## Configuration
 
-### Model Provider DSN
+### Model Credentials
 
-Format: `provider/model-name` (e.g., `anthropic/claude-sonnet-4`,
-`openai/gpt-4`, `openrouter/anthropic/claude-3.5-sonnet`)
+Set environment variables based on provider:
 
-Credentials from environment: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
-`OPENROUTER_API_KEY`
+- Anthropic: `ANTHROPIC_API_KEY`
+- OpenAI: `OPENAI_API_KEY`
+- OpenRouter: `OPENROUTER_API_KEY`
 
-### Tool Safety
+Format in config: `provider/model` (e.g., `anthropic/claude-sonnet-4`,
+`openai/gpt-4`)
 
-- **Container isolation**: All agent tools execute within container boundaries
-- **Volume restrictions**: Only access explicitly mounted inputs/outputs/caches
-- **Resource limits**: Sandbox inherits container limits (CPU, memory, timeout)
-- **No host access**: Cannot access host file system outside pipeline volumes
-- **JavaScript sandboxing**: Goja VM prevents arbitrary system calls
+Default: `anthropic/claude-sonnet-4`
 
-### Driver Compatibility
+### Defaults
 
-| Feature                  | Docker | K8s | Native |
-| ------------------------ | ------ | --- | ------ |
-| `runtime.run`            | ✅     | ✅  | ✅     |
-| `runtime.startContainer` | ✅     | ✅  | ❌     |
-| `container.exec()`       | ✅     | ✅  | ❌     |
+| Setting     | Default                                                                                  | Override               |
+| ----------- | ---------------------------------------------------------------------------------------- | ---------------------- |
+| Image       | Previous step's image                                                                    | `image: myimage:tag`   |
+| Model       | `anthropic/claude-sonnet-4`                                                              | `model: openai/gpt-4`  |
+| Max steps   | 20                                                                                       | `max_steps: 50`        |
+| Timeout     | 10m                                                                                      | `timeout: 30m`         |
+| Max depth   | 3 (sub-agent nesting)                                                                    | `max_depth: 5`         |
+| Environment | Inherits from previous step                                                              | `params: { FOO: bar }` |
+| Tools       | Basic: exec, read_file, read_output, list_files<br>Composable: add containers and agents | `tools: [...]`         |
+| Volumes     | Auto-mount from previous                                                                 | (cannot override)      |
 
-Native driver returns `ErrNotSupported` for `startContainer` - agents must use
-one-shot `runtime.run` instead.
+### Storage Structure
 
-## Future Enhancements
-
-- **Streaming execution**: Real-time UI updates via fantasy streaming callbacks
-- **Write operations**: `write_file`, `create_pr`, `update_config` tools with
-  approval workflows
-- **Multi-agent collaboration**: `spawn_agent` tool for delegating subtasks
-- **Cost tracking**: Per-job token usage metrics in UI
-- **Agent caching**: Cache responses for deterministic tool sequences
-- **Command allowlists**: Restrict `sandbox_exec` to approved commands (e.g.,
-  `["sh", "go", "cat"]`)
+```
+/pipeline/{runID}/jobs/{job}/agent-{name}/
+  ├── trace.json       (prompt, response, steps, tokens, duration)
+  ├── result.txt       (final text output)
+  ├── containers/      (outputs from run() tool calls)
+  │   ├── run-0/
+  │   │   ├── stdout
+  │   │   └── stderr
+  │   └── run-1/
+  └── sub-agents/      (nested agent traces)
+      ├── delegate-0/
+      │   ├── trace.json
+      │   └── result.txt
+      └── delegate-1/
+```
 
 ## Testing Strategy
 
-**Container tests** (`runtime/container_test.go`): Test `startContainer` and
-`exec()` across drivers **Integration tests** (`examples/examples_test.go`):
-Real agent calls using fantasy library in JavaScript **Driver tests**
-(`orchestra/drivers_test.go`): Verify `Exec()` implementation with gomega
-**Pipeline tests**: End-to-end YAML → JavaScript transpilation → agent execution
-
 ```go
-func TestContainerExec(t *testing.T) {
+// runtime/agent_test.go
+func TestAgentMinimal(t *testing.T) {
   assert := NewGomegaWithT(t)
-  rt := setupTestRuntime(t, "docker") // Skip for native driver
+  rt := setupTestRuntime(t, "docker")
   
-  container, err := rt.StartContainer(context.Background(), StartContainerConfig{
-    Image:     "alpine",
-    KeepAlive: true,
+  // Previous step
+  result, _ := rt.Run(context.Background(), RunConfig{
+    Name: "test",
+    Image: "alpine",
+    Command: &Command{Path: "echo", Args: []string{"hello"}},
   })
-  assert.Expect(err).NotTo(HaveOccurred())
-  defer container.Cleanup(context.Background())
   
-  // Execute multiple commands
-  result1, err := container.Exec(context.Background(), []string{"echo", "hello"})
-  assert.Expect(err).NotTo(HaveOccurred())
-  assert.Expect(result1.Stdout).To(Equal("hello\n"))
+  // Agent with zero config
+  agentResult, err := rt.Agent(context.Background(), AgentConfig{
+    Prompt: "What did the test output?",
+  })
   
-  result2, err := container.Exec(context.Background(), []string{"ls", "-la"})
   assert.Expect(err).NotTo(HaveOccurred())
-  assert.Expect(result2.ExitCode).To(Equal(0))
+  assert.Expect(agentResult.Text).To(ContainSubstring("hello"))
 }
 ```
+
+Test matrix: Docker driver (full support), Native driver (returns
+`ErrNotSupported`)
+
+## Future Enhancements
+
+Once core primitive is stable:
+
+- **Write tools**: `write_file`, `append_file` (requires output volume)
+- **HTTP tool**: `http_request` for external APIs (webhook notifications, GitHub
+  issues)
+- **Retry on failure**: `on_failure: { agent: "..." }` for fallback agents
+- **Streaming UI**: Real-time tool call visibility via WebSocket
+- **Cost dashboard**: Token usage per job/pipeline (including sub-agents)
+- **Agent caching**: Cache responses for identical prompts + context
+- **Parallel delegation**: `delegate_parallel()` for concurrent sub-agents
+- **Resource limits**: CPU/memory limits per agent to prevent abuse
+
+## Appendix: Why This Is Simple
+
+**Before (complex):**
+
+- Explicit tool registration
+- Manual container lifecycle (`startContainer`, `exec`, `cleanup`)
+- Duplicate task config for sandbox
+- Multiple configuration surfaces (sandbox vs agent vs task)
+- Two divergent APIs (YAML vs TypeScript)
+- Complex orchestration logic exposed to users
+
+**After (simple):**
+
+- Basic tools always available (no registration)
+- Composable tools: define containers and agents as tools
+- One method: `runtime.agent(config)` handles everything
+- Config is 7 optional fields with smart defaults
+- YAML and TypeScript have identical capabilities
+- Reuses existing container infrastructure
+- Tools are explicitly named and described
+
+**Value:**
+
+- **90% case**: `agent: "Debug this"` → 1 line (uses basic tools only)
+- **Complex orchestration**: Add named container/agent tools when needed
+- **Overrides**: Available when needed, not required
+- **Implementation**: ~600 LOC (runtime/agent.go + runtime/agent_tools.go)
+- **Testing**: Existing container test infrastructure works unchanged
+- **Safety**: Built-in depth limits prevent infinite recursion
+- **Visibility**: Full trace of all container runs and sub-agent calls in
+  storage tree
+- **Composability**: Containers and agents are first-class tools
+
+**Key insight**: Instead of hardcoding orchestration primitives, containers and
+agents are tools you can add to agents. This makes the system more composable
+and explicit. You name tools meaningfully (`golang_runner`,
+`security_specialist`) which makes prompts clearer and traces more readable. The
+agent picks the right tool for each task.
