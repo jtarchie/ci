@@ -99,7 +99,7 @@ jobs:
         name: golang_runner
         image: golang:1.22
         description: Run Go commands
-        persistent: true  # Container stays alive for multiple commands
+        persistent: true # Container stays alive for multiple commands
     - container:
         name: python_runner
         image: python:3.12
@@ -235,14 +235,14 @@ let analysis = await runtime.agent({
 
 **When to use persistent vs one-shot containers:**
 
-| Use Persistent (`persistent: true`)             | Use One-Shot (`persistent: false`, default) |
-| ----------------------------------------------- | ------------------------------------------- |
-| Multiple related commands in same environment   | Single command per tool invocation          |
-| Preserve state (installed deps, build cache)   | Stateless operations (scans, linters)       |
-| Interactive debugging workflows                 | Parallel tool execution                     |
-| Example: `npm install` then `npm test`          | Example: `trivy scan`, `golangci-lint run`  |
-| Example: `go mod download` then `go test`       | Example: One-off database queries           |
-| Agent decides when to reuse same container      | Fresh container every time                  |
+| Use Persistent (`persistent: true`)           | Use One-Shot (`persistent: false`, default) |
+| --------------------------------------------- | ------------------------------------------- |
+| Multiple related commands in same environment | Single command per tool invocation          |
+| Preserve state (installed deps, build cache)  | Stateless operations (scans, linters)       |
+| Interactive debugging workflows               | Parallel tool execution                     |
+| Example: `npm install` then `npm test`        | Example: `trivy scan`, `golangci-lint run`  |
+| Example: `go mod download` then `go test`     | Example: One-off database queries           |
+| Agent decides when to reuse same container    | Fresh container every time                  |
 
 **Key benefit:** Persistent containers let agents build up state across multiple
 tool calls, like a human would in a shell session. The agent can install
@@ -354,7 +354,7 @@ Agent coordinates security checks across multiple tools:
         name: trivy_scanner
         image: aquasec/trivy:latest
         description: Scan container images for vulnerabilities
-        persistent: false  # One-shot scanner
+        persistent: false # One-shot scanner
     - agent:
         name: dependency_auditor
         prompt_prefix: "You are a dependency security expert. "
@@ -369,8 +369,8 @@ Agent coordinates security checks across multiple tools:
   timeout: 30m
 ```
 
-**Note:** Security scanners are one-shot (persistent: false) since they typically
-run once per scan target.
+**Note:** Security scanners are one-shot (persistent: false) since they
+typically run once per scan target.
 
 ### 3. Gradual Debugging Escalation
 
