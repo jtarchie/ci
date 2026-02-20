@@ -43,7 +43,7 @@ export const pipeline = async () => {
 	});
 };`
 
-				pipeline, err := client.SavePipeline(context.Background(), "success-pipeline", pipelineContent, "native://")
+				pipeline, err := client.SavePipeline(context.Background(), "success-pipeline", pipelineContent, "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
@@ -89,7 +89,7 @@ export const pipeline = async () => {
 	}
 };`
 
-				pipeline, err := client.SavePipeline(context.Background(), "failure-pipeline", pipelineContent, "native://")
+				pipeline, err := client.SavePipeline(context.Background(), "failure-pipeline", pipelineContent, "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
@@ -125,7 +125,7 @@ export const pipeline = async () => {
 	storage.set("/pipeline/" + runID + "/jobs/error-job", { status: "error" });
 };`
 
-				pipeline, err := client.SavePipeline(context.Background(), "error-pipeline", pipelineContent, "native://")
+				pipeline, err := client.SavePipeline(context.Background(), "error-pipeline", pipelineContent, "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
@@ -159,7 +159,7 @@ export const pipeline = async () => {
 	storage.set("/pipeline/" + runID + "/jobs/abort-job", { status: "abort" });
 };`
 
-				pipeline, err := client.SavePipeline(context.Background(), "abort-pipeline", pipelineContent, "native://")
+				pipeline, err := client.SavePipeline(context.Background(), "abort-pipeline", pipelineContent, "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
@@ -200,7 +200,7 @@ export const pipeline = async () => {
 	storage.set("/pipeline/" + runID + "/jobs/job-3", { status: "success" });
 };`
 
-				pipeline, err := client.SavePipeline(context.Background(), "recovery-pipeline", pipelineContent, "native://")
+				pipeline, err := client.SavePipeline(context.Background(), "recovery-pipeline", pipelineContent, "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
@@ -236,7 +236,7 @@ export const pipeline = async () => {
 	storage.set("/pipeline/" + runID + "/jobs/job-3", { status: "success" });
 };`
 
-				pipeline, err := client.SavePipeline(context.Background(), "mixed-pipeline", pipelineContent, "native://")
+				pipeline, err := client.SavePipeline(context.Background(), "mixed-pipeline", pipelineContent, "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
@@ -270,7 +270,7 @@ export const pipeline = async () => {
 	throw new Error("Pipeline execution failed");
 };`
 
-				pipeline, err := client.SavePipeline(context.Background(), "error-execution-pipeline", pipelineContent, "native://")
+				pipeline, err := client.SavePipeline(context.Background(), "error-execution-pipeline", pipelineContent, "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
@@ -307,7 +307,7 @@ export const pipeline = async () => {
 	storage.set("/pipeline/" + runID + "/jobs/job-2", { status: "success" });
 };`
 
-				pipeline, err := client.SavePipeline(context.Background(), "pending-pipeline", pipelineContent, "native://")
+				pipeline, err := client.SavePipeline(context.Background(), "pending-pipeline", pipelineContent, "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})

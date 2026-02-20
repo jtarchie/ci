@@ -70,8 +70,40 @@ declare global {
     runID?: string;
     pipelineID?: string;
     driverName?: string;
+    triggeredBy?: string;
   }
   const pipelineContext: PipelineContext;
+
+  // HTTP / Webhook types
+  interface HttpRequest {
+    method: string;
+    url: string;
+    headers: Record<string, string>;
+    body: string;
+    query: Record<string, string>;
+  }
+
+  interface HttpResponse {
+    status: number;
+    body?: string;
+    headers?: Record<string, string>;
+  }
+
+  namespace http {
+    /**
+     * Returns the incoming HTTP request data when triggered via webhook.
+     * Returns undefined when the pipeline was not triggered via webhook.
+     */
+    function request(): HttpRequest | undefined;
+
+    /**
+     * Sends an HTTP response back to the webhook caller.
+     * This is a one-shot operation — subsequent calls are silently ignored.
+     * If not triggered via webhook, this is a no-op.
+     * The pipeline continues executing after the response is sent.
+     */
+    function respond(response: HttpResponse): void;
+  }
 
   // Utility namespaces
   interface StoredResourceVersion {

@@ -1,13 +1,19 @@
 package server
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"time"
 
+	"github.com/jtarchie/ci/runtime"
 	"github.com/jtarchie/ci/storage"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -16,14 +22,16 @@ import (
 
 // PipelineRequest represents the JSON body for creating a pipeline.
 type PipelineRequest struct {
-	Name      string `json:"name"`
-	Content   string `json:"content"`
-	DriverDSN string `json:"driver_dsn"`
+	Name          string `json:"name"`
+	Content       string `json:"content"`
+	DriverDSN     string `json:"driver_dsn"`
+	WebhookSecret string `json:"webhook_secret"`
 }
 
 // RouterOptions configures the router.
 type RouterOptions struct {
-	MaxInFlight int
+	MaxInFlight    int
+	WebhookTimeout time.Duration
 }
 
 // Router wraps echo.Echo and provides access to the execution service.
@@ -164,7 +172,11 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 
 	// Pipeline API endpoints
 	api := router.Group("/api")
-	registerPipelineRoutes(api, store, execService)
+	webhookTimeout := opts.WebhookTimeout
+	if webhookTimeout == 0 {
+		webhookTimeout = 5 * time.Second
+	}
+	registerPipelineRoutes(api, store, execService, webhookTimeout)
 
 	// Run-specific views that look up tasks at /pipeline/<runID>/...
 	router.GET("/runs/:id/tasks", func(ctx echo.Context) error {
@@ -270,7 +282,7 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	return &Router{Echo: router, execService: execService}, nil
 }
 
-func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *ExecutionService) {
+func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *ExecutionService, webhookTimeout time.Duration) {
 	// POST /api/pipelines - Create a new pipeline
 	api.POST("/pipelines", func(ctx echo.Context) error {
 		var req PipelineRequest
@@ -292,7 +304,7 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 			})
 		}
 
-		pipeline, err := store.SavePipeline(ctx.Request().Context(), req.Name, req.Content, req.DriverDSN)
+		pipeline, err := store.SavePipeline(ctx.Request().Context(), req.Name, req.Content, req.DriverDSN, req.WebhookSecret)
 		if err != nil {
 			return ctx.JSON(http.StatusInternalServerError, map[string]string{
 				"error": fmt.Sprintf("failed to save pipeline: %v", err),
@@ -443,4 +455,128 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 
 		return ctx.JSON(http.StatusOK, run)
 	})
+
+	// ANY /api/webhooks/:id - Trigger pipeline execution via webhook
+	api.Any("/webhooks/:id", func(ctx echo.Context) error {
+		id := ctx.Param("id")
+
+		// Get the pipeline
+		pipeline, err := store.GetPipeline(ctx.Request().Context(), id)
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				return ctx.JSON(http.StatusNotFound, map[string]string{
+					"error": "pipeline not found",
+				})
+			}
+
+			return ctx.JSON(http.StatusInternalServerError, map[string]string{
+				"error": fmt.Sprintf("failed to get pipeline: %v", err),
+			})
+		}
+
+		// Read request body
+		body, err := io.ReadAll(ctx.Request().Body)
+		if err != nil {
+			return ctx.JSON(http.StatusBadRequest, map[string]string{
+				"error": "failed to read request body",
+			})
+		}
+
+		// Validate webhook signature if secret is configured
+		if pipeline.WebhookSecret != "" {
+			signature := ctx.Request().Header.Get("X-Webhook-Signature")
+			if signature == "" {
+				signature = ctx.QueryParam("signature")
+			}
+
+			if signature == "" {
+				return ctx.JSON(http.StatusUnauthorized, map[string]string{
+					"error": "missing webhook signature",
+				})
+			}
+
+			if !validateWebhookSignature(body, pipeline.WebhookSecret, signature) {
+				return ctx.JSON(http.StatusUnauthorized, map[string]string{
+					"error": "invalid webhook signature",
+				})
+			}
+		}
+
+		// Check if we can execute more pipelines
+		if !execService.CanExecute() {
+			return ctx.JSON(http.StatusTooManyRequests, map[string]any{
+				"error":         "max concurrent executions reached",
+				"in_flight":     execService.CurrentInFlight(),
+				"max_in_flight": execService.MaxInFlight(),
+			})
+		}
+
+		// Build webhook data from request
+		headers := make(map[string]string)
+		for key, values := range ctx.Request().Header {
+			if len(values) > 0 {
+				headers[key] = values[0]
+			}
+		}
+
+		query := make(map[string]string)
+		for key, values := range ctx.QueryParams() {
+			if len(values) > 0 {
+				query[key] = values[0]
+			}
+		}
+
+		webhookData := &runtime.WebhookData{
+			Method:  ctx.Request().Method,
+			URL:     ctx.Request().URL.String(),
+			Headers: headers,
+			Body:    string(body),
+			Query:   query,
+		}
+
+		// Create response channel for pipeline to send HTTP response
+		responseChan := make(chan *runtime.HTTPResponse, 1)
+
+		// Trigger the pipeline with webhook data
+		run, err := execService.TriggerWebhookPipeline(ctx.Request().Context(), pipeline, webhookData, responseChan)
+		if err != nil {
+			return ctx.JSON(http.StatusInternalServerError, map[string]string{
+				"error": fmt.Sprintf("failed to trigger pipeline: %v", err),
+			})
+		}
+
+		// Wait for pipeline to respond or timeout
+		select {
+		case resp := <-responseChan:
+			// Pipeline sent a response
+			for key, value := range resp.Headers {
+				ctx.Response().Header().Set(key, value)
+			}
+
+			if resp.Body != "" {
+				return ctx.String(resp.Status, resp.Body)
+			}
+
+			return ctx.NoContent(resp.Status)
+
+		case <-time.After(webhookTimeout):
+			// Pipeline didn't respond in time, return 202 Accepted
+			return ctx.JSON(http.StatusAccepted, map[string]any{
+				"run_id":      run.ID,
+				"pipeline_id": pipeline.ID,
+				"status":      run.Status,
+				"message":     "pipeline execution started",
+			})
+		}
+	})
+}
+
+// validateWebhookSignature validates an HMAC-SHA256 signature of the request body.
+func validateWebhookSignature(body []byte, secret, signature string) bool {
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(body)
+	expectedMAC := mac.Sum(nil)
+	expectedSignature := hex.EncodeToString(expectedMAC)
+
+	return hmac.Equal([]byte(signature), []byte(expectedSignature))
 }

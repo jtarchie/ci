@@ -28,6 +28,10 @@ type ExecuteOptions struct {
 	PipelineID string
 	// Namespace is the namespace for this execution.
 	Namespace string
+	// WebhookData contains the incoming HTTP request when triggered via webhook.
+	WebhookData *WebhookData
+	// ResponseChan receives the HTTP response from the pipeline.
+	ResponseChan chan *HTTPResponse
 }
 
 type JS struct {
@@ -175,10 +179,24 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 		return fmt.Errorf("could not set storage: %w", err)
 	}
 
+	// Set up HTTP runtime for webhook support
+	httpRuntime := NewHTTPRuntime(jsVM, opts.WebhookData, opts.ResponseChan)
+
+	err = jsVM.Set("http", httpRuntime)
+	if err != nil {
+		return fmt.Errorf("could not set http: %w", err)
+	}
+
 	// Expose pipeline context to JavaScript (runID, pipelineID, etc.)
+	triggeredBy := "manual"
+	if opts.WebhookData != nil {
+		triggeredBy = "webhook"
+	}
+
 	pipelineContext := map[string]interface{}{
-		"runID":      opts.RunID,
-		"pipelineID": opts.PipelineID,
+		"runID":       opts.RunID,
+		"pipelineID":  opts.PipelineID,
+		"triggeredBy": triggeredBy,
 	}
 	if driver != nil {
 		pipelineContext["driverName"] = driver.Name()
@@ -270,8 +288,8 @@ func (w *storageContextWrapper) GetAll(prefix string, fields []string) (storage.
 }
 
 // SavePipeline wraps the storage SavePipeline method, injecting context automatically.
-func (w *storageContextWrapper) SavePipeline(name, content, driverDSN string) (*storage.Pipeline, error) {
-	return w.driver.SavePipeline(w.ctx, name, content, driverDSN)
+func (w *storageContextWrapper) SavePipeline(name, content, driverDSN, webhookSecret string) (*storage.Pipeline, error) {
+	return w.driver.SavePipeline(w.ctx, name, content, driverDSN, webhookSecret)
 }
 
 // GetPipeline wraps the storage GetPipeline method, injecting context automatically.
