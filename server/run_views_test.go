@@ -34,7 +34,7 @@ func TestRunViews(t *testing.T) {
 				defer func() { _ = client.Close() }()
 
 				// Create a pipeline and run
-				pipeline, err := client.SavePipeline(context.Background(), "test-pipeline", "export const pipeline = async () => {};", "docker://")
+				pipeline, err := client.SavePipeline(context.Background(), "test-pipeline", "export const pipeline = async () => {};", "docker://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				run, err := client.SaveRun(context.Background(), pipeline.ID)
@@ -70,7 +70,7 @@ func TestRunViews(t *testing.T) {
 				defer func() { _ = client.Close() }()
 
 				// Create a pipeline and run
-				pipeline, err := client.SavePipeline(context.Background(), "test-pipeline", "export const pipeline = async () => {};", "docker://")
+				pipeline, err := client.SavePipeline(context.Background(), "test-pipeline", "export const pipeline = async () => {};", "docker://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				run, err := client.SaveRun(context.Background(), pipeline.ID)
@@ -130,7 +130,7 @@ func TestRunViews(t *testing.T) {
 				defer func() { _ = client.Close() }()
 
 				// Create a pipeline and run
-				pipeline, err := client.SavePipeline(context.Background(), "test-pipeline", "export const pipeline = async () => {};", "docker://")
+				pipeline, err := client.SavePipeline(context.Background(), "test-pipeline", "export const pipeline = async () => {};", "docker://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				run, err := client.SaveRun(context.Background(), pipeline.ID)
@@ -161,7 +161,7 @@ func TestRunViews(t *testing.T) {
 				defer func() { _ = client.Close() }()
 
 				// Create a pipeline and run
-				pipeline, err := client.SavePipeline(context.Background(), "test-pipeline", "export const pipeline = async () => {};", "docker://")
+				pipeline, err := client.SavePipeline(context.Background(), "test-pipeline", "export const pipeline = async () => {};", "docker://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				run, err := client.SaveRun(context.Background(), pipeline.ID)
@@ -192,7 +192,7 @@ func TestRunViews(t *testing.T) {
 				defer func() { _ = client.Close() }()
 
 				// Create a pipeline and run
-				pipeline, err := client.SavePipeline(context.Background(), "test-pipeline", "export const pipeline = async () => {};", "docker://")
+				pipeline, err := client.SavePipeline(context.Background(), "test-pipeline", "export const pipeline = async () => {};", "docker://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				run, err := client.SaveRun(context.Background(), pipeline.ID)

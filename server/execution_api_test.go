@@ -34,7 +34,7 @@ func TestExecutionAPI(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				// Create a simple pipeline that will fail quickly (no actual execution in test)
-				pipeline, err := client.SavePipeline(context.Background(), "test-pipeline", "export const pipeline = async () => {};", "native://")
+				pipeline, err := client.SavePipeline(context.Background(), "test-pipeline", "export const pipeline = async () => {};", "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
@@ -95,7 +95,7 @@ func TestExecutionAPI(t *testing.T) {
 				defer func() { _ = client.Close() }()
 
 				// Create pipeline and run directly
-				pipeline, err := client.SavePipeline(context.Background(), "my-pipeline", "content", "docker://")
+				pipeline, err := client.SavePipeline(context.Background(), "my-pipeline", "content", "docker://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				run, err := client.SaveRun(context.Background(), pipeline.ID)
@@ -152,9 +152,9 @@ func TestExecutionAPI(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				// Create multiple pipelines
-				pipeline1, err := client.SavePipeline(context.Background(), "pipeline-1", "export const pipeline = async () => { console.log('pipeline 1'); };", "docker://")
+				pipeline1, err := client.SavePipeline(context.Background(), "pipeline-1", "export const pipeline = async () => { console.log('pipeline 1'); };", "docker://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
-				pipeline2, err := client.SavePipeline(context.Background(), "pipeline-2", "export const pipeline = async () => { console.log('pipeline 2'); };", "docker://")
+				pipeline2, err := client.SavePipeline(context.Background(), "pipeline-2", "export const pipeline = async () => { console.log('pipeline 2'); };", "docker://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				// Set max-in-flight to 0 - should reject all new executions

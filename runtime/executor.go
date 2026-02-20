@@ -22,6 +22,12 @@ type ExecutorOptions struct {
 	PipelineID string
 	// Namespace is the namespace for this execution (internal use).
 	Namespace string
+	// WebhookData contains the incoming HTTP request when triggered via webhook.
+	// Nil when not triggered via webhook.
+	WebhookData *WebhookData
+	// ResponseChan receives the HTTP response from the pipeline.
+	// Nil when not triggered via webhook.
+	ResponseChan chan *HTTPResponse
 }
 
 // ExecutePipeline executes a pipeline with the given content and driver DSN.
@@ -77,8 +83,14 @@ func ExecutePipeline(
 
 	js := NewJS(logger)
 
-	executeOpts := ExecuteOptions(opts)
-	executeOpts.Namespace = namespace
+	executeOpts := ExecuteOptions{
+		Resume:       opts.Resume,
+		RunID:        opts.RunID,
+		PipelineID:   opts.PipelineID,
+		Namespace:    namespace,
+		WebhookData:  opts.WebhookData,
+		ResponseChan: opts.ResponseChan,
+	}
 
 	err = js.ExecuteWithOptions(ctx, content, driver, store, executeOpts)
 	if err != nil {

@@ -52,6 +52,7 @@ func NewSqlite(dsn string, namespace string, _ *slog.Logger) (storage.Driver, er
 			name TEXT NOT NULL,
 			content TEXT NOT NULL,
 			driver_dsn TEXT NOT NULL,
+			webhook_secret TEXT NOT NULL DEFAULT '',
 			created_at TEXT DEFAULT CURRENT_TIMESTAMP,
 			updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 		) STRICT;
@@ -212,25 +213,26 @@ func (s *Sqlite) Close() error {
 }
 
 // SavePipeline creates or updates a pipeline in the database.
-func (s *Sqlite) SavePipeline(ctx context.Context, name, content, driverDSN string) (*storage.Pipeline, error) {
+func (s *Sqlite) SavePipeline(ctx context.Context, name, content, driverDSN, webhookSecret string) (*storage.Pipeline, error) {
 	id := runtime.PipelineID(name, content)
 	now := time.Now().UTC()
 
 	_, err := s.writer.ExecContext(ctx, `
-		INSERT INTO pipelines (id, name, content, driver_dsn, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?)
-	`, id, name, content, driverDSN, now.Format(time.RFC3339), now.Format(time.RFC3339))
+		INSERT INTO pipelines (id, name, content, driver_dsn, webhook_secret, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, id, name, content, driverDSN, webhookSecret, now.Format(time.RFC3339), now.Format(time.RFC3339))
 	if err != nil {
 		return nil, fmt.Errorf("failed to save pipeline: %w", err)
 	}
 
 	return &storage.Pipeline{
-		ID:        id,
-		Name:      name,
-		Content:   content,
-		DriverDSN: driverDSN,
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:            id,
+		Name:          name,
+		Content:       content,
+		DriverDSN:     driverDSN,
+		WebhookSecret: webhookSecret,
+		CreatedAt:     now,
+		UpdatedAt:     now,
 	}, nil
 }
 
@@ -240,9 +242,9 @@ func (s *Sqlite) GetPipeline(ctx context.Context, id string) (*storage.Pipeline,
 	var createdAt, updatedAt string
 
 	err := s.writer.QueryRowContext(ctx, `
-		SELECT id, name, content, driver_dsn, created_at, updated_at
+		SELECT id, name, content, driver_dsn, webhook_secret, created_at, updated_at
 		FROM pipelines WHERE id = ?
-	`, id).Scan(&pipeline.ID, &pipeline.Name, &pipeline.Content, &pipeline.DriverDSN, &createdAt, &updatedAt)
+	`, id).Scan(&pipeline.ID, &pipeline.Name, &pipeline.Content, &pipeline.DriverDSN, &pipeline.WebhookSecret, &createdAt, &updatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, storage.ErrNotFound
@@ -260,7 +262,7 @@ func (s *Sqlite) GetPipeline(ctx context.Context, id string) (*storage.Pipeline,
 // ListPipelines returns all pipelines in the database.
 func (s *Sqlite) ListPipelines(ctx context.Context) ([]storage.Pipeline, error) {
 	rows, err := s.writer.QueryContext(ctx, `
-		SELECT id, name, content, driver_dsn, created_at, updated_at
+		SELECT id, name, content, driver_dsn, webhook_secret, created_at, updated_at
 		FROM pipelines ORDER BY created_at DESC
 	`)
 	if err != nil {
@@ -274,7 +276,7 @@ func (s *Sqlite) ListPipelines(ctx context.Context) ([]storage.Pipeline, error) 
 		var pipeline storage.Pipeline
 		var createdAt, updatedAt string
 
-		err := rows.Scan(&pipeline.ID, &pipeline.Name, &pipeline.Content, &pipeline.DriverDSN, &createdAt, &updatedAt)
+		err := rows.Scan(&pipeline.ID, &pipeline.Name, &pipeline.Content, &pipeline.DriverDSN, &pipeline.WebhookSecret, &createdAt, &updatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan pipeline: %w", err)
 		}

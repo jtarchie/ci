@@ -115,7 +115,7 @@ func BenchmarkStorage_SavePipeline(b *testing.B) {
 
 	for i := range b.N {
 		name := fmt.Sprintf("pipeline-%d", i)
-		if _, err := driver.SavePipeline(ctx, name, content, "docker://"); err != nil {
+		if _, err := driver.SavePipeline(ctx, name, content, "docker://", ""); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -129,7 +129,7 @@ func BenchmarkStorage_ListPipelines(b *testing.B) {
 	// Pre-populate pipelines
 	for i := range 50 {
 		name := fmt.Sprintf("pipeline-%d", i)
-		if _, err := driver.SavePipeline(ctx, name, content, "docker://"); err != nil {
+		if _, err := driver.SavePipeline(ctx, name, content, "docker://", ""); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -150,7 +150,7 @@ func BenchmarkStorage_SaveAndGetRun(b *testing.B) {
 	content := `const pipeline = async () => {}; export { pipeline };`
 
 	// Create a pipeline first
-	pipeline, err := driver.SavePipeline(ctx, "bench-pipeline", content, "docker://")
+	pipeline, err := driver.SavePipeline(ctx, "bench-pipeline", content, "docker://", "")
 	if err != nil {
 		b.Fatal(err)
 	}

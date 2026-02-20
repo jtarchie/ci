@@ -72,12 +72,48 @@ func (s *ExecutionService) TriggerPipeline(ctx context.Context, pipeline *storag
 	s.wg.Add(1)
 
 	// Launch execution goroutine
-	go s.executePipeline(pipeline, run)
+	go s.executePipeline(pipeline, run, nil)
 
 	return run, nil
 }
 
-func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *storage.PipelineRun) {
+// TriggerWebhookPipeline starts a new pipeline execution triggered by a webhook.
+// It passes webhook request data and a response channel through to the pipeline runtime.
+func (s *ExecutionService) TriggerWebhookPipeline(
+	ctx context.Context,
+	pipeline *storage.Pipeline,
+	webhookData *runtime.WebhookData,
+	responseChan chan *runtime.HTTPResponse,
+) (*storage.PipelineRun, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Create run record with queued status
+	run, err := s.store.SaveRun(ctx, pipeline.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Increment in-flight counter and WaitGroup
+	s.inFlight.Add(1)
+	s.wg.Add(1)
+
+	// Launch execution goroutine with webhook data
+	go s.executePipeline(pipeline, run, &webhookExecData{
+		webhookData:  webhookData,
+		responseChan: responseChan,
+	})
+
+	return run, nil
+}
+
+// webhookExecData holds webhook-specific execution data.
+type webhookExecData struct {
+	webhookData  *runtime.WebhookData
+	responseChan chan *runtime.HTTPResponse
+}
+
+func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *storage.PipelineRun, webhook *webhookExecData) {
 	defer s.inFlight.Add(-1)
 	defer s.wg.Done()
 
@@ -108,6 +144,11 @@ func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *stor
 	opts := runtime.ExecutorOptions{
 		RunID:      run.ID,
 		PipelineID: pipeline.ID,
+	}
+
+	if webhook != nil {
+		opts.WebhookData = webhook.webhookData
+		opts.ResponseChan = webhook.responseChan
 	}
 
 	err = runtime.ExecutePipeline(ctx, pipeline.Content, driverDSN, s.store, logger, opts)

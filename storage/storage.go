@@ -15,12 +15,13 @@ var ErrNotFound = errors.New("not found")
 
 // Pipeline represents a stored pipeline definition.
 type Pipeline struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Content   string    `json:"content"`
-	DriverDSN string    `json:"driver_dsn"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID            string    `json:"id"`
+	Name          string    `json:"name"`
+	Content       string    `json:"content"`
+	DriverDSN     string    `json:"driver_dsn"`
+	WebhookSecret string    `json:"webhook_secret,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 // RunStatus represents the status of a pipeline run.
@@ -60,7 +61,7 @@ type Driver interface {
 	GetAll(ctx context.Context, prefix string, fields []string) (Results, error)
 
 	// Pipeline CRUD operations
-	SavePipeline(ctx context.Context, name, content, driverDSN string) (*Pipeline, error)
+	SavePipeline(ctx context.Context, name, content, driverDSN, webhookSecret string) (*Pipeline, error)
 	GetPipeline(ctx context.Context, id string) (*Pipeline, error)
 	ListPipelines(ctx context.Context) ([]Pipeline, error)
 	DeletePipeline(ctx context.Context, id string) error

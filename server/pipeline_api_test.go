@@ -101,7 +101,7 @@ func TestPipelineAPI(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				_, err = client.SavePipeline(context.Background(), "pipeline-1", "content1", "docker://")
+				_, err = client.SavePipeline(context.Background(), "pipeline-1", "content1", "docker://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
@@ -131,7 +131,7 @@ func TestPipelineAPI(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				saved, err := client.SavePipeline(context.Background(), "my-pipeline", "content", "docker://")
+				saved, err := client.SavePipeline(context.Background(), "my-pipeline", "content", "docker://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
@@ -184,7 +184,7 @@ func TestPipelineAPI(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				saved, err := client.SavePipeline(context.Background(), "to-delete", "content", "docker://")
+				saved, err := client.SavePipeline(context.Background(), "to-delete", "content", "docker://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})

@@ -17,17 +17,19 @@ import (
 )
 
 type SetPipeline struct {
-	Pipeline  string `arg:""                  help:"Path to pipeline file (JS, TS, or YAML)"  required:"" type:"existingfile"`
-	Name      string `help:"Name for the pipeline (defaults to filename without extension)" short:"n"`
-	ServerURL string `help:"URL of the CI server"                                           required:"" short:"s"`
-	Driver    string `help:"Orchestrator driver DSN (e.g., 'docker', 'native', 'k8s')"      short:"d"`
+	Pipeline      string `arg:""                  help:"Path to pipeline file (JS, TS, or YAML)"  required:"" type:"existingfile"`
+	Name          string `help:"Name for the pipeline (defaults to filename without extension)" short:"n"`
+	ServerURL     string `help:"URL of the CI server"                                           required:"" short:"s"`
+	Driver        string `help:"Orchestrator driver DSN (e.g., 'docker', 'native', 'k8s')"      short:"d"`
+	WebhookSecret string `help:"Secret for webhook signature validation"                        short:"w"`
 }
 
 // pipelineRequest matches the server's expected JSON body.
 type pipelineRequest struct {
-	Name      string `json:"name"`
-	Content   string `json:"content"`
-	DriverDSN string `json:"driver_dsn"`
+	Name          string `json:"name"`
+	Content       string `json:"content"`
+	DriverDSN     string `json:"driver_dsn"`
+	WebhookSecret string `json:"webhook_secret"`
 }
 
 func (c *SetPipeline) Run(logger *slog.Logger) error {
@@ -95,9 +97,10 @@ func (c *SetPipeline) Run(logger *slog.Logger) error {
 	logger.Info("pipeline.upload", "url", endpoint)
 
 	reqBody := pipelineRequest{
-		Name:      name,
-		Content:   finalContent,
-		DriverDSN: c.Driver,
+		Name:          name,
+		Content:       finalContent,
+		DriverDSN:     c.Driver,
+		WebhookSecret: c.WebhookSecret,
 	}
 
 	jsonBody, err := json.Marshal(reqBody)
