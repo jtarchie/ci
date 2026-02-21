@@ -22,10 +22,10 @@ import (
 )
 
 type Runner struct {
-	Storage  string        `default:"sqlite://test.db"                                    help:"Path to storage file"                                                                                                                                      required:""`
+	Storage  string        `default:"sqlite://test.db"                                    env:"CI_STORAGE"              help:"Path to storage file"                                                                                                                                      required:""`
 	Pipeline string        `arg:""                                                        help:"Path to pipeline javascript file"                                                                                                                          type:"existingfile"`
-	Driver   string        `default:"native"                                              help:"Orchestrator driver DSN (e.g., 'k8s:namespace=my-ns', 'k8s://my-ns', 'docker', 'native')"`
-	Timeout  time.Duration `help:"timeout for the pipeline, will cause abort if exceeded"`
+	Driver   string        `default:"native"                                              env:"CI_DRIVER"               help:"Orchestrator driver DSN (e.g., 'k8s:namespace=my-ns', 'k8s://my-ns', 'docker', 'native')"`
+	Timeout  time.Duration `env:"CI_TIMEOUT"                                              help:"timeout for the pipeline, will cause abort if exceeded"`
 	Resume   bool          `help:"Resume from last checkpoint if pipeline was interrupted"`
 	RunID    string        `help:"Unique run ID for resume support (auto-generated if not provided)"`
 }

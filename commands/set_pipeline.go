@@ -19,9 +19,9 @@ import (
 type SetPipeline struct {
 	Pipeline      string `arg:""                  help:"Path to pipeline file (JS, TS, or YAML)"  required:"" type:"existingfile"`
 	Name          string `help:"Name for the pipeline (defaults to filename without extension)" short:"n"`
-	ServerURL     string `help:"URL of the CI server"                                           required:"" short:"s"`
-	Driver        string `help:"Orchestrator driver DSN (e.g., 'docker', 'native', 'k8s')"      short:"d"`
-	WebhookSecret string `help:"Secret for webhook signature validation"                        short:"w"`
+	ServerURL     string `env:"CI_SERVER_URL"      help:"URL of the CI server"                                           required:"" short:"s"`
+	Driver        string `env:"CI_DRIVER"          help:"Orchestrator driver DSN (e.g., 'docker', 'native', 'k8s')"      short:"d"`
+	WebhookSecret string `env:"CI_WEBHOOK_SECRET"  help:"Secret for webhook signature validation"                        short:"w"`
 }
 
 // pipelineRequest matches the server's expected JSON body.

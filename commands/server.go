@@ -16,11 +16,11 @@ import (
 )
 
 type Server struct {
-	Port           int           `default:"8080"             help:"Port to run the server on"`
-	Storage        string        `default:"sqlite://test.db" help:"Path to storage file"                      required:""`
-	MaxInFlight    int           `default:"10"               help:"Maximum concurrent pipeline executions"`
-	WebhookTimeout time.Duration `default:"5s"               help:"Timeout waiting for pipeline webhook response"`
-	BasicAuth      string        `help:"Basic auth credentials in format 'username:password' (optional)"`
+	Port           int           `default:"8080"             env:"CI_PORT"                 help:"Port to run the server on"`
+	Storage        string        `default:"sqlite://test.db" env:"CI_STORAGE"              help:"Path to storage file"                      required:""`
+	MaxInFlight    int           `default:"10"               env:"CI_MAX_IN_FLIGHT"         help:"Maximum concurrent pipeline executions"`
+	WebhookTimeout time.Duration `default:"5s"               env:"CI_WEBHOOK_TIMEOUT"       help:"Timeout waiting for pipeline webhook response"`
+	BasicAuth      string        `env:"CI_BASIC_AUTH"         help:"Basic auth credentials in format 'username:password' (optional)"`
 }
 
 func (c *Server) Run(logger *slog.Logger) error {
