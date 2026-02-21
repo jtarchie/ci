@@ -11,8 +11,10 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/jtarchie/ci/orchestra"
 	"github.com/jtarchie/ci/runtime"
 	"github.com/jtarchie/ci/storage"
 	"github.com/labstack/echo/v4"
@@ -34,13 +36,15 @@ type RouterOptions struct {
 	WebhookTimeout    time.Duration
 	BasicAuthUsername string
 	BasicAuthPassword string
+	AllowedDrivers    string
 }
 
 // Router wraps echo.Echo and provides access to the execution service.
 type Router struct {
 	*echo.Echo
-	execService *ExecutionService
-	webGroup    *echo.Group
+	execService    *ExecutionService
+	webGroup       *echo.Group
+	allowedDrivers []string
 }
 
 // WaitForExecutions blocks until all in-flight pipeline executions have completed.
@@ -83,8 +87,11 @@ func newBasicAuthMiddleware(username, password string) echo.MiddlewareFunc {
 func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*Router, error) {
 	router := echo.New()
 
-	// Create execution service
-	execService := NewExecutionService(store, logger, opts.MaxInFlight)
+	// Parse allowed drivers
+	allowedDrivers := parseAllowedDrivers(opts.AllowedDrivers)
+
+	// Create execution service with allowed drivers
+	execService := NewExecutionService(store, logger, opts.MaxInFlight, allowedDrivers)
 	router.Pre(middleware.AddTrailingSlashWithConfig(middleware.TrailingSlashConfig{
 		Skipper: func(c echo.Context) bool {
 			// Skip trailing slash middleware for static files, API routes, runs, and health
@@ -209,7 +216,8 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	// Create API group with basic auth middleware (for non-webhook endpoints)
 	api := router.Group("/api")
 	api.Use(newBasicAuthMiddleware(opts.BasicAuthUsername, opts.BasicAuthPassword))
-	registerPipelineRoutes(api, store, execService, webhookTimeout)
+	registerPipelineRoutes(api, store, execService, webhookTimeout, allowedDrivers)
+	registerDriverRoutes(api, allowedDrivers)
 
 	// Run-specific views that look up tasks at /pipeline/<runID>/...
 	web.GET("/runs/:id/tasks", func(ctx echo.Context) error {
@@ -312,10 +320,10 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 		})
 	})
 
-	return &Router{Echo: router, execService: execService, webGroup: web}, nil
+	return &Router{Echo: router, execService: execService, webGroup: web, allowedDrivers: allowedDrivers}, nil
 }
 
-func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *ExecutionService, webhookTimeout time.Duration) {
+func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *ExecutionService, webhookTimeout time.Duration, allowedDrivers []string) {
 	// POST /api/pipelines - Create a new pipeline
 	api.POST("/pipelines", func(ctx echo.Context) error {
 		var req PipelineRequest
@@ -334,6 +342,18 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 		if req.Content == "" {
 			return ctx.JSON(http.StatusBadRequest, map[string]string{
 				"error": "content is required",
+			})
+		}
+
+		// If no driver specified, use the default from execution service
+		if req.DriverDSN == "" {
+			req.DriverDSN = execService.DefaultDriver
+		}
+
+		// Validate driver is allowed
+		if err := orchestra.IsDriverAllowed(req.DriverDSN, allowedDrivers); err != nil {
+			return ctx.JSON(http.StatusBadRequest, map[string]string{
+				"error": fmt.Sprintf("driver not allowed: %v", err),
 			})
 		}
 
@@ -614,4 +634,47 @@ func validateWebhookSignature(body []byte, secret, signature string) bool {
 	expectedSignature := hex.EncodeToString(expectedMAC)
 
 	return hmac.Equal([]byte(signature), []byte(expectedSignature))
+}
+
+// parseAllowedDrivers parses a comma-separated list of driver names.
+// Returns ["*"] if input is empty or "*".
+// Trims whitespace from each driver name.
+func parseAllowedDrivers(input string) []string {
+	if input == "" || input == "*" {
+		return []string{"*"}
+	}
+
+	parts := strings.Split(input, ",")
+	drivers := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			drivers = append(drivers, trimmed)
+		}
+	}
+
+	if len(drivers) == 0 {
+		return []string{"*"}
+	}
+
+	return drivers
+}
+
+// registerDriverRoutes adds API endpoints for listing allowed drivers.
+func registerDriverRoutes(api *echo.Group, allowedDrivers []string) {
+	// GET /api/drivers - List allowed drivers
+	api.GET("/drivers", func(ctx echo.Context) error {
+		var drivers []string
+
+		// If wildcard, return all registered drivers
+		if len(allowedDrivers) == 1 && allowedDrivers[0] == "*" {
+			drivers = orchestra.ListDrivers()
+		} else {
+			drivers = allowedDrivers
+		}
+
+		return ctx.JSON(http.StatusOK, map[string]any{
+			"drivers": drivers,
+		})
+	})
 }

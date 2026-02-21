@@ -12,24 +12,34 @@ import (
 
 // ExecutionService manages pipeline execution with concurrency limits.
 type ExecutionService struct {
-	store       storage.Driver
-	logger      *slog.Logger
-	maxInFlight int
-	inFlight    atomic.Int32
-	mu          sync.Mutex
-	wg          sync.WaitGroup
+	store         storage.Driver
+	logger        *slog.Logger
+	maxInFlight   int
+	inFlight      atomic.Int32
+	mu            sync.Mutex
+	wg            sync.WaitGroup
+	DefaultDriver string
 }
 
 // NewExecutionService creates a new execution service.
-func NewExecutionService(store storage.Driver, logger *slog.Logger, maxInFlight int) *ExecutionService {
+// The allowedDrivers list determines the default driver (first in list).
+// If allowedDrivers is empty or contains "*", defaults to "docker".
+func NewExecutionService(store storage.Driver, logger *slog.Logger, maxInFlight int, allowedDrivers []string) *ExecutionService {
 	if maxInFlight <= 0 {
 		maxInFlight = 10 // default limit
 	}
 
+	// Determine default driver: first allowed driver, or "docker" if wildcard/empty
+	defaultDriver := "docker"
+	if len(allowedDrivers) > 0 && allowedDrivers[0] != "*" {
+		defaultDriver = allowedDrivers[0]
+	}
+
 	return &ExecutionService{
-		store:       store,
-		logger:      logger.WithGroup("executor.run"),
-		maxInFlight: maxInFlight,
+		store:         store,
+		logger:        logger.WithGroup("executor.run"),
+		maxInFlight:   maxInFlight,
+		DefaultDriver: defaultDriver,
 	}
 }
 
@@ -134,10 +144,10 @@ func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *stor
 
 	logger.Info("pipeline.execute.start")
 
-	// Determine driver DSN - use pipeline's if set, otherwise default to docker
+	// Determine driver DSN - use pipeline's if set, otherwise use default
 	driverDSN := pipeline.DriverDSN
 	if driverDSN == "" {
-		driverDSN = "docker"
+		driverDSN = s.DefaultDriver
 	}
 
 	// Execute the pipeline
