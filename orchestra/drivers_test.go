@@ -10,6 +10,7 @@ import (
 
 	"github.com/jtarchie/ci/orchestra"
 	_ "github.com/jtarchie/ci/orchestra/docker"
+	_ "github.com/jtarchie/ci/orchestra/fly"
 	"github.com/jtarchie/ci/orchestra/k8s"
 	_ "github.com/jtarchie/ci/orchestra/native"
 	gonanoid "github.com/matoous/go-nanoid/v2"
@@ -28,8 +29,30 @@ func TestDrivers(t *testing.T) {
 				t.Skip("Kubernetes cluster not available")
 			}
 
+			// Skip fly tests if token is not available
+			if name == "fly" && os.Getenv("FLY_API_TOKEN") == "" {
+				t.Skip("FLY_API_TOKEN not set, skipping Fly integration tests")
+			}
+
+			// Fly machines are remote and need longer timeouts for image pull + boot
+			statusTimeout := "10s"
+			statusInterval := "100ms"
+			logsTimeout := "10s"
+			logsInterval := "100ms"
+			if name == "fly" {
+				statusTimeout = "2m"
+				statusInterval = "1s"
+				logsTimeout = "30s"
+				logsInterval = "2s"
+			}
+
 			t.Run("with stdin", func(t *testing.T) {
 				t.Parallel()
+
+				// Fly machines don't support piping stdin from the client
+				if name == "fly" {
+					t.Skip("Fly machines do not support stdin")
+				}
 
 				assert := NewGomegaWithT(t)
 
@@ -56,7 +79,7 @@ func TestDrivers(t *testing.T) {
 					assert.Expect(err).NotTo(HaveOccurred())
 
 					return status.IsDone() && status.ExitCode() == 0
-				}, "10s").Should(BeTrue())
+				}, statusTimeout, statusInterval).Should(BeTrue())
 
 				assert.Eventually(func() bool {
 					ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -66,7 +89,7 @@ func TestDrivers(t *testing.T) {
 					_ = container.Logs(ctx, stdout, stderr, false)
 
 					return strings.Contains(stdout.String(), "hello")
-				}, "10s").Should(BeTrue())
+				}, logsTimeout, logsInterval).Should(BeTrue())
 
 				err = client.Close()
 				assert.Expect(err).NotTo(HaveOccurred())
@@ -99,8 +122,7 @@ func TestDrivers(t *testing.T) {
 					assert.Expect(err).NotTo(HaveOccurred())
 
 					return status.IsDone() && status.ExitCode() == 1
-				}, "10s").Should(BeTrue())
-
+				}, statusTimeout, statusInterval).Should(BeTrue())
 				assert.Consistently(func() bool {
 					status, err := container.Status(context.Background())
 					assert.Expect(err).NotTo(HaveOccurred())
@@ -139,7 +161,7 @@ func TestDrivers(t *testing.T) {
 					assert.Expect(err).NotTo(HaveOccurred())
 
 					return status.IsDone() && status.ExitCode() == 0
-				}, "10s").Should(BeTrue())
+				}, statusTimeout, statusInterval).Should(BeTrue())
 
 				assert.Eventually(func() bool {
 					ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -150,8 +172,7 @@ func TestDrivers(t *testing.T) {
 					// assert.Expect(err).NotTo(HaveOccurred())
 
 					return strings.Contains(stdout.String(), "hello")
-				}, "10s").Should(BeTrue())
-
+				}, logsTimeout, logsInterval).Should(BeTrue())
 				// running a container should be deterministic and idempotent
 				container, err = client.RunContainer(
 					context.Background(),
@@ -215,7 +236,7 @@ func TestDrivers(t *testing.T) {
 					assert.Expect(err).NotTo(HaveOccurred())
 
 					return status.IsDone() && status.ExitCode() == 0
-				}, "10s").Should(BeTrue())
+				}, statusTimeout, statusInterval).Should(BeTrue())
 
 				container, err = client.RunContainer(
 					context.Background(),
@@ -235,7 +256,7 @@ func TestDrivers(t *testing.T) {
 					assert.Expect(err).NotTo(HaveOccurred())
 
 					return status.IsDone() && status.ExitCode() == 0
-				}, "10s").Should(BeTrue())
+				}, statusTimeout, statusInterval).Should(BeTrue())
 
 				assert.Eventually(func() bool {
 					ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -245,8 +266,7 @@ func TestDrivers(t *testing.T) {
 					_ = container.Logs(ctx, stdout, stderr, false)
 
 					return strings.Contains(stdout.String(), "world")
-				}, "10s").Should(BeTrue())
-
+				}, logsTimeout, logsInterval).Should(BeTrue())
 				err = client.Close()
 				assert.Expect(err).NotTo(HaveOccurred())
 			})
@@ -281,7 +301,7 @@ func TestDrivers(t *testing.T) {
 					assert.Expect(err).NotTo(HaveOccurred())
 
 					return status.IsDone() && status.ExitCode() == 0
-				}, "10s").Should(BeTrue())
+				}, statusTimeout, statusInterval).Should(BeTrue())
 
 				assert.Eventually(func() bool {
 					ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -291,7 +311,7 @@ func TestDrivers(t *testing.T) {
 					_ = container.Logs(ctx, stdout, stderr, false)
 
 					return strings.Contains(stdout.String(), "HELLO=WORLD\n") && !strings.Contains(stdout.String(), "IGNORE")
-				}, "10s").Should(BeTrue())
+				}, logsTimeout, logsInterval).Should(BeTrue())
 			})
 
 			t.Run("streaming logs with follow", func(t *testing.T) {
@@ -332,16 +352,20 @@ func TestDrivers(t *testing.T) {
 					assert.Expect(err).NotTo(HaveOccurred())
 
 					return status.IsDone() && status.ExitCode() == 0
-				}, "10s").Should(BeTrue())
-
+				}, statusTimeout, statusInterval).Should(BeTrue())
 				// Cancel the stream context after container is done
 				streamCancel()
 
 				// Wait for stream goroutine to finish
+				streamWaitTime := 5 * time.Second
+				if name == "fly" {
+					streamWaitTime = 30 * time.Second
+				}
+
 				select {
 				case <-streamDone:
 					// Stream finished
-				case <-time.After(5 * time.Second):
+				case <-time.After(streamWaitTime):
 					t.Fatal("stream did not finish in time")
 				}
 

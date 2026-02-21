@@ -9,6 +9,7 @@ import (
 	_ "github.com/jtarchie/ci/orchestra/cache/s3"
 	_ "github.com/jtarchie/ci/orchestra/digitalocean"
 	_ "github.com/jtarchie/ci/orchestra/docker"
+	_ "github.com/jtarchie/ci/orchestra/fly"
 	_ "github.com/jtarchie/ci/orchestra/k8s"
 	_ "github.com/jtarchie/ci/orchestra/native"
 	_ "github.com/jtarchie/ci/orchestra/qemu"
