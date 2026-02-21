@@ -322,13 +322,14 @@ border-indigo-300 dark:border-indigo-600
     class="task-details mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
     <div class="grid grid-cols-1 gap-4 text-sm">
       <div class="mb-4">
-        <div id="player-{{ $path.FullPath | urlquery }}" class="w-full"></div>
+        <div id="player-{{ $path.FullPath | urlquery }}"
+          class="w-full max-w-full overflow-x-hidden"></div>
       </div>
       <script>
       document.addEventListener('DOMContentLoaded', function() {
         AsciinemaPlayer.create('/asciicast/{{ $path.FullPath }}', 
           document.getElementById('player-{{ $path.FullPath | urlquery }}'), {
-          fit: 'none',
+          fit: 'width',
           theme: 'monokai'
         });
       });

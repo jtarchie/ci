@@ -64,13 +64,13 @@
   </div>
 
   <div
-    class="graph-container relative w-full min-h-100 overflow-hidden cursor-grab bg-gray-100 dark:bg-gray-800 focus:outline-2 focus:outline-blue-500 focus:-outline-offset-2"
+    class="graph-container relative w-full min-h-100 overflow-visible sm:overflow-hidden cursor-grab bg-gray-100 dark:bg-gray-800 focus:outline-2 focus:outline-blue-500 focus:-outline-offset-2"
     id="graph-container"
     tabindex="0"
     role="application"
     aria-label="Pipeline graph visualization. Use arrow keys to pan, plus and minus to zoom, and Tab to navigate between nodes.">
 
-    <svg class="w-full h-full" id="graph-svg" aria-hidden="true">
+    <svg class="w-full h-[60vh] sm:h-full" id="graph-svg" aria-hidden="true">
       <defs>
         <marker id="arrowhead" markerWidth="10" markerHeight="7"
           refX="9" refY="3.5" orient="auto">
@@ -88,7 +88,7 @@
     </svg>
 
     <div
-      class="absolute top-4 left-4 p-2 bg-white/95 dark:bg-gray-800/95 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-800 dark:text-white text-xs z-10"
+      class="static sm:absolute sm:top-4 sm:left-4 mb-3 sm:mb-0 p-2 bg-white/95 dark:bg-gray-800/95 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-800 dark:text-white text-xs z-10 w-full sm:w-auto"
       role="region" aria-label="Graph controls">
       <!-- Legend row -->
       <div class="flex items-center gap-2 flex-wrap">
@@ -135,7 +135,7 @@
     </div>
 
     <button
-      class="absolute top-4 right-4 z-10 w-10 h-10 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white text-xl cursor-pointer flex items-center justify-center transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-2 focus:outline-blue-500 focus:outline-offset-2"
+      class="static sm:absolute sm:top-4 sm:right-4 mb-3 sm:mb-0 z-10 w-10 h-10 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white text-xl cursor-pointer flex items-center justify-center transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-2 focus:outline-blue-500 focus:outline-offset-2"
       id="help-toggle"
       aria-expanded="false"
       aria-controls="help-panel">
@@ -143,7 +143,7 @@
     </button>
 
     <div
-      class="help-panel absolute top-15 right-4 p-4 bg-white/98 dark:bg-gray-800/98 rounded-lg text-gray-800 dark:text-white text-[13px] z-10 hidden min-w-62 border border-gray-200 dark:border-gray-700 shadow-md"
+      class="help-panel static sm:absolute sm:top-15 sm:right-4 mt-3 sm:mt-0 p-4 bg-white/98 dark:bg-gray-800/98 rounded-lg text-gray-800 dark:text-white text-[13px] z-10 hidden w-full sm:w-auto min-w-0 sm:min-w-62 border border-gray-200 dark:border-gray-700 shadow-md"
       id="help-panel" role="tooltip">
       <h3 class="m-0 mb-3 text-sm font-semibold">Keyboard Shortcuts</h3>
       <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5">
@@ -173,7 +173,8 @@
       </dl>
     </div>
 
-    <div class="absolute bottom-4 right-4 flex flex-col gap-2 z-10"
+    <div
+      class="static sm:absolute sm:bottom-4 sm:right-4 mb-3 sm:mb-0 flex flex-row sm:flex-col gap-2 z-10"
       role="group" aria-label="Zoom controls">
       <button
         class="w-10 h-10 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white text-xl cursor-pointer flex items-center justify-center transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-2 focus:outline-blue-500 focus:outline-offset-2"
@@ -190,13 +191,14 @@
     </div>
 
     <div
-      class="absolute bottom-4 left-4 px-3 py-2 bg-white/90 dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700 rounded-md text-gray-600 dark:text-gray-400 text-xs z-10"
+      class="static sm:absolute sm:bottom-4 sm:left-4 mb-3 sm:mb-0 px-3 py-2 bg-white/90 dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700 rounded-md text-gray-600 dark:text-gray-400 text-xs z-10"
       id="zoom-info" aria-live="polite">
       Zoom: 100%
     </div>
 
     <!-- Search box -->
-    <div class="absolute top-4 left-1/2 -translate-x-1/2 z-10">
+    <div
+      class="static sm:absolute sm:top-4 sm:left-1/2 sm:-translate-x-1/2 mb-3 sm:mb-0 z-10 w-full sm:w-auto">
       <svg
         class="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
         width="16" height="16" viewBox="0 0 20 20"
@@ -206,7 +208,7 @@
           clip-rule="evenodd" />
       </svg>
       <input type="text"
-        class="w-60 py-2 pr-3 pl-9 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white/95 dark:bg-gray-800/95 text-gray-800 dark:text-white placeholder-gray-400 focus:outline-2 focus:outline-blue-500 focus:outline-offset-1"
+        class="w-full sm:w-60 py-2 pr-3 pl-9 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white/95 dark:bg-gray-800/95 text-gray-800 dark:text-white placeholder-gray-400 focus:outline-2 focus:outline-blue-500 focus:outline-offset-1"
         id="search-input"
         placeholder="Search nodes..."
         aria-label="Search nodes"
@@ -215,7 +217,7 @@
 
     <!-- Minimap -->
     <div
-      class="absolute bottom-40 right-4 w-40 h-25 bg-white/90 dark:bg-gray-800/90 border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden z-10"
+      class="hidden sm:block absolute bottom-40 right-4 w-40 h-25 bg-white/90 dark:bg-gray-800/90 border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden z-10"
       id="minimap" aria-hidden="true">
       <svg class="w-full h-full" id="minimap-svg">
         <g id="minimap-nodes"></g>
