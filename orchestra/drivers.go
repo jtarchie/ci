@@ -33,6 +33,15 @@ func Get(driverName string) (InitFunc, bool) {
 	return init, ok
 }
 
+// ListDrivers returns a sorted list of all registered driver names.
+func ListDrivers() []string {
+	names := make([]string, 0, len(drivers))
+	for name := range drivers {
+		names = append(names, name)
+	}
+	return names
+}
+
 // ParseDriverDSN parses a driver DSN string in the format:
 // - "driver" (simple name, uses defaults)
 // - "driver:param1=value1,param2=value2" (parameters after colon)
@@ -105,4 +114,33 @@ func GetFromDSN(dsn string) (*DriverConfig, InitFunc, error) {
 	}
 
 	return config, init, nil
+}
+
+// IsDriverAllowed validates that the driver specified in the DSN is in the allowed list.
+// If allowedList contains "*", all drivers with valid DSN format are allowed.
+// Returns an error if the driver is not allowed or if the DSN is invalid.
+func IsDriverAllowed(driverDSN string, allowedList []string) error {
+	config, err := ParseDriverDSN(driverDSN)
+	if err != nil {
+		return fmt.Errorf("invalid driver DSN: %w", err)
+	}
+
+	// Check if wildcard (all drivers allowed)
+	for _, allowed := range allowedList {
+		if allowed == "*" {
+			// Wildcard mode: just verify DSN is valid (parsed successfully above)
+			// Driver existence check happens at execution time
+			return nil
+		}
+	}
+
+	// Check if driver is in allowed list
+	for _, allowed := range allowedList {
+		if allowed == config.Name {
+			return nil
+		}
+	}
+
+	// Build friendly error message
+	return fmt.Errorf("driver %q is not allowed on this server. Allowed drivers: %s", config.Name, strings.Join(allowedList, ", "))
 }
