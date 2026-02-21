@@ -30,14 +30,17 @@ type PipelineRequest struct {
 
 // RouterOptions configures the router.
 type RouterOptions struct {
-	MaxInFlight    int
-	WebhookTimeout time.Duration
+	MaxInFlight       int
+	WebhookTimeout    time.Duration
+	BasicAuthUsername string
+	BasicAuthPassword string
 }
 
 // Router wraps echo.Echo and provides access to the execution service.
 type Router struct {
 	*echo.Echo
 	execService *ExecutionService
+	webGroup    *echo.Group
 }
 
 // WaitForExecutions blocks until all in-flight pipeline executions have completed.
@@ -51,9 +54,30 @@ func (r *Router) ExecutionService() *ExecutionService {
 	return r.execService
 }
 
+// ProtectedGroup returns the web group that has basic auth middleware applied.
+// Use this to add routes that should require authentication.
+func (r *Router) ProtectedGroup() *echo.Group {
+	return r.webGroup
+}
+
 // isHtmxRequest checks if the request is from htmx.
 func isHtmxRequest(ctx echo.Context) bool {
 	return ctx.Request().Header.Get("HX-Request") == "true"
+}
+
+// newBasicAuthMiddleware creates a basic auth middleware using Echo's built-in BasicAuth.
+// If username/password are empty strings, the middleware is disabled (returns a no-op middleware).
+func newBasicAuthMiddleware(username, password string) echo.MiddlewareFunc {
+	if username == "" || password == "" {
+		// No basic auth configured, return a no-op middleware
+		return func(next echo.HandlerFunc) echo.HandlerFunc {
+			return next
+		}
+	}
+
+	return middleware.BasicAuth(func(u, p string, ctx echo.Context) (bool, error) {
+		return u == username && p == password, nil
+	})
 }
 
 func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*Router, error) {
@@ -104,13 +128,17 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 		return ctx.String(http.StatusOK, "OK")
 	})
 
+	// Create web UI group and apply basic auth middleware
+	web := router.Group("")
+	web.Use(newBasicAuthMiddleware(opts.BasicAuthUsername, opts.BasicAuthPassword))
+
 	// Redirect root to pipelines list
-	router.GET("/", func(ctx echo.Context) error {
+	web.GET("/", func(ctx echo.Context) error {
 		return ctx.Redirect(http.StatusMovedPermanently, "/pipelines/")
 	})
 
 	// Pipeline web UI routes
-	router.GET("/pipelines/", func(ctx echo.Context) error {
+	web.GET("/pipelines/", func(ctx echo.Context) error {
 		pipelines, err := store.ListPipelines(ctx.Request().Context())
 		if err != nil {
 			return fmt.Errorf("could not list pipelines: %w", err)
@@ -125,7 +153,7 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 		})
 	})
 
-	router.GET("/pipelines/:id/", func(ctx echo.Context) error {
+	web.GET("/pipelines/:id/", func(ctx echo.Context) error {
 		id := ctx.Param("id")
 
 		pipeline, err := store.GetPipeline(ctx.Request().Context(), id)
@@ -152,7 +180,7 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	})
 
 	// GET /pipelines/:id/runs-section - Returns just the runs section partial for htmx
-	router.GET("/pipelines/:id/runs-section", func(ctx echo.Context) error {
+	web.GET("/pipelines/:id/runs-section", func(ctx echo.Context) error {
 		id := ctx.Param("id")
 
 		runs, err := store.ListRunsByPipeline(ctx.Request().Context(), id)
@@ -171,15 +199,20 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	})
 
 	// Pipeline API endpoints
-	api := router.Group("/api")
+	// Register webhooks first (without auth) on the main router
 	webhookTimeout := opts.WebhookTimeout
 	if webhookTimeout == 0 {
 		webhookTimeout = 5 * time.Second
 	}
+	registerWebhookRoutes(router, store, execService, webhookTimeout)
+
+	// Create API group with basic auth middleware (for non-webhook endpoints)
+	api := router.Group("/api")
+	api.Use(newBasicAuthMiddleware(opts.BasicAuthUsername, opts.BasicAuthPassword))
 	registerPipelineRoutes(api, store, execService, webhookTimeout)
 
 	// Run-specific views that look up tasks at /pipeline/<runID>/...
-	router.GET("/runs/:id/tasks", func(ctx echo.Context) error {
+	web.GET("/runs/:id/tasks", func(ctx echo.Context) error {
 		runID := ctx.Param("id")
 		lookupPath := "/pipeline/" + runID + "/"
 
@@ -200,7 +233,7 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 		})
 	})
 
-	router.GET("/runs/:id/graph", func(ctx echo.Context) error {
+	web.GET("/runs/:id/graph", func(ctx echo.Context) error {
 		runID := ctx.Param("id")
 		lookupPath := "/pipeline/" + runID + "/"
 
@@ -229,7 +262,7 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	})
 
 	// GET /runs/:id/tasks-partial - Returns just the tasks container for htmx polling
-	router.GET("/runs/:id/tasks-partial", func(ctx echo.Context) error {
+	web.GET("/runs/:id/tasks-partial", func(ctx echo.Context) error {
 		runID := ctx.Param("id")
 		lookupPath := "/pipeline/" + runID + "/"
 
@@ -251,7 +284,7 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	})
 
 	// GET /runs/:id/graph-data - Returns just the graph data JSON for htmx polling
-	router.GET("/runs/:id/graph-data", func(ctx echo.Context) error {
+	web.GET("/runs/:id/graph-data", func(ctx echo.Context) error {
 		runID := ctx.Param("id")
 		lookupPath := "/pipeline/" + runID + "/"
 
@@ -279,7 +312,7 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 		})
 	})
 
-	return &Router{Echo: router, execService: execService}, nil
+	return &Router{Echo: router, execService: execService, webGroup: web}, nil
 }
 
 func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *ExecutionService, webhookTimeout time.Duration) {
@@ -455,9 +488,11 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 
 		return ctx.JSON(http.StatusOK, run)
 	})
+}
 
+func registerWebhookRoutes(router *echo.Echo, store storage.Driver, execService *ExecutionService, webhookTimeout time.Duration) {
 	// ANY /api/webhooks/:id - Trigger pipeline execution via webhook
-	api.Any("/webhooks/:id", func(ctx echo.Context) error {
+	router.Any("/api/webhooks/:id", func(ctx echo.Context) error {
 		id := ctx.Param("id")
 
 		// Get the pipeline
