@@ -181,7 +181,11 @@ func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *stor
 
 // determineRunStatus checks job statuses to determine the final run status.
 func (s *ExecutionService) determineRunStatus(ctx context.Context, runID string, logger *slog.Logger) storage.RunStatus {
-	// Query all job statuses for this run
+	// Query all job statuses for this run (backwards-compat Concourse YAML pipelines).
+	// Note: TypeScript pipeline task statuses under /pipeline/{runID}/tasks/ are NOT
+	// checked here because individual task failures don't necessarily mean the pipeline
+	// failed — the pipeline may handle errors (e.g., try/catch). Pipeline-level failure
+	// is already handled by the executePipeline error return path.
 	prefix := "/pipeline/" + runID + "/jobs"
 	results, err := s.store.GetAll(ctx, prefix, []string{"status"})
 	if err != nil {
