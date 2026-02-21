@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/jtarchie/ci/server"
@@ -19,6 +20,7 @@ type Server struct {
 	Storage        string        `default:"sqlite://test.db" help:"Path to storage file"                      required:""`
 	MaxInFlight    int           `default:"10"               help:"Maximum concurrent pipeline executions"`
 	WebhookTimeout time.Duration `default:"5s"               help:"Timeout waiting for pipeline webhook response"`
+	BasicAuth      string        `help:"Basic auth credentials in format 'username:password' (optional)"`
 }
 
 func (c *Server) Run(logger *slog.Logger) error {
@@ -33,15 +35,31 @@ func (c *Server) Run(logger *slog.Logger) error {
 	}
 	defer func() { _ = client.Close() }()
 
+	// Parse basic auth credentials if provided
+	var basicAuthUsername, basicAuthPassword string
+	if c.BasicAuth != "" {
+		parts := strings.SplitN(c.BasicAuth, ":", 2)
+		if len(parts) != 2 {
+			return fmt.Errorf("invalid basic auth format: expected 'username:password', got '%s'", c.BasicAuth)
+		}
+		basicAuthUsername = parts[0]
+		basicAuthPassword = parts[1]
+		if basicAuthUsername == "" || basicAuthPassword == "" {
+			return fmt.Errorf("basic auth username and password cannot be empty")
+		}
+	}
+
 	router, err := server.NewRouter(logger, client, server.RouterOptions{
-		MaxInFlight:    c.MaxInFlight,
-		WebhookTimeout: c.WebhookTimeout,
+		MaxInFlight:       c.MaxInFlight,
+		WebhookTimeout:    c.WebhookTimeout,
+		BasicAuthUsername: basicAuthUsername,
+		BasicAuthPassword: basicAuthPassword,
 	})
 	if err != nil {
 		return fmt.Errorf("could not create router: %w", err)
 	}
 
-	router.GET("/tasks/*", func(ctx echo.Context) error {
+	router.ProtectedGroup().GET("/tasks/*", func(ctx echo.Context) error {
 		lookupPath := ctx.Param("*")
 		if lookupPath == "" || lookupPath[0] != '/' {
 			lookupPath = "/" + lookupPath
@@ -58,7 +76,7 @@ func (c *Server) Run(logger *slog.Logger) error {
 		})
 	})
 
-	router.GET("/graph/*", func(ctx echo.Context) error {
+	router.ProtectedGroup().GET("/graph/*", func(ctx echo.Context) error {
 		lookupPath := ctx.Param("*")
 		if lookupPath == "" || lookupPath[0] != '/' {
 			lookupPath = "/" + lookupPath
@@ -82,7 +100,7 @@ func (c *Server) Run(logger *slog.Logger) error {
 		})
 	})
 
-	router.GET("/asciicast/*", func(ctx echo.Context) error {
+	router.ProtectedGroup().GET("/asciicast/*", func(ctx echo.Context) error {
 		lookupPath := ctx.Param("*")
 		if lookupPath == "" || lookupPath[0] != '/' {
 			lookupPath = "/" + lookupPath
