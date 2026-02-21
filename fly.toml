@@ -1,0 +1,29 @@
+# fly.toml app configuration file generated for ci-app on 2026-02-21T07:37:40-05:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'ci-app'
+primary_region = 'sjc'
+
+[build]
+  dockerfile = 'Dockerfile.fly'
+
+[deploy]
+  strategy = 'rolling'
+
+[[mounts]]
+  source = 'ci_data'
+  destination = '/data'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 512
