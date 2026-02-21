@@ -252,6 +252,68 @@ for more granular resource management and targeted cleanup.
 connect to the server. Both the key and server are cleaned up when the driver is
 closed.
 
+### Fly Driver
+
+The Fly driver runs tasks as Fly Machines (lightweight VMs) on
+[Fly.io](https://fly.io). Each container maps to a Fly Machine with
+`auto_destroy: true` and restart policy `no`, making it ideal for ephemeral CI
+workloads. Volumes are Fly persistent volumes attached to machines.
+
+| Parameter | Description             | Default         | Env Var         | Example                  |
+| --------- | ----------------------- | --------------- | --------------- | ------------------------ |
+| `token`   | Fly API token           | (required)      | `FLY_API_TOKEN` | `fly:token=fo1_xxx`      |
+| `app`     | Existing Fly app name   | (auto-created)  | `FLY_APP`       | `fly:app=my-ci`          |
+| `region`  | Fly region for machines | (Fly default)   | `FLY_REGION`    | `fly:region=ord`         |
+| `org`     | Fly organization slug   | `personal`      | `FLY_ORG`       | `fly:org=my-org`         |
+| `size`    | Machine size preset     | `shared-cpu-1x` |                 | `fly:size=shared-cpu-2x` |
+
+**App modes**:
+
+- **Existing app**: Set `app` to use a pre-existing Fly app. Machines and
+  volumes are created within it and cleaned up on `Close()`, but the app itself
+  is preserved.
+- **Ephemeral app** (default): When `app` is not set, the driver creates a new
+  Fly app named `ci-<namespace>` and deletes it (along with all resources) on
+  `Close()`.
+
+**Examples**:
+
+```bash
+# Using environment variable for token, ephemeral app
+FLY_API_TOKEN=fo1_xxx --driver=fly
+
+# Existing app with region
+--driver=fly:app=my-ci-app,region=ord
+
+# URL-style with namespace
+--driver=fly://my-namespace?token=fo1_xxx&app=my-ci&region=lax
+
+# Full configuration
+--driver=fly:token=fo1_xxx,app=my-ci,region=ord,org=my-org,size=shared-cpu-2x
+```
+
+**Environment Variables**:
+
+| Variable        | Description                    |
+| --------------- | ------------------------------ |
+| `FLY_API_TOKEN` | API token (alternative to DSN) |
+| `FLY_APP`       | Default Fly app name           |
+| `FLY_REGION`    | Default region                 |
+| `FLY_ORG`       | Default organization slug      |
+
+**Machine sizing**: The `size` parameter maps to Fly Machine presets (see
+[Fly Machine sizing](https://fly.io/docs/machines/guides-examples/machine-sizing/)).
+Task-specific `container_limits` (CPU count, memory in bytes) override the
+preset if provided.
+
+**Logs**: Machine event logs (start, exit, exit code, OOM status) are available.
+For full stdout/stderr streaming, use `flyctl logs` or Fly's log shipping
+integrations.
+
+**Note**: All machines are launched with `auto_destroy: true` so they
+self-cleanup after stopping, and the `Close()` method also explicitly destroys
+any tracked machines and volumes.
+
 ### QEMU Driver
 
 The QEMU driver runs tasks inside a local QEMU virtual machine. Commands are
