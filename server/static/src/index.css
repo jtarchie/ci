@@ -2,6 +2,13 @@
 @import "asciinema-player/dist/bundle/asciinema-player.css";
 
 /* Custom styles */
+html, body {
+  min-height: 100%;
+}
+
+body {
+  min-height: 100dvh;
+}
 .task-details {
   display: none;
 }
@@ -24,9 +31,16 @@
 
 /* Graph container - dot grid background needs custom CSS */
 .graph-container {
-  height: calc(100vh - 200px);
+  height: calc(100dvh - 200px);
   background-image: radial-gradient(circle, #d1d5db 1px, transparent 1px);
   background-size: 20px 20px;
+}
+
+@media (max-width: 640px) {
+  .graph-container {
+    height: auto;
+    min-height: 320px;
+  }
 }
 
 @media (prefers-color-scheme: dark) {
