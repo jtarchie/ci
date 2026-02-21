@@ -151,6 +151,10 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 
 	logger.Debug("container.run.start")
 
+	// Persist task status to storage so the UI can display progress
+	storageKey := c.taskStorageKey(stepID)
+	c.setTaskStatus(storageKey, map[string]interface{}{"status": "pending"})
+
 	var mounts orchestra.Mounts
 	for path, volume := range input.Mounts {
 		mounts = append(mounts, orchestra.Mount{
@@ -191,11 +195,17 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 		logger.Error("container.run.create_error", "err", err)
 
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			c.setTaskStatus(storageKey, map[string]interface{}{"status": "abort"})
+
 			return &RunResult{Status: RunAbort}, nil
 		}
 
+		c.setTaskStatus(storageKey, map[string]interface{}{"status": "error"})
+
 		return nil, fmt.Errorf("could not run container: %w", err)
 	}
+
+	c.setTaskStatus(storageKey, map[string]interface{}{"status": "running"})
 
 	var containerStatus orchestra.ContainerStatus
 
@@ -225,8 +235,12 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 			cancelStream()
 
 			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+				c.setTaskStatus(storageKey, map[string]interface{}{"status": "abort"})
+
 				return &RunResult{Status: RunAbort}, nil
 			}
+
+			c.setTaskStatus(storageKey, map[string]interface{}{"status": "error"})
 
 			return nil, fmt.Errorf("could not get container status: %w", err)
 		}
@@ -259,14 +273,30 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 			logger.Error("container.logs.error", "err", err)
 
 			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+				c.setTaskStatus(storageKey, map[string]interface{}{"status": "abort"})
+
 				return &RunResult{Status: RunAbort}, nil
 			}
+
+			c.setTaskStatus(storageKey, map[string]interface{}{"status": "error"})
 
 			return nil, fmt.Errorf("could not get container logs: %w", err)
 		}
 	}
 
 	logger.Debug("container.logs", "stdout", stdout.String(), "stderr", stderr.String())
+
+	status := "success"
+	if containerStatus.ExitCode() != 0 {
+		status = "failure"
+	}
+
+	c.setTaskStatus(storageKey, map[string]interface{}{
+		"status": status,
+		"code":   containerStatus.ExitCode(),
+		"stdout": stdout.String(),
+		"stderr": stderr.String(),
+	})
 
 	return &RunResult{
 		Status: RunComplete,
@@ -356,4 +386,29 @@ func (c *PipelineRunner) CleanupVolumes() error {
 	}
 
 	return nil
+}
+
+// taskStorageKey returns the storage path for a task within the current run.
+// The path follows the pattern /pipeline/{runID}/tasks/{stepID} which the UI
+// views (tasks/graph) query via store.GetAll.
+func (c *PipelineRunner) taskStorageKey(stepID string) string {
+	if c.runID == "" {
+		return ""
+	}
+
+	return "/pipeline/" + c.runID + "/tasks/" + stepID
+}
+
+// setTaskStatus persists task status to storage for UI visibility.
+// Errors are logged but not propagated — task execution should not fail
+// due to status tracking issues.
+func (c *PipelineRunner) setTaskStatus(key string, payload map[string]interface{}) {
+	if key == "" || c.storage == nil {
+		return
+	}
+
+	err := c.storage.Set(c.ctx, key, payload)
+	if err != nil {
+		c.logger.Error("task.status.persist.error", "key", key, "err", err)
+	}
 }
