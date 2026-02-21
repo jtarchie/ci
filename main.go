@@ -25,9 +25,9 @@ type CLI struct {
 	Server      commands.Server      `cmd:"" help:"Run a server"`
 	SetPipeline commands.SetPipeline `cmd:"" help:"Upload a pipeline to the server" name:"set-pipeline"`
 
-	LogLevel  slog.Level `default:"info"                                  help:"Set the log level (debug, info, warn, error)"`
-	AddSource bool       `help:"Add source code location to log messages"`
-	LogFormat string     `default:"text"                                  enum:"text,json"                                    help:"Set the log format (text, json)"`
+	LogLevel  slog.Level `default:"info"             env:"CI_LOG_LEVEL"   help:"Set the log level (debug, info, warn, error)"`
+	AddSource bool       `env:"CI_ADD_SOURCE"        help:"Add source code location to log messages"`
+	LogFormat string     `default:"text"             env:"CI_LOG_FORMAT"  enum:"text,json" help:"Set the log format (text, json)"`
 }
 
 func main() {
