@@ -32,7 +32,7 @@
 </nav>
 
 <div class="container mx-auto p-4">
-  <div class="flex items-center justify-between mb-4">
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
     <div class="flex items-center gap-3">
       <h1 class="text-3xl font-bold dark:text-white">Pipeline Visualizer</h1>
       {{ if .IsActive }}
@@ -48,10 +48,10 @@
       </span>
       {{ end }}
     </div>
-    <div class="flex items-center gap-2">
+    <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto">
       <!-- Expand/Collapse All -->
       <button id="expand-all"
-        class="px-3 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400"
+        class="w-full sm:w-auto px-3 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400"
         title="Expand all tasks">
         <svg class="w-4 h-4" fill="none" stroke="currentColor"
           viewBox="0 0 24 24">
@@ -60,7 +60,7 @@
         </svg>
       </button>
       <button id="collapse-all"
-        class="px-3 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400"
+        class="w-full sm:w-auto px-3 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400"
         title="Collapse all tasks">
         <svg class="w-4 h-4" fill="none" stroke="currentColor"
           viewBox="0 0 24 24">
@@ -70,12 +70,12 @@
       </button>
       {{ if .RunID }}
       <a href="/runs/{{ .RunID }}/graph"
-        class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
+        class="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
         Graph View
       </a>
       {{ else }}
       <a href="/graph{{ .Path }}/"
-        class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
+        class="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
         Graph View
       </a>
       {{ end }}
