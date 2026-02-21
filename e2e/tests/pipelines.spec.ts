@@ -58,7 +58,8 @@ test.describe("Pipeline Management UI", () => {
       // Should show the pipeline in the table
       await expect(page.getByRole("link", { name: pipelineName }))
         .toBeVisible();
-      await expect(page.getByText("docker://")).toBeVisible();
+      const row = page.locator("tr").filter({ hasText: pipelineName });
+      await expect(row.getByText("docker://", { exact: true })).toBeVisible();
     });
 
     test("shows trigger button for each pipeline", async ({ page, request }) => {
@@ -492,9 +493,15 @@ test.describe("Live Updates", () => {
     await expect(page).toHaveURL(/\/runs\/[^/]+\/tasks/);
 
     // Wait for completion - the run will eventually show Live indicator or tasks
-    await expect(
-      page.getByText("Live", { exact: true }).or(page.locator(".task-item")),
-    ).toBeVisible({ timeout: 60000 });
+    const liveIndicator = page.getByText("Live", { exact: true });
+    const taskItem = page.locator(".task-item").first();
+    await expect
+      .poll(
+        async () =>
+          (await liveIndicator.isVisible()) || (await taskItem.isVisible()),
+        { timeout: 60000 },
+      )
+      .toBeTruthy();
   });
 
   test("graph page shows Live indicator and updates", async ({ page, request }) => {
