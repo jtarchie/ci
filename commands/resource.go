@@ -41,7 +41,7 @@ func (r *Resource) Run(logger *slog.Logger) error {
 	ctx, cancel := context.WithTimeout(context.Background(), r.Timeout)
 	defer cancel()
 
-	var response interface{}
+	var response any
 
 	switch r.Operation {
 	case "check":

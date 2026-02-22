@@ -33,7 +33,7 @@ type sourceConfig struct {
 	SkipSSLVerify bool
 }
 
-func parseSourceConfig(source map[string]interface{}) (*sourceConfig, error) {
+func parseSourceConfig(source map[string]any) (*sourceConfig, error) {
 	cfg := &sourceConfig{
 		Branch: "main", // Default branch
 	}

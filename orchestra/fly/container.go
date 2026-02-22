@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"sync"
 	"time"
 
@@ -222,9 +223,7 @@ func (f *Fly) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.
 
 	// Build environment variables
 	env := make(map[string]string)
-	for k, v := range task.Env {
-		env[k] = v
-	}
+	maps.Copy(env, task.Env)
 
 	// Build machine mounts
 	var mounts []fly.MachineMount

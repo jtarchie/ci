@@ -167,7 +167,7 @@ func (h *Hetzner) ensureServer(ctx context.Context, containerLimits orchestra.Co
 	// Add custom labels from DSN parameter (format: key1=value1,key2=value2)
 	customLabels := orchestra.GetParam(h.params, "labels", "HETZNER_LABELS", "")
 	if customLabels != "" {
-		for _, label := range strings.Split(customLabels, ",") {
+		for label := range strings.SplitSeq(customLabels, ",") {
 			label = strings.TrimSpace(label)
 			if parts := strings.SplitN(label, "=", 2); len(parts) == 2 {
 				key := sanitizeHostname(strings.TrimSpace(parts[0]))
@@ -638,10 +638,10 @@ func CleanupOrphanedResources(ctx context.Context, token string, logger *slog.Lo
 
 	// If selector includes namespace, use it for more targeted cleanup
 	if strings.Contains(labelSelector, "namespace=") {
-		for _, part := range strings.Split(labelSelector, ",") {
+		for part := range strings.SplitSeq(labelSelector, ",") {
 			part = strings.TrimSpace(part)
-			if strings.HasPrefix(part, "namespace=") {
-				ns := strings.TrimPrefix(part, "namespace=")
+			if after, ok := strings.CutPrefix(part, "namespace="); ok {
+				ns := after
 				keyPrefix = "ci-" + ns
 
 				break

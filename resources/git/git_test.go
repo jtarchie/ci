@@ -30,7 +30,7 @@ func TestGitResource(t *testing.T) {
 
 		ctx := context.Background()
 		resp, err := res.Check(ctx, resources.CheckRequest{
-			Source: map[string]interface{}{
+			Source: map[string]any{
 				"uri":    "https://github.com/octocat/Hello-World.git",
 				"branch": "master",
 			},
@@ -49,7 +49,7 @@ func TestGitResource(t *testing.T) {
 		// First, check to get a version
 		ctx := context.Background()
 		checkResp, err := res.Check(ctx, resources.CheckRequest{
-			Source: map[string]interface{}{
+			Source: map[string]any{
 				"uri":    "https://github.com/octocat/Hello-World.git",
 				"branch": "master",
 			},
@@ -67,7 +67,7 @@ func TestGitResource(t *testing.T) {
 
 		// In (get) the repository
 		inResp, err := res.In(ctx, destDir, resources.InRequest{
-			Source: map[string]interface{}{
+			Source: map[string]any{
 				"uri":    "https://github.com/octocat/Hello-World.git",
 				"branch": "master",
 			},

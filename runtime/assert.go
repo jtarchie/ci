@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"reflect"
 	"regexp"
+	"slices"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -36,7 +37,7 @@ func NewAssert(vm *goja.Runtime, logger *slog.Logger) *Assert {
 
 var ErrAssertion = errors.New("assertion failed")
 
-func (a *Assert) Equal(expected, actual interface{}, message ...string) {
+func (a *Assert) Equal(expected, actual any, message ...string) {
 	a.logger.Debug("equality.checking",
 		"expected_type", fmt.Sprintf("%T", expected),
 		"actual_type", fmt.Sprintf("%T", actual))
@@ -56,7 +57,7 @@ func (a *Assert) Equal(expected, actual interface{}, message ...string) {
 	}
 }
 
-func (a *Assert) NotEqual(expected, actual interface{}, message ...string) {
+func (a *Assert) NotEqual(expected, actual any, message ...string) {
 	a.logger.Debug("inequality.checking",
 		"expected_type", fmt.Sprintf("%T", expected),
 		"actual_type", fmt.Sprintf("%T", actual))
@@ -108,20 +109,12 @@ func (a *Assert) Truthy(value bool, message ...string) {
 	}
 }
 
-func (a *Assert) ContainsElement(array []interface{}, element interface{}, message ...string) {
+func (a *Assert) ContainsElement(array []any, element any, message ...string) {
 	a.logger.Debug("element.checking",
 		"element_type", fmt.Sprintf("%T", element),
 		"array_length", len(array))
 
-	found := false
-
-	for _, item := range array {
-		if item == element {
-			found = true
-
-			break
-		}
-	}
+	found := slices.Contains(array, element)
 
 	if !found {
 		msg := fmt.Sprintf("expected array to contain %v", element)
@@ -155,11 +148,11 @@ var spewConfigStringerEnabled = spew.ConfigState{
 	MaxDepth:                MaxDepth,
 }
 
-func typeAndKind(v interface{}) (reflect.Type, reflect.Kind) {
+func typeAndKind(v any) (reflect.Type, reflect.Kind) {
 	valType := reflect.TypeOf(v)
 	valKind := valType.Kind()
 
-	if valKind == reflect.Ptr {
+	if valKind == reflect.Pointer {
 		valType = valType.Elem()
 		valKind = valType.Kind()
 	}
@@ -167,7 +160,7 @@ func typeAndKind(v interface{}) (reflect.Type, reflect.Kind) {
 	return valType, valKind
 }
 
-func diff(expected interface{}, actual interface{}) string {
+func diff(expected any, actual any) string {
 	if expected == nil || actual == nil {
 		return ""
 	}
@@ -186,10 +179,10 @@ func diff(expected interface{}, actual interface{}) string {
 	var expectedStr, actualStr string
 
 	switch expectedType {
-	case reflect.TypeOf(""):
+	case reflect.TypeFor[string]():
 		expectedStr = reflect.ValueOf(expected).String()
 		actualStr = reflect.ValueOf(actual).String()
-	case reflect.TypeOf(time.Time{}):
+	case reflect.TypeFor[time.Time]():
 		expectedStr = spewConfigStringerEnabled.Sdump(expected)
 		actualStr = spewConfigStringerEnabled.Sdump(actual)
 	default:
@@ -210,7 +203,7 @@ func diff(expected interface{}, actual interface{}) string {
 	return "\n\nDiff:\n" + diff
 }
 
-func formatUnequalValues(expected, actual interface{}) (string, string) {
+func formatUnequalValues(expected, actual any) (string, string) {
 	if reflect.TypeOf(expected) != reflect.TypeOf(actual) {
 		return fmt.Sprintf("%T(%s)", expected, truncatingFormat(expected)),
 			fmt.Sprintf("%T(%s)", actual, truncatingFormat(actual))
@@ -223,7 +216,7 @@ func formatUnequalValues(expected, actual interface{}) (string, string) {
 	return truncatingFormat(expected), truncatingFormat(actual)
 }
 
-func truncatingFormat(data interface{}) string {
+func truncatingFormat(data any) string {
 	value := fmt.Sprintf("%#v", data)
 	maxCap := bufio.MaxScanTokenSize - SpacingMargin // Give us some space the type info too if needed.
 

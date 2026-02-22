@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"slices"
 	"strings"
 )
 
@@ -87,7 +88,7 @@ func ParseDriverDSN(dsn string) (*DriverConfig, error) {
 
 	params := make(map[string]string)
 	if parts[1] != "" {
-		for _, pair := range strings.Split(parts[1], ",") {
+		for pair := range strings.SplitSeq(parts[1], ",") {
 			kv := strings.SplitN(pair, "=", 2)
 			if len(kv) == 2 {
 				params[kv[0]] = kv[1]
@@ -126,19 +127,15 @@ func IsDriverAllowed(driverDSN string, allowedList []string) error {
 	}
 
 	// Check if wildcard (all drivers allowed)
-	for _, allowed := range allowedList {
-		if allowed == "*" {
-			// Wildcard mode: just verify DSN is valid (parsed successfully above)
-			// Driver existence check happens at execution time
-			return nil
-		}
+	if slices.Contains(allowedList, "*") {
+		// Wildcard mode: just verify DSN is valid (parsed successfully above)
+		// Driver existence check happens at execution time
+		return nil
 	}
 
 	// Check if driver is in allowed list
-	for _, allowed := range allowedList {
-		if allowed == config.Name {
-			return nil
-		}
+	if slices.Contains(allowedList, config.Name) {
+		return nil
 	}
 
 	// Build friendly error message

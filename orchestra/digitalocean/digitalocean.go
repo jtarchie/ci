@@ -135,7 +135,7 @@ func (d *DigitalOcean) ensureDroplet(ctx context.Context, containerLimits orches
 	// Add custom tags from DSN parameter
 	customTags := orchestra.GetParam(d.params, "tags", "DIGITALOCEAN_TAGS", "")
 	if customTags != "" {
-		for _, tag := range strings.Split(customTags, ",") {
+		for tag := range strings.SplitSeq(customTags, ",") {
 			tag = strings.TrimSpace(tag)
 			if tag != "" {
 				tags = append(tags, sanitizeHostname(tag))

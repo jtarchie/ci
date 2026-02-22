@@ -4,8 +4,8 @@ import "time"
 
 // https://github.com/concourse/concourse/blob/master/atc/config.go
 type ImageResource struct {
-	Source map[string]interface{} `yaml:"source,omitempty"`
-	Type   string                 `yaml:"type,omitempty"`
+	Source map[string]any `yaml:"source,omitempty"`
+	Type   string         `yaml:"type,omitempty"`
 }
 
 type TaskConfigRun struct {
@@ -54,7 +54,7 @@ type GetConfig struct {
 	Passed   []string          `yaml:"passed,omitempty"`
 	Params   map[string]string `yaml:"params,omitempty"`
 	Trigger  bool              `yaml:"trigger,omitempty"`
-	Version  interface{}       `yaml:"version,omitempty"` // "latest" | "every" | map[string]string (pinned)
+	Version  any               `yaml:"version,omitempty"` // "latest" | "every" | map[string]string (pinned)
 }
 
 // GetVersionMode returns the version mode: "latest", "every", or "pinned".
@@ -76,7 +76,7 @@ func (g *GetConfig) GetVersionMode() string {
 
 // GetPinnedVersion returns the pinned version map, or nil if not pinned.
 func (g *GetConfig) GetPinnedVersion() map[string]string {
-	if m, ok := g.Version.(map[string]interface{}); ok {
+	if m, ok := g.Version.(map[string]any); ok {
 		result := make(map[string]string)
 
 		for k, v := range m {
@@ -176,18 +176,18 @@ type Job struct {
 type Jobs []Job
 
 type ResourceType struct {
-	Name   string                 `validate:"required"     yaml:"name,omitempty"`
-	Source map[string]interface{} `yaml:"source,omitempty"`
-	Type   string                 `validate:"required"     yaml:"type,omitempty"`
+	Name   string         `validate:"required"     yaml:"name,omitempty"`
+	Source map[string]any `yaml:"source,omitempty"`
+	Type   string         `validate:"required"     yaml:"type,omitempty"`
 }
 
 type ResourceTypes []ResourceType
 
 type Resource struct {
-	Name   string                 `validate:"required"     yaml:"name,omitempty"`
-	Icon   string                 `yaml:"icon,omitempty"`
-	Source map[string]interface{} `yaml:"source,omitempty"`
-	Type   string                 `validate:"required"     yaml:"type,omitempty"`
+	Name   string         `validate:"required"     yaml:"name,omitempty"`
+	Icon   string         `yaml:"icon,omitempty"`
+	Source map[string]any `yaml:"source,omitempty"`
+	Type   string         `validate:"required"     yaml:"type,omitempty"`
 }
 
 type Resources []Resource

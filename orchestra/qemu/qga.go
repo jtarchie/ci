@@ -20,8 +20,8 @@ type QGAClient struct {
 }
 
 type qgaRequest struct {
-	Execute   string      `json:"execute"`
-	Arguments interface{} `json:"arguments,omitempty"`
+	Execute   string `json:"execute"`
+	Arguments any    `json:"arguments,omitempty"`
 }
 
 type qgaResponse struct {
