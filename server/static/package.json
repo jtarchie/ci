@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "asciinema-player": "3.14.0",
+    "highlight.js": "^11.11.1",
     "htmx.org": "^2.0.8"
   },
   "devDependencies": {

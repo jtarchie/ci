@@ -4,6 +4,17 @@ import "htmx.org";
 // Import asciinema-player
 import * as AsciinemaPlayer from "asciinema-player";
 
+// Import highlight.js core and languages
+import hljs from "highlight.js/lib/core";
+import yaml from "highlight.js/lib/languages/yaml";
+import typescript from "highlight.js/lib/languages/typescript";
+import javascript from "highlight.js/lib/languages/javascript";
+
+// Register languages
+hljs.registerLanguage("yaml", yaml);
+hljs.registerLanguage("typescript", typescript);
+hljs.registerLanguage("javascript", javascript);
+
 // Import graph module
 import { initGraph } from "./graph.js";
 
@@ -16,8 +27,15 @@ import { initPipelines, showToast } from "./pipelines.js";
 // Make AsciinemaPlayer available globally
 window.AsciinemaPlayer = AsciinemaPlayer;
 
+// Initialize syntax highlighting
+function initSyntaxHighlighting() {
+  document.querySelectorAll("pre code").forEach((block) => {
+    hljs.highlightElement(block);
+  });
+}
+
 // Export CI namespace for htmx hx-on attributes
-window.CI = { showToast };
+window.CI = { showToast, initSyntaxHighlighting };
 
 // Initialize when DOM is ready
 document.addEventListener("DOMContentLoaded", function () {
@@ -46,6 +64,9 @@ document.addEventListener("DOMContentLoaded", function () {
   // Initialize pipelines page if we're on a pipelines page
   const pipelinesTable = document.getElementById("pipelines-table");
   const triggerBtn = document.getElementById("trigger-btn");
+
+  // Initialize syntax highlighting
+  initSyntaxHighlighting();
   if (pipelinesTable || triggerBtn) {
     try {
       initPipelines();

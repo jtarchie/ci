@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "asciinema-player/dist/bundle/asciinema-player.css";
+@import "./highlight-theme.css";
 
 /* Custom styles */
 html, body {
