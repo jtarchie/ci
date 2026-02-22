@@ -79,6 +79,30 @@ export { pipeline };
   subdirectories
 - JSON field tags for Goja interop: `json:"fieldName"`
 
+## Accessibility & UI Patterns
+
+The UI (server/templates/, server/static/src/) uses idiomorph + HTMx for
+intelligent DOM morphing, which preserves CSS animations, event listeners, and
+element state during dynamic updates. A few patterns worth noting:
+
+- **DOM Morphing** (`idiomorph`): Use `morph:innerHTML` or `morph:outerHTML` swap
+  strategy instead of full replacements. This prevents animation resets and
+  preserves SVG viewport transforms. Idiomorph uses ID-set algorithm to match
+  nodes in-place.
+- **Lazy Initialization**: Use event listeners (e.g., `toggle` on `<details>`)
+  rather than `DOMContentLoaded` for content that loads dynamically. Inline
+  scripts in dynamically-loaded HTML won't re-execute.
+- **Semantic HTML**: Use `<ul role="list">` for lists, `role="radiogroup"` with
+  `role="radio"` for radio buttons, `role="toolbar"` for control groups. Pair
+  with matching ARIA attributes (`aria-checked`, `aria-label`,
+  `aria-roledescription`).
+- **Touch Targets**: Mobile controls should be at least 44×44px. Avoid relying
+  on CSS `static` positioning for overlays on mobile—use `absolute` or `fixed`
+  instead.
+- **Experience vs. Custom JS**: Avoid custom JavaScript for DOM state management
+  (e.g., comparing HTML structures, tracking expanded nodes). Modern tools like
+  idiomorph handle edge cases better than hand-coded solutions.
+
 ## Common Pitfalls
 
 - **Stale TS bundle**: Always run `go generate ./...` after editing
