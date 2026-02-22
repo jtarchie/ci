@@ -25,9 +25,9 @@ func NewResourceRunner(ctx context.Context, logger *slog.Logger) *ResourceRunner
 
 // ResourceCheckInput is the input for a Check operation from JS.
 type ResourceCheckInput struct {
-	Type    string                 `json:"type"`
-	Source  map[string]interface{} `json:"source"`
-	Version map[string]string      `json:"version,omitempty"`
+	Type    string            `json:"type"`
+	Source  map[string]any    `json:"source"`
+	Version map[string]string `json:"version,omitempty"`
 }
 
 // ResourceCheckResult is the result of a Check operation.
@@ -67,11 +67,11 @@ func (r *ResourceRunner) Check(input ResourceCheckInput) (*ResourceCheckResult, 
 
 // ResourceFetchInput is the input for a Fetch operation from JS.
 type ResourceFetchInput struct {
-	Type    string                 `json:"type"`
-	Source  map[string]interface{} `json:"source"`
-	Version map[string]string      `json:"version"`
-	Params  map[string]interface{} `json:"params,omitempty"`
-	DestDir string                 `json:"destDir"`
+	Type    string            `json:"type"`
+	Source  map[string]any    `json:"source"`
+	Version map[string]string `json:"version"`
+	Params  map[string]any    `json:"params,omitempty"`
+	DestDir string            `json:"destDir"`
 }
 
 // ResourceFetchResult is the result of a Fetch operation.
@@ -122,10 +122,10 @@ func (r *ResourceRunner) Fetch(input ResourceFetchInput) (*ResourceFetchResult, 
 
 // ResourcePushInput is the input for a Push operation from JS.
 type ResourcePushInput struct {
-	Type   string                 `json:"type"`
-	Source map[string]interface{} `json:"source"`
-	Params map[string]interface{} `json:"params,omitempty"`
-	SrcDir string                 `json:"srcDir"`
+	Type   string         `json:"type"`
+	Source map[string]any `json:"source"`
+	Params map[string]any `json:"params,omitempty"`
+	SrcDir string         `json:"srcDir"`
 }
 
 // ResourcePushResult is the result of a Push operation.

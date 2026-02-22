@@ -30,7 +30,7 @@ func TestMockResource(t *testing.T) {
 
 		ctx := context.Background()
 		resp, err := res.Check(ctx, resources.CheckRequest{
-			Source: map[string]interface{}{
+			Source: map[string]any{
 				"force_version": "test-version",
 			},
 		})
@@ -54,7 +54,7 @@ func TestMockResource(t *testing.T) {
 
 		ctx := context.Background()
 		inResp, err := res.In(ctx, destDir, resources.InRequest{
-			Source: map[string]interface{}{},
+			Source: map[string]any{},
 			Version: resources.Version{
 				"version": "1.0.0",
 			},
@@ -77,8 +77,8 @@ func TestMockResource(t *testing.T) {
 
 		ctx := context.Background()
 		outResp, err := res.Out(ctx, "/tmp", resources.OutRequest{
-			Source: map[string]interface{}{},
-			Params: map[string]interface{}{
+			Source: map[string]any{},
+			Params: map[string]any{
 				"version": "2.0.0",
 			},
 		})
@@ -94,7 +94,7 @@ func TestMockResource(t *testing.T) {
 
 		ctx := context.Background()
 		resp, err := res.Check(ctx, resources.CheckRequest{
-			Source: map[string]interface{}{},
+			Source: map[string]any{},
 		})
 		assert.Expect(err).NotTo(HaveOccurred())
 		assert.Expect(resp).To(HaveLen(1))
@@ -109,7 +109,7 @@ func TestMockResource(t *testing.T) {
 
 		ctx := context.Background()
 		resp, err := res.Check(ctx, resources.CheckRequest{
-			Source:  map[string]interface{}{},
+			Source:  map[string]any{},
 			Version: resources.Version{"version": "5"},
 		})
 		assert.Expect(err).NotTo(HaveOccurred())
@@ -126,7 +126,7 @@ func TestMockResource(t *testing.T) {
 
 		ctx := context.Background()
 		resp, err := res.Check(ctx, resources.CheckRequest{
-			Source: map[string]interface{}{
+			Source: map[string]any{
 				"force_version": "fixed-v1",
 			},
 			Version: resources.Version{"version": "fixed-v1"},

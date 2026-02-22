@@ -22,7 +22,7 @@ type TemplateRender struct {
 	templates *template.Template
 }
 
-func (t *TemplateRender) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
+func (t *TemplateRender) Render(w io.Writer, name string, data any, c echo.Context) error {
 	err := t.templates.ExecuteTemplate(w, name, data)
 	if err != nil {
 		return fmt.Errorf("could not execute template: %w", err)

@@ -19,8 +19,8 @@ type Metadata []MetadataField
 // CheckRequest is the input to a Check operation.
 // Source contains the resource configuration, Version is the last known version (may be nil).
 type CheckRequest struct {
-	Source  map[string]interface{} `json:"source"`
-	Version Version                `json:"version,omitempty"`
+	Source  map[string]any `json:"source"`
+	Version Version        `json:"version,omitempty"`
 }
 
 // CheckResponse is the output of a Check operation.
@@ -29,9 +29,9 @@ type CheckResponse []Version
 
 // InRequest is the input to an In (get) operation.
 type InRequest struct {
-	Source  map[string]interface{} `json:"source"`
-	Version Version                `json:"version"`
-	Params  map[string]interface{} `json:"params,omitempty"`
+	Source  map[string]any `json:"source"`
+	Version Version        `json:"version"`
+	Params  map[string]any `json:"params,omitempty"`
 }
 
 // InResponse is the output of an In operation.
@@ -42,8 +42,8 @@ type InResponse struct {
 
 // OutRequest is the input to an Out (put) operation.
 type OutRequest struct {
-	Source map[string]interface{} `json:"source"`
-	Params map[string]interface{} `json:"params,omitempty"`
+	Source map[string]any `json:"source"`
+	Params map[string]any `json:"params,omitempty"`
 }
 
 // OutResponse is the output of an Out operation.

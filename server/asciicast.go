@@ -47,7 +47,7 @@ func (c *AsciiCastConverter) ToAsciiCast(stdout string, writer io.Writer) error 
 	encoder := json.NewEncoder(writer)
 
 	// Create the header with required fields
-	header := map[string]interface{}{
+	header := map[string]any{
 		"version":   c.Version,
 		"width":     c.TerminalWidth,
 		"height":    c.TerminalHeight,
@@ -113,7 +113,7 @@ func (c *AsciiCastConverter) writeChunkWithEncoder(chunk *strings.Builder, encod
 	chunkStr := chunk.String()
 
 	// Create the event as a slice
-	event := []interface{}{*currentTime, "o", chunkStr}
+	event := []any{*currentTime, "o", chunkStr}
 
 	// Encode the event (this will automatically add a newline)
 	err := encoder.Encode(event)

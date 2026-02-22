@@ -90,7 +90,7 @@ func (n *Container) Status(ctx context.Context) (orchestra.ContainerStatus, erro
 func (n *Native) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.Container, error) {
 	logger := n.logger.With("taskID", task.ID)
 
-	containerName := fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("%s-%s", n.namespace, task.ID))))
+	containerName := fmt.Sprintf("%x", sha256.Sum256(fmt.Appendf(nil, "%s-%s", n.namespace, task.ID)))
 
 	dir, err := os.MkdirTemp(n.path, containerName)
 	if err != nil {

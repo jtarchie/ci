@@ -44,7 +44,7 @@ func NewHTTPRuntime(jsVM *goja.Runtime, webhookData *WebhookData, responseChan c
 }
 
 // Request returns the incoming HTTP request data, or undefined if not triggered via webhook.
-func (h *HTTPRuntime) Request() interface{} {
+func (h *HTTPRuntime) Request() any {
 	if h.request == nil {
 		return goja.Undefined()
 	}

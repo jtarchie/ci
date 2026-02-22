@@ -153,7 +153,7 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 
 	// Persist task status to storage so the UI can display progress
 	storageKey := c.taskStorageKey(stepID)
-	c.setTaskStatus(storageKey, map[string]interface{}{"status": "pending"})
+	c.setTaskStatus(storageKey, map[string]any{"status": "pending"})
 
 	var mounts orchestra.Mounts
 	for path, volume := range input.Mounts {
@@ -195,17 +195,17 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 		logger.Error("container.run.create_error", "err", err)
 
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
-			c.setTaskStatus(storageKey, map[string]interface{}{"status": "abort"})
+			c.setTaskStatus(storageKey, map[string]any{"status": "abort"})
 
 			return &RunResult{Status: RunAbort}, nil
 		}
 
-		c.setTaskStatus(storageKey, map[string]interface{}{"status": "error"})
+		c.setTaskStatus(storageKey, map[string]any{"status": "error"})
 
 		return nil, fmt.Errorf("could not run container: %w", err)
 	}
 
-	c.setTaskStatus(storageKey, map[string]interface{}{"status": "running"})
+	c.setTaskStatus(storageKey, map[string]any{"status": "running"})
 
 	var containerStatus orchestra.ContainerStatus
 
@@ -218,12 +218,10 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 
 	// Start streaming logs if callback is provided
 	if input.OnOutput != nil {
-		streamWg.Add(1)
 
-		go func() {
-			defer streamWg.Done()
+		streamWg.Go(func() {
 			c.streamLogsWithCallback(streamCtx, container, input.OnOutput, stdout, stderr)
-		}()
+		})
 	}
 
 	// Wait for container to complete
@@ -235,12 +233,12 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 			cancelStream()
 
 			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
-				c.setTaskStatus(storageKey, map[string]interface{}{"status": "abort"})
+				c.setTaskStatus(storageKey, map[string]any{"status": "abort"})
 
 				return &RunResult{Status: RunAbort}, nil
 			}
 
-			c.setTaskStatus(storageKey, map[string]interface{}{"status": "error"})
+			c.setTaskStatus(storageKey, map[string]any{"status": "error"})
 
 			return nil, fmt.Errorf("could not get container status: %w", err)
 		}
@@ -273,12 +271,12 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 			logger.Error("container.logs.error", "err", err)
 
 			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
-				c.setTaskStatus(storageKey, map[string]interface{}{"status": "abort"})
+				c.setTaskStatus(storageKey, map[string]any{"status": "abort"})
 
 				return &RunResult{Status: RunAbort}, nil
 			}
 
-			c.setTaskStatus(storageKey, map[string]interface{}{"status": "error"})
+			c.setTaskStatus(storageKey, map[string]any{"status": "error"})
 
 			return nil, fmt.Errorf("could not get container logs: %w", err)
 		}
@@ -291,7 +289,7 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 		status = "failure"
 	}
 
-	c.setTaskStatus(storageKey, map[string]interface{}{
+	c.setTaskStatus(storageKey, map[string]any{
 		"status": status,
 		"code":   containerStatus.ExitCode(),
 		"stdout": stdout.String(),
@@ -320,17 +318,14 @@ func (c *PipelineRunner) streamLogsWithCallback(
 
 	var streamWg sync.WaitGroup
 
-	streamWg.Add(1)
-
-	go func() {
-		defer streamWg.Done()
+	streamWg.Go(func() {
 		defer func() { _ = pw.Close() }()
 
 		err := container.Logs(ctx, pw, io.Discard, true)
 		if err != nil && ctx.Err() == nil {
 			logger.Debug("container.streamLogs.error", "err", err)
 		}
-	}()
+	})
 
 	// Read from pipe in chunks and invoke callback
 	buf := make([]byte, 4096)
@@ -402,7 +397,7 @@ func (c *PipelineRunner) taskStorageKey(stepID string) string {
 // setTaskStatus persists task status to storage for UI visibility.
 // Errors are logged but not propagated — task execution should not fail
 // due to status tracking issues.
-func (c *PipelineRunner) setTaskStatus(key string, payload map[string]interface{}) {
+func (c *PipelineRunner) setTaskStatus(key string, payload map[string]any) {
 	if key == "" || c.storage == nil {
 		return
 	}

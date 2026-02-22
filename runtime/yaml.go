@@ -19,8 +19,8 @@ func NewYAML(vm *goja.Runtime, logger *slog.Logger) *YAML {
 	}
 }
 
-func (y *YAML) Parse(source string) interface{} {
-	var payload interface{}
+func (y *YAML) Parse(source string) any {
+	var payload any
 
 	err := yaml.Unmarshal([]byte(source), &payload)
 	if err != nil {
@@ -33,7 +33,7 @@ func (y *YAML) Parse(source string) interface{} {
 	return payload
 }
 
-func (y *YAML) Stringify(payload interface{}) string {
+func (y *YAML) Stringify(payload any) string {
 	contents, err := yaml.Marshal(payload)
 	if err != nil {
 		return ""
