@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -11,19 +12,56 @@ import (
 	"github.com/jtarchie/ci/orchestra"
 	"github.com/jtarchie/ci/orchestra/cache"
 	_ "github.com/jtarchie/ci/orchestra/cache/s3"
+	_ "github.com/jtarchie/ci/orchestra/digitalocean"
 	_ "github.com/jtarchie/ci/orchestra/docker"
+	_ "github.com/jtarchie/ci/orchestra/fly"
+	_ "github.com/jtarchie/ci/orchestra/hetzner"
 	_ "github.com/jtarchie/ci/orchestra/native"
 	"github.com/jtarchie/ci/testhelpers"
 	gonanoid "github.com/matoous/go-nanoid/v2"
 	"github.com/onsi/gomega"
 )
 
+// getAvailableDrivers returns a list of drivers available based on environment
+// and system requirements. Only includes drivers that support caching.
+func getAvailableDrivers() []string {
+	var drivers []string
+
+	// native is always available and supports caching
+	drivers = append(drivers, "native")
+
+	// docker requires docker command and supports caching
+	if _, err := exec.LookPath("docker"); err == nil {
+		drivers = append(drivers, "docker")
+	}
+
+	// digitalocean requires DIGITALOCEAN_TOKEN env var
+	if os.Getenv("DIGITALOCEAN_TOKEN") != "" {
+		drivers = append(drivers, "digitalocean")
+	}
+
+	// hetzner requires HETZNER_TOKEN env var
+	if os.Getenv("HETZNER_TOKEN") != "" {
+		drivers = append(drivers, "hetzner")
+	}
+
+	// fly requires FLY_API_TOKEN and FLY_APP env vars
+	if os.Getenv("FLY_API_TOKEN") != "" && os.Getenv("FLY_APP") != "" {
+		drivers = append(drivers, "fly")
+	}
+
+	return drivers
+}
+
 func TestCacheIntegration(t *testing.T) {
 	if _, err := exec.LookPath("minio"); err != nil {
 		t.Skip("minio not installed, skipping integration test")
 	}
 
-	drivers := []string{"native", "docker"}
+	drivers := getAvailableDrivers()
+	if len(drivers) == 0 {
+		t.Skip("no drivers available for testing")
+	}
 
 	for _, driverName := range drivers {
 		t.Run(driverName, func(t *testing.T) {

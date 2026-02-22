@@ -29,14 +29,14 @@ export function showToast(message, type = "info") {
   if (!container) return;
 
   const toast = document.createElement("div");
-  const bgColor =
-    type === "success"
-      ? "bg-green-600"
-      : type === "error"
-        ? "bg-red-600"
-        : "bg-blue-600";
+  const bgColor = type === "success"
+    ? "bg-green-600"
+    : type === "error"
+    ? "bg-red-600"
+    : "bg-blue-600";
 
-  toast.className = `${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 transform transition-all duration-300 translate-x-full`;
+  toast.className =
+    `${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 transform transition-all duration-300 translate-x-full`;
   toast.setAttribute("role", "alert");
   toast.setAttribute("aria-live", "assertive");
   toast.setAttribute("aria-atomic", "true");

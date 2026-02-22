@@ -23,6 +23,7 @@ type Fly struct {
 	region    string
 	size      string
 	org       string
+	token     string // raw API token, needed for SSH cert/WireGuard operations
 
 	// ephemeralApp is true if we created the app and should delete it on Close()
 	ephemeralApp bool
@@ -78,6 +79,7 @@ func NewFly(namespace string, logger *slog.Logger, params map[string]string) (or
 		region:            region,
 		size:              size,
 		org:               org,
+		token:             token,
 		volumes:           make(map[string]*Volume),
 		volumeAttachments: make(map[string]string),
 	}
