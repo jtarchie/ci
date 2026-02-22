@@ -187,7 +187,7 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	})
 
 	// GET /pipelines/:id/runs-section - Returns just the runs section partial for htmx
-	web.GET("/pipelines/:id/runs-section", func(ctx echo.Context) error {
+	runsSectionHandler := func(ctx echo.Context) error {
 		id := ctx.Param("id")
 
 		runs, err := store.ListRunsByPipeline(ctx.Request().Context(), id)
@@ -203,7 +203,9 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 			"PipelineID": id,
 			"Runs":       runs,
 		})
-	})
+	}
+	web.GET("/pipelines/:id/runs-section", runsSectionHandler)
+	web.GET("/pipelines/:id/runs-section/", runsSectionHandler)
 
 	// Pipeline API endpoints
 	// Register webhooks first (without auth) on the main router

@@ -1,7 +1,7 @@
 {{ define "runs-section" }}
 <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden"
   id="runs-section"
-  hx-get="/pipelines/{{ .PipelineID }}/runs-section"
+  hx-get="/pipelines/{{ .PipelineID }}/runs-section/"
   hx-trigger="load delay:3s, poll-runs from:body"
   hx-swap="outerHTML swap:3s"
   data-pipeline-id="{{ .PipelineID }}">
