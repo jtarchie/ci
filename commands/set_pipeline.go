@@ -94,6 +94,60 @@ func (c *SetPipeline) Run(logger *slog.Logger) error {
 	serverURL := strings.TrimSuffix(c.ServerURL, "/")
 	endpoint := serverURL + "/api/pipelines"
 
+	// Helper: make an authenticated request, honouring basic auth in the server URL.
+	doRequest := func(method, url string, bodyBytes []byte) (*http.Response, error) {
+		var bodyReader io.Reader
+		if bodyBytes != nil {
+			bodyReader = bytes.NewReader(bodyBytes)
+		}
+
+		req, err := http.NewRequest(method, url, bodyReader)
+		if err != nil {
+			return nil, err
+		}
+
+		if bodyBytes != nil {
+			req.Header.Set("Content-Type", "application/json")
+		}
+
+		if req.URL.User != nil {
+			password, _ := req.URL.User.Password()
+			req.SetBasicAuth(req.URL.User.Username(), password)
+		}
+
+		return http.DefaultClient.Do(req)
+	}
+
+	// List existing pipelines and delete any with the same name (idempotent upsert
+	// for servers that do not yet support ON CONFLICT upsert).
+	logger.Info("pipeline.list")
+
+	listResp, err := doRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return fmt.Errorf("could not list pipelines: %w", err)
+	}
+
+	listBody, _ := io.ReadAll(listResp.Body)
+	_ = listResp.Body.Close()
+
+	if listResp.StatusCode == http.StatusOK {
+		var existing []storage.Pipeline
+		if json.Unmarshal(listBody, &existing) == nil {
+			for _, p := range existing {
+				if p.Name == name {
+					logger.Info("pipeline.delete.existing", "id", p.ID)
+
+					delResp, err := doRequest(http.MethodDelete, endpoint+"/"+p.ID, nil)
+					if err != nil {
+						return fmt.Errorf("could not delete existing pipeline: %w", err)
+					}
+
+					_ = delResp.Body.Close()
+				}
+			}
+		}
+	}
+
 	logger.Info("pipeline.upload", "url", endpoint)
 
 	reqBody := pipelineRequest{
@@ -108,7 +162,7 @@ func (c *SetPipeline) Run(logger *slog.Logger) error {
 		return fmt.Errorf("could not marshal request: %w", err)
 	}
 
-	resp, err := http.Post(endpoint, "application/json", bytes.NewReader(jsonBody))
+	resp, err := doRequest(http.MethodPost, endpoint, jsonBody)
 	if err != nil {
 		return fmt.Errorf("could not connect to server: %w", err)
 	}
