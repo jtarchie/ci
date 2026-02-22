@@ -28,9 +28,6 @@ export function initResults() {
   // Restore expanded state from previous swap
   restoreExpandedState(getTasksContainer());
 
-  // Listen for htmx before swap to save state
-  document.body.addEventListener("htmx:beforeSwap", handleBeforeSwap);
-
   // Listen for htmx after swap to restore state
   document.body.addEventListener("htmx:afterSwap", handleAfterSwap);
 
@@ -217,9 +214,12 @@ export function initResults() {
       case "f":
         if (e.target.tagName !== "INPUT") {
           // Jump to first failure
-          const firstFailure = tasksContainer.querySelector(
-            ".task-item.bg-red-100, .task-item.dark\\:bg-red-900\\/30",
-          );
+          const container = getTasksContainer();
+          const firstFailure = container
+            ? container.querySelector(
+                ".task-item.bg-red-100, .task-item.dark\\:bg-red-900\\/30",
+              )
+            : null;
           if (firstFailure) {
             firstFailure.scrollIntoView({
               behavior: "smooth",
@@ -232,27 +232,6 @@ export function initResults() {
         break;
     }
   });
-}
-
-// Handle htmx beforeSwap - save expanded state
-function handleBeforeSwap(event) {
-  const target = event.detail.target;
-  if (!target || target.id !== "pipeline") return;
-
-  const responseText = event.detail.xhr?.responseText || "";
-  if (
-    responseText &&
-    normalizeHtml(responseText) === normalizeHtml(target.innerHTML)
-  ) {
-    event.detail.shouldSwap = false;
-    return;
-  }
-
-  const container = target.querySelector("#tasks-container");
-  if (!container) return;
-
-  // Save expanded task state
-  saveExpandedState(container);
 }
 
 // Handle htmx afterSwap - restore expanded state and reinitialize
@@ -268,10 +247,6 @@ function handleAfterSwap(event) {
 
   // Update stats
   updateStatsForContainer(container);
-}
-
-function normalizeHtml(value) {
-  return value.replace(/\s+/g, " ").trim();
 }
 
 // Save which tasks are expanded
