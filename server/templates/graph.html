@@ -67,13 +67,14 @@
     </div>
 
     <div
-      class="graph-container relative w-full min-h-100 overflow-visible sm:overflow-hidden cursor-grab bg-gray-100 dark:bg-gray-800 focus:outline-2 focus:outline-blue-500 focus:-outline-offset-2"
+      class="graph-container relative w-full overflow-hidden cursor-grab bg-gray-100 dark:bg-gray-800 rounded-lg focus:outline-2 focus:outline-blue-500 focus:-outline-offset-2"
       id="graph-container"
       tabindex="0"
       role="application"
-      aria-label="Pipeline graph visualization. Use arrow keys to pan, plus and minus to zoom, and Tab to navigate between nodes.">
+      aria-roledescription="interactive graph"
+      aria-label="Pipeline graph visualization. Use arrow keys to pan, plus and minus to zoom, Tab to navigate nodes. On touch devices, drag to pan and pinch to zoom.">
 
-      <svg class="w-full h-[60vh] sm:h-full" id="graph-svg" aria-hidden="true">
+      <svg class="w-full h-full" id="graph-svg" aria-hidden="true">
         <defs>
           <marker id="arrowhead" markerWidth="10" markerHeight="7"
             refX="9" refY="3.5" orient="auto">
@@ -90,64 +91,78 @@
         </g>
       </svg>
 
+      <!-- Mobile toolbar: collapsible controls above the graph on small screens -->
       <div
-        class="static sm:absolute sm:top-4 sm:left-4 mb-3 sm:mb-0 p-2 bg-white/95 dark:bg-gray-800/95 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-800 dark:text-white text-xs z-10 w-full sm:w-auto"
-        role="region" aria-label="Graph controls">
-        <!-- Legend row -->
-        <div class="flex items-center gap-2 flex-wrap">
-          <div class="flex items-center gap-1" title="Success"><div
-              class="w-3 h-3 rounded bg-green-600"></div><span
-              class="sr-only">Success</span></div>
-          <div class="flex items-center gap-1" title="Running"><div
-              class="w-3 h-3 rounded bg-yellow-500 animate-pulse"></div><span
-              class="sr-only">Running</span></div>
-          <div class="flex items-center gap-1" title="Failure"><div
-              class="w-3 h-3 rounded bg-red-600"></div><span
-              class="sr-only">Failure</span></div>
-          <div class="flex items-center gap-1" title="Error"><div
-              class="w-3 h-3 rounded bg-amber-600"></div><span
-              class="sr-only">Error</span></div>
-          <div class="flex items-center gap-1" title="Pending"><div
-              class="w-3 h-3 rounded bg-gray-500"></div><span
-              class="sr-only">Pending</span></div>
-          <div class="flex items-center gap-1" title="Group"><div
-              class="w-3 h-3 rounded bg-blue-600"></div><span
-              class="sr-only">Group</span></div>
-          <div class="flex items-center gap-1" title="Dependency">
-            <svg class="w-4 h-2" viewBox="0 0 16 8"><line x1="0" y1="4"
+        class="absolute top-0 left-0 right-0 sm:top-4 sm:left-4 sm:right-auto p-2 bg-white/95 dark:bg-gray-800/95 border-b sm:border border-gray-200 dark:border-gray-700 sm:rounded-lg text-gray-800 dark:text-white text-xs z-10 sm:w-auto"
+        role="region" aria-label="Graph legend and controls">
+        <!-- Legend -->
+        <ul class="flex items-center gap-2 flex-wrap list-none m-0 p-0"
+          role="list" aria-label="Status legend">
+          <li class="flex items-center gap-1" title="Success"><div
+              class="w-3 h-3 rounded bg-green-600"
+              aria-hidden="true"></div><span
+              class="sr-only">Success</span></li>
+          <li class="flex items-center gap-1" title="Running"><div
+              class="w-3 h-3 rounded bg-yellow-500 animate-pulse"
+              aria-hidden="true"></div><span
+              class="sr-only">Running</span></li>
+          <li class="flex items-center gap-1" title="Failure"><div
+              class="w-3 h-3 rounded bg-red-600" aria-hidden="true"></div><span
+              class="sr-only">Failure</span></li>
+          <li class="flex items-center gap-1" title="Error"><div
+              class="w-3 h-3 rounded bg-amber-600"
+              aria-hidden="true"></div><span
+              class="sr-only">Error</span></li>
+          <li class="flex items-center gap-1" title="Pending"><div
+              class="w-3 h-3 rounded bg-gray-500" aria-hidden="true"></div><span
+              class="sr-only">Pending</span></li>
+          <li class="flex items-center gap-1" title="Group"><div
+              class="w-3 h-3 rounded bg-blue-600" aria-hidden="true"></div><span
+              class="sr-only">Group</span></li>
+          <li class="flex items-center gap-1" title="Dependency">
+            <svg class="w-4 h-2" viewBox="0 0 16 8" aria-hidden="true"><line
+                x1="0" y1="4"
                 x2="16" y2="4" stroke="currentColor" stroke-width="2"
                 stroke-dasharray="3 2" class="text-purple-500" /></svg>
             <span class="sr-only">Dependency</span>
-          </div>
-          <span class="text-gray-300 dark:text-gray-600">|</span>
-          <!-- Edge mode toggle inline -->
-          <span class="text-gray-500 dark:text-gray-400">View:</span>
-          <button
-            id="edge-mode-tree"
-            class="px-1.5 py-0.5 rounded text-xs font-medium transition-colors bg-blue-600 text-white"
-            aria-pressed="true">
-            Tree
-          </button>
-          <button
-            id="edge-mode-flow"
-            class="px-1.5 py-0.5 rounded text-xs font-medium transition-colors bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
-            aria-pressed="false">
-            Flow
-          </button>
-        </div>
+          </li>
+          <li class="flex items-center" aria-hidden="true">
+            <span class="text-gray-300 dark:text-gray-600">|</span>
+          </li>
+          <!-- Edge mode toggle -->
+          <li class="flex items-center gap-1" role="radiogroup"
+            aria-label="Edge display mode">
+            <span class="text-gray-500 dark:text-gray-400 mr-0.5">View:</span>
+            <button
+              id="edge-mode-tree"
+              class="px-2 py-1 rounded text-xs font-medium transition-colors bg-blue-600 text-white min-h-7 min-w-10"
+              role="radio"
+              aria-checked="true">
+              Tree
+            </button>
+            <button
+              id="edge-mode-flow"
+              class="px-2 py-1 rounded text-xs font-medium transition-colors bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 min-h-7 min-w-10"
+              role="radio"
+              aria-checked="false">
+              Flow
+            </button>
+          </li>
+        </ul>
       </div>
 
       <button
-        class="static sm:absolute sm:top-4 sm:right-4 mb-3 sm:mb-0 z-10 w-10 h-10 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white text-xl cursor-pointer flex items-center justify-center transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-2 focus:outline-blue-500 focus:outline-offset-2"
+        class="absolute top-11 sm:top-4 right-2 sm:right-4 z-10 w-11 h-11 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white text-xl cursor-pointer flex items-center justify-center transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-2 focus:outline-blue-500 focus:outline-offset-2"
         id="help-toggle"
         aria-expanded="false"
-        aria-controls="help-panel">
+        aria-controls="help-panel"
+        aria-label="Keyboard shortcuts and help">
         ?
       </button>
 
       <div
-        class="help-panel static sm:absolute sm:top-15 sm:right-4 mt-3 sm:mt-0 p-4 bg-white/98 dark:bg-gray-800/98 rounded-lg text-gray-800 dark:text-white text-[13px] z-10 hidden w-full sm:w-auto min-w-0 sm:min-w-62 border border-gray-200 dark:border-gray-700 shadow-md"
-        id="help-panel" role="tooltip">
+        class="help-panel absolute top-24 sm:top-15 right-2 sm:right-4 p-4 bg-white/98 dark:bg-gray-800/98 rounded-lg text-gray-800 dark:text-white text-[13px] z-20 hidden w-[calc(100%-1rem)] sm:w-auto min-w-0 sm:min-w-62 border border-gray-200 dark:border-gray-700 shadow-md"
+        id="help-panel" role="region" aria-label="Help and shortcuts">
         <h3 class="m-0 mb-3 text-sm font-semibold">Keyboard Shortcuts</h3>
         <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5">
           <dt class="text-gray-500 dark:text-gray-400"><kbd>+</kbd> /
@@ -165,62 +180,64 @@
           <dt class="text-gray-500 dark:text-gray-400"><kbd>Enter</kbd></dt>
           <dd class="m-0">Open node</dd>
         </dl>
-        <h3 class="m-0 mb-3 mt-3 text-sm font-semibold">Mouse Controls</h3>
+        <h3 class="m-0 mb-3 mt-3 text-sm font-semibold">Touch &amp; Mouse</h3>
         <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5">
-          <dt class="text-gray-500 dark:text-gray-400">Scroll</dt>
+          <dt class="text-gray-500 dark:text-gray-400">Scroll / Pinch</dt>
           <dd class="m-0">Zoom in/out</dd>
           <dt class="text-gray-500 dark:text-gray-400">Drag</dt>
           <dd class="m-0">Pan view</dd>
-          <dt class="text-gray-500 dark:text-gray-400">Click node</dt>
+          <dt class="text-gray-500 dark:text-gray-400">Tap / Click</dt>
           <dd class="m-0">Open node details</dd>
         </dl>
       </div>
 
+      <!-- Zoom controls -->
       <div
-        class="static sm:absolute sm:bottom-4 sm:right-4 mb-3 sm:mb-0 flex flex-row sm:flex-col gap-2 z-10"
-        role="group" aria-label="Zoom controls">
+        class="absolute bottom-2 right-2 sm:bottom-4 sm:right-4 flex flex-row sm:flex-col gap-1.5 sm:gap-2 z-10"
+        role="toolbar" aria-label="Zoom controls">
         <button
-          class="w-10 h-10 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white text-xl cursor-pointer flex items-center justify-center transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-2 focus:outline-blue-500 focus:outline-offset-2"
+          class="w-11 h-11 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white text-xl cursor-pointer flex items-center justify-center transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-2 focus:outline-blue-500 focus:outline-offset-2 shadow-sm"
           id="zoom-in"
           aria-label="Zoom in">+</button>
         <button
-          class="w-10 h-10 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white text-xl cursor-pointer flex items-center justify-center transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-2 focus:outline-blue-500 focus:outline-offset-2"
+          class="w-11 h-11 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white text-xl cursor-pointer flex items-center justify-center transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-2 focus:outline-blue-500 focus:outline-offset-2 shadow-sm"
           id="zoom-out"
           aria-label="Zoom out">−</button>
         <button
-          class="w-10 h-10 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white text-xl cursor-pointer flex items-center justify-center transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-2 focus:outline-blue-500 focus:outline-offset-2"
+          class="w-11 h-11 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white text-xl cursor-pointer flex items-center justify-center transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-2 focus:outline-blue-500 focus:outline-offset-2 shadow-sm"
           id="zoom-reset"
-          aria-label="Reset zoom">⌂</button>
+          aria-label="Reset zoom to fit all nodes">⌂</button>
       </div>
 
+      <!-- Zoom level indicator -->
       <div
-        class="static sm:absolute sm:bottom-4 sm:left-4 mb-3 sm:mb-0 px-3 py-2 bg-white/90 dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700 rounded-md text-gray-600 dark:text-gray-400 text-xs z-10"
+        class="absolute bottom-2 left-2 sm:bottom-4 sm:left-4 px-2 py-1 sm:px-3 sm:py-2 bg-white/90 dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700 rounded-md text-gray-600 dark:text-gray-400 text-xs z-10"
         id="zoom-info" aria-live="polite">
         Zoom: 100%
       </div>
 
       <!-- Search box -->
       <div
-        class="static sm:absolute sm:top-4 sm:left-1/2 sm:-translate-x-1/2 mb-3 sm:mb-0 z-10 w-full sm:w-auto">
+        class="absolute top-11 sm:top-4 left-2 sm:left-1/2 sm:-translate-x-1/2 z-10 w-[calc(100%-4rem)] sm:w-auto">
+        <label for="search-input" class="sr-only">Search nodes</label>
         <svg
           class="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
           width="16" height="16" viewBox="0 0 20 20"
-          fill="currentColor">
+          fill="currentColor" aria-hidden="true">
           <path fill-rule="evenodd"
             d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
             clip-rule="evenodd" />
         </svg>
-        <input type="text"
-          class="w-full sm:w-60 py-2 pr-3 pl-9 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white/95 dark:bg-gray-800/95 text-gray-800 dark:text-white placeholder-gray-400 focus:outline-2 focus:outline-blue-500 focus:outline-offset-1"
+        <input type="search"
+          class="w-full sm:w-60 py-2 pr-3 pl-9 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white/95 dark:bg-gray-800/95 text-gray-800 dark:text-white placeholder-gray-400 focus:outline-2 focus:outline-blue-500 focus:outline-offset-1 shadow-sm"
           id="search-input"
           placeholder="Search nodes..."
-          aria-label="Search nodes"
           autocomplete="off">
       </div>
 
-      <!-- Minimap -->
+      <!-- Minimap (desktop only) -->
       <div
-        class="hidden sm:block absolute bottom-40 right-4 w-40 h-25 bg-white/90 dark:bg-gray-800/90 border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden z-10"
+        class="hidden sm:block absolute bottom-16 right-4 w-40 h-25 bg-white/90 dark:bg-gray-800/90 border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden z-10"
         id="minimap" aria-hidden="true">
         <svg class="w-full h-full" id="minimap-svg">
           <g id="minimap-nodes"></g>
@@ -231,17 +248,18 @@
       <!-- Tooltip -->
       <div
         class="graph-tooltip absolute py-2.5 px-3.5 bg-white/98 dark:bg-gray-800/98 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-800 dark:text-white text-[13px] z-100 pointer-events-none opacity-0 transition-opacity max-w-70 shadow-lg"
-        id="graph-tooltip" role="tooltip">
-        <h4 class="m-0 mb-1.5 font-semibold text-sm break-all"
-          id="tooltip-name">Node</h4>
+        id="graph-tooltip" role="tooltip" aria-hidden="true">
+        <p class="m-0 mb-1.5 font-semibold text-sm break-all"
+          id="tooltip-name">Node</p>
         <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-2.5 gap-y-1 text-xs">
           <dt class="text-gray-500 dark:text-gray-400">Status</dt>
           <dd class="m-0 font-medium" id="tooltip-status"></dd>
           <dt class="text-gray-500 dark:text-gray-400">Type</dt>
           <dd class="m-0 font-medium" id="tooltip-type"></dd>
-          <dt class="text-gray-500 dark:text-gray-400 hidden"
-            id="tooltip-duration-label">Duration</dt>
-          <dd class="m-0 font-medium hidden" id="tooltip-duration"></dd>
+          <dt class="text-gray-500 dark:text-gray-400"
+            id="tooltip-duration-label" style="display:none">Duration</dt>
+          <dd class="m-0 font-medium" id="tooltip-duration"
+            style="display:none"></dd>
         </dl>
       </div>
     </div>

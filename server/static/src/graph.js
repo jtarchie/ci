@@ -935,7 +935,7 @@ export function initGraph(graphData, _currentPath) {
         "dark:hover:bg-gray-600",
       );
       edgeModeTree.classList.add("bg-blue-600", "text-white");
-      edgeModeTree.setAttribute("aria-pressed", "true");
+      edgeModeTree.setAttribute("aria-checked", "true");
 
       edgeModeFlow.classList.remove("bg-blue-600", "text-white");
       edgeModeFlow.classList.add(
@@ -946,7 +946,7 @@ export function initGraph(graphData, _currentPath) {
         "hover:bg-gray-300",
         "dark:hover:bg-gray-600",
       );
-      edgeModeFlow.setAttribute("aria-pressed", "false");
+      edgeModeFlow.setAttribute("aria-checked", "false");
     } else {
       edgeModeFlow.classList.remove(
         "bg-gray-200",
@@ -957,7 +957,7 @@ export function initGraph(graphData, _currentPath) {
         "dark:hover:bg-gray-600",
       );
       edgeModeFlow.classList.add("bg-blue-600", "text-white");
-      edgeModeFlow.setAttribute("aria-pressed", "true");
+      edgeModeFlow.setAttribute("aria-checked", "true");
 
       edgeModeTree.classList.remove("bg-blue-600", "text-white");
       edgeModeTree.classList.add(
@@ -968,7 +968,7 @@ export function initGraph(graphData, _currentPath) {
         "hover:bg-gray-300",
         "dark:hover:bg-gray-600",
       );
-      edgeModeTree.setAttribute("aria-pressed", "false");
+      edgeModeTree.setAttribute("aria-checked", "false");
     }
   }
 

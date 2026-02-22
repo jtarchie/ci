@@ -32,15 +32,16 @@ body {
 
 /* Graph container - dot grid background needs custom CSS */
 .graph-container {
-  height: calc(100dvh - 200px);
+  height: calc(100dvh - 180px);
   background-image: radial-gradient(circle, #d1d5db 1px, transparent 1px);
   background-size: 20px 20px;
 }
 
 @media (max-width: 640px) {
   .graph-container {
-    height: auto;
-    min-height: 320px;
+    height: calc(100dvh - 160px);
+    min-height: 300px;
+    touch-action: none; /* Let JS handle all touch gestures */
   }
 }
 
