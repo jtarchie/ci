@@ -3,7 +3,7 @@
   id="runs-section"
   hx-get="/pipelines/{{ .PipelineID }}/runs-section/"
   hx-trigger="load delay:3s, poll-runs from:body"
-  hx-swap="morph"
+  hx-swap="morph:outerHTML"
   data-pipeline-id="{{ .PipelineID }}">
   <div
     class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

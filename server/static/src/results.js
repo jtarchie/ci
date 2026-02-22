@@ -5,11 +5,8 @@
  * - Keyboard navigation
  * - Stats display
  * - Help panel
- * - Live polling with state preservation
+ * - Live polling with idiomorph morphing
  */
-
-// Track expanded task state across htmx swaps
-const expandedTasks = new Set();
 
 export function initResults() {
   const searchInput = document.getElementById("task-search");
@@ -25,8 +22,8 @@ export function initResults() {
   // Bail if required elements don't exist
   if (!getTasksContainer()) return;
 
-  // Restore expanded state from previous swap
-  restoreExpandedState(getTasksContainer());
+  // Listen for htmx before swap to guard empty responses
+  document.body.addEventListener("htmx:beforeSwap", handleBeforeSwap);
 
   // Listen for htmx after swap to restore state
   document.body.addEventListener("htmx:afterSwap", handleAfterSwap);
@@ -234,7 +231,19 @@ export function initResults() {
   });
 }
 
-// Handle htmx afterSwap - restore expanded state and reinitialize
+// Handle htmx beforeSwap - skip empty responses
+function handleBeforeSwap(event) {
+  const target = event.detail.target;
+  if (!target || target.id !== "pipeline") return;
+
+  const responseText = event.detail.xhr?.responseText || "";
+  if (!responseText.trim()) {
+    event.detail.shouldSwap = false;
+    return;
+  }
+}
+
+// Handle htmx afterSwap - update stats
 function handleAfterSwap(event) {
   const target = event.detail.target;
   if (!target || target.id !== "pipeline") return;
@@ -242,36 +251,8 @@ function handleAfterSwap(event) {
   const container = target.querySelector("#tasks-container");
   if (!container) return;
 
-  // Restore expanded state
-  restoreExpandedState(container);
-
   // Update stats
   updateStatsForContainer(container);
-}
-
-// Save which tasks are expanded
-function saveExpandedState(container) {
-  expandedTasks.clear();
-  const tasks = container.querySelectorAll(".task-item[open]");
-  tasks.forEach((task) => {
-    const taskId = task.dataset.taskId;
-    if (taskId) {
-      expandedTasks.add(taskId);
-    }
-  });
-}
-
-// Restore expanded state to tasks
-function restoreExpandedState(container) {
-  if (expandedTasks.size === 0) return;
-
-  const tasks = container.querySelectorAll(".task-item");
-  tasks.forEach((task) => {
-    const taskId = task.dataset.taskId;
-    if (taskId && expandedTasks.has(taskId)) {
-      task.setAttribute("open", "");
-    }
-  });
 }
 
 // Update stats for a given container
