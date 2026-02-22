@@ -85,8 +85,8 @@ The UI (server/templates/, server/static/src/) uses idiomorph + HTMx for
 intelligent DOM morphing, which preserves CSS animations, event listeners, and
 element state during dynamic updates. A few patterns worth noting:
 
-- **DOM Morphing** (`idiomorph`): Use `morph:innerHTML` or `morph:outerHTML` swap
-  strategy instead of full replacements. This prevents animation resets and
+- **DOM Morphing** (`idiomorph`): Use `morph:innerHTML` or `morph:outerHTML`
+  swap strategy instead of full replacements. This prevents animation resets and
   preserves SVG viewport transforms. Idiomorph uses ID-set algorithm to match
   nodes in-place.
 - **Lazy Initialization**: Use event listeners (e.g., `toggle` on `<details>`)
