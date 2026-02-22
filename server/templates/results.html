@@ -199,10 +199,11 @@
 {{ define "tasks-partial" }}
 <div class="space-y-4" id="tasks-container"
   {{ if and .RunID .IsActive }}
-  hx-get="/runs/{{ .RunID }}/tasks-partial"
-  hx-trigger="every 3s"
-  hx-swap="outerHTML"
-  hx-preserve="true"
+  hx-get="/runs/{{ .RunID }}/tasks-partial/"
+  hx-trigger="load, every 3s"
+  hx-target="#pipeline"
+  hx-swap="innerHTML"
+  hx-on::beforeSwap="if(event.detail.xhr.responseText.trim()===''){event.detail.shouldSwap=false;}"
   {{ end }}
   data-run-active="{{ if .IsActive }}true{{ else }}false{{ end }}">
   {{ template "renderPath" dict "Path" .Tree "Depth" 0 }}

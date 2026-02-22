@@ -272,7 +272,7 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	})
 
 	// GET /runs/:id/tasks-partial - Returns just the tasks container for htmx polling
-	web.GET("/runs/:id/tasks-partial", func(ctx echo.Context) error {
+	tasksPartialHandler := func(ctx echo.Context) error {
 		runID := ctx.Param("id")
 		lookupPath := "/pipeline/" + runID + "/"
 
@@ -291,10 +291,12 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 			"RunID":    runID,
 			"IsActive": isActive,
 		})
-	})
+	}
+	web.GET("/runs/:id/tasks-partial", tasksPartialHandler)
+	web.GET("/runs/:id/tasks-partial/", tasksPartialHandler)
 
 	// GET /runs/:id/graph-data - Returns just the graph data JSON for htmx polling
-	web.GET("/runs/:id/graph-data", func(ctx echo.Context) error {
+	graphDataHandler := func(ctx echo.Context) error {
 		runID := ctx.Param("id")
 		lookupPath := "/pipeline/" + runID + "/"
 
@@ -320,7 +322,9 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 			"RunID":    runID,
 			"IsActive": isActive,
 		})
-	})
+	}
+	web.GET("/runs/:id/graph-data", graphDataHandler)
+	web.GET("/runs/:id/graph-data/", graphDataHandler)
 
 	return &Router{Echo: router, execService: execService, webGroup: web, allowedDrivers: allowedDrivers}, nil
 }

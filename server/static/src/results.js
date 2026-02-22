@@ -15,15 +15,18 @@ export function initResults() {
   const searchInput = document.getElementById("task-search");
   const expandAllBtn = document.getElementById("expand-all");
   const collapseAllBtn = document.getElementById("collapse-all");
-  const tasksContainer = document.getElementById("tasks-container");
   const helpToggle = document.getElementById("help-toggle");
   const helpPanel = document.getElementById("help-panel");
 
+  function getTasksContainer() {
+    return document.getElementById("tasks-container");
+  }
+
   // Bail if required elements don't exist
-  if (!tasksContainer) return;
+  if (!getTasksContainer()) return;
 
   // Restore expanded state from previous swap
-  restoreExpandedState(tasksContainer);
+  restoreExpandedState(getTasksContainer());
 
   // Listen for htmx before swap to save state
   document.body.addEventListener("htmx:beforeSwap", handleBeforeSwap);
@@ -64,7 +67,8 @@ export function initResults() {
 
   // Get all task items
   function getAllTasks() {
-    return tasksContainer.querySelectorAll(".task-item");
+    const container = getTasksContainer();
+    return container ? container.querySelectorAll(".task-item") : [];
   }
 
   // Update stats
@@ -102,7 +106,10 @@ export function initResults() {
     searchInput.addEventListener("input", function (e) {
       const query = e.target.value.toLowerCase();
       const tasks = getAllTasks();
-      const groups = tasksContainer.querySelectorAll(".group-container");
+      const container = getTasksContainer();
+      const groups = container
+        ? container.querySelectorAll(".group-container")
+        : [];
 
       tasks.forEach((task) => {
         const name =
@@ -230,22 +237,41 @@ export function initResults() {
 // Handle htmx beforeSwap - save expanded state
 function handleBeforeSwap(event) {
   const target = event.detail.target;
-  if (!target || target.id !== "tasks-container") return;
+  if (!target || target.id !== "pipeline") return;
+
+  const responseText = event.detail.xhr?.responseText || "";
+  if (
+    responseText &&
+    normalizeHtml(responseText) === normalizeHtml(target.innerHTML)
+  ) {
+    event.detail.shouldSwap = false;
+    return;
+  }
+
+  const container = target.querySelector("#tasks-container");
+  if (!container) return;
 
   // Save expanded task state
-  saveExpandedState(target);
+  saveExpandedState(container);
 }
 
 // Handle htmx afterSwap - restore expanded state and reinitialize
 function handleAfterSwap(event) {
   const target = event.detail.target;
-  if (!target || target.id !== "tasks-container") return;
+  if (!target || target.id !== "pipeline") return;
+
+  const container = target.querySelector("#tasks-container");
+  if (!container) return;
 
   // Restore expanded state
-  restoreExpandedState(target);
+  restoreExpandedState(container);
 
   // Update stats
-  updateStatsForContainer(target);
+  updateStatsForContainer(container);
+}
+
+function normalizeHtml(value) {
+  return value.replace(/\s+/g, " ").trim();
 }
 
 // Save which tasks are expanded
