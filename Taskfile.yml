@@ -81,11 +81,11 @@ tasks:
       - go get -u ./...
       - go mod tidy
       - echo "Bumping npm dependencies in e2e..."
-      - cd e2e && npm update
+      - cd e2e && npx npm-check-updates -u && npm install
       - echo "Bumping npm dependencies in packages/ci..."
-      - cd packages/ci && npm update
+      - cd packages/ci && npx npm-check-updates -u && npm install
       - echo "Bumping npm dependencies in examples..."
-      - cd examples && npm update
+      - cd examples && npx npm-check-updates -u && npm install
       - echo "Bumping npm dependencies in server/static..."
-      - cd server/static && npm update
+      - cd server/static && npx npm-check-updates -u && npm install
       - echo "All dependencies bumped! Run 'task' to test."
