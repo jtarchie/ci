@@ -1,7 +1,6 @@
 package s3
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/jtarchie/ci/orchestra/cache"
@@ -137,24 +137,27 @@ func (s *S3Store) Restore(ctx context.Context, key string) (io.ReadCloser, error
 	return result.Body, nil
 }
 
-// Persist uploads content to S3.
+// Persist uploads content to S3 using streaming multipart upload.
+// Data is uploaded in chunks without buffering the entire content in memory.
 func (s *S3Store) Persist(ctx context.Context, key string, reader io.Reader) error {
 	fullKey := s.fullKey(key)
 
-	// Buffer the reader to make it seekable - required by AWS SDK v2 for checksums
-	data, err := io.ReadAll(reader)
-	if err != nil {
-		return fmt.Errorf("failed to read data: %w", err)
-	}
+	// Use the transfer manager for efficient multipart uploads
+	// It automatically handles chunking, parallelization, and retries
+	uploader := transfermanager.New(s.client, func(u *transfermanager.Options) {
+		// Use 10MB part size for efficient streaming
+		u.PartSizeBytes = 10 * 1024 * 1024
+		// Upload 3 parts concurrently
+		u.Concurrency = 3
+	})
 
-	_, err = s.client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket:        aws.String(s.bucket),
-		Key:           aws.String(fullKey),
-		Body:          bytes.NewReader(data),
-		ContentLength: aws.Int64(int64(len(data))),
+	_, err := uploader.UploadObject(ctx, &transfermanager.UploadObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(fullKey),
+		Body:   reader,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to put object to S3: %w", err)
+		return fmt.Errorf("failed to upload to S3: %w", err)
 	}
 
 	return nil
