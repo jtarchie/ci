@@ -6,6 +6,6 @@
   {{ if and .RunID .IsActive }}
   hx-get="/runs/{{ .RunID }}/graph-data/"
   hx-trigger="load, every 3s"
-  hx-swap="outerHTML"
+  hx-swap="morph"
   {{ end }}>{{ .TreeJSON }}</script>
 {{ end }}

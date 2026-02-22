@@ -202,8 +202,7 @@
   hx-get="/runs/{{ .RunID }}/tasks-partial/"
   hx-trigger="load, every 3s"
   hx-target="#pipeline"
-  hx-swap="innerHTML"
-  hx-on::beforeSwap="if(event.detail.xhr.responseText.trim()===''){event.detail.shouldSwap=false;}"
+  hx-swap="morph:innerHTML"
   {{ end }}
   data-run-active="{{ if .IsActive }}true{{ else }}false{{ end }}">
   {{ template "renderPath" dict "Path" .Tree "Depth" 0 }}
