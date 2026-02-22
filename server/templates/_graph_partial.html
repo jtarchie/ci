@@ -5,7 +5,7 @@
   data-run-active="{{ if .IsActive }}true{{ else }}false{{ end }}"
   {{ if and .RunID .IsActive }}
   hx-get="/runs/{{ .RunID }}/graph-data/"
-  hx-trigger="load, every 3s"
-  hx-swap="morph"
+  hx-trigger="every 3s"
+  hx-swap="morph:outerHTML"
   {{ end }}>{{ .TreeJSON }}</script>
 {{ end }}

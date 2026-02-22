@@ -54,6 +54,7 @@ export function initGraph(graphData, _currentPath) {
 
   // Store nodes for search
   let allNodes = [];
+  let isInitialRender = true;
   let graphBounds = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
 
   // Layout algorithm - tree-based hierarchical layout
@@ -278,9 +279,9 @@ export function initGraph(graphData, _currentPath) {
     return { nodes, edges };
   }
 
-  // Render the graph
-  function renderGraph() {
-    const { nodes, edges } = layoutGraph(graphData);
+  // Render the graph from data
+  function renderGraphFromData(data) {
+    const { nodes, edges } = layoutGraph(data);
     allNodes = nodes; // Store for search
 
     // Clear existing content
@@ -484,9 +485,14 @@ export function initGraph(graphData, _currentPath) {
       nodesLayer.appendChild(g);
     });
 
-    // Auto-fit on initial render
+    // Auto-fit only on initial render; preserve pan/zoom on updates
     if (nodes.length > 0) {
-      autoFit(nodes);
+      if (isInitialRender) {
+        autoFit(nodes);
+        isInitialRender = false;
+      } else {
+        updateTransform();
+      }
       renderMinimap(nodes);
     }
   }
@@ -775,7 +781,8 @@ export function initGraph(graphData, _currentPath) {
     scale = 1;
     translateX = 0;
     translateY = 0;
-    renderGraph(); // This will auto-fit
+    isInitialRender = true;
+    renderGraphFromData(graphData); // This will auto-fit
   }
 
   // Event handlers
@@ -974,7 +981,8 @@ export function initGraph(graphData, _currentPath) {
         edgeMode = "tree";
         localStorage.setItem("graphEdgeMode", "tree");
         updateEdgeModeButtons();
-        renderGraph();
+        isInitialRender = true;
+        renderGraphFromData(graphData);
       }
     });
 
@@ -983,7 +991,8 @@ export function initGraph(graphData, _currentPath) {
         edgeMode = "flow";
         localStorage.setItem("graphEdgeMode", "flow");
         updateEdgeModeButtons();
-        renderGraph();
+        isInitialRender = true;
+        renderGraphFromData(graphData);
       }
     });
   }
@@ -1003,7 +1012,7 @@ export function initGraph(graphData, _currentPath) {
   });
 
   // Initialize
-  renderGraph();
+  renderGraphFromData(graphData);
 
   // Announce for screen readers
   const announcer = document.createElement("div");
@@ -1013,16 +1022,76 @@ export function initGraph(graphData, _currentPath) {
   announcer.textContent = `Pipeline graph loaded with ${nodesLayer.children.length} nodes. Use Tab to navigate between nodes, arrow keys to pan, and plus/minus to zoom.`;
   document.body.appendChild(announcer);
 
+  const STATUS_CLASSES = [
+    "success",
+    "failure",
+    "error",
+    "pending",
+    "running",
+    "abort",
+    "group",
+  ];
+
+  // Update only node status colors without full re-render (preserves pan/zoom)
+  function updateNodeStatuses(newNodes) {
+    const statusById = new Map(newNodes.map((node) => [node.id, node]));
+
+    const nodeGroups = nodesLayer.querySelectorAll(".node-group");
+    nodeGroups.forEach((group) => {
+      const nodeId = group.dataset.nodeId;
+      const node = statusById.get(nodeId);
+      if (!node) return;
+
+      const rect = group.querySelector(".node-rect");
+      if (rect) {
+        STATUS_CLASSES.forEach((name) => rect.classList.remove(name));
+        rect.classList.add(node.status);
+      }
+
+      group.setAttribute(
+        "aria-label",
+        `${node.name}, status: ${node.status}${node.isGroup ? ", click to expand" : ""}`,
+      );
+    });
+
+    // Update minimap
+    const minimapRects = minimapNodes.querySelectorAll(".minimap-node");
+    minimapRects.forEach((rect) => {
+      const nodeId = rect.dataset.nodeId;
+      const node = statusById.get(nodeId);
+      if (!node) return;
+      STATUS_CLASSES.forEach((name) => rect.classList.remove(name));
+      rect.classList.add(node.status);
+    });
+  }
+
+  // Check if graph structure changed (ignoring status)
+  function structureChanged(oldNodes, newNodes) {
+    if (oldNodes.length !== newNodes.length) return true;
+    for (let i = 0; i < oldNodes.length; i++) {
+      if (oldNodes[i].id !== newNodes[i].id) return true;
+    }
+    return false;
+  }
+
   // Listen for htmx swaps on the graph data element for live updates
   document.body.addEventListener("htmx:afterSwap", (event) => {
     const target = event.detail.target;
     if (!target || target.id !== "graph-data") return;
 
     try {
-      // Parse the new graph data and re-render
       const newData = JSON.parse(target.textContent);
-      graphData = newData;
-      renderGraph();
+      const { nodes: newNodes } = layoutGraph(newData);
+
+      if (!structureChanged(allNodes, newNodes)) {
+        // Structure same — just update status colors in-place
+        allNodes = newNodes;
+        updateNodeStatuses(newNodes);
+      } else {
+        // Structure changed — full re-render (preserves current pan/zoom)
+        graphData = newData;
+        renderGraphFromData(newData);
+      }
     } catch (e) {
       console.error("Failed to update graph from htmx swap:", e);
     }
