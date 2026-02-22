@@ -19,13 +19,13 @@ RUN go mod download
 COPY . .
 
 # Build frontend assets
-RUN cd server/static && npm install && npm run build
+RUN cd server/static && npm ci && npm run build
 
 # Generate bundled assets
 RUN go generate ./...
 
 # Build the binary
-RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -o ci .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ci .
 
 # Stage 2: Runtime
 FROM alpine:latest
