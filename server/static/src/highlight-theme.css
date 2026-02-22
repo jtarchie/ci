@@ -1,0 +1,166 @@
+/* Highlight.js custom theme for CI - matches Tailwind gray scale with dark mode */
+/* Light mode colors */
+.hljs {
+  color: #1f2937; /* gray-800 */
+  background: transparent;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: #6b7280; /* gray-500 */
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-subst {
+  color: #dc2626; /* red-600 - matches failure theme */
+  font-weight: 600;
+}
+
+.hljs-number,
+.hljs-literal,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag .hljs-attr {
+  color: #7c3aed; /* violet-600 */
+}
+
+.hljs-string,
+.hljs-doctag {
+  color: #059669; /* emerald-600 - matches success theme */
+}
+
+.hljs-title,
+.hljs-section,
+.hljs-selector-id {
+  color: #2563eb; /* blue-600 */
+  font-weight: 600;
+}
+
+.hljs-type,
+.hljs-class .hljs-title {
+  color: #d97706; /* amber-600 */
+  font-weight: 600;
+}
+
+.hljs-tag,
+.hljs-name,
+.hljs-attribute {
+  color: #0891b2; /* cyan-600 */
+  font-weight: 600;
+}
+
+.hljs-regexp,
+.hljs-link {
+  color: #10b981; /* emerald-500 - custom success color */
+}
+
+.hljs-symbol,
+.hljs-bullet {
+  color: #8b5cf6; /* violet-500 */
+}
+
+.hljs-built_in,
+.hljs-builtin-name {
+  color: #0284c7; /* sky-600 */
+}
+
+.hljs-meta {
+  color: #6b7280; /* gray-500 */
+}
+
+.hljs-deletion {
+  background: #fee2e2; /* red-100 */
+}
+
+.hljs-addition {
+  background: #d1fae5; /* emerald-100 */
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: 700;
+}
+
+/* Dark mode colors */
+@media (prefers-color-scheme: dark) {
+  .hljs {
+    color: #e5e7eb; /* gray-200 */
+  }
+
+  .hljs-comment,
+  .hljs-quote {
+    color: #9ca3af; /* gray-400 */
+  }
+
+  .hljs-keyword,
+  .hljs-selector-tag,
+  .hljs-subst {
+    color: #f87171; /* red-400 - matches failure theme */
+    font-weight: 600;
+  }
+
+  .hljs-number,
+  .hljs-literal,
+  .hljs-variable,
+  .hljs-template-variable,
+  .hljs-tag .hljs-attr {
+    color: #a78bfa; /* violet-400 */
+  }
+
+  .hljs-string,
+  .hljs-doctag {
+    color: #34d399; /* emerald-400 - matches success theme */
+  }
+
+  .hljs-title,
+  .hljs-section,
+  .hljs-selector-id {
+    color: #60a5fa; /* blue-400 */
+    font-weight: 600;
+  }
+
+  .hljs-type,
+  .hljs-class .hljs-title {
+    color: #fbbf24; /* amber-400 */
+    font-weight: 600;
+  }
+
+  .hljs-tag,
+  .hljs-name,
+  .hljs-attribute {
+    color: #22d3ee; /* cyan-400 */
+    font-weight: 600;
+  }
+
+  .hljs-regexp,
+  .hljs-link {
+    color: #10b981; /* emerald-500 - custom success color */
+  }
+
+  .hljs-symbol,
+  .hljs-bullet {
+    color: #a78bfa; /* violet-400 */
+  }
+
+  .hljs-built_in,
+  .hljs-builtin-name {
+    color: #38bdf8; /* sky-400 */
+  }
+
+  .hljs-meta {
+    color: #9ca3af; /* gray-400 */
+  }
+
+  .hljs-deletion {
+    background: #7f1d1d; /* red-900 */
+  }
+
+  .hljs-addition {
+    background: #064e3b; /* emerald-900 */
+  }
+}
