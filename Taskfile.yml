@@ -74,6 +74,12 @@ tasks:
     cmds:
       - ./bin/cleanup.sh
 
+  deploy:
+    desc: Deploy to Fly.io (requires flyctl and authentication)
+    cmds:
+      - task: build
+      - flyctl deploy
+
   bump:
     desc: Bump all Go and npm dependencies to latest versions
     cmds:
