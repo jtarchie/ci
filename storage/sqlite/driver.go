@@ -220,6 +220,10 @@ func (s *Sqlite) SavePipeline(ctx context.Context, name, content, driverDSN, web
 	_, err := s.writer.ExecContext(ctx, `
 		INSERT INTO pipelines (id, name, content, driver_dsn, webhook_secret, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			driver_dsn=excluded.driver_dsn,
+			webhook_secret=excluded.webhook_secret,
+			updated_at=excluded.updated_at
 	`, id, name, content, driverDSN, webhookSecret, now.Format(time.RFC3339), now.Format(time.RFC3339))
 	if err != nil {
 		return nil, fmt.Errorf("failed to save pipeline: %w", err)
