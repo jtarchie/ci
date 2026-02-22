@@ -1,6 +1,6 @@
 # Multi-stage Dockerfile for Fly.io deployment
 # Stage 1: Build
-FROM golang:1.25-alpine AS builder
+FROM golang:alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache \
