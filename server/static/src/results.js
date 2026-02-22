@@ -37,6 +37,11 @@ export function initResults() {
       const isHidden = helpPanel.classList.contains("hidden");
       helpPanel.classList.toggle("hidden");
       helpToggle.setAttribute("aria-expanded", isHidden);
+
+      // Focus management - focus first element in panel when opening
+      if (isHidden) {
+        helpPanel.focus();
+      }
     });
 
     // Close help panel when clicking outside
@@ -44,6 +49,15 @@ export function initResults() {
       if (!helpToggle.contains(e.target) && !helpPanel.contains(e.target)) {
         helpPanel.classList.add("hidden");
         helpToggle.setAttribute("aria-expanded", "false");
+      }
+    });
+
+    // Close help panel with Escape key
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && !helpPanel.classList.contains("hidden")) {
+        helpPanel.classList.add("hidden");
+        helpToggle.setAttribute("aria-expanded", "false");
+        helpToggle.focus(); // Return focus to toggle button
       }
     });
   }
@@ -239,9 +253,9 @@ function saveExpandedState(container) {
   expandedTasks.clear();
   const tasks = container.querySelectorAll(".task-item[open]");
   tasks.forEach((task) => {
-    const taskName = task.querySelector(".font-medium")?.textContent?.trim();
-    if (taskName) {
-      expandedTasks.add(taskName);
+    const taskId = task.dataset.taskId;
+    if (taskId) {
+      expandedTasks.add(taskId);
     }
   });
 }
@@ -252,8 +266,8 @@ function restoreExpandedState(container) {
 
   const tasks = container.querySelectorAll(".task-item");
   tasks.forEach((task) => {
-    const taskName = task.querySelector(".font-medium")?.textContent?.trim();
-    if (taskName && expandedTasks.has(taskName)) {
+    const taskId = task.dataset.taskId;
+    if (taskId && expandedTasks.has(taskId)) {
       task.setAttribute("open", "");
     }
   });

@@ -29,22 +29,46 @@ export function showToast(message, type = "info") {
   if (!container) return;
 
   const toast = document.createElement("div");
-  const bgColor = type === "success"
-    ? "bg-green-600"
-    : type === "error"
-    ? "bg-red-600"
-    : "bg-blue-600";
+  const bgColor =
+    type === "success"
+      ? "bg-green-600"
+      : type === "error"
+        ? "bg-red-600"
+        : "bg-blue-600";
 
-  toast.className =
-    `${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 transform transition-all duration-300 translate-x-full`;
-  toast.innerHTML = `
-    <span>${message}</span>
-    <button class="ml-2 hover:opacity-75" onclick="this.parentElement.remove()">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-      </svg>
-    </button>
-  `;
+  toast.className = `${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 transform transition-all duration-300 translate-x-full`;
+  toast.setAttribute("role", "alert");
+  toast.setAttribute("aria-live", "assertive");
+  toast.setAttribute("aria-atomic", "true");
+
+  // Create message span
+  const messageSpan = document.createElement("span");
+  messageSpan.textContent = message;
+  toast.appendChild(messageSpan);
+
+  // Create close button
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "ml-2 hover:opacity-75";
+  closeBtn.setAttribute("aria-label", "Close notification");
+  closeBtn.addEventListener("click", () => toast.remove());
+
+  // Create SVG for close button
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "w-4 h-4");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("stroke-linecap", "round");
+  path.setAttribute("stroke-linejoin", "round");
+  path.setAttribute("stroke-width", "2");
+  path.setAttribute("d", "M6 18L18 6M6 6l12 12");
+
+  svg.appendChild(path);
+  closeBtn.appendChild(svg);
+  toast.appendChild(closeBtn);
 
   container.appendChild(toast);
 

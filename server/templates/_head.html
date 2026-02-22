@@ -13,8 +13,24 @@
       .htmx-indicator { display: none; }
       .htmx-request .htmx-indicator { display: inline-flex; }
       .htmx-request .btn-text { display: none; }
+      
+      /* Skip to content link - visible on focus */
+      .skip-link {
+        position: absolute;
+        top: -40px;
+        left: 0;
+        background: #000;
+        color: #fff;
+        padding: 8px;
+        text-decoration: none;
+        z-index: 100;
+      }
+      .skip-link:focus {
+        top: 0;
+      }
     </style>
   </head>
   <body
     class="bg-gray-100 dark:bg-gray-900 min-h-screen{{ if .BodyClass }} {{ .BodyClass }}{{ end }}">
+    <a href="#main-content" class="skip-link">Skip to main content</a>
     {{ end }}
