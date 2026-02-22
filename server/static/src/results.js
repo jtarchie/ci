@@ -214,8 +214,8 @@ export function initResults() {
           const container = getTasksContainer();
           const firstFailure = container
             ? container.querySelector(
-                ".task-item.bg-red-100, .task-item.dark\\:bg-red-900\\/30",
-              )
+              ".task-item.bg-red-100, .task-item.dark\\:bg-red-900\\/30",
+            )
             : null;
           if (firstFailure) {
             firstFailure.scrollIntoView({
