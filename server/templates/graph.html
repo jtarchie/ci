@@ -2,7 +2,8 @@
 <!-- Breadcrumb navigation -->
 <nav
   class="px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2 flex-wrap"
-  aria-label="Pipeline path">
+  role="navigation"
+  aria-label="Breadcrumb">
   <a href="/pipelines/"
     class="text-blue-600 dark:text-blue-400 hover:underline">Pipelines</a>
   {{ if .RunID }}
@@ -31,219 +32,221 @@
   {{ end }}
 </nav>
 
-<div class="container mx-auto p-4">
-  <div
-    class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
-    <div class="flex items-center gap-3">
-      <h1 class="text-2xl font-bold dark:text-white">Pipeline Graph</h1>
-      {{ if .IsActive }}
-      <span
-        class="flex items-center gap-2 text-sm text-yellow-600 dark:text-yellow-400">
-        <span class="relative flex h-2 w-2">
-          <span
-            class="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
-          <span
-            class="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
-        </span>
-        Live
-      </span>
-      {{ end }}
-    </div>
-    <div class="flex w-full flex-wrap gap-2 sm:w-auto">
-      {{ if .RunID }}
-      <a href="/runs/{{ .RunID }}/tasks"
-        class="w-full sm:w-auto px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400">
-        List View
-      </a>
-      {{ else }}
-      <a href="/tasks{{ .Path }}/"
-        class="w-full sm:w-auto px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400">
-        List View
-      </a>
-      {{ end }}
-    </div>
-  </div>
-
-  <div
-    class="graph-container relative w-full min-h-100 overflow-visible sm:overflow-hidden cursor-grab bg-gray-100 dark:bg-gray-800 focus:outline-2 focus:outline-blue-500 focus:-outline-offset-2"
-    id="graph-container"
-    tabindex="0"
-    role="application"
-    aria-label="Pipeline graph visualization. Use arrow keys to pan, plus and minus to zoom, and Tab to navigate between nodes.">
-
-    <svg class="w-full h-[60vh] sm:h-full" id="graph-svg" aria-hidden="true">
-      <defs>
-        <marker id="arrowhead" markerWidth="10" markerHeight="7"
-          refX="9" refY="3.5" orient="auto">
-          <polygon points="0 0, 10 3.5, 0 7" class="edge-arrow" />
-        </marker>
-        <marker id="arrowhead-dependency" markerWidth="10" markerHeight="7"
-          refX="9" refY="3.5" orient="auto">
-          <polygon points="0 0, 10 3.5, 0 7" class="dependency-arrow" />
-        </marker>
-      </defs>
-      <g id="graph-viewport">
-        <g id="edges-layer"></g>
-        <g id="nodes-layer"></g>
-      </g>
-    </svg>
-
+<main id="main-content" role="main">
+  <div class="container mx-auto p-4">
     <div
-      class="static sm:absolute sm:top-4 sm:left-4 mb-3 sm:mb-0 p-2 bg-white/95 dark:bg-gray-800/95 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-800 dark:text-white text-xs z-10 w-full sm:w-auto"
-      role="region" aria-label="Graph controls">
-      <!-- Legend row -->
-      <div class="flex items-center gap-2 flex-wrap">
-        <div class="flex items-center gap-1" title="Success"><div
-            class="w-3 h-3 rounded bg-green-600"></div><span
-            class="sr-only">Success</span></div>
-        <div class="flex items-center gap-1" title="Running"><div
-            class="w-3 h-3 rounded bg-yellow-500 animate-pulse"></div><span
-            class="sr-only">Running</span></div>
-        <div class="flex items-center gap-1" title="Failure"><div
-            class="w-3 h-3 rounded bg-red-600"></div><span
-            class="sr-only">Failure</span></div>
-        <div class="flex items-center gap-1" title="Error"><div
-            class="w-3 h-3 rounded bg-amber-600"></div><span
-            class="sr-only">Error</span></div>
-        <div class="flex items-center gap-1" title="Pending"><div
-            class="w-3 h-3 rounded bg-gray-500"></div><span
-            class="sr-only">Pending</span></div>
-        <div class="flex items-center gap-1" title="Group"><div
-            class="w-3 h-3 rounded bg-blue-600"></div><span
-            class="sr-only">Group</span></div>
-        <div class="flex items-center gap-1" title="Dependency">
-          <svg class="w-4 h-2" viewBox="0 0 16 8"><line x1="0" y1="4"
-              x2="16" y2="4" stroke="currentColor" stroke-width="2"
-              stroke-dasharray="3 2" class="text-purple-500" /></svg>
-          <span class="sr-only">Dependency</span>
-        </div>
-        <span class="text-gray-300 dark:text-gray-600">|</span>
-        <!-- Edge mode toggle inline -->
-        <span class="text-gray-500 dark:text-gray-400">View:</span>
-        <button
-          id="edge-mode-tree"
-          class="px-1.5 py-0.5 rounded text-xs font-medium transition-colors bg-blue-600 text-white"
-          aria-pressed="true">
-          Tree
-        </button>
-        <button
-          id="edge-mode-flow"
-          class="px-1.5 py-0.5 rounded text-xs font-medium transition-colors bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
-          aria-pressed="false">
-          Flow
-        </button>
+      class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+      <div class="flex items-center gap-3">
+        <h1 class="text-2xl font-bold dark:text-white">Pipeline Graph</h1>
+        {{ if .IsActive }}
+        <span
+          class="flex items-center gap-2 text-sm text-yellow-600 dark:text-yellow-400">
+          <span class="relative flex h-2 w-2">
+            <span
+              class="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+            <span
+              class="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
+          </span>
+          Live
+        </span>
+        {{ end }}
+      </div>
+      <div class="flex w-full flex-wrap gap-2 sm:w-auto">
+        {{ if .RunID }}
+        <a href="/runs/{{ .RunID }}/tasks"
+          class="w-full sm:w-auto px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400">
+          List View
+        </a>
+        {{ else }}
+        <a href="/tasks{{ .Path }}/"
+          class="w-full sm:w-auto px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400">
+          List View
+        </a>
+        {{ end }}
       </div>
     </div>
 
-    <button
-      class="static sm:absolute sm:top-4 sm:right-4 mb-3 sm:mb-0 z-10 w-10 h-10 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white text-xl cursor-pointer flex items-center justify-center transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-2 focus:outline-blue-500 focus:outline-offset-2"
-      id="help-toggle"
-      aria-expanded="false"
-      aria-controls="help-panel">
-      ?
-    </button>
-
     <div
-      class="help-panel static sm:absolute sm:top-15 sm:right-4 mt-3 sm:mt-0 p-4 bg-white/98 dark:bg-gray-800/98 rounded-lg text-gray-800 dark:text-white text-[13px] z-10 hidden w-full sm:w-auto min-w-0 sm:min-w-62 border border-gray-200 dark:border-gray-700 shadow-md"
-      id="help-panel" role="tooltip">
-      <h3 class="m-0 mb-3 text-sm font-semibold">Keyboard Shortcuts</h3>
-      <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5">
-        <dt class="text-gray-500 dark:text-gray-400"><kbd>+</kbd> /
-          <kbd>=</kbd></dt>
-        <dd class="m-0">Zoom in</dd>
-        <dt class="text-gray-500 dark:text-gray-400"><kbd>-</kbd></dt>
-        <dd class="m-0">Zoom out</dd>
-        <dt class="text-gray-500 dark:text-gray-400"><kbd>0</kbd></dt>
-        <dd class="m-0">Reset view</dd>
-        <dt class="text-gray-500 dark:text-gray-400"><kbd>Arrow
-            keys</kbd></dt>
-        <dd class="m-0">Pan view</dd>
-        <dt class="text-gray-500 dark:text-gray-400"><kbd>Tab</kbd></dt>
-        <dd class="m-0">Navigate nodes</dd>
-        <dt class="text-gray-500 dark:text-gray-400"><kbd>Enter</kbd></dt>
-        <dd class="m-0">Open node</dd>
-      </dl>
-      <h3 class="m-0 mb-3 mt-3 text-sm font-semibold">Mouse Controls</h3>
-      <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5">
-        <dt class="text-gray-500 dark:text-gray-400">Scroll</dt>
-        <dd class="m-0">Zoom in/out</dd>
-        <dt class="text-gray-500 dark:text-gray-400">Drag</dt>
-        <dd class="m-0">Pan view</dd>
-        <dt class="text-gray-500 dark:text-gray-400">Click node</dt>
-        <dd class="m-0">Open node details</dd>
-      </dl>
-    </div>
+      class="graph-container relative w-full min-h-100 overflow-visible sm:overflow-hidden cursor-grab bg-gray-100 dark:bg-gray-800 focus:outline-2 focus:outline-blue-500 focus:-outline-offset-2"
+      id="graph-container"
+      tabindex="0"
+      role="application"
+      aria-label="Pipeline graph visualization. Use arrow keys to pan, plus and minus to zoom, and Tab to navigate between nodes.">
 
-    <div
-      class="static sm:absolute sm:bottom-4 sm:right-4 mb-3 sm:mb-0 flex flex-row sm:flex-col gap-2 z-10"
-      role="group" aria-label="Zoom controls">
-      <button
-        class="w-10 h-10 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white text-xl cursor-pointer flex items-center justify-center transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-2 focus:outline-blue-500 focus:outline-offset-2"
-        id="zoom-in"
-        aria-label="Zoom in">+</button>
-      <button
-        class="w-10 h-10 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white text-xl cursor-pointer flex items-center justify-center transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-2 focus:outline-blue-500 focus:outline-offset-2"
-        id="zoom-out"
-        aria-label="Zoom out">−</button>
-      <button
-        class="w-10 h-10 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white text-xl cursor-pointer flex items-center justify-center transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-2 focus:outline-blue-500 focus:outline-offset-2"
-        id="zoom-reset"
-        aria-label="Reset zoom">⌂</button>
-    </div>
-
-    <div
-      class="static sm:absolute sm:bottom-4 sm:left-4 mb-3 sm:mb-0 px-3 py-2 bg-white/90 dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700 rounded-md text-gray-600 dark:text-gray-400 text-xs z-10"
-      id="zoom-info" aria-live="polite">
-      Zoom: 100%
-    </div>
-
-    <!-- Search box -->
-    <div
-      class="static sm:absolute sm:top-4 sm:left-1/2 sm:-translate-x-1/2 mb-3 sm:mb-0 z-10 w-full sm:w-auto">
-      <svg
-        class="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-        width="16" height="16" viewBox="0 0 20 20"
-        fill="currentColor">
-        <path fill-rule="evenodd"
-          d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
-          clip-rule="evenodd" />
+      <svg class="w-full h-[60vh] sm:h-full" id="graph-svg" aria-hidden="true">
+        <defs>
+          <marker id="arrowhead" markerWidth="10" markerHeight="7"
+            refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" class="edge-arrow" />
+          </marker>
+          <marker id="arrowhead-dependency" markerWidth="10" markerHeight="7"
+            refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" class="dependency-arrow" />
+          </marker>
+        </defs>
+        <g id="graph-viewport">
+          <g id="edges-layer"></g>
+          <g id="nodes-layer"></g>
+        </g>
       </svg>
-      <input type="text"
-        class="w-full sm:w-60 py-2 pr-3 pl-9 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white/95 dark:bg-gray-800/95 text-gray-800 dark:text-white placeholder-gray-400 focus:outline-2 focus:outline-blue-500 focus:outline-offset-1"
-        id="search-input"
-        placeholder="Search nodes..."
-        aria-label="Search nodes"
-        autocomplete="off">
-    </div>
 
-    <!-- Minimap -->
-    <div
-      class="hidden sm:block absolute bottom-40 right-4 w-40 h-25 bg-white/90 dark:bg-gray-800/90 border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden z-10"
-      id="minimap" aria-hidden="true">
-      <svg class="w-full h-full" id="minimap-svg">
-        <g id="minimap-nodes"></g>
-        <rect class="minimap-viewport" id="minimap-viewport"></rect>
-      </svg>
-    </div>
+      <div
+        class="static sm:absolute sm:top-4 sm:left-4 mb-3 sm:mb-0 p-2 bg-white/95 dark:bg-gray-800/95 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-800 dark:text-white text-xs z-10 w-full sm:w-auto"
+        role="region" aria-label="Graph controls">
+        <!-- Legend row -->
+        <div class="flex items-center gap-2 flex-wrap">
+          <div class="flex items-center gap-1" title="Success"><div
+              class="w-3 h-3 rounded bg-green-600"></div><span
+              class="sr-only">Success</span></div>
+          <div class="flex items-center gap-1" title="Running"><div
+              class="w-3 h-3 rounded bg-yellow-500 animate-pulse"></div><span
+              class="sr-only">Running</span></div>
+          <div class="flex items-center gap-1" title="Failure"><div
+              class="w-3 h-3 rounded bg-red-600"></div><span
+              class="sr-only">Failure</span></div>
+          <div class="flex items-center gap-1" title="Error"><div
+              class="w-3 h-3 rounded bg-amber-600"></div><span
+              class="sr-only">Error</span></div>
+          <div class="flex items-center gap-1" title="Pending"><div
+              class="w-3 h-3 rounded bg-gray-500"></div><span
+              class="sr-only">Pending</span></div>
+          <div class="flex items-center gap-1" title="Group"><div
+              class="w-3 h-3 rounded bg-blue-600"></div><span
+              class="sr-only">Group</span></div>
+          <div class="flex items-center gap-1" title="Dependency">
+            <svg class="w-4 h-2" viewBox="0 0 16 8"><line x1="0" y1="4"
+                x2="16" y2="4" stroke="currentColor" stroke-width="2"
+                stroke-dasharray="3 2" class="text-purple-500" /></svg>
+            <span class="sr-only">Dependency</span>
+          </div>
+          <span class="text-gray-300 dark:text-gray-600">|</span>
+          <!-- Edge mode toggle inline -->
+          <span class="text-gray-500 dark:text-gray-400">View:</span>
+          <button
+            id="edge-mode-tree"
+            class="px-1.5 py-0.5 rounded text-xs font-medium transition-colors bg-blue-600 text-white"
+            aria-pressed="true">
+            Tree
+          </button>
+          <button
+            id="edge-mode-flow"
+            class="px-1.5 py-0.5 rounded text-xs font-medium transition-colors bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+            aria-pressed="false">
+            Flow
+          </button>
+        </div>
+      </div>
 
-    <!-- Tooltip -->
-    <div
-      class="graph-tooltip absolute py-2.5 px-3.5 bg-white/98 dark:bg-gray-800/98 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-800 dark:text-white text-[13px] z-100 pointer-events-none opacity-0 transition-opacity max-w-70 shadow-lg"
-      id="graph-tooltip" role="tooltip">
-      <h4 class="m-0 mb-1.5 font-semibold text-sm break-all"
-        id="tooltip-name">Node</h4>
-      <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-2.5 gap-y-1 text-xs">
-        <dt class="text-gray-500 dark:text-gray-400">Status</dt>
-        <dd class="m-0 font-medium" id="tooltip-status"></dd>
-        <dt class="text-gray-500 dark:text-gray-400">Type</dt>
-        <dd class="m-0 font-medium" id="tooltip-type"></dd>
-        <dt class="text-gray-500 dark:text-gray-400 hidden"
-          id="tooltip-duration-label">Duration</dt>
-        <dd class="m-0 font-medium hidden" id="tooltip-duration"></dd>
-      </dl>
+      <button
+        class="static sm:absolute sm:top-4 sm:right-4 mb-3 sm:mb-0 z-10 w-10 h-10 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white text-xl cursor-pointer flex items-center justify-center transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-2 focus:outline-blue-500 focus:outline-offset-2"
+        id="help-toggle"
+        aria-expanded="false"
+        aria-controls="help-panel">
+        ?
+      </button>
+
+      <div
+        class="help-panel static sm:absolute sm:top-15 sm:right-4 mt-3 sm:mt-0 p-4 bg-white/98 dark:bg-gray-800/98 rounded-lg text-gray-800 dark:text-white text-[13px] z-10 hidden w-full sm:w-auto min-w-0 sm:min-w-62 border border-gray-200 dark:border-gray-700 shadow-md"
+        id="help-panel" role="tooltip">
+        <h3 class="m-0 mb-3 text-sm font-semibold">Keyboard Shortcuts</h3>
+        <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5">
+          <dt class="text-gray-500 dark:text-gray-400"><kbd>+</kbd> /
+            <kbd>=</kbd></dt>
+          <dd class="m-0">Zoom in</dd>
+          <dt class="text-gray-500 dark:text-gray-400"><kbd>-</kbd></dt>
+          <dd class="m-0">Zoom out</dd>
+          <dt class="text-gray-500 dark:text-gray-400"><kbd>0</kbd></dt>
+          <dd class="m-0">Reset view</dd>
+          <dt class="text-gray-500 dark:text-gray-400"><kbd>Arrow
+              keys</kbd></dt>
+          <dd class="m-0">Pan view</dd>
+          <dt class="text-gray-500 dark:text-gray-400"><kbd>Tab</kbd></dt>
+          <dd class="m-0">Navigate nodes</dd>
+          <dt class="text-gray-500 dark:text-gray-400"><kbd>Enter</kbd></dt>
+          <dd class="m-0">Open node</dd>
+        </dl>
+        <h3 class="m-0 mb-3 mt-3 text-sm font-semibold">Mouse Controls</h3>
+        <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5">
+          <dt class="text-gray-500 dark:text-gray-400">Scroll</dt>
+          <dd class="m-0">Zoom in/out</dd>
+          <dt class="text-gray-500 dark:text-gray-400">Drag</dt>
+          <dd class="m-0">Pan view</dd>
+          <dt class="text-gray-500 dark:text-gray-400">Click node</dt>
+          <dd class="m-0">Open node details</dd>
+        </dl>
+      </div>
+
+      <div
+        class="static sm:absolute sm:bottom-4 sm:right-4 mb-3 sm:mb-0 flex flex-row sm:flex-col gap-2 z-10"
+        role="group" aria-label="Zoom controls">
+        <button
+          class="w-10 h-10 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white text-xl cursor-pointer flex items-center justify-center transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-2 focus:outline-blue-500 focus:outline-offset-2"
+          id="zoom-in"
+          aria-label="Zoom in">+</button>
+        <button
+          class="w-10 h-10 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white text-xl cursor-pointer flex items-center justify-center transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-2 focus:outline-blue-500 focus:outline-offset-2"
+          id="zoom-out"
+          aria-label="Zoom out">−</button>
+        <button
+          class="w-10 h-10 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white text-xl cursor-pointer flex items-center justify-center transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-2 focus:outline-blue-500 focus:outline-offset-2"
+          id="zoom-reset"
+          aria-label="Reset zoom">⌂</button>
+      </div>
+
+      <div
+        class="static sm:absolute sm:bottom-4 sm:left-4 mb-3 sm:mb-0 px-3 py-2 bg-white/90 dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700 rounded-md text-gray-600 dark:text-gray-400 text-xs z-10"
+        id="zoom-info" aria-live="polite">
+        Zoom: 100%
+      </div>
+
+      <!-- Search box -->
+      <div
+        class="static sm:absolute sm:top-4 sm:left-1/2 sm:-translate-x-1/2 mb-3 sm:mb-0 z-10 w-full sm:w-auto">
+        <svg
+          class="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+          width="16" height="16" viewBox="0 0 20 20"
+          fill="currentColor">
+          <path fill-rule="evenodd"
+            d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+            clip-rule="evenodd" />
+        </svg>
+        <input type="text"
+          class="w-full sm:w-60 py-2 pr-3 pl-9 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white/95 dark:bg-gray-800/95 text-gray-800 dark:text-white placeholder-gray-400 focus:outline-2 focus:outline-blue-500 focus:outline-offset-1"
+          id="search-input"
+          placeholder="Search nodes..."
+          aria-label="Search nodes"
+          autocomplete="off">
+      </div>
+
+      <!-- Minimap -->
+      <div
+        class="hidden sm:block absolute bottom-40 right-4 w-40 h-25 bg-white/90 dark:bg-gray-800/90 border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden z-10"
+        id="minimap" aria-hidden="true">
+        <svg class="w-full h-full" id="minimap-svg">
+          <g id="minimap-nodes"></g>
+          <rect class="minimap-viewport" id="minimap-viewport"></rect>
+        </svg>
+      </div>
+
+      <!-- Tooltip -->
+      <div
+        class="graph-tooltip absolute py-2.5 px-3.5 bg-white/98 dark:bg-gray-800/98 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-800 dark:text-white text-[13px] z-100 pointer-events-none opacity-0 transition-opacity max-w-70 shadow-lg"
+        id="graph-tooltip" role="tooltip">
+        <h4 class="m-0 mb-1.5 font-semibold text-sm break-all"
+          id="tooltip-name">Node</h4>
+        <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-2.5 gap-y-1 text-xs">
+          <dt class="text-gray-500 dark:text-gray-400">Status</dt>
+          <dd class="m-0 font-medium" id="tooltip-status"></dd>
+          <dt class="text-gray-500 dark:text-gray-400">Type</dt>
+          <dd class="m-0 font-medium" id="tooltip-type"></dd>
+          <dt class="text-gray-500 dark:text-gray-400 hidden"
+            id="tooltip-duration-label">Duration</dt>
+          <dd class="m-0 font-medium hidden" id="tooltip-duration"></dd>
+        </dl>
+      </div>
     </div>
   </div>
-</div>
+</main>
 
 {{ template "footer" }}
 <!-- Graph data from server -->

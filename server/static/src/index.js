@@ -24,6 +24,9 @@ import { initResults } from "./results.js";
 // Import pipelines module
 import { initPipelines, showToast } from "./pipelines.js";
 
+// Import polling management
+import { initPolling } from "./polling.js";
+
 // Make AsciinemaPlayer available globally
 window.AsciinemaPlayer = AsciinemaPlayer;
 
@@ -36,6 +39,34 @@ function initSyntaxHighlighting() {
 
 // Export CI namespace for htmx hx-on attributes
 window.CI = { showToast, initSyntaxHighlighting };
+
+// Add global HTMx error handling
+document.body.addEventListener("htmx:responseError", function (event) {
+  console.error("HTMx error:", event.detail);
+  const statusCode = event.detail.xhr?.status;
+  const message =
+    statusCode === 404
+      ? "Resource not found"
+      : statusCode === 500
+        ? "Server error occurred"
+        : statusCode === 0
+          ? "Network error - please check your connection"
+          : "An error occurred";
+  showToast(message, "error");
+});
+
+// Add loading state management
+document.body.addEventListener("htmx:beforeRequest", function (event) {
+  if (event.detail.target) {
+    event.detail.target.setAttribute("aria-busy", "true");
+  }
+});
+
+document.body.addEventListener("htmx:afterSettle", function (event) {
+  if (event.detail.target) {
+    event.detail.target.removeAttribute("aria-busy");
+  }
+});
 
 // Initialize when DOM is ready
 document.addEventListener("DOMContentLoaded", function () {
@@ -73,5 +104,12 @@ document.addEventListener("DOMContentLoaded", function () {
     } catch (e) {
       console.error("Failed to initialize pipelines:", e);
     }
+  }
+
+  // Initialize polling management
+  try {
+    initPolling();
+  } catch (e) {
+    console.error("Failed to initialize polling:", e);
   }
 });
