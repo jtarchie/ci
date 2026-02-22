@@ -10,14 +10,15 @@ import (
 )
 
 type Volume struct {
-	id     string
-	name   string
-	path   string
-	driver *Fly
+	id             string
+	name           string // sanitized internal name for Fly API
+	userFacingName string // original name passed by the user
+	path           string
+	driver         *Fly
 }
 
 func (v *Volume) Name() string {
-	return v.name
+	return v.userFacingName
 }
 
 func (v *Volume) Path() string {
@@ -68,10 +69,11 @@ func (f *Fly) CreateVolume(ctx context.Context, name string, size int) (orchestr
 	f.logger.Info("fly.volume.created", "volume", vol.ID, "name", volumeName)
 
 	v := &Volume{
-		id:     vol.ID,
-		name:   volumeName,
-		path:   "/" + volumeName,
-		driver: f,
+		id:             vol.ID,
+		name:           volumeName,
+		userFacingName: name,
+		path:           "/" + volumeName,
+		driver:         f,
 	}
 
 	f.mu.Lock()

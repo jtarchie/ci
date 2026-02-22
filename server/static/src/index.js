@@ -44,14 +44,13 @@ window.CI = { showToast, initSyntaxHighlighting };
 document.body.addEventListener("htmx:responseError", function (event) {
   console.error("HTMx error:", event.detail);
   const statusCode = event.detail.xhr?.status;
-  const message =
-    statusCode === 404
-      ? "Resource not found"
-      : statusCode === 500
-        ? "Server error occurred"
-        : statusCode === 0
-          ? "Network error - please check your connection"
-          : "An error occurred";
+  const message = statusCode === 404
+    ? "Resource not found"
+    : statusCode === 500
+    ? "Server error occurred"
+    : statusCode === 0
+    ? "Network error - please check your connection"
+    : "An error occurred";
   showToast(message, "error");
 });
 

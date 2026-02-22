@@ -12,6 +12,18 @@ import (
 	"github.com/jtarchie/ci/orchestra/cache"
 )
 
+// pullImage ensures an image is available locally, waiting for the pull to complete.
+func (d *Docker) pullImage(ctx context.Context, imageName string) error {
+	reader, err := d.client.ImagePull(ctx, imageName, image.PullOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = reader.Close() }()
+	// Drain the reader to wait for pull completion
+	_, _ = io.Copy(io.Discard, reader)
+	return nil
+}
+
 const cacheHelperImage = "busybox:latest"
 
 // CopyToVolume implements cache.VolumeDataAccessor.
@@ -20,8 +32,7 @@ func (d *Docker) CopyToVolume(ctx context.Context, volumeName string, reader io.
 	fullVolumeName := fmt.Sprintf("%s-%s", d.namespace, volumeName)
 
 	// Ensure busybox image is available
-	_, err := d.client.ImagePull(ctx, cacheHelperImage, image.PullOptions{})
-	if err != nil {
+	if err := d.pullImage(ctx, cacheHelperImage); err != nil {
 		// Try to continue anyway, image might already exist
 		d.logger.Debug("cache.helper.pull.copyto.failed", "error", err)
 	}
@@ -66,8 +77,7 @@ func (d *Docker) CopyFromVolume(ctx context.Context, volumeName string) (io.Read
 	fullVolumeName := fmt.Sprintf("%s-%s", d.namespace, volumeName)
 
 	// Ensure busybox image is available
-	_, err := d.client.ImagePull(ctx, cacheHelperImage, image.PullOptions{})
-	if err != nil {
+	if err := d.pullImage(ctx, cacheHelperImage); err != nil {
 		// Try to continue anyway, image might already exist
 		d.logger.Debug("cache.helper.pull.copyfrom.failed", "error", err)
 	}

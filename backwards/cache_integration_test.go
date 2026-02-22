@@ -289,7 +289,7 @@ func downloadAndVerifyCache(t *testing.T, client *s3.Client, bucket, key, expect
 		Key:    aws.String(key),
 	})
 	assert.Expect(err).NotTo(HaveOccurred(), "Should download object from S3")
-	defer result.Body.Close()
+	defer func() { _ = result.Body.Close() }()
 
 	// Decompress with zstd
 	t.Log("Decompressing zstd stream...")
