@@ -18,14 +18,15 @@ import (
 )
 
 type Server struct {
-	Port           int           `default:"8080"             env:"CI_PORT"                 help:"Port to run the server on"`
-	Storage        string        `default:"sqlite://test.db" env:"CI_STORAGE"              help:"Path to storage file"                      required:""`
-	MaxInFlight    int           `default:"10"               env:"CI_MAX_IN_FLIGHT"         help:"Maximum concurrent pipeline executions"`
-	WebhookTimeout time.Duration `default:"5s"               env:"CI_WEBHOOK_TIMEOUT"       help:"Timeout waiting for pipeline webhook response"`
-	BasicAuth      string        `env:"CI_BASIC_AUTH"         help:"Basic auth credentials in format 'username:password' (optional)"`
-	AllowedDrivers string        `default:"*"                env:"CI_ALLOWED_DRIVERS"       help:"Comma-separated list of allowed driver names (e.g., 'docker,native,k8s'), or '*' for all"`
-	Secrets        string        `default:""                 env:"CI_SECRETS"              help:"Secrets backend DSN (e.g., 'local://secrets.db?key=my-passphrase')"`
-	Secret         []string      `help:"Set a global secret as KEY=VALUE (can be repeated)" short:"e"`
+	Port            int           `default:"8080"             env:"CI_PORT"                 help:"Port to run the server on"`
+	Storage         string        `default:"sqlite://test.db" env:"CI_STORAGE"              help:"Path to storage file"                      required:""`
+	MaxInFlight     int           `default:"10"               env:"CI_MAX_IN_FLIGHT"         help:"Maximum concurrent pipeline executions"`
+	WebhookTimeout  time.Duration `default:"5s"               env:"CI_WEBHOOK_TIMEOUT"       help:"Timeout waiting for pipeline webhook response"`
+	BasicAuth       string        `env:"CI_BASIC_AUTH"         help:"Basic auth credentials in format 'username:password' (optional)"`
+	AllowedDrivers  string        `default:"*"                env:"CI_ALLOWED_DRIVERS"       help:"Comma-separated list of allowed driver names (e.g., 'docker,native,k8s'), or '*' for all"`
+	AllowedFeatures string        `default:"*"                env:"CI_ALLOWED_FEATURES"      help:"Comma-separated list of allowed features (webhooks,secrets,notifications), or '*' for all"`
+	Secrets         string        `default:""                 env:"CI_SECRETS"              help:"Secrets backend DSN (e.g., 'local://secrets.db?key=my-passphrase')"`
+	Secret          []string      `help:"Set a global secret as KEY=VALUE (can be repeated)" short:"e"`
 }
 
 func (c *Server) Run(logger *slog.Logger) error {
@@ -84,6 +85,7 @@ func (c *Server) Run(logger *slog.Logger) error {
 		BasicAuthUsername: basicAuthUsername,
 		BasicAuthPassword: basicAuthPassword,
 		AllowedDrivers:    c.AllowedDrivers,
+		AllowedFeatures:   c.AllowedFeatures,
 		SecretsManager:    secretsManager,
 	})
 	if err != nil {

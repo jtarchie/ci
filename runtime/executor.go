@@ -32,6 +32,8 @@ type ExecutorOptions struct {
 	// SecretsManager provides access to encrypted secrets.
 	// If nil, secret resolution is disabled.
 	SecretsManager secrets.Manager
+	// DisableNotifications prevents the notify system from sending messages.
+	DisableNotifications bool
 }
 
 // ExecutePipeline executes a pipeline with the given content and driver DSN.
@@ -88,13 +90,14 @@ func ExecutePipeline(
 	js := NewJS(logger)
 
 	executeOpts := ExecuteOptions{
-		Resume:         opts.Resume,
-		RunID:          opts.RunID,
-		PipelineID:     opts.PipelineID,
-		Namespace:      namespace,
-		WebhookData:    opts.WebhookData,
-		ResponseChan:   opts.ResponseChan,
-		SecretsManager: opts.SecretsManager,
+		Resume:               opts.Resume,
+		RunID:                opts.RunID,
+		PipelineID:           opts.PipelineID,
+		Namespace:            namespace,
+		WebhookData:          opts.WebhookData,
+		ResponseChan:         opts.ResponseChan,
+		SecretsManager:       opts.SecretsManager,
+		DisableNotifications: opts.DisableNotifications,
 	}
 
 	err = js.ExecuteWithOptions(ctx, content, driver, store, executeOpts)

@@ -38,15 +38,17 @@ type RouterOptions struct {
 	BasicAuthUsername string
 	BasicAuthPassword string
 	AllowedDrivers    string
+	AllowedFeatures   string
 	SecretsManager    secrets.Manager
 }
 
 // Router wraps echo.Echo and provides access to the execution service.
 type Router struct {
 	*echo.Echo
-	execService    *ExecutionService
-	webGroup       *echo.Group
-	allowedDrivers []string
+	execService     *ExecutionService
+	webGroup        *echo.Group
+	allowedDrivers  []string
+	allowedFeatures []Feature
 }
 
 // WaitForExecutions blocks until all in-flight pipeline executions have completed.
@@ -92,9 +94,16 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	// Parse allowed drivers
 	allowedDrivers := parseAllowedDrivers(opts.AllowedDrivers)
 
-	// Create execution service with allowed drivers
+	// Parse allowed features
+	allowedFeatures, err := ParseAllowedFeatures(opts.AllowedFeatures)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse allowed features: %w", err)
+	}
+
+	// Create execution service with allowed drivers and features
 	execService := NewExecutionService(store, logger, opts.MaxInFlight, allowedDrivers)
 	execService.SecretsManager = opts.SecretsManager
+	execService.AllowedFeatures = allowedFeatures
 	router.Pre(middleware.AddTrailingSlashWithConfig(middleware.TrailingSlashConfig{
 		Skipper: func(c echo.Context) bool {
 			// Skip trailing slash middleware for static files, API routes, runs, and health
@@ -216,13 +225,14 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	if webhookTimeout == 0 {
 		webhookTimeout = 5 * time.Second
 	}
-	registerWebhookRoutes(router, store, execService, webhookTimeout)
+	registerWebhookRoutes(router, store, execService, webhookTimeout, allowedFeatures)
 
 	// Create API group with basic auth middleware (for non-webhook endpoints)
 	api := router.Group("/api")
 	api.Use(newBasicAuthMiddleware(opts.BasicAuthUsername, opts.BasicAuthPassword))
-	registerPipelineRoutes(api, store, execService, webhookTimeout, allowedDrivers)
+	registerPipelineRoutes(api, store, execService, webhookTimeout, allowedDrivers, allowedFeatures)
 	registerDriverRoutes(api, allowedDrivers)
+	registerFeatureRoutes(api, allowedFeatures)
 
 	// Run-specific views that look up tasks at /pipeline/<runID>/...
 	web.GET("/runs/:id/tasks", func(ctx echo.Context) error {
@@ -329,10 +339,10 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	web.GET("/runs/:id/graph-data", graphDataHandler)
 	web.GET("/runs/:id/graph-data/", graphDataHandler)
 
-	return &Router{Echo: router, execService: execService, webGroup: web, allowedDrivers: allowedDrivers}, nil
+	return &Router{Echo: router, execService: execService, webGroup: web, allowedDrivers: allowedDrivers, allowedFeatures: allowedFeatures}, nil
 }
 
-func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *ExecutionService, webhookTimeout time.Duration, allowedDrivers []string) {
+func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *ExecutionService, webhookTimeout time.Duration, allowedDrivers []string, allowedFeatures []Feature) {
 	// POST /api/pipelines - Create a new pipeline
 	api.POST("/pipelines", func(ctx echo.Context) error {
 		var req PipelineRequest
@@ -363,6 +373,13 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 		if err := orchestra.IsDriverAllowed(req.DriverDSN, allowedDrivers); err != nil {
 			return ctx.JSON(http.StatusBadRequest, map[string]string{
 				"error": fmt.Sprintf("driver not allowed: %v", err),
+			})
+		}
+
+		// Reject webhook_secret if webhooks feature is disabled
+		if req.WebhookSecret != "" && !IsFeatureEnabled(FeatureWebhooks, allowedFeatures) {
+			return ctx.JSON(http.StatusBadRequest, map[string]string{
+				"error": "webhooks feature is not enabled",
 			})
 		}
 
@@ -519,9 +536,16 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 	})
 }
 
-func registerWebhookRoutes(router *echo.Echo, store storage.Driver, execService *ExecutionService, webhookTimeout time.Duration) {
+func registerWebhookRoutes(router *echo.Echo, store storage.Driver, execService *ExecutionService, webhookTimeout time.Duration, allowedFeatures []Feature) {
 	// ANY /api/webhooks/:id - Trigger pipeline execution via webhook
 	router.Any("/api/webhooks/:id", func(ctx echo.Context) error {
+		// Check if webhooks feature is enabled
+		if !IsFeatureEnabled(FeatureWebhooks, allowedFeatures) {
+			return ctx.JSON(http.StatusForbidden, map[string]string{
+				"error": "webhooks feature is not enabled",
+			})
+		}
+
 		id := ctx.Param("id")
 
 		// Get the pipeline
@@ -684,6 +708,21 @@ func registerDriverRoutes(api *echo.Group, allowedDrivers []string) {
 
 		return ctx.JSON(http.StatusOK, map[string]any{
 			"drivers": drivers,
+		})
+	})
+}
+
+// registerFeatureRoutes adds API endpoints for listing allowed features.
+func registerFeatureRoutes(api *echo.Group, allowedFeatures []Feature) {
+	// GET /api/features - List allowed features
+	api.GET("/features", func(ctx echo.Context) error {
+		features := make([]string, len(allowedFeatures))
+		for i, f := range allowedFeatures {
+			features[i] = string(f)
+		}
+
+		return ctx.JSON(http.StatusOK, map[string]any{
+			"features": features,
 		})
 	})
 }
