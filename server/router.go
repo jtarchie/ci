@@ -33,13 +33,15 @@ type PipelineRequest struct {
 
 // RouterOptions configures the router.
 type RouterOptions struct {
-	MaxInFlight       int
-	WebhookTimeout    time.Duration
-	BasicAuthUsername string
-	BasicAuthPassword string
-	AllowedDrivers    string
-	AllowedFeatures   string
-	SecretsManager    secrets.Manager
+	MaxInFlight           int
+	WebhookTimeout        time.Duration
+	BasicAuthUsername     string
+	BasicAuthPassword     string
+	AllowedDrivers        string
+	AllowedFeatures       string
+	SecretsManager        secrets.Manager
+	FetchTimeout          time.Duration
+	FetchMaxResponseBytes int64
 }
 
 // Router wraps echo.Echo and provides access to the execution service.
@@ -104,6 +106,8 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	execService := NewExecutionService(store, logger, opts.MaxInFlight, allowedDrivers)
 	execService.SecretsManager = opts.SecretsManager
 	execService.AllowedFeatures = allowedFeatures
+	execService.FetchTimeout = opts.FetchTimeout
+	execService.FetchMaxResponseBytes = opts.FetchMaxResponseBytes
 	router.Pre(middleware.AddTrailingSlashWithConfig(middleware.TrailingSlashConfig{
 		Skipper: func(c echo.Context) bool {
 			// Skip trailing slash middleware for static files, API routes, runs, and health
