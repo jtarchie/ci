@@ -7,6 +7,7 @@ import (
 
 	"github.com/jtarchie/ci/orchestra"
 	"github.com/jtarchie/ci/orchestra/cache"
+	"github.com/jtarchie/ci/secrets"
 	"github.com/jtarchie/ci/storage"
 )
 
@@ -28,6 +29,9 @@ type ExecutorOptions struct {
 	// ResponseChan receives the HTTP response from the pipeline.
 	// Nil when not triggered via webhook.
 	ResponseChan chan *HTTPResponse
+	// SecretsManager provides access to encrypted secrets.
+	// If nil, secret resolution is disabled.
+	SecretsManager secrets.Manager
 }
 
 // ExecutePipeline executes a pipeline with the given content and driver DSN.
@@ -84,12 +88,13 @@ func ExecutePipeline(
 	js := NewJS(logger)
 
 	executeOpts := ExecuteOptions{
-		Resume:       opts.Resume,
-		RunID:        opts.RunID,
-		PipelineID:   opts.PipelineID,
-		Namespace:    namespace,
-		WebhookData:  opts.WebhookData,
-		ResponseChan: opts.ResponseChan,
+		Resume:         opts.Resume,
+		RunID:          opts.RunID,
+		PipelineID:     opts.PipelineID,
+		Namespace:      namespace,
+		WebhookData:    opts.WebhookData,
+		ResponseChan:   opts.ResponseChan,
+		SecretsManager: opts.SecretsManager,
 	}
 
 	err = js.ExecuteWithOptions(ctx, content, driver, store, executeOpts)

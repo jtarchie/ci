@@ -16,6 +16,7 @@ import (
 
 	"github.com/jtarchie/ci/orchestra"
 	"github.com/jtarchie/ci/runtime"
+	"github.com/jtarchie/ci/secrets"
 	"github.com/jtarchie/ci/storage"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -37,6 +38,7 @@ type RouterOptions struct {
 	BasicAuthUsername string
 	BasicAuthPassword string
 	AllowedDrivers    string
+	SecretsManager    secrets.Manager
 }
 
 // Router wraps echo.Echo and provides access to the execution service.
@@ -92,6 +94,7 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 
 	// Create execution service with allowed drivers
 	execService := NewExecutionService(store, logger, opts.MaxInFlight, allowedDrivers)
+	execService.SecretsManager = opts.SecretsManager
 	router.Pre(middleware.AddTrailingSlashWithConfig(middleware.TrailingSlashConfig{
 		Skipper: func(c echo.Context) bool {
 			// Skip trailing slash middleware for static files, API routes, runs, and health

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jtarchie/ci/secrets"
 	"github.com/jtarchie/ci/server"
 	"github.com/jtarchie/ci/storage"
 	_ "github.com/jtarchie/ci/storage/sqlite"
@@ -22,6 +23,7 @@ type Server struct {
 	WebhookTimeout time.Duration `default:"5s"               env:"CI_WEBHOOK_TIMEOUT"       help:"Timeout waiting for pipeline webhook response"`
 	BasicAuth      string        `env:"CI_BASIC_AUTH"         help:"Basic auth credentials in format 'username:password' (optional)"`
 	AllowedDrivers string        `default:"*"                env:"CI_ALLOWED_DRIVERS"       help:"Comma-separated list of allowed driver names (e.g., 'docker,native,k8s'), or '*' for all"`
+	Secrets        string        `default:""                 env:"CI_SECRETS"              help:"Secrets backend DSN (e.g., 'local://secrets.db?key=my-passphrase')"`
 }
 
 func (c *Server) Run(logger *slog.Logger) error {
@@ -35,6 +37,17 @@ func (c *Server) Run(logger *slog.Logger) error {
 		return fmt.Errorf("could not create sqlite client: %w", err)
 	}
 	defer func() { _ = client.Close() }()
+
+	// Initialize secrets manager if configured
+	var secretsManager secrets.Manager
+
+	if c.Secrets != "" {
+		secretsManager, err = secrets.GetFromDSN(c.Secrets, logger)
+		if err != nil {
+			return fmt.Errorf("could not create secrets manager: %w", err)
+		}
+		defer func() { _ = secretsManager.Close() }()
+	}
 
 	// Parse basic auth credentials if provided
 	var basicAuthUsername, basicAuthPassword string
@@ -56,6 +69,7 @@ func (c *Server) Run(logger *slog.Logger) error {
 		BasicAuthUsername: basicAuthUsername,
 		BasicAuthPassword: basicAuthPassword,
 		AllowedDrivers:    c.AllowedDrivers,
+		SecretsManager:    secretsManager,
 	})
 	if err != nil {
 		return fmt.Errorf("could not create router: %w", err)

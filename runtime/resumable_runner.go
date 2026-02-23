@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jtarchie/ci/orchestra"
+	"github.com/jtarchie/ci/secrets"
 	storagelib "github.com/jtarchie/ci/storage"
 )
 
@@ -84,6 +85,11 @@ func NewResumableRunner(
 }
 
 const stateStoragePrefix = "_resume/state"
+
+// SetSecretsManager configures the underlying pipeline runner to load secrets.
+func (r *ResumableRunner) SetSecretsManager(mgr secrets.Manager, pipelineID string) {
+	r.runner.SetSecretsManager(mgr, pipelineID)
+}
 
 // loadState loads pipeline state from storage.
 func (r *ResumableRunner) loadState(runID string) (*PipelineState, error) {

@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/jtarchie/ci/orchestra"
 	"github.com/jtarchie/ci/orchestra/cache"
 	"github.com/jtarchie/ci/runtime"
+	"github.com/jtarchie/ci/secrets"
 	"github.com/jtarchie/ci/storage"
 )
 
@@ -28,6 +30,8 @@ type Runner struct {
 	Timeout  time.Duration `env:"CI_TIMEOUT"                                              help:"timeout for the pipeline, will cause abort if exceeded"`
 	Resume   bool          `help:"Resume from last checkpoint if pipeline was interrupted"`
 	RunID    string        `help:"Unique run ID for resume support (auto-generated if not provided)"`
+	Secrets  string        `default:"" env:"CI_SECRETS" help:"Secrets backend DSN (e.g., 'local://secrets.db?key=my-passphrase')"`
+	Secret   []string      `help:"Set a secret as KEY=VALUE (can be repeated)" short:"e"`
 }
 
 func youtubeIDStyle(input string) string {
@@ -143,12 +147,37 @@ func (c *Runner) Run(logger *slog.Logger) error {
 	}
 	defer func() { _ = storage.Close() }()
 
+	// Initialize secrets manager if configured
+	var secretsManager secrets.Manager
+
+	if c.Secrets != "" {
+		secretsManager, err = secrets.GetFromDSN(c.Secrets, logger)
+		if err != nil {
+			return fmt.Errorf("could not create secrets manager: %w", err)
+		}
+		defer func() { _ = secretsManager.Close() }()
+
+		// Store any secrets provided via --secret flags
+		for _, s := range c.Secret {
+			key, value, found := parseSecretFlag(s)
+			if !found {
+				return fmt.Errorf("invalid --secret flag %q: expected KEY=VALUE format", s)
+			}
+
+			err = secretsManager.Set(ctx, secrets.PipelineScope(runtimeID), key, value)
+			if err != nil {
+				return fmt.Errorf("could not set secret %q: %w", key, err)
+			}
+		}
+	}
+
 	js := runtime.NewJS(logger)
 
 	opts := runtime.ExecuteOptions{
-		Resume:     c.Resume,
-		RunID:      c.RunID,
-		PipelineID: runtimeID,
+		Resume:         c.Resume,
+		RunID:          c.RunID,
+		PipelineID:     runtimeID,
+		SecretsManager: secretsManager,
 	}
 
 	// If resuming but no RunID provided, use the runtime ID for consistency
@@ -167,6 +196,15 @@ func (c *Runner) Run(logger *slog.Logger) error {
 	}
 
 	return nil
+}
+
+func parseSecretFlag(s string) (string, string, bool) {
+	key, value, found := strings.Cut(s, "=")
+	if !found || key == "" {
+		return "", "", false
+	}
+
+	return key, value, true
 }
 
 var (

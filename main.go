@@ -15,6 +15,7 @@ import (
 	_ "github.com/jtarchie/ci/orchestra/qemu"
 	_ "github.com/jtarchie/ci/resources/git"
 	_ "github.com/jtarchie/ci/resources/mock"
+	_ "github.com/jtarchie/ci/secrets/local"
 	_ "github.com/jtarchie/ci/storage/sqlite"
 	"github.com/lmittmann/tint"
 )

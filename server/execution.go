@@ -7,18 +7,20 @@ import (
 	"sync/atomic"
 
 	"github.com/jtarchie/ci/runtime"
+	"github.com/jtarchie/ci/secrets"
 	"github.com/jtarchie/ci/storage"
 )
 
 // ExecutionService manages pipeline execution with concurrency limits.
 type ExecutionService struct {
-	store         storage.Driver
-	logger        *slog.Logger
-	maxInFlight   int
-	inFlight      atomic.Int32
-	mu            sync.Mutex
-	wg            sync.WaitGroup
-	DefaultDriver string
+	store          storage.Driver
+	logger         *slog.Logger
+	maxInFlight    int
+	inFlight       atomic.Int32
+	mu             sync.Mutex
+	wg             sync.WaitGroup
+	DefaultDriver  string
+	SecretsManager secrets.Manager
 }
 
 // NewExecutionService creates a new execution service.
@@ -152,8 +154,9 @@ func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *stor
 
 	// Execute the pipeline
 	opts := runtime.ExecutorOptions{
-		RunID:      run.ID,
-		PipelineID: pipeline.ID,
+		RunID:          run.ID,
+		PipelineID:     pipeline.ID,
+		SecretsManager: s.SecretsManager,
 	}
 
 	if webhook != nil {
