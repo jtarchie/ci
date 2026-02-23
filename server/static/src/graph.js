@@ -332,9 +332,8 @@ export function initGraph(graphData, _currentPath) {
         const afterJobs = node.fullPath.substring(jobsIndex + 6); // skip "/jobs/"
         // Job name is the first segment after /jobs/
         const slashIndex = afterJobs.indexOf("/");
-        const jobName = slashIndex === -1
-          ? afterJobs
-          : afterJobs.substring(0, slashIndex);
+        const jobName =
+          slashIndex === -1 ? afterJobs : afterJobs.substring(0, slashIndex);
         // Only register if this is the actual job node (not a child like tasks/compile)
         if (slashIndex === -1) {
           const key = `${pipelinePrefix}/${jobName}`;
@@ -535,10 +534,12 @@ export function initGraph(graphData, _currentPath) {
     scale = Math.max(scale, 0.1); // Min scale of 0.1
 
     // Center the graph
-    translateX = (containerRect.width - graphWidth * scale) / 2 -
+    translateX =
+      (containerRect.width - graphWidth * scale) / 2 -
       minX * scale +
       PADDING * scale;
-    translateY = (containerRect.height - graphHeight * scale) / 2 -
+    translateY =
+      (containerRect.height - graphHeight * scale) / 2 -
       minY * scale +
       PADDING * scale;
 
@@ -557,8 +558,8 @@ export function initGraph(graphData, _currentPath) {
   // Tooltip functions
   function showTooltip(event, node) {
     tooltipName.textContent = node.name;
-    tooltipStatus.textContent = node.status.charAt(0).toUpperCase() +
-      node.status.slice(1);
+    tooltipStatus.textContent =
+      node.status.charAt(0).toUpperCase() + node.status.slice(1);
     tooltipType.textContent = node.isGroup ? "Group" : "Task";
 
     // Show duration if available
@@ -721,7 +722,7 @@ export function initGraph(graphData, _currentPath) {
     // If there's a match, pan to the first one
     if (hasMatch) {
       const matchIndex = allNodes.findIndex((n) =>
-        n.name.toLowerCase().includes(lowerQuery)
+        n.name.toLowerCase().includes(lowerQuery),
       );
       if (matchIndex >= 0) {
         const node = allNodes[matchIndex];
@@ -1014,8 +1015,7 @@ export function initGraph(graphData, _currentPath) {
   announcer.setAttribute("role", "status");
   announcer.setAttribute("aria-live", "polite");
   announcer.classList.add("sr-only");
-  announcer.textContent =
-    `Pipeline graph loaded with ${nodesLayer.children.length} nodes. Use Tab to navigate between nodes, arrow keys to pan, and plus/minus to zoom.`;
+  announcer.textContent = `Pipeline graph loaded with ${nodesLayer.children.length} nodes. Use Tab to navigate between nodes, arrow keys to pan, and plus/minus to zoom.`;
   document.body.appendChild(announcer);
 
   const STATUS_CLASSES = [
