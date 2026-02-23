@@ -11,19 +11,23 @@ import (
 	"time"
 
 	"github.com/jtarchie/ci/orchestra"
+	"github.com/jtarchie/ci/secrets"
 	"github.com/jtarchie/ci/storage"
 )
 
 type PipelineRunner struct {
-	client    orchestra.Driver
-	storage   storage.Driver
-	ctx       context.Context //nolint: containedctx
-	logger    *slog.Logger
-	volumes   []orchestra.Volume
-	namespace string
-	runID     string
-	mu        sync.Mutex // Protects callIndex
-	callIndex int        // Tracks how many times Run() has been called
+	client         orchestra.Driver
+	storage        storage.Driver
+	ctx            context.Context //nolint: containedctx
+	logger         *slog.Logger
+	volumes        []orchestra.Volume
+	namespace      string
+	runID          string
+	mu             sync.Mutex // Protects callIndex
+	callIndex      int        // Tracks how many times Run() has been called
+	secretsManager secrets.Manager
+	pipelineID     string
+	secretValues   []string // Cached secret values for redaction
 }
 
 func NewPipelineRunner(
@@ -43,6 +47,54 @@ func NewPipelineRunner(
 		namespace: namespace,
 		runID:     runID,
 	}
+}
+
+// SetSecretsManager configures the pipeline runner to load secrets
+// from the given manager for the specified pipeline.
+func (c *PipelineRunner) SetSecretsManager(mgr secrets.Manager, pipelineID string) {
+	c.secretsManager = mgr
+	c.pipelineID = pipelineID
+}
+
+// loadSecrets loads all secrets for this pipeline from the secrets manager
+// and returns them as a map of key->value. It checks pipeline scope first,
+// then falls back to global scope.
+func (c *PipelineRunner) loadSecrets(ctx context.Context, requestedKeys []string) (map[string]string, error) {
+	if c.secretsManager == nil || len(requestedKeys) == 0 {
+		return nil, nil
+	}
+
+	result := make(map[string]string, len(requestedKeys))
+	pipelineScope := secrets.PipelineScope(c.pipelineID)
+
+	for _, key := range requestedKeys {
+		// Try pipeline scope first
+		val, err := c.secretsManager.Get(ctx, pipelineScope, key)
+		if err == nil {
+			result[key] = val
+			continue
+		}
+
+		if !errors.Is(err, secrets.ErrNotFound) {
+			return nil, fmt.Errorf("could not retrieve secret %q from scope %q: %w", key, pipelineScope, err)
+		}
+
+		// Fall back to global scope
+		val, err = c.secretsManager.Get(ctx, secrets.GlobalScope, key)
+		if err == nil {
+			result[key] = val
+			continue
+		}
+
+		if !errors.Is(err, secrets.ErrNotFound) {
+			return nil, fmt.Errorf("could not retrieve secret %q from scope %q: %w", key, secrets.GlobalScope, err)
+		}
+
+		// Secret not found in any scope - fail fast
+		return nil, fmt.Errorf("secret %q not found in scopes %q or %q: %w", key, pipelineScope, secrets.GlobalScope, secrets.ErrNotFound)
+	}
+
+	return result, nil
 }
 
 type VolumeInput struct {
@@ -148,6 +200,48 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 	taskID := DeterministicTaskID(c.namespace, c.runID, stepID, input.Name)
 
 	logger = c.logger.With("task.id", taskID, "task.name", input.Name, "task.privileged", input.Privileged)
+
+	// Inject secrets into the task environment.
+	// Secrets are loaded on demand from env keys prefixed with "secret:" or
+	// from all stored secrets for this pipeline.
+	if c.secretsManager != nil && input.Env != nil {
+		// Find env vars that reference secrets (prefixed with "secret:")
+		var secretKeys []string
+
+		for key, val := range input.Env {
+			if strings.HasPrefix(val, "secret:") {
+				secretKeys = append(secretKeys, strings.TrimPrefix(val, "secret:"))
+
+				// Store the env key so we know to replace it after loading
+				_ = key
+			}
+		}
+
+		if len(secretKeys) > 0 {
+			secretMap, err := c.loadSecrets(ctx, secretKeys)
+			if err != nil {
+				c.setTaskStatus(c.taskStorageKey(stepID), map[string]any{
+					"status": "error",
+					"stderr": err.Error(),
+				})
+
+				return nil, fmt.Errorf("failed to load secrets for task %q: %w", input.Name, err)
+			}
+
+			// Replace "secret:KEY" references with actual secret values
+			for envKey, envVal := range input.Env {
+				if strings.HasPrefix(envVal, "secret:") {
+					secretKey := strings.TrimPrefix(envVal, "secret:")
+					if secretVal, ok := secretMap[secretKey]; ok {
+						input.Env[envKey] = secretVal
+
+						// Track for redaction
+						c.secretValues = append(c.secretValues, secretVal)
+					}
+				}
+			}
+		}
+	}
 
 	logger.Debug("container.run.start")
 
@@ -282,7 +376,16 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 		}
 	}
 
-	logger.Debug("container.logs", "stdout", stdout.String(), "stderr", stderr.String())
+	// Redact secret values from output before storing or returning
+	stdoutStr := stdout.String()
+	stderrStr := stderr.String()
+
+	if len(c.secretValues) > 0 {
+		stdoutStr = RedactSecrets(stdoutStr, c.secretValues)
+		stderrStr = RedactSecrets(stderrStr, c.secretValues)
+	}
+
+	logger.Debug("container.logs", "stdout", stdoutStr, "stderr", stderrStr)
 
 	status := "success"
 	if containerStatus.ExitCode() != 0 {
@@ -292,14 +395,14 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 	c.setTaskStatus(storageKey, map[string]any{
 		"status": status,
 		"code":   containerStatus.ExitCode(),
-		"stdout": stdout.String(),
-		"stderr": stderr.String(),
+		"stdout": stdoutStr,
+		"stderr": stderrStr,
 	})
 
 	return &RunResult{
 		Status: RunComplete,
-		Stdout: stdout.String(),
-		Stderr: stderr.String(),
+		Stdout: stdoutStr,
+		Stderr: stderrStr,
 		Code:   containerStatus.ExitCode(),
 	}, nil
 }

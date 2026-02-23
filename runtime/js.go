@@ -13,6 +13,7 @@ import (
 	"github.com/dop251/goja_nodejs/require"
 	"github.com/evanw/esbuild/pkg/api"
 	"github.com/jtarchie/ci/orchestra"
+	"github.com/jtarchie/ci/secrets"
 	"github.com/jtarchie/ci/storage"
 )
 
@@ -32,6 +33,9 @@ type ExecuteOptions struct {
 	WebhookData *WebhookData
 	// ResponseChan receives the HTTP response from the pipeline.
 	ResponseChan chan *HTTPResponse
+	// SecretsManager provides access to encrypted secrets for this pipeline.
+	// If nil, secret resolution is disabled.
+	SecretsManager secrets.Manager
 }
 
 type JS struct {
@@ -97,9 +101,19 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 		if err != nil {
 			return fmt.Errorf("could not create resumable runner: %w", err)
 		}
+
+		if opts.SecretsManager != nil {
+			resumableRunner.SetSecretsManager(opts.SecretsManager, opts.PipelineID)
+		}
+
 		runner = resumableRunner
 	} else {
-		runner = NewPipelineRunner(ctx, driver, storage, j.logger, opts.Namespace, opts.RunID)
+		pipelineRunner := NewPipelineRunner(ctx, driver, storage, j.logger, opts.Namespace, opts.RunID)
+		if opts.SecretsManager != nil {
+			pipelineRunner.SetSecretsManager(opts.SecretsManager, opts.PipelineID)
+		}
+
+		runner = pipelineRunner
 	}
 
 	finalSource, err := TranspileAndValidate(source)

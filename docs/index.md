@@ -5,6 +5,9 @@
 This is a development repository for CI/CD system. These notes can probably be
 inferred from the `git` commit messages. I'm journaling for my own benefit.
 
+- 2026-02-22:
+  - Added encrypted secrets management with AES-256-GCM and pluggable backends.
+    See [secrets.md](secrets.md) for details.
 - 2026-02-16:
   - Added QEMU driver for running pipelines inside local VMs. Uses QGA for
     command execution, 9p virtfs for volumes, and cloud-init for guest setup.
