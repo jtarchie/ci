@@ -77,3 +77,56 @@ func TestSecretsInvalidFlag(t *testing.T) {
 	assert.Expect(err).To(HaveOccurred())
 	assert.Expect(err.Error()).To(ContainSubstring("expected KEY=VALUE"))
 }
+
+func TestSecretsGlobal(t *testing.T) {
+	t.Parallel()
+
+	drivers := []string{"docker", "native"}
+
+	for _, driver := range drivers {
+		t.Run(driver, func(t *testing.T) {
+			t.Parallel()
+
+			assert := NewGomegaWithT(t)
+
+			// Uses secrets-global.ts which verifies "global-secret-value-99999" is redacted
+			examplePath, err := filepath.Abs("both/secrets-global.ts")
+			assert.Expect(err).NotTo(HaveOccurred())
+
+			// Set API_KEY as a global secret (not pipeline-scoped)
+			// The pipeline should still find it via global fallback
+			// and the value should be redacted from output
+			runner := commands.Runner{
+				Pipeline:     examplePath,
+				Driver:       driver,
+				Storage:      "sqlite://:memory:",
+				Secrets:      "local://:memory:?key=test-passphrase",
+				GlobalSecret: []string{"API_KEY=global-secret-value-99999"},
+			}
+			err = runner.Run(nil)
+			assert.Expect(err).NotTo(HaveOccurred())
+		})
+	}
+}
+
+func TestSecretsGlobalOverriddenByPipeline(t *testing.T) {
+	t.Parallel()
+
+	assert := NewGomegaWithT(t)
+
+	examplePath, err := filepath.Abs("both/secrets-basic.ts")
+	assert.Expect(err).NotTo(HaveOccurred())
+
+	// Set API_KEY at both global and pipeline scope
+	// Pipeline scope should win
+	runner := commands.Runner{
+		Pipeline:     examplePath,
+		Driver:       "native",
+		Storage:      "sqlite://:memory:",
+		Secrets:      "local://:memory:?key=test-passphrase",
+		Secret:       []string{"API_KEY=pipeline-secret"},
+		GlobalSecret: []string{"API_KEY=global-secret"},
+	}
+	err = runner.Run(nil)
+	assert.Expect(err).NotTo(HaveOccurred())
+}

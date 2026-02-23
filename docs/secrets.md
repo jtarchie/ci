@@ -19,13 +19,13 @@ storage.
 
 ## Setting Secrets
 
-There are two ways to set secrets: via the CLI or via environment variables.
+Secrets can be set at two scopes: **pipeline** (only visible to one pipeline) or
+**global** (visible to all pipelines, used as a fallback).
 
-### 1. CLI Flags (`--secret`)
+### Pipeline-Scoped Secrets (`ci run --secret`)
 
-Pass secrets directly on the command line using `--secret KEY=VALUE` (or
-`-e KEY=VALUE`). This flag can be repeated for multiple secrets. The `--secrets`
-flag configures the backend DSN (the backend name is inferred from the scheme).
+Pass secrets on the `ci run` command line using `--secret KEY=VALUE` (or
+`-e KEY=VALUE`). These are scoped to the pipeline being run.
 
 ```bash
 ci run pipeline.ts \
@@ -34,10 +34,32 @@ ci run pipeline.ts \
   --secret DB_PASSWORD=hunter2
 ```
 
-Each `--secret` flag stores the value (encrypted) into the backend before the
-pipeline executes. The secret is scoped to the pipeline being run.
+### Global Secrets
 
-### 2. Environment Variables
+Global secrets are shared across all pipelines. There are two ways to set them:
+
+**Via the server command** (`ci server --secret`):
+
+```bash
+ci server \
+  --secrets "local://secrets.db?key=my-passphrase" \
+  --secret SHARED_TOKEN=tok-global-abc \
+  --secret REGISTRY_PASSWORD=ghp-xyz
+```
+
+**Via the runner** (`ci run --global-secret`):
+
+```bash
+ci run pipeline.ts \
+  --secrets "local://secrets.db?key=my-passphrase" \
+  --global-secret SHARED_TOKEN=tok-global-abc \
+  --secret PIPELINE_KEY=per-pipeline-only
+```
+
+At runtime, the system checks pipeline scope first, then falls back to global.
+This means a pipeline can override a global secret with its own value.
+
+### Environment Variables
 
 The secrets DSN can also be configured via an environment variable, which is
 useful for server mode or CI environments where you don't want to pass flags on
@@ -53,12 +75,10 @@ export CI_SECRETS="local://secrets.db?key=my-passphrase"
 ci run pipeline.ts --secret API_KEY=sk-1234567890
 ```
 
-This also works with the server command:
-
 ```bash
 export CI_SECRETS="local:///var/lib/ci/secrets.db?key=my-passphrase"
 
-ci server --port 8080
+ci server --secret SHARED_TOKEN=tok-global-abc
 ```
 
 ## Backend Configuration
@@ -134,10 +154,13 @@ env: {
 
 Secrets are scoped to limit access:
 
-- **Pipeline scope** (`pipeline/<id>`): Secrets set via `--secret` are scoped to
-  the pipeline being run. Each pipeline only sees its own secrets.
-- **Global scope** (`global`): Shared secrets accessible by all pipelines. The
-  system checks pipeline scope first, then falls back to global scope.
+- **Pipeline scope** (`pipeline/<id>`): Set via `ci run --secret`. Each pipeline
+  only sees its own pipeline-scoped secrets.
+- **Global scope** (`global`): Set via `ci server --secret` or
+  `ci run --global-secret`. Shared across all pipelines.
+
+The system checks pipeline scope first, then falls back to global. A
+pipeline-scoped secret with the same key overrides its global counterpart.
 
 ## Output Redaction
 
@@ -151,12 +174,17 @@ of another, the longer value is redacted first to avoid partial matches.
 ## Full Example
 
 ```bash
-# Set secrets and run a pipeline
+# Set global secrets on the server
+ci server \
+  --secrets "local://my-secrets.db?key=change-me-in-production" \
+  --secret REGISTRY_TOKEN=ghp-abc123
+
+# Set pipeline-scoped secrets and run
 ci run examples/both/secrets-basic.ts \
   --driver docker \
   --secrets "local://my-secrets.db?key=change-me-in-production" \
   --secret API_KEY=sk-live-abc123 \
-  --secret WEBHOOK_TOKEN=whsec-xyz789
+  --global-secret WEBHOOK_TOKEN=whsec-xyz789
 ```
 
 ## Architecture
