@@ -24,14 +24,15 @@ import (
 )
 
 type Runner struct {
-	Storage  string        `default:"sqlite://test.db"                                    env:"CI_STORAGE"              help:"Path to storage file"                                                                                                                                      required:""`
-	Pipeline string        `arg:""                                                        help:"Path to pipeline javascript file"                                                                                                                          type:"existingfile"`
-	Driver   string        `default:"native"                                              env:"CI_DRIVER"               help:"Orchestrator driver DSN (e.g., 'k8s:namespace=my-ns', 'k8s://my-ns', 'docker', 'native')"`
-	Timeout  time.Duration `env:"CI_TIMEOUT"                                              help:"timeout for the pipeline, will cause abort if exceeded"`
-	Resume   bool          `help:"Resume from last checkpoint if pipeline was interrupted"`
-	RunID    string        `help:"Unique run ID for resume support (auto-generated if not provided)"`
-	Secrets  string        `default:"" env:"CI_SECRETS" help:"Secrets backend DSN (e.g., 'local://secrets.db?key=my-passphrase')"`
-	Secret   []string      `help:"Set a secret as KEY=VALUE (can be repeated)" short:"e"`
+	Storage      string        `default:"sqlite://test.db"                                    env:"CI_STORAGE"              help:"Path to storage file"                                                                                                                                      required:""`
+	Pipeline     string        `arg:""                                                        help:"Path to pipeline javascript file"                                                                                                                          type:"existingfile"`
+	Driver       string        `default:"native"                                              env:"CI_DRIVER"               help:"Orchestrator driver DSN (e.g., 'k8s:namespace=my-ns', 'k8s://my-ns', 'docker', 'native')"`
+	Timeout      time.Duration `env:"CI_TIMEOUT"                                              help:"timeout for the pipeline, will cause abort if exceeded"`
+	Resume       bool          `help:"Resume from last checkpoint if pipeline was interrupted"`
+	RunID        string        `help:"Unique run ID for resume support (auto-generated if not provided)"`
+	Secrets      string        `default:"" env:"CI_SECRETS" help:"Secrets backend DSN (e.g., 'local://secrets.db?key=my-passphrase')"`
+	Secret       []string      `help:"Set a pipeline-scoped secret as KEY=VALUE (can be repeated)" short:"e"`
+	GlobalSecret []string      `help:"Set a global secret as KEY=VALUE (can be repeated)"`
 }
 
 func youtubeIDStyle(input string) string {
@@ -157,7 +158,7 @@ func (c *Runner) Run(logger *slog.Logger) error {
 		}
 		defer func() { _ = secretsManager.Close() }()
 
-		// Store any secrets provided via --secret flags
+		// Store any secrets provided via --secret flags (pipeline scope)
 		for _, s := range c.Secret {
 			key, value, found := parseSecretFlag(s)
 			if !found {
@@ -167,6 +168,19 @@ func (c *Runner) Run(logger *slog.Logger) error {
 			err = secretsManager.Set(ctx, secrets.PipelineScope(runtimeID), key, value)
 			if err != nil {
 				return fmt.Errorf("could not set secret %q: %w", key, err)
+			}
+		}
+
+		// Store any secrets provided via --global-secret flags (global scope)
+		for _, s := range c.GlobalSecret {
+			key, value, found := parseSecretFlag(s)
+			if !found {
+				return fmt.Errorf("invalid --global-secret flag %q: expected KEY=VALUE format", s)
+			}
+
+			err = secretsManager.Set(ctx, secrets.GlobalScope, key, value)
+			if err != nil {
+				return fmt.Errorf("could not set global secret %q: %w", key, err)
 			}
 		}
 	}

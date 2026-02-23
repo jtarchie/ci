@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,6 +25,7 @@ type Server struct {
 	BasicAuth      string        `env:"CI_BASIC_AUTH"         help:"Basic auth credentials in format 'username:password' (optional)"`
 	AllowedDrivers string        `default:"*"                env:"CI_ALLOWED_DRIVERS"       help:"Comma-separated list of allowed driver names (e.g., 'docker,native,k8s'), or '*' for all"`
 	Secrets        string        `default:""                 env:"CI_SECRETS"              help:"Secrets backend DSN (e.g., 'local://secrets.db?key=my-passphrase')"`
+	Secret         []string      `help:"Set a global secret as KEY=VALUE (can be repeated)" short:"e"`
 }
 
 func (c *Server) Run(logger *slog.Logger) error {
@@ -47,6 +49,19 @@ func (c *Server) Run(logger *slog.Logger) error {
 			return fmt.Errorf("could not create secrets manager: %w", err)
 		}
 		defer func() { _ = secretsManager.Close() }()
+
+		// Store any secrets provided via --secret flags (global scope)
+		for _, s := range c.Secret {
+			key, value, found := strings.Cut(s, "=")
+			if !found || key == "" {
+				return fmt.Errorf("invalid --secret flag %q: expected KEY=VALUE format", s)
+			}
+
+			err = secretsManager.Set(context.Background(), secrets.GlobalScope, key, value)
+			if err != nil {
+				return fmt.Errorf("could not set global secret %q: %w", key, err)
+			}
+		}
 	}
 
 	// Parse basic auth credentials if provided
