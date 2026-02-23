@@ -36,6 +36,8 @@ type ExecuteOptions struct {
 	// SecretsManager provides access to encrypted secrets for this pipeline.
 	// If nil, secret resolution is disabled.
 	SecretsManager secrets.Manager
+	// DisableNotifications prevents the notify system from sending messages.
+	DisableNotifications bool
 }
 
 type JS struct {
@@ -166,8 +168,9 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 		return fmt.Errorf("could not set runtime: %w", err)
 	}
 
-	// Set up notification runtime
+	// Set up notification runtime (disabled when feature is gated)
 	notifier := NewNotifier(j.logger)
+	notifier.disabled = opts.DisableNotifications
 	notifyRuntime := NewNotifyRuntime(ctx, jsVM, notifier, runtime.promises, runtime.tasks)
 
 	err = jsVM.Set("notify", notifyRuntime)

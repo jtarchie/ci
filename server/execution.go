@@ -13,14 +13,15 @@ import (
 
 // ExecutionService manages pipeline execution with concurrency limits.
 type ExecutionService struct {
-	store          storage.Driver
-	logger         *slog.Logger
-	maxInFlight    int
-	inFlight       atomic.Int32
-	mu             sync.Mutex
-	wg             sync.WaitGroup
-	DefaultDriver  string
-	SecretsManager secrets.Manager
+	store           storage.Driver
+	logger          *slog.Logger
+	maxInFlight     int
+	inFlight        atomic.Int32
+	mu              sync.Mutex
+	wg              sync.WaitGroup
+	DefaultDriver   string
+	SecretsManager  secrets.Manager
+	AllowedFeatures []Feature
 }
 
 // NewExecutionService creates a new execution service.
@@ -154,15 +155,23 @@ func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *stor
 
 	// Execute the pipeline
 	opts := runtime.ExecutorOptions{
-		RunID:          run.ID,
-		PipelineID:     pipeline.ID,
-		SecretsManager: s.SecretsManager,
+		RunID:      run.ID,
+		PipelineID: pipeline.ID,
 	}
 
-	if webhook != nil {
+	// Only pass secrets manager if the secrets feature is enabled
+	if IsFeatureEnabled(FeatureSecrets, s.AllowedFeatures) {
+		opts.SecretsManager = s.SecretsManager
+	}
+
+	// Only pass webhook data if the webhooks feature is enabled
+	if webhook != nil && IsFeatureEnabled(FeatureWebhooks, s.AllowedFeatures) {
 		opts.WebhookData = webhook.webhookData
 		opts.ResponseChan = webhook.responseChan
 	}
+
+	// Disable notifications if the feature is not enabled
+	opts.DisableNotifications = !IsFeatureEnabled(FeatureNotifications, s.AllowedFeatures)
 
 	err = runtime.ExecutePipeline(ctx, pipeline.Content, driverDSN, s.store, logger, opts)
 	if err != nil {

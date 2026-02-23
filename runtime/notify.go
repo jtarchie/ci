@@ -10,7 +10,7 @@ import (
 	"text/template"
 
 	"github.com/dop251/goja"
-	"github.com/go-task/slim-sprig/v3"
+	sprig "github.com/go-task/slim-sprig/v3"
 	"github.com/nikoksr/notify"
 	nhttp "github.com/nikoksr/notify/service/http"
 	"github.com/nikoksr/notify/service/msteams"
@@ -57,10 +57,11 @@ type NotifyResult struct {
 
 // Notifier handles notification sending with configuration management.
 type Notifier struct {
-	configs map[string]NotifyConfig
-	context NotifyContext
-	logger  *slog.Logger
-	mu      sync.RWMutex
+	configs  map[string]NotifyConfig
+	context  NotifyContext
+	logger   *slog.Logger
+	mu       sync.RWMutex
+	disabled bool
 }
 
 // NewNotifier creates a new Notifier instance.
@@ -127,6 +128,10 @@ func (n *Notifier) RenderTemplate(templateStr string) (string, error) {
 
 // Send sends a notification using the named configuration.
 func (n *Notifier) Send(ctx context.Context, name string, message string) error {
+	if n.disabled {
+		return fmt.Errorf("notifications feature is not enabled")
+	}
+
 	n.mu.RLock()
 	config, exists := n.configs[name]
 	n.mu.RUnlock()
