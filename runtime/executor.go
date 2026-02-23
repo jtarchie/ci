@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/jtarchie/ci/orchestra"
 	"github.com/jtarchie/ci/orchestra/cache"
@@ -34,6 +35,12 @@ type ExecutorOptions struct {
 	SecretsManager secrets.Manager
 	// DisableNotifications prevents the notify system from sending messages.
 	DisableNotifications bool
+	// DisableFetch prevents the fetch() function from making outbound HTTP requests.
+	DisableFetch bool
+	// FetchTimeout is the default timeout for fetch() calls.
+	FetchTimeout time.Duration
+	// FetchMaxResponseBytes is the maximum response body size for fetch() calls.
+	FetchMaxResponseBytes int64
 }
 
 // ExecutePipeline executes a pipeline with the given content and driver DSN.
@@ -90,14 +97,17 @@ func ExecutePipeline(
 	js := NewJS(logger)
 
 	executeOpts := ExecuteOptions{
-		Resume:               opts.Resume,
-		RunID:                opts.RunID,
-		PipelineID:           opts.PipelineID,
-		Namespace:            namespace,
-		WebhookData:          opts.WebhookData,
-		ResponseChan:         opts.ResponseChan,
-		SecretsManager:       opts.SecretsManager,
-		DisableNotifications: opts.DisableNotifications,
+		Resume:                opts.Resume,
+		RunID:                 opts.RunID,
+		PipelineID:            opts.PipelineID,
+		Namespace:             namespace,
+		WebhookData:           opts.WebhookData,
+		ResponseChan:          opts.ResponseChan,
+		SecretsManager:        opts.SecretsManager,
+		DisableNotifications:  opts.DisableNotifications,
+		DisableFetch:          opts.DisableFetch,
+		FetchTimeout:          opts.FetchTimeout,
+		FetchMaxResponseBytes: opts.FetchMaxResponseBytes,
 	}
 
 	err = js.ExecuteWithOptions(ctx, content, driver, store, executeOpts)

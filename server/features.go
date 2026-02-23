@@ -12,6 +12,7 @@ const (
 	FeatureWebhooks      Feature = "webhooks"
 	FeatureSecrets       Feature = "secrets"
 	FeatureNotifications Feature = "notifications"
+	FeatureFetch         Feature = "fetch"
 )
 
 // AllFeatures is the canonical list of known features.
@@ -19,6 +20,7 @@ var AllFeatures = []Feature{
 	FeatureWebhooks,
 	FeatureSecrets,
 	FeatureNotifications,
+	FeatureFetch,
 }
 
 // ParseAllowedFeatures parses a comma-separated allowlist of feature names.

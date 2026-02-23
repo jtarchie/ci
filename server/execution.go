@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/jtarchie/ci/runtime"
 	"github.com/jtarchie/ci/secrets"
@@ -13,15 +14,17 @@ import (
 
 // ExecutionService manages pipeline execution with concurrency limits.
 type ExecutionService struct {
-	store           storage.Driver
-	logger          *slog.Logger
-	maxInFlight     int
-	inFlight        atomic.Int32
-	mu              sync.Mutex
-	wg              sync.WaitGroup
-	DefaultDriver   string
-	SecretsManager  secrets.Manager
-	AllowedFeatures []Feature
+	store                 storage.Driver
+	logger                *slog.Logger
+	maxInFlight           int
+	inFlight              atomic.Int32
+	mu                    sync.Mutex
+	wg                    sync.WaitGroup
+	DefaultDriver         string
+	SecretsManager        secrets.Manager
+	AllowedFeatures       []Feature
+	FetchTimeout          time.Duration
+	FetchMaxResponseBytes int64
 }
 
 // NewExecutionService creates a new execution service.
@@ -172,6 +175,11 @@ func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *stor
 
 	// Disable notifications if the feature is not enabled
 	opts.DisableNotifications = !IsFeatureEnabled(FeatureNotifications, s.AllowedFeatures)
+
+	// Disable fetch if the feature is not enabled
+	opts.DisableFetch = !IsFeatureEnabled(FeatureFetch, s.AllowedFeatures)
+	opts.FetchTimeout = s.FetchTimeout
+	opts.FetchMaxResponseBytes = s.FetchMaxResponseBytes
 
 	err = runtime.ExecutePipeline(ctx, pipeline.Content, driverDSN, s.store, logger, opts)
 	if err != nil {

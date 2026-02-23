@@ -10,6 +10,7 @@ capabilities are available. By default, all features are enabled.
 | `webhooks`      | Webhook trigger routes, `http.request()`/`http.respond()` API |
 | `secrets`       | `secret:` env var resolution and secret injection             |
 | `notifications` | The `notify` system (Slack, Teams, HTTP)                      |
+| `fetch`         | The global `fetch()` function for outbound HTTP requests      |
 
 ## Configuration
 
@@ -52,13 +53,19 @@ ci server --allowed-features "*"
 - Calling `notify.send()` in a pipeline returns an error:
   `"notifications feature is not enabled"`
 
+### Fetch disabled
+
+- Calling `fetch()` in a pipeline returns an error:
+  `"fetch feature is not enabled"`
+- Outbound HTTP requests from pipelines are blocked
+
 ## Discovery
 
 Query the enabled features at runtime:
 
 ```bash
 curl http://localhost:8080/api/features
-# {"features":["webhooks","secrets","notifications"]}
+# {"features":["webhooks","secrets","notifications","fetch"]}
 ```
 
 ## Error on unknown features
@@ -66,5 +73,5 @@ curl http://localhost:8080/api/features
 If you specify an unknown feature name, the server will refuse to start:
 
 ```
-could not parse allowed features: unknown feature "bogus"; known features: webhooks, secrets, notifications
+could not parse allowed features: unknown feature "bogus"; known features: webhooks, secrets, notifications, fetch
 ```

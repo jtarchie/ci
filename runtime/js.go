@@ -38,6 +38,12 @@ type ExecuteOptions struct {
 	SecretsManager secrets.Manager
 	// DisableNotifications prevents the notify system from sending messages.
 	DisableNotifications bool
+	// DisableFetch prevents the fetch() function from making outbound HTTP requests.
+	DisableFetch bool
+	// FetchTimeout is the default timeout for fetch() calls.
+	FetchTimeout time.Duration
+	// FetchMaxResponseBytes is the maximum response body size for fetch() calls.
+	FetchMaxResponseBytes int64
 }
 
 type JS struct {
@@ -194,6 +200,15 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 	err = jsVM.Set("storage", storageWrapper)
 	if err != nil {
 		return fmt.Errorf("could not set storage: %w", err)
+	}
+
+	// Set up fetch runtime for outbound HTTP requests
+	fetchRuntime := NewFetchRuntime(ctx, jsVM, runtime.promises, runtime.tasks, opts.FetchTimeout, opts.FetchMaxResponseBytes)
+	fetchRuntime.disabled = opts.DisableFetch
+
+	err = jsVM.Set("fetch", fetchRuntime.Fetch)
+	if err != nil {
+		return fmt.Errorf("could not set fetch: %w", err)
 	}
 
 	// Set up HTTP runtime for webhook support
