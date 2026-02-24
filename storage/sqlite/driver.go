@@ -263,12 +263,30 @@ func (s *Sqlite) GetPipeline(ctx context.Context, id string) (*storage.Pipeline,
 	return &pipeline, nil
 }
 
-// ListPipelines returns all pipelines in the database.
-func (s *Sqlite) ListPipelines(ctx context.Context) ([]storage.Pipeline, error) {
+// ListPipelines returns a paginated list of pipelines in the database.
+func (s *Sqlite) ListPipelines(ctx context.Context, page, perPage int) (*storage.PaginationResult[storage.Pipeline], error) {
+	if page < 1 {
+		page = 1
+	}
+	if perPage < 1 {
+		perPage = 20
+	}
+
+	offset := (page - 1) * perPage
+
+	// Get total count
+	var totalItems int
+	err := s.writer.QueryRowContext(ctx, `SELECT COUNT(*) FROM pipelines`).Scan(&totalItems)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count pipelines: %w", err)
+	}
+
+	// Get paginated results
 	rows, err := s.writer.QueryContext(ctx, `
 		SELECT id, name, content, driver_dsn, webhook_secret, created_at, updated_at
 		FROM pipelines ORDER BY created_at DESC
-	`)
+		LIMIT ? OFFSET ?
+	`, perPage, offset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list pipelines: %w", err)
 	}
@@ -294,7 +312,17 @@ func (s *Sqlite) ListPipelines(ctx context.Context) ([]storage.Pipeline, error) 
 		return nil, fmt.Errorf("error iterating pipelines: %w", err)
 	}
 
-	return pipelines, nil
+	totalPages := (totalItems + perPage - 1) / perPage
+	hasNext := page < totalPages
+
+	return &storage.PaginationResult[storage.Pipeline]{
+		Items:      pipelines,
+		Page:       page,
+		PerPage:    perPage,
+		TotalItems: totalItems,
+		TotalPages: totalPages,
+		HasNext:    hasNext,
+	}, nil
 }
 
 // DeletePipeline removes a pipeline by its ID.
@@ -376,13 +404,31 @@ func (s *Sqlite) GetRun(ctx context.Context, runID string) (*storage.PipelineRun
 	return &run, nil
 }
 
-// ListRunsByPipeline returns all runs for a specific pipeline.
-func (s *Sqlite) ListRunsByPipeline(ctx context.Context, pipelineID string) ([]storage.PipelineRun, error) {
+// ListRunsByPipeline returns a paginated list of runs for a specific pipeline.
+func (s *Sqlite) ListRunsByPipeline(ctx context.Context, pipelineID string, page, perPage int) (*storage.PaginationResult[storage.PipelineRun], error) {
+	if page < 1 {
+		page = 1
+	}
+	if perPage < 1 {
+		perPage = 20
+	}
+
+	offset := (page - 1) * perPage
+
+	// Get total count for this pipeline
+	var totalItems int
+	err := s.writer.QueryRowContext(ctx, `SELECT COUNT(*) FROM pipeline_runs WHERE pipeline_id = ?`, pipelineID).Scan(&totalItems)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count runs: %w", err)
+	}
+
+	// Get paginated results
 	rows, err := s.writer.QueryContext(ctx, `
 		SELECT id, pipeline_id, status, started_at, completed_at, error_message, created_at
 		FROM pipeline_runs WHERE pipeline_id = ?
 		ORDER BY created_at DESC
-	`, pipelineID)
+		LIMIT ? OFFSET ?
+	`, pipelineID, perPage, offset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list runs: %w", err)
 	}
@@ -425,10 +471,19 @@ func (s *Sqlite) ListRunsByPipeline(ctx context.Context, pipelineID string) ([]s
 		return nil, fmt.Errorf("error iterating runs: %w", err)
 	}
 
-	return runs, nil
+	totalPages := (totalItems + perPage - 1) / perPage
+	hasNext := page < totalPages
+
+	return &storage.PaginationResult[storage.PipelineRun]{
+		Items:      runs,
+		Page:       page,
+		PerPage:    perPage,
+		TotalItems: totalItems,
+		TotalPages: totalPages,
+		HasNext:    hasNext,
+	}, nil
 }
 
-// UpdateRunStatus updates the status of a pipeline run.
 func (s *Sqlite) UpdateRunStatus(ctx context.Context, runID string, status storage.RunStatus, errorMessage string) error {
 	now := time.Now().UTC()
 

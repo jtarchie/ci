@@ -162,17 +162,37 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 
 	// Pipeline web UI routes
 	web.GET("/pipelines/", func(ctx echo.Context) error {
-		pipelines, err := store.ListPipelines(ctx.Request().Context())
+		// Parse pagination parameters
+		page := 1
+		perPage := 20
+
+		if p := ctx.QueryParam("page"); p != "" {
+			_, _ = fmt.Sscanf(p, "%d", &page)
+		}
+		if pp := ctx.QueryParam("per_page"); pp != "" {
+			_, _ = fmt.Sscanf(pp, "%d", &perPage)
+		}
+
+		// Get paginated pipelines
+		result, err := store.ListPipelines(ctx.Request().Context(), page, perPage)
 		if err != nil {
 			return fmt.Errorf("could not list pipelines: %w", err)
 		}
 
-		if pipelines == nil {
-			pipelines = []storage.Pipeline{}
+		if result == nil || result.Items == nil {
+			result = &storage.PaginationResult[storage.Pipeline]{
+				Items:      []storage.Pipeline{},
+				Page:       page,
+				PerPage:    perPage,
+				TotalItems: 0,
+				TotalPages: 0,
+				HasNext:    false,
+			}
 		}
 
 		return ctx.Render(http.StatusOK, "pipelines.html", map[string]any{
-			"Pipelines": pipelines,
+			"Pipelines":  result.Items,
+			"Pagination": result,
 		})
 	})
 
@@ -187,18 +207,39 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 			return fmt.Errorf("could not get pipeline: %w", err)
 		}
 
-		runs, err := store.ListRunsByPipeline(ctx.Request().Context(), id)
+		// Parse pagination parameters
+		page := 1
+		perPage := 20
+
+		if p := ctx.QueryParam("page"); p != "" {
+			_, _ = fmt.Sscanf(p, "%d", &page)
+		}
+		if pp := ctx.QueryParam("per_page"); pp != "" {
+			_, _ = fmt.Sscanf(pp, "%d", &perPage)
+		}
+
+		// Get paginated runs
+		result, err := store.ListRunsByPipeline(ctx.Request().Context(), id, page, perPage)
 		if err != nil {
 			return fmt.Errorf("could not list runs: %w", err)
 		}
 
-		if runs == nil {
-			runs = []storage.PipelineRun{}
+		if result == nil || result.Items == nil {
+			result = &storage.PaginationResult[storage.PipelineRun]{
+				Items:      []storage.PipelineRun{},
+				Page:       page,
+				PerPage:    perPage,
+				TotalItems: 0,
+				TotalPages: 0,
+				HasNext:    false,
+			}
 		}
 
 		return ctx.Render(http.StatusOK, "pipeline_detail.html", map[string]any{
-			"Pipeline": pipeline,
-			"Runs":     runs,
+			"Pipeline":   pipeline,
+			"Runs":       result.Items,
+			"RunPage":    page,
+			"Pagination": result,
 		})
 	})
 
@@ -206,18 +247,38 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	runsSectionHandler := func(ctx echo.Context) error {
 		id := ctx.Param("id")
 
-		runs, err := store.ListRunsByPipeline(ctx.Request().Context(), id)
+		// Parse pagination parameters
+		page := 1
+		perPage := 20
+
+		if p := ctx.QueryParam("page"); p != "" {
+			_, _ = fmt.Sscanf(p, "%d", &page)
+		}
+		if pp := ctx.QueryParam("per_page"); pp != "" {
+			_, _ = fmt.Sscanf(pp, "%d", &perPage)
+		}
+
+		// Get paginated runs
+		result, err := store.ListRunsByPipeline(ctx.Request().Context(), id, page, perPage)
 		if err != nil {
 			return fmt.Errorf("could not list runs: %w", err)
 		}
 
-		if runs == nil {
-			runs = []storage.PipelineRun{}
+		if result == nil || result.Items == nil {
+			result = &storage.PaginationResult[storage.PipelineRun]{
+				Items:      []storage.PipelineRun{},
+				Page:       page,
+				PerPage:    perPage,
+				TotalItems: 0,
+				TotalPages: 0,
+				HasNext:    false,
+			}
 		}
 
 		return ctx.Render(http.StatusOK, "runs-section", map[string]any{
 			"PipelineID": id,
-			"Runs":       runs,
+			"Runs":       result.Items,
+			"Pagination": result,
 		})
 	}
 	web.GET("/pipelines/:id/runs-section", runsSectionHandler)
@@ -399,18 +460,37 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 
 	// GET /api/pipelines - List all pipelines
 	api.GET("/pipelines", func(ctx echo.Context) error {
-		pipelines, err := store.ListPipelines(ctx.Request().Context())
+		// Parse pagination parameters
+		page := 1
+		perPage := 20
+
+		if p := ctx.QueryParam("page"); p != "" {
+			_, _ = fmt.Sscanf(p, "%d", &page)
+		}
+		if pp := ctx.QueryParam("per_page"); pp != "" {
+			_, _ = fmt.Sscanf(pp, "%d", &perPage)
+		}
+
+		// Get paginated pipelines
+		result, err := store.ListPipelines(ctx.Request().Context(), page, perPage)
 		if err != nil {
 			return ctx.JSON(http.StatusInternalServerError, map[string]string{
 				"error": fmt.Sprintf("failed to list pipelines: %v", err),
 			})
 		}
 
-		if pipelines == nil {
-			pipelines = []storage.Pipeline{}
+		if result == nil {
+			result = &storage.PaginationResult[storage.Pipeline]{
+				Items:      []storage.Pipeline{},
+				Page:       page,
+				PerPage:    perPage,
+				TotalItems: 0,
+				TotalPages: 0,
+				HasNext:    false,
+			}
 		}
 
-		return ctx.JSON(http.StatusOK, pipelines)
+		return ctx.JSON(http.StatusOK, result)
 	})
 
 	// GET /api/pipelines/:id - Get a specific pipeline
@@ -496,13 +576,14 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 
 		// For htmx requests, return the updated runs section
 		if isHtmxRequest(ctx) {
-			runs, err := store.ListRunsByPipeline(ctx.Request().Context(), id)
+			result, err := store.ListRunsByPipeline(ctx.Request().Context(), id, 1, 1000)
 			if err != nil {
 				return fmt.Errorf("could not list runs: %w", err)
 			}
 
-			if runs == nil {
-				runs = []storage.PipelineRun{}
+			runs := []storage.PipelineRun{}
+			if result != nil && result.Items != nil {
+				runs = result.Items
 			}
 
 			return ctx.Render(http.StatusOK, "runs-section", map[string]any{

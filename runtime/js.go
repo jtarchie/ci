@@ -329,9 +329,9 @@ func (w *storageContextWrapper) GetPipeline(id string) (*storage.Pipeline, error
 	return w.driver.GetPipeline(w.ctx, id)
 }
 
-// ListPipelines wraps the storage ListPipelines method, injecting context automatically.
-func (w *storageContextWrapper) ListPipelines() ([]storage.Pipeline, error) {
-	return w.driver.ListPipelines(w.ctx)
+// ListPipelines wraps the storage ListPipelines method with default pagination, injecting context automatically.
+func (w *storageContextWrapper) ListPipelines() (*storage.PaginationResult[storage.Pipeline], error) {
+	return w.driver.ListPipelines(w.ctx, 1, 20)
 }
 
 // DeletePipeline wraps the storage DeletePipeline method, injecting context automatically.
