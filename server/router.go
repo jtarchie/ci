@@ -303,7 +303,7 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 		runID := ctx.Param("id")
 		lookupPath := "/pipeline/" + runID + "/"
 
-		results, err := store.GetAll(ctx.Request().Context(), lookupPath, []string{"status"})
+		results, err := store.GetAll(ctx.Request().Context(), lookupPath, []string{"status", "elapsed", "started_at"})
 		if err != nil {
 			return fmt.Errorf("could not get all results: %w", err)
 		}
@@ -317,6 +317,7 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 			"Path":     lookupPath,
 			"RunID":    runID,
 			"IsActive": isActive,
+			"Run":      run,
 		})
 	})
 
@@ -353,7 +354,7 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 		runID := ctx.Param("id")
 		lookupPath := "/pipeline/" + runID + "/"
 
-		results, err := store.GetAll(ctx.Request().Context(), lookupPath, []string{"status"})
+		results, err := store.GetAll(ctx.Request().Context(), lookupPath, []string{"status", "elapsed", "started_at"})
 		if err != nil {
 			return fmt.Errorf("could not get all results: %w", err)
 		}
@@ -367,6 +368,7 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 			"Path":     lookupPath,
 			"RunID":    runID,
 			"IsActive": isActive,
+			"Run":      run,
 		})
 	}
 	web.GET("/runs/:id/tasks-partial", tasksPartialHandler)

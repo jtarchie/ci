@@ -38,6 +38,17 @@
       class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
       <div class="flex items-center gap-3">
         <h1 class="text-3xl font-bold dark:text-white">Pipeline Visualizer</h1>
+        {{ if and .Run .Run.StartedAt }}
+        <span class="text-sm text-gray-500 dark:text-gray-400 font-mono">
+          {{ if .Run.CompletedAt }}
+          {{ durationBetween .Run.StartedAt .Run.CompletedAt }}
+          {{ else }}
+          <span
+            data-elapsed-start="{{ .Run.StartedAt.UTC.Format "2006-01-02T15:04:05Z07:00"
+            }}">—</span>
+          {{ end }}
+        </span>
+        {{ end }}
         {{ if .IsActive }}
         <span
           class="flex items-center gap-2 text-sm text-yellow-600 dark:text-yellow-400">
