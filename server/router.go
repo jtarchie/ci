@@ -238,7 +238,6 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 		return ctx.Render(http.StatusOK, "pipeline_detail.html", map[string]any{
 			"Pipeline":   pipeline,
 			"Runs":       result.Items,
-			"RunPage":    page,
 			"Pagination": result,
 		})
 	})
@@ -576,19 +575,19 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 
 		// For htmx requests, return the updated runs section
 		if isHtmxRequest(ctx) {
-			result, err := store.ListRunsByPipeline(ctx.Request().Context(), id, 1, 1000)
+			result, err := store.ListRunsByPipeline(ctx.Request().Context(), id, 1, 20)
 			if err != nil {
 				return fmt.Errorf("could not list runs: %w", err)
 			}
 
-			runs := []storage.PipelineRun{}
-			if result != nil && result.Items != nil {
-				runs = result.Items
+			if result == nil || result.Items == nil {
+				result = &storage.PaginationResult[storage.PipelineRun]{Items: []storage.PipelineRun{}}
 			}
 
 			return ctx.Render(http.StatusOK, "runs-section", map[string]any{
 				"PipelineID": id,
-				"Runs":       runs,
+				"Runs":       result.Items,
+				"Pagination": result,
 			})
 		}
 

@@ -86,7 +86,8 @@
     </div>
 
     <!-- Runs Section -->
-    {{ template "runs-section" dict "PipelineID" .Pipeline.ID "Runs" .Runs }}
+    {{ template "runs-section" dict "PipelineID" .Pipeline.ID "Runs" .Runs
+    "Pagination" .Pagination }}
 
     {{ if .Pipeline.Content }}
     <!-- Pipeline Content -->

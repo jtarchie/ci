@@ -60,78 +60,35 @@
             </thead>
             <tbody class="divide-y divide-gray-200 dark:divide-gray-600"
               id="pipelines-table">
-              {{ range .Pipelines }}
-              <tr
-                class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                data-pipeline-id="{{ .ID }}">
-                <td class="px-6 py-4">
-                  <a href="/pipelines/{{ .ID }}/"
-                    class="text-blue-600 dark:text-blue-400 hover:underline font-medium">
-                    {{ .Name }}
-                  </a>
-                </td>
-                <td class="px-6 py-4 text-gray-600 dark:text-gray-300">
-                  {{ if .DriverDSN }}
-                  <code
-                    class="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-sm">{{
-                    .DriverDSN }}</code>
-                  {{ else }}
-                  <span
-                    class="text-gray-400 dark:text-gray-500 italic">default</span>
-                  {{ end }}
-                </td>
-                <td class="px-6 py-4 text-gray-600 dark:text-gray-300 text-sm">
-                  {{ .CreatedAt.Format "Jan 02, 2006 15:04" }}
-                </td>
-                <td class="px-6 py-4 text-right">
-                  <button
-                    class="trigger-btn px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                    hx-post="/api/pipelines/{{ .ID }}/trigger"
-                    hx-swap="none"
-                    data-pipeline-name="{{ .Name }}"
-                    title="Trigger pipeline execution">
-                    <span class="btn-text">Trigger</span>
-                    <span class="htmx-indicator">
-                      <svg class="animate-spin h-4 w-4 inline"
-                        xmlns="http://www.w3.org/2000/svg" fill="none"
-                        viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10"
-                          stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                    </span>
-                  </button>
-                </td>
-              </tr>
-              {{ end }}
+              {{ template "_pipeline_rows" . }}
             </tbody>
           </table>
         </div>
-      </div>
-
-      {{ if .Pagination.HasNext }}
-      <div class="mt-6 flex justify-center">
-        <button
-          class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
-          hx-get="/pipelines/?page={{ add .Pagination.Page 1 }}&per_page={{ .Pagination.PerPage }}"
-          hx-target="#pipelines-list"
-          hx-swap="morph:innerHTML"
-          hx-indicator=".htmx-request .spinner">
-          Load More Pipelines
-          <span class="spinner htmx-indicator ml-2 inline-block">
-            <svg class="animate-spin h-4 w-4 inline"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10"
-                stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
+        {{ if gt .Pagination.TotalPages 1 }}
+        <div
+          class="flex items-center justify-between px-6 py-3 border-t border-gray-200 dark:border-gray-700">
+          <span class="text-sm text-gray-600 dark:text-gray-400">
+            Page {{ .Pagination.Page }} of {{ .Pagination.TotalPages }}
           </span>
-        </button>
+          <div class="flex gap-2">
+            {{ if gt .Pagination.Page 1 }}
+            <a
+              href="/pipelines/?page={{ sub .Pagination.Page 1 }}&per_page={{ .Pagination.PerPage }}"
+              class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded text-sm transition-colors">
+              ← Previous
+            </a>
+            {{ end }}
+            {{ if .Pagination.HasNext }}
+            <a
+              href="/pipelines/?page={{ add .Pagination.Page 1 }}&per_page={{ .Pagination.PerPage }}"
+              class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm transition-colors">
+              Next →
+            </a>
+            {{ end }}
+          </div>
+        </div>
+        {{ end }}
       </div>
-      {{ end }}
     </div>
     {{ end }}
   </div>
