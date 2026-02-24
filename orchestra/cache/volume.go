@@ -52,6 +52,18 @@ func (v *CachingVolume) RestoreFromCache(ctx context.Context) error {
 		"cache_key", v.cacheKey,
 	)
 
+	// Check if cache exists before attempting to restore
+	exists, err := v.store.Exists(ctx, v.cacheKey)
+	if err != nil {
+		return fmt.Errorf("failed to check cache existence: %w", err)
+	}
+
+	if !exists {
+		v.logger.Debug("volume.cache.miss", "volume", v.inner.Name())
+
+		return nil // Cache miss, nothing to restore
+	}
+
 	// Get compressed data from cache store
 	reader, err := v.store.Restore(ctx, v.cacheKey)
 	if err != nil {
