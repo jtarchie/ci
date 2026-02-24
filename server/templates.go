@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+	"time"
 
 	sprig "github.com/go-task/slim-sprig/v3"
 	"github.com/labstack/echo/v4"
@@ -35,6 +36,26 @@ func newTemplates() (*TemplateRender, error) {
 	templates, err := template.New("templates").
 		Funcs(sprig.FuncMap()).
 		Funcs(template.FuncMap{
+			"durationBetween": func(start, end *time.Time) string {
+				if start == nil {
+					return "—"
+				}
+				e := time.Now()
+				if end != nil {
+					e = *end
+				}
+				d := e.Sub(*start).Round(time.Second)
+				h := int(d.Hours())
+				m := int(d.Minutes()) % 60
+				s := int(d.Seconds()) % 60
+				if h > 0 {
+					return fmt.Sprintf("%dh %dm %ds", h, m, s)
+				}
+				if m > 0 {
+					return fmt.Sprintf("%dm %ds", m, s)
+				}
+				return fmt.Sprintf("%ds", s)
+			},
 			"formatPath": func(path string) string {
 				path = strings.ReplaceAll(path, " ", "")
 				path = filepath.Clean(path)

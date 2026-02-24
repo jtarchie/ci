@@ -299,7 +299,11 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 		return nil, fmt.Errorf("could not run container: %w", err)
 	}
 
-	c.setTaskStatus(storageKey, map[string]any{"status": "running"})
+	taskStartedAt := time.Now()
+	c.setTaskStatus(storageKey, map[string]any{
+		"status":     "running",
+		"started_at": taskStartedAt.UTC().Format(time.RFC3339),
+	})
 
 	var containerStatus orchestra.ContainerStatus
 
@@ -327,12 +331,20 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 			cancelStream()
 
 			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
-				c.setTaskStatus(storageKey, map[string]any{"status": "abort"})
+				c.setTaskStatus(storageKey, map[string]any{
+					"status":     "abort",
+					"started_at": taskStartedAt.UTC().Format(time.RFC3339),
+					"elapsed":    formatElapsed(time.Since(taskStartedAt)),
+				})
 
 				return &RunResult{Status: RunAbort}, nil
 			}
 
-			c.setTaskStatus(storageKey, map[string]any{"status": "error"})
+			c.setTaskStatus(storageKey, map[string]any{
+				"status":     "error",
+				"started_at": taskStartedAt.UTC().Format(time.RFC3339),
+				"elapsed":    formatElapsed(time.Since(taskStartedAt)),
+			})
 
 			return nil, fmt.Errorf("could not get container status: %w", err)
 		}
@@ -365,12 +377,20 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 			logger.Error("container.logs.error", "err", err)
 
 			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
-				c.setTaskStatus(storageKey, map[string]any{"status": "abort"})
+				c.setTaskStatus(storageKey, map[string]any{
+					"status":     "abort",
+					"started_at": taskStartedAt.UTC().Format(time.RFC3339),
+					"elapsed":    formatElapsed(time.Since(taskStartedAt)),
+				})
 
 				return &RunResult{Status: RunAbort}, nil
 			}
 
-			c.setTaskStatus(storageKey, map[string]any{"status": "error"})
+			c.setTaskStatus(storageKey, map[string]any{
+				"status":     "error",
+				"started_at": taskStartedAt.UTC().Format(time.RFC3339),
+				"elapsed":    formatElapsed(time.Since(taskStartedAt)),
+			})
 
 			return nil, fmt.Errorf("could not get container logs: %w", err)
 		}
@@ -393,10 +413,12 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 	}
 
 	c.setTaskStatus(storageKey, map[string]any{
-		"status": status,
-		"code":   containerStatus.ExitCode(),
-		"stdout": stdoutStr,
-		"stderr": stderrStr,
+		"status":     status,
+		"code":       containerStatus.ExitCode(),
+		"stdout":     stdoutStr,
+		"stderr":     stderrStr,
+		"started_at": taskStartedAt.UTC().Format(time.RFC3339),
+		"elapsed":    formatElapsed(time.Since(taskStartedAt)),
 	})
 
 	return &RunResult{
@@ -495,6 +517,24 @@ func (c *PipelineRunner) taskStorageKey(stepID string) string {
 	}
 
 	return "/pipeline/" + c.runID + "/tasks/" + stepID
+}
+
+// formatElapsed returns a human-readable elapsed time string, e.g. "1h 2m 3s".
+func formatElapsed(d time.Duration) string {
+	d = d.Round(time.Second)
+	h := int(d.Hours())
+	m := int(d.Minutes()) % 60
+	s := int(d.Seconds()) % 60
+
+	if h > 0 {
+		return fmt.Sprintf("%dh %dm %ds", h, m, s)
+	}
+
+	if m > 0 {
+		return fmt.Sprintf("%dm %ds", m, s)
+	}
+
+	return fmt.Sprintf("%ds", s)
 }
 
 // setTaskStatus persists task status to storage for UI visibility.

@@ -73,6 +73,25 @@
 {{ end }}
 
 {{ define "end" }}
+  <script>
+    (function () {
+      function updateElapsed() {
+        document.querySelectorAll('[data-elapsed-start]').forEach(function (el) {
+          var start = new Date(el.dataset.elapsedStart);
+          if (isNaN(start)) return;
+          var secs = Math.max(0, Math.floor((Date.now() - start) / 1000));
+          var h = Math.floor(secs / 3600);
+          var m = Math.floor((secs % 3600) / 60);
+          var s = secs % 60;
+          if (h > 0) el.textContent = h + 'h ' + m + 'm ' + s + 's';
+          else if (m > 0) el.textContent = m + 'm ' + s + 's';
+          else el.textContent = s + 's';
+        });
+      }
+      updateElapsed();
+      setInterval(updateElapsed, 1000);
+    })();
+  </script>
   </body>
 </html>
 {{ end }}
