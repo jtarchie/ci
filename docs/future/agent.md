@@ -19,8 +19,8 @@ A single new step type: `agent`. It gets:
 
 - **Prompt**: Explicit string or shorthand (`debug`, `review`, `analyze`)
 - **Built-in tools** (always available):
-  - `run_container` — one-off container → `{ stdout, stderr, exitCode }`
-    (reuses `runtime.run()`)
+  - `run_container` — one-off container → `{ stdout, stderr, exitCode }` (reuses
+    `runtime.run()`)
   - `get_step_result` — reads a previous step's output by name (smart
     truncation: first 4KB + last 60KB, configurable)
   - `conclude` — ends the agent with `pass`/`fail` status + summary. If not
@@ -186,19 +186,30 @@ let analysis = await runtime.agent({
   maxTokens: 200000,
   timeout: "30m",
   tools: [
-    { type: "container", name: "linter", image: "golangci/golangci-lint:latest",
-      description: "Run Go linter" },
+    {
+      type: "container",
+      name: "linter",
+      image: "golangci/golangci-lint:latest",
+      description: "Run Go linter",
+    },
   ],
   mcpServers: [
-    { type: "stdio", command: "npx", args: ["-y", "@github/github-mcp-server"],
-      env: { GITHUB_PERSONAL_ACCESS_TOKEN: process.env.GITHUB_TOKEN } },
+    {
+      type: "stdio",
+      command: "npx",
+      args: ["-y", "@github/github-mcp-server"],
+      env: { GITHUB_PERSONAL_ACCESS_TOKEN: process.env.GITHUB_TOKEN },
+    },
   ],
 });
 
 // Alternative providers:
 await runtime.agent({ prompt: "Quick check.", model: "ollama/qwen3:8b" });
-await runtime.agent({ prompt: "Summarize.", model: "custom/my-model",
-  baseURL: "https://my-llm-gateway.internal/v1" });
+await runtime.agent({
+  prompt: "Summarize.",
+  model: "custom/my-model",
+  baseURL: "https://my-llm-gateway.internal/v1",
+});
 ```
 
 Tools can also be string references to job-level or global registrations:
@@ -218,14 +229,23 @@ await runtime.agent({
 const pipeline = async () => {
   const review = await runtime.agent({
     model: "anthropic/claude-sonnet-4",
-    prompt: `Review PR #${process.env.PR_NUMBER}. Run linter, summarize issues.`,
+    prompt:
+      `Review PR #${process.env.PR_NUMBER}. Run linter, summarize issues.`,
     tools: [
-      { type: "container", name: "linter",
-        image: "golangci/golangci-lint:latest", description: "Lint Go files" },
+      {
+        type: "container",
+        name: "linter",
+        image: "golangci/golangci-lint:latest",
+        description: "Lint Go files",
+      },
     ],
     mcpServers: [
-      { type: "stdio", command: "npx", args: ["-y", "@github/github-mcp-server"],
-        env: { GITHUB_PERSONAL_ACCESS_TOKEN: process.env.GITHUB_TOKEN } },
+      {
+        type: "stdio",
+        command: "npx",
+        args: ["-y", "@github/github-mcp-server"],
+        env: { GITHUB_PERSONAL_ACCESS_TOKEN: process.env.GITHUB_TOKEN },
+      },
     ],
     maxSteps: 30,
   });
@@ -411,20 +431,20 @@ Format: `provider/model-name`. **No default** — `model` is required.
 
 ### Defaults
 
-| Setting       | Default                                      | Override                           |
-| ------------- | -------------------------------------------- | ---------------------------------- |
-| Image         | Previous step's image                        | `image: myimage:tag`               |
-| Model         | **Required**                                 | `model: provider/model-name`       |
-| Base URL      | Auto-detected from provider                  | `base_url: https://my-endpoint/v1` |
-| Prompt        | Raw string                                   | `prompt: debug` (shorthand)        |
-| Workspace     | `false`                                      | `workspace: true`                  |
-| Max steps     | 20                                           | `max_steps: 50`                    |
-| Max tokens    | Unlimited                                    | `max_tokens: 200000`               |
-| Timeout       | 10m                                          | `timeout: 30m`                     |
-| Truncate head | 4096 (4 KB)                                  | `truncate_head: 8192`              |
-| Truncate tail | 61440 (60 KB)                                | `truncate_tail: 131072`            |
-| Tools         | Built-ins always available                   | `tools: [...]` or string refs      |
-| MCP servers   | None                                         | `mcp_servers: [...]` or string refs|
+| Setting       | Default                     | Override                            |
+| ------------- | --------------------------- | ----------------------------------- |
+| Image         | Previous step's image       | `image: myimage:tag`                |
+| Model         | **Required**                | `model: provider/model-name`        |
+| Base URL      | Auto-detected from provider | `base_url: https://my-endpoint/v1`  |
+| Prompt        | Raw string                  | `prompt: debug` (shorthand)         |
+| Workspace     | `false`                     | `workspace: true`                   |
+| Max steps     | 20                          | `max_steps: 50`                     |
+| Max tokens    | Unlimited                   | `max_tokens: 200000`                |
+| Timeout       | 10m                         | `timeout: 30m`                      |
+| Truncate head | 4096 (4 KB)                 | `truncate_head: 8192`               |
+| Truncate tail | 61440 (60 KB)               | `truncate_tail: 131072`             |
+| Tools         | Built-ins always available  | `tools: [...]` or string refs       |
+| MCP servers   | None                        | `mcp_servers: [...]` or string refs |
 
 ### Storage Structure
 
@@ -442,12 +462,12 @@ Format: `provider/model-name`. **No default** — `model` is required.
 The server auto-detects webhook signature formats by inspecting request headers
 (no per-pipeline configuration needed):
 
-| Header                | Service | Validation                                                     |
-| --------------------- | ------- | -------------------------------------------------------------- |
+| Header                | Service | Validation                                                    |
+| --------------------- | ------- | ------------------------------------------------------------- |
 | `X-Hub-Signature-256` | GitHub  | Strip `sha256=` prefix, HMAC-SHA256 of body                   |
 | `X-Slack-Signature`   | Slack   | HMAC-SHA256 of `v0:{timestamp}:{body}` with request timestamp |
-| `X-Webhook-Signature` | Generic | HMAC-SHA256 of body (existing behavior)                        |
-| _(none)_              | —       | Accept without validation (no secret configured)               |
+| `X-Webhook-Signature` | Generic | HMAC-SHA256 of body (existing behavior)                       |
+| _(none)_              | —       | Accept without validation (no secret configured)              |
 
 First matching header wins. Extends `validateWebhookSignature()` in
 `server/router.go`. No changes to the pipeline JS API.

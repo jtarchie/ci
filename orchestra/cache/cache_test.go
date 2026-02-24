@@ -4,11 +4,44 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"log/slog"
 	"testing"
 
+	"github.com/jtarchie/ci/orchestra"
 	"github.com/jtarchie/ci/orchestra/cache"
 	"github.com/onsi/gomega"
 )
+
+type mockVolume struct {
+	name string
+}
+
+func (m *mockVolume) Cleanup(ctx context.Context) error {
+	return nil
+}
+
+func (m *mockVolume) Name() string {
+	return m.name
+}
+
+func (m *mockVolume) Path() string {
+	return "/mock/" + m.name
+}
+
+type mockAccessor struct{}
+
+func (m *mockAccessor) CopyToVolume(ctx context.Context, volumeName string, reader io.Reader) error {
+	// Mock implementation: just consume the reader
+	_, _ = io.ReadAll(reader)
+	return nil
+}
+
+func (m *mockAccessor) CopyFromVolume(ctx context.Context, volumeName string) (io.ReadCloser, error) {
+	return io.NopCloser(bytes.NewReader([]byte("mock tar data"))), nil
+}
+
+var _ orchestra.Volume = (*mockVolume)(nil)
+var _ cache.VolumeDataAccessor = (*mockAccessor)(nil)
 
 func TestCompressor(t *testing.T) {
 	t.Parallel()
@@ -103,6 +136,52 @@ func (m *mockCacheStore) Delete(_ context.Context, key string) error {
 	return nil
 }
 
+type trackingMockCacheStore struct {
+	data         map[string][]byte
+	restoreCalls int
+	existsCalls  int
+	persistCalls int
+}
+
+func newTrackingMockCacheStore() *trackingMockCacheStore {
+	return &trackingMockCacheStore{data: make(map[string][]byte)}
+}
+
+func (m *trackingMockCacheStore) Restore(_ context.Context, key string) (io.ReadCloser, error) {
+	m.restoreCalls++
+	data, ok := m.data[key]
+	if !ok {
+		return nil, nil
+	}
+
+	return io.NopCloser(bytes.NewReader(data)), nil
+}
+
+func (m *trackingMockCacheStore) Persist(_ context.Context, key string, reader io.Reader) error {
+	m.persistCalls++
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return err
+	}
+
+	m.data[key] = data
+
+	return nil
+}
+
+func (m *trackingMockCacheStore) Exists(_ context.Context, key string) (bool, error) {
+	m.existsCalls++
+	_, ok := m.data[key]
+
+	return ok, nil
+}
+
+func (m *trackingMockCacheStore) Delete(_ context.Context, key string) error {
+	delete(m.data, key)
+
+	return nil
+}
+
 func TestMockCacheStore(t *testing.T) {
 	t.Parallel()
 
@@ -136,4 +215,103 @@ func TestMockCacheStore(t *testing.T) {
 	exists, err = store.Exists(ctx, "test-key")
 	assert.Expect(err).NotTo(gomega.HaveOccurred())
 	assert.Expect(exists).To(gomega.BeFalse())
+}
+
+func TestCachingVolumeExistsCheckBeforeRestore(t *testing.T) {
+	t.Parallel()
+
+	assert := gomega.NewGomegaWithT(t)
+	ctx := context.Background()
+
+	t.Run("cache miss: Exists is called but Restore is not", func(t *testing.T) {
+		t.Parallel()
+
+		store := newTrackingMockCacheStore()
+		compressor := cache.NewCompressor("none")
+		mockVolume := &mockVolume{name: "test-vol"}
+		logger := slog.Default()
+
+		vol := cache.NewCachingVolume(
+			mockVolume,
+			&mockAccessor{},
+			store,
+			compressor,
+			"test-key",
+			logger,
+		)
+
+		err := vol.RestoreFromCache(ctx)
+		assert.Expect(err).NotTo(gomega.HaveOccurred())
+
+		// Verify that Exists was called
+		assert.Expect(store.existsCalls).To(gomega.Equal(1))
+
+		// Verify that Restore was NOT called (optimization: skip download on cache miss)
+		assert.Expect(store.restoreCalls).To(gomega.Equal(0))
+	})
+
+	t.Run("cache hit: Exists and Restore are both called", func(t *testing.T) {
+		t.Parallel()
+
+		store := newTrackingMockCacheStore()
+		compressor := cache.NewCompressor("none")
+		mockVolume := &mockVolume{name: "test-vol"}
+		logger := slog.Default()
+
+		// Persist some data first
+		err := store.Persist(ctx, "test-key.tar", bytes.NewReader([]byte("test data")))
+		assert.Expect(err).NotTo(gomega.HaveOccurred())
+
+		vol := cache.NewCachingVolume(
+			mockVolume,
+			&mockAccessor{},
+			store,
+			compressor,
+			"test-key",
+			logger,
+		)
+
+		err = vol.RestoreFromCache(ctx)
+		assert.Expect(err).NotTo(gomega.HaveOccurred())
+
+		// Verify that Exists was called
+		assert.Expect(store.existsCalls).To(gomega.Equal(1))
+
+		// Verify that Restore was called (cache hit)
+		assert.Expect(store.restoreCalls).To(gomega.Equal(1))
+	})
+
+	t.Run("RestoreFromCache is idempotent", func(t *testing.T) {
+		t.Parallel()
+
+		store := newTrackingMockCacheStore()
+		compressor := cache.NewCompressor("none")
+		mockVolume := &mockVolume{name: "test-vol"}
+		logger := slog.Default()
+
+		vol := cache.NewCachingVolume(
+			mockVolume,
+			&mockAccessor{},
+			store,
+			compressor,
+			"test-key",
+			logger,
+		)
+
+		// Call RestoreFromCache multiple times
+		err := vol.RestoreFromCache(ctx)
+		assert.Expect(err).NotTo(gomega.HaveOccurred())
+
+		err = vol.RestoreFromCache(ctx)
+		assert.Expect(err).NotTo(gomega.HaveOccurred())
+
+		err = vol.RestoreFromCache(ctx)
+		assert.Expect(err).NotTo(gomega.HaveOccurred())
+
+		// Verify that Exists was called only once (due to idempotency)
+		assert.Expect(store.existsCalls).To(gomega.Equal(1))
+
+		// Verify that Restore was called only once (or not at all)
+		assert.Expect(store.restoreCalls).To(gomega.Equal(0))
+	})
 }
