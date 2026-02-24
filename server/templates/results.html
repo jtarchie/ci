@@ -85,6 +85,26 @@
           </svg>
         </button>
         {{ if .RunID }}
+        {{ if and .Run .Run.PipelineID }}
+        <details class="relative">
+          <summary
+            class="flex items-center justify-center w-full sm:w-auto px-3 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400 list-none [&::-webkit-details-marker]:hidden"
+            aria-label="More actions"
+            aria-haspopup="true">
+            <span aria-hidden="true"
+              class="text-base font-bold tracking-widest select-none">&middot;&middot;&middot;</span>
+          </summary>
+          <div
+            class="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 py-1"
+            role="menu">
+            <a href="/pipelines/{{ .Run.PipelineID }}/source/"
+              class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:bg-gray-100 dark:focus:bg-gray-700"
+              role="menuitem">
+              View Source
+            </a>
+          </div>
+        </details>
+        {{ end }}
         <a href="/runs/{{ .RunID }}/graph"
           class="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
           Graph View

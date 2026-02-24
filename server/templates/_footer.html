@@ -75,6 +75,13 @@
 {{ define "end" }}
   <script>
     (function () {
+      // Close open <details> dropdowns when clicking outside
+      document.addEventListener('click', function (e) {
+        document.querySelectorAll('details[open]').forEach(function (d) {
+          if (!d.contains(e.target)) d.removeAttribute('open');
+        });
+      });
+
       function updateElapsed() {
         document.querySelectorAll('[data-elapsed-start]').forEach(function (el) {
           var start = new Date(el.dataset.elapsedStart);
