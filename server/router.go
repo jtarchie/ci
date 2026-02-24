@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -29,6 +30,28 @@ type PipelineRequest struct {
 	Content       string `json:"content"`
 	DriverDSN     string `json:"driver_dsn"`
 	WebhookSecret string `json:"webhook_secret"`
+}
+
+// PipelineRow is a view model for the pipeline listing page that pairs a
+// pipeline with its most recent run (nil if no runs exist yet).
+type PipelineRow struct {
+	Pipeline  storage.Pipeline
+	LatestRun *storage.PipelineRun
+}
+
+// buildPipelineRows fetches the latest run for each pipeline and returns
+// a slice of PipelineRow view models ready for the template.
+func buildPipelineRows(ctx context.Context, store storage.Driver, pipelines []storage.Pipeline) []PipelineRow {
+	rows := make([]PipelineRow, 0, len(pipelines))
+	for _, p := range pipelines {
+		row := PipelineRow{Pipeline: p}
+		run, err := store.GetLatestRunByPipeline(ctx, p.ID)
+		if err == nil {
+			row.LatestRun = run
+		}
+		rows = append(rows, row)
+	}
+	return rows
 }
 
 // RouterOptions configures the router.
@@ -162,6 +185,8 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 
 	// Pipeline web UI routes
 	web.GET("/pipelines/", func(ctx echo.Context) error {
+		q := ctx.QueryParam("q")
+
 		// Parse pagination parameters
 		page := 1
 		perPage := 20
@@ -173,8 +198,8 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 			_, _ = fmt.Sscanf(pp, "%d", &perPage)
 		}
 
-		// Get paginated pipelines
-		result, err := store.ListPipelines(ctx.Request().Context(), page, perPage)
+		// Get paginated pipelines (search if q is present)
+		result, err := store.SearchPipelines(ctx.Request().Context(), q, page, perPage)
 		if err != nil {
 			return fmt.Errorf("could not list pipelines: %w", err)
 		}
@@ -190,9 +215,12 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 			}
 		}
 
+		rows := buildPipelineRows(ctx.Request().Context(), store, result.Items)
+
 		return ctx.Render(http.StatusOK, "pipelines.html", map[string]any{
-			"Pipelines":  result.Items,
-			"Pagination": result,
+			"PipelineRows": rows,
+			"Pagination":   result,
+			"Query":        q,
 		})
 	})
 
@@ -228,9 +256,12 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 			}
 		}
 
-		return ctx.Render(http.StatusOK, "_pipeline_rows", map[string]any{
-			"Pipelines":  result.Items,
-			"Pagination": result,
+		rows := buildPipelineRows(ctx.Request().Context(), store, result.Items)
+
+		return ctx.Render(http.StatusOK, "_pipelines_content", map[string]any{
+			"PipelineRows": rows,
+			"Pagination":   result,
+			"Query":        q,
 		})
 	}
 	web.GET("/pipelines/search", pipelinesSearchHandler)
@@ -258,10 +289,18 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 			_, _ = fmt.Sscanf(pp, "%d", &perPage)
 		}
 
-		// Get paginated runs
-		result, err := store.ListRunsByPipeline(ctx.Request().Context(), id, page, perPage)
-		if err != nil {
-			return fmt.Errorf("could not list runs: %w", err)
+		q := ctx.QueryParam("q")
+
+		// Get paginated runs (search if q is present)
+		var result *storage.PaginationResult[storage.PipelineRun]
+		var runsErr error
+		if q != "" {
+			result, runsErr = store.SearchRunsByPipeline(ctx.Request().Context(), id, q, page, perPage)
+		} else {
+			result, runsErr = store.ListRunsByPipeline(ctx.Request().Context(), id, page, perPage)
+		}
+		if runsErr != nil {
+			return fmt.Errorf("could not list runs: %w", runsErr)
 		}
 
 		if result == nil || result.Items == nil {
@@ -279,6 +318,7 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 			"Pipeline":   pipeline,
 			"Runs":       result.Items,
 			"Pagination": result,
+			"Query":      q,
 		})
 	})
 

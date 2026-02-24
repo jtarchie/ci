@@ -34,69 +34,27 @@
           id="pipeline-search"
           class="w-full py-2 pr-3 pl-10 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="Search pipelines by name or content…"
+          value="{{ .Query }}"
           aria-label="Search pipelines"
           autocomplete="off"
           hx-get="/pipelines/search/"
           hx-trigger="input changed delay:300ms, search"
-          hx-target="#pipelines-table"
-          hx-swap="innerHTML">
+          hx-target="#pipelines-content"
+          hx-swap="morph:innerHTML">
       </div>
     </div>
 
     <div id="pipelines-list">
       <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-        <div class="w-full overflow-x-auto">
-          <table class="w-full min-w-[640px]">
-            <thead class="bg-gray-50 dark:bg-gray-700">
-              <tr>
-                <th
-                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Name
-                </th>
-                <th
-                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Driver
-                </th>
-                <th
-                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Created
-                </th>
-                <th
-                  class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200 dark:divide-gray-600"
-              id="pipelines-table">
-              {{ template "_pipeline_rows" . }}
-            </tbody>
-          </table>
-        </div>
-        {{ if gt .Pagination.TotalPages 1 }}
         <div
-          class="flex items-center justify-between px-6 py-3 border-t border-gray-200 dark:border-gray-700">
-          <span class="text-sm text-gray-600 dark:text-gray-400">
-            Page {{ .Pagination.Page }} of {{ .Pagination.TotalPages }}
-          </span>
-          <div class="flex gap-2">
-            {{ if gt .Pagination.Page 1 }}
-            <a
-              href="/pipelines/?page={{ sub .Pagination.Page 1 }}&per_page={{ .Pagination.PerPage }}"
-              class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded text-sm transition-colors">
-              ← Previous
-            </a>
-            {{ end }}
-            {{ if .Pagination.HasNext }}
-            <a
-              href="/pipelines/?page={{ add .Pagination.Page 1 }}&per_page={{ .Pagination.PerPage }}"
-              class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm transition-colors">
-              Next →
-            </a>
-            {{ end }}
-          </div>
+          id="pipelines-content"
+          hx-get="/pipelines/search/"
+          hx-trigger="every 5s"
+          hx-target="this"
+          hx-swap="morph:innerHTML"
+          hx-include="#pipeline-search, #pipeline-page, #pipeline-per-page">
+          {{ template "_pipelines_content" . }}
         </div>
-        {{ end }}
       </div>
     </div>
   </div>
