@@ -196,6 +196,46 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 		})
 	})
 
+	// GET /pipelines/search/ - HTMX partial: returns only the pipeline table
+	// rows filtered by the ?q= full-text search query. Used by the search box on
+	// the pipeline listing page.
+	pipelinesSearchHandler := func(ctx echo.Context) error {
+		q := ctx.QueryParam("q")
+
+		page := 1
+		perPage := 20
+
+		if p := ctx.QueryParam("page"); p != "" {
+			_, _ = fmt.Sscanf(p, "%d", &page)
+		}
+		if pp := ctx.QueryParam("per_page"); pp != "" {
+			_, _ = fmt.Sscanf(pp, "%d", &perPage)
+		}
+
+		result, err := store.SearchPipelines(ctx.Request().Context(), q, page, perPage)
+		if err != nil {
+			return fmt.Errorf("could not search pipelines: %w", err)
+		}
+
+		if result == nil || result.Items == nil {
+			result = &storage.PaginationResult[storage.Pipeline]{
+				Items:      []storage.Pipeline{},
+				Page:       page,
+				PerPage:    perPage,
+				TotalItems: 0,
+				TotalPages: 0,
+				HasNext:    false,
+			}
+		}
+
+		return ctx.Render(http.StatusOK, "_pipeline_rows", map[string]any{
+			"Pipelines":  result.Items,
+			"Pagination": result,
+		})
+	}
+	web.GET("/pipelines/search", pipelinesSearchHandler)
+	web.GET("/pipelines/search/", pipelinesSearchHandler)
+
 	web.GET("/pipelines/:id/", func(ctx echo.Context) error {
 		id := ctx.Param("id")
 
@@ -278,12 +318,52 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 			"PipelineID": id,
 			"Runs":       result.Items,
 			"Pagination": result,
+			"Query":      "",
 		})
 	}
 	web.GET("/pipelines/:id/runs-section", runsSectionHandler)
 	web.GET("/pipelines/:id/runs-section/", runsSectionHandler)
 
-	// GET /pipelines/:id/source/ - Pipeline source viewer
+	// GET /pipelines/:id/runs-search/ - HTMX partial: returns runs-section filtered by ?q=
+	runsSearchHandler := func(ctx echo.Context) error {
+		id := ctx.Param("id")
+		q := ctx.QueryParam("q")
+
+		page := 1
+		perPage := 20
+
+		if p := ctx.QueryParam("page"); p != "" {
+			_, _ = fmt.Sscanf(p, "%d", &page)
+		}
+		if pp := ctx.QueryParam("per_page"); pp != "" {
+			_, _ = fmt.Sscanf(pp, "%d", &perPage)
+		}
+
+		result, err := store.SearchRunsByPipeline(ctx.Request().Context(), id, q, page, perPage)
+		if err != nil {
+			return fmt.Errorf("could not search runs: %w", err)
+		}
+
+		if result == nil || result.Items == nil {
+			result = &storage.PaginationResult[storage.PipelineRun]{
+				Items:      []storage.PipelineRun{},
+				Page:       page,
+				PerPage:    perPage,
+				TotalItems: 0,
+				TotalPages: 0,
+				HasNext:    false,
+			}
+		}
+
+		return ctx.Render(http.StatusOK, "runs-section", map[string]any{
+			"PipelineID": id,
+			"Runs":       result.Items,
+			"Pagination": result,
+			"Query":      q,
+		})
+	}
+	web.GET("/pipelines/:id/runs-search", runsSearchHandler)
+	web.GET("/pipelines/:id/runs-search/", runsSearchHandler)
 	sourceHandler := func(ctx echo.Context) error {
 		id := ctx.Param("id")
 		pipeline, err := store.GetPipeline(ctx.Request().Context(), id)
@@ -370,8 +450,29 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	tasksPartialHandler := func(ctx echo.Context) error {
 		runID := ctx.Param("id")
 		lookupPath := "/pipeline/" + runID + "/"
+		q := ctx.QueryParam("q")
 
-		results, err := store.GetAll(ctx.Request().Context(), lookupPath, []string{"status", "elapsed", "started_at"})
+		var results storage.Results
+		var err error
+
+		if q != "" {
+			// Full-text search: return only tasks whose output matches the query.
+			// Disable live-polling while a search filter is active.
+			results, err = store.Search(ctx.Request().Context(), "pipeline/"+runID, q)
+			if err != nil {
+				return fmt.Errorf("could not search tasks: %w", err)
+			}
+
+			return ctx.Render(http.StatusOK, "tasks-partial", map[string]any{
+				"Tree":     results.AsTree(),
+				"Path":     lookupPath,
+				"RunID":    runID,
+				"IsActive": false, // no polling while search is active
+				"Run":      nil,
+			})
+		}
+
+		results, err = store.GetAll(ctx.Request().Context(), lookupPath, []string{"status", "elapsed", "started_at"})
 		if err != nil {
 			return fmt.Errorf("could not get all results: %w", err)
 		}
@@ -607,6 +708,7 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 				"PipelineID": id,
 				"Runs":       result.Items,
 				"Pagination": result,
+				"Query":      "",
 			})
 		}
 

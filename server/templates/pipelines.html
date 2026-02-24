@@ -18,22 +18,31 @@
       </div>
     </div>
 
-    {{ if eq (len .Pipelines) 0 }}
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center">
-      <svg class="w-16 h-16 mx-auto text-gray-400 dark:text-gray-500 mb-4"
-        fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-      <h2
-        class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">No
-        pipelines yet</h2>
-      <p class="text-gray-500 dark:text-gray-400">
-        Use <code class="bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">ci
-          set-pipeline</code> to upload your first pipeline.
-      </p>
+    <!-- Search box -->
+    <div class="mb-4">
+      <div class="relative max-w-md">
+        <svg
+          class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none w-4 h-4"
+          viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path fill-rule="evenodd"
+            d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+            clip-rule="evenodd" />
+        </svg>
+        <input
+          type="search"
+          name="q"
+          id="pipeline-search"
+          class="w-full py-2 pr-3 pl-10 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Search pipelines by name or content…"
+          aria-label="Search pipelines"
+          autocomplete="off"
+          hx-get="/pipelines/search/"
+          hx-trigger="input changed delay:300ms, search"
+          hx-target="#pipelines-table"
+          hx-swap="innerHTML">
+      </div>
     </div>
-    {{ else }}
+
     <div id="pipelines-list">
       <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
         <div class="w-full overflow-x-auto">
@@ -90,7 +99,6 @@
         {{ end }}
       </div>
     </div>
-    {{ end }}
   </div>
 </main>
 

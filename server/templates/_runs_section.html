@@ -1,31 +1,57 @@
 {{ define "runs-section" }}
 <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden"
   id="runs-section"
+  {{ if not .Query }}
   hx-get="/pipelines/{{ .PipelineID }}/runs-section/?page={{ .Pagination.Page }}&per_page={{ .Pagination.PerPage }}"
   hx-trigger="load delay:3s, poll-runs from:body"
   hx-swap="morph:outerHTML"
+  {{ end }}
   data-pipeline-id="{{ .PipelineID }}">
   <div
-    class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-    <h2 class="text-xl font-semibold dark:text-white">Pipeline Runs</h2>
-    {{ $hasActive := false }}
-    {{ range .Runs }}
-    {{ if or (eq .Status "running") (eq .Status "queued") }}
-    {{ $hasActive = true }}
-    {{ end }}
-    {{ end }}
-    {{ if $hasActive }}
-    <span
-      class="flex items-center gap-2 text-sm text-yellow-600 dark:text-yellow-400">
-      <span class="relative flex h-2 w-2">
-        <span
-          class="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
-        <span
-          class="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
+    class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex flex-col gap-3">
+    <div
+      class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <h2 class="text-xl font-semibold dark:text-white">Pipeline Runs</h2>
+      {{ $hasActive := false }}
+      {{ range .Runs }}
+      {{ if or (eq .Status "running") (eq .Status "queued") }}
+      {{ $hasActive = true }}
+      {{ end }}
+      {{ end }}
+      {{ if and $hasActive (not .Query) }}
+      <span
+        class="flex items-center gap-2 text-sm text-yellow-600 dark:text-yellow-400">
+        <span class="relative flex h-2 w-2">
+          <span
+            class="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+          <span
+            class="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
+        </span>
+        Live
       </span>
-      Live
-    </span>
-    {{ end }}
+      {{ end }}
+    </div>
+    <div class="relative">
+      <svg
+        class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none w-4 h-4"
+        viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <path fill-rule="evenodd"
+          d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+          clip-rule="evenodd" />
+      </svg>
+      <input
+        type="search"
+        name="q"
+        value="{{ .Query }}"
+        class="w-full py-2 pr-3 pl-10 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        placeholder="Search runs by ID, status, or error…"
+        aria-label="Search runs"
+        autocomplete="off"
+        hx-get="/pipelines/{{ .PipelineID }}/runs-search/"
+        hx-trigger="input changed delay:300ms, search"
+        hx-target="#runs-section"
+        hx-swap="morph:outerHTML">
+    </div>
   </div>
 
   <div id="runs-container">
@@ -36,8 +62,13 @@
         <path stroke-linecap="round" stroke-linejoin="round"
           stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
       </svg>
+      {{ if .Query }}
+      <p class="text-gray-500 dark:text-gray-400">No runs match <strong>{{
+          .Query }}</strong>.</p>
+      {{ else }}
       <p class="text-gray-500 dark:text-gray-400">No runs yet. Click
         "Trigger Run" to start your first execution.</p>
+      {{ end }}
     </div>
     {{ else }}
     <div class="w-full overflow-x-auto">
