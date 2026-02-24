@@ -283,6 +283,23 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	web.GET("/pipelines/:id/runs-section", runsSectionHandler)
 	web.GET("/pipelines/:id/runs-section/", runsSectionHandler)
 
+	// GET /pipelines/:id/source/ - Pipeline source viewer
+	sourceHandler := func(ctx echo.Context) error {
+		id := ctx.Param("id")
+		pipeline, err := store.GetPipeline(ctx.Request().Context(), id)
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				return ctx.String(http.StatusNotFound, "Pipeline not found")
+			}
+			return fmt.Errorf("could not get pipeline: %w", err)
+		}
+		return ctx.Render(http.StatusOK, "pipeline_source.html", map[string]any{
+			"Pipeline": pipeline,
+		})
+	}
+	web.GET("/pipelines/:id/source", sourceHandler)
+	web.GET("/pipelines/:id/source/", sourceHandler)
+
 	// Pipeline API endpoints
 	// Register webhooks first (without auth) on the main router
 	webhookTimeout := opts.WebhookTimeout
