@@ -113,10 +113,10 @@ func TestPipelineAPI(t *testing.T) {
 
 				assert.Expect(rec.Code).To(Equal(http.StatusOK))
 
-				var pipelines []storage.Pipeline
-				err = json.Unmarshal(rec.Body.Bytes(), &pipelines)
+				var result storage.PaginationResult[storage.Pipeline]
+				err = json.Unmarshal(rec.Body.Bytes(), &result)
 				assert.Expect(err).NotTo(HaveOccurred())
-				assert.Expect(pipelines).To(HaveLen(1))
+				assert.Expect(result.Items).To(HaveLen(1))
 			})
 
 			t.Run("GET /api/pipelines/:id retrieves a pipeline", func(t *testing.T) {

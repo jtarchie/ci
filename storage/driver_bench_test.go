@@ -138,7 +138,7 @@ func BenchmarkStorage_ListPipelines(b *testing.B) {
 	b.ResetTimer()
 
 	for b.Loop() {
-		if _, err := driver.ListPipelines(ctx); err != nil {
+		if _, err := driver.ListPipelines(ctx, 1, 100); err != nil {
 			b.Fatal(err)
 		}
 	}

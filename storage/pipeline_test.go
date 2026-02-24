@@ -98,9 +98,9 @@ func TestPipelineStorage(t *testing.T) {
 				_, err = client.SavePipeline(context.Background(), "pipeline-2", "content2", "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				pipelines, err := client.ListPipelines(context.Background())
+				result, err := client.ListPipelines(context.Background(), 1, 100)
 				assert.Expect(err).NotTo(HaveOccurred())
-				assert.Expect(pipelines).To(HaveLen(2))
+				assert.Expect(result.Items).To(HaveLen(2))
 			})
 
 			t.Run("ListPipelines returns empty slice when no pipelines", func(t *testing.T) {
@@ -115,9 +115,9 @@ func TestPipelineStorage(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				pipelines, err := client.ListPipelines(context.Background())
+				result, err := client.ListPipelines(context.Background(), 1, 100)
 				assert.Expect(err).NotTo(HaveOccurred())
-				assert.Expect(pipelines).To(BeEmpty())
+				assert.Expect(result.Items).To(BeEmpty())
 			})
 
 			t.Run("DeletePipeline removes a pipeline", func(t *testing.T) {

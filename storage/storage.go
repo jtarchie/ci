@@ -45,6 +45,16 @@ type PipelineRun struct {
 	CreatedAt    time.Time  `json:"created_at"`
 }
 
+// PaginationResult holds paginated items along with pagination metadata.
+type PaginationResult[T any] struct {
+	Items      []T  `json:"items"`
+	Page       int  `json:"page"`
+	PerPage    int  `json:"per_page"`
+	TotalItems int  `json:"total_items"`
+	TotalPages int  `json:"total_pages"`
+	HasNext    bool `json:"has_next"`
+}
+
 // ResourceVersion represents a stored resource version.
 type ResourceVersion struct {
 	ID           int64             `json:"id"`
@@ -63,13 +73,13 @@ type Driver interface {
 	// Pipeline CRUD operations
 	SavePipeline(ctx context.Context, name, content, driverDSN, webhookSecret string) (*Pipeline, error)
 	GetPipeline(ctx context.Context, id string) (*Pipeline, error)
-	ListPipelines(ctx context.Context) ([]Pipeline, error)
+	ListPipelines(ctx context.Context, page, perPage int) (*PaginationResult[Pipeline], error)
 	DeletePipeline(ctx context.Context, id string) error
 
 	// Pipeline run operations
 	SaveRun(ctx context.Context, pipelineID string) (*PipelineRun, error)
 	GetRun(ctx context.Context, runID string) (*PipelineRun, error)
-	ListRunsByPipeline(ctx context.Context, pipelineID string) ([]PipelineRun, error)
+	ListRunsByPipeline(ctx context.Context, pipelineID string, page, perPage int) (*PaginationResult[PipelineRun], error)
 	UpdateRunStatus(ctx context.Context, runID string, status RunStatus, errorMessage string) error
 
 	// Resource version operations
