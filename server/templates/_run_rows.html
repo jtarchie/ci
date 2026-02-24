@@ -64,16 +64,15 @@
     </span>
     {{ end }}
   </td>
-  <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
+  <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 font-mono">
     {{ if .StartedAt }}
-    {{ .StartedAt.Format "Jan 02, 15:04:05" }}
-    {{ else }}
-    <span class="text-gray-400 dark:text-gray-500">—</span>
-    {{ end }}
-  </td>
-  <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
     {{ if .CompletedAt }}
-    {{ .CompletedAt.Format "Jan 02, 15:04:05" }}
+    {{ durationBetween .StartedAt .CompletedAt }}
+    {{ else }}
+    <span
+      data-elapsed-start="{{ .StartedAt.UTC.Format "2006-01-02T15:04:05Z07:00"
+      }}">—</span>
+    {{ end }}
     {{ else }}
     <span class="text-gray-400 dark:text-gray-500">—</span>
     {{ end }}

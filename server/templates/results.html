@@ -337,6 +337,15 @@ border-indigo-300 dark:border-indigo-600
         <span class="font-medium">{{ $path.Name }}</span>
       </div>
     </div>
+    <div class="flex items-center pr-1">
+      {{ if $path.Value.elapsed }}
+      <span class="text-xs text-gray-400 dark:text-gray-500 font-mono">{{
+        $path.Value.elapsed }}</span>
+      {{ else if $path.Value.started_at }}
+      <span class="text-xs text-gray-400 dark:text-gray-500 font-mono"
+        data-elapsed-start="{{ $path.Value.started_at }}">—</span>
+      {{ end }}
+    </div>
   </summary>
   <div
     class="task-details mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
