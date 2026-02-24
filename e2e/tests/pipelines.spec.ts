@@ -145,10 +145,11 @@ test.describe("Pipeline Management UI", () => {
       await page.goto("/pipelines/");
       await page.getByRole("link", { name: pipelineName }).click();
 
-      // Click on pipeline source to expand
-      await page.getByText("Pipeline Source").click();
+      // Open the "..." dropdown and click "View Source"
+      await page.getByLabel("More actions").click();
+      await page.getByRole("menuitem", { name: "View Source" }).click();
 
-      // Should show the pipeline content
+      // Should show the pipeline content on the source page
       await expect(page.getByText("source test marker")).toBeVisible();
     });
 

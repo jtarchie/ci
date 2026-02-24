@@ -108,19 +108,15 @@
       <div class="flex gap-2">
         {{ if gt .Pagination.Page 1 }}
         <a
-          hx-get="/pipelines/{{ .PipelineID }}/runs-section/?page={{ sub .Pagination.Page 1 }}&per_page={{ .Pagination.PerPage }}"
-          hx-target="#runs-section"
-          hx-swap="morph:outerHTML"
-          class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded text-sm transition-colors cursor-pointer">
+          href="/pipelines/{{ .PipelineID }}/?page={{ sub .Pagination.Page 1 }}&per_page={{ .Pagination.PerPage }}&q={{ .Query }}"
+          class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded text-sm transition-colors">
           ← Previous
         </a>
         {{ end }}
         {{ if .Pagination.HasNext }}
         <a
-          hx-get="/pipelines/{{ .PipelineID }}/runs-section/?page={{ add .Pagination.Page 1 }}&per_page={{ .Pagination.PerPage }}"
-          hx-target="#runs-section"
-          hx-swap="morph:outerHTML"
-          class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm transition-colors cursor-pointer">
+          href="/pipelines/{{ .PipelineID }}/?page={{ add .Pagination.Page 1 }}&per_page={{ .Pagination.PerPage }}&q={{ .Query }}"
+          class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm transition-colors">
           Next →
         </a>
         {{ end }}

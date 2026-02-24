@@ -79,6 +79,7 @@ type Driver interface {
 	// Pipeline run operations
 	SaveRun(ctx context.Context, pipelineID string) (*PipelineRun, error)
 	GetRun(ctx context.Context, runID string) (*PipelineRun, error)
+	GetLatestRunByPipeline(ctx context.Context, pipelineID string) (*PipelineRun, error)
 	ListRunsByPipeline(ctx context.Context, pipelineID string, page, perPage int) (*PaginationResult[PipelineRun], error)
 	SearchRunsByPipeline(ctx context.Context, pipelineID, query string, page, perPage int) (*PaginationResult[PipelineRun], error)
 	UpdateRunStatus(ctx context.Context, runID string, status RunStatus, errorMessage string) error

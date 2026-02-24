@@ -466,6 +466,46 @@ func (s *Sqlite) GetRun(ctx context.Context, runID string) (*storage.PipelineRun
 	return &run, nil
 }
 
+// GetLatestRunByPipeline returns the most recent run for a pipeline, or ErrNotFound if none exist.
+func (s *Sqlite) GetLatestRunByPipeline(ctx context.Context, pipelineID string) (*storage.PipelineRun, error) {
+	var run storage.PipelineRun
+	var status string
+	var createdAt string
+	var startedAt, completedAt, errorMessage sql.NullString
+
+	err := s.writer.QueryRowContext(ctx, `
+		SELECT id, pipeline_id, status, started_at, completed_at, error_message, created_at
+		FROM pipeline_runs WHERE pipeline_id = ?
+		ORDER BY created_at DESC LIMIT 1
+	`, pipelineID).Scan(&run.ID, &run.PipelineID, &status, &startedAt, &completedAt, &errorMessage, &createdAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, storage.ErrNotFound
+		}
+
+		return nil, fmt.Errorf("failed to get latest run: %w", err)
+	}
+
+	run.Status = storage.RunStatus(status)
+	run.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+
+	if startedAt.Valid {
+		t, _ := time.Parse(time.RFC3339, startedAt.String)
+		run.StartedAt = &t
+	}
+
+	if completedAt.Valid {
+		t, _ := time.Parse(time.RFC3339, completedAt.String)
+		run.CompletedAt = &t
+	}
+
+	if errorMessage.Valid {
+		run.ErrorMessage = errorMessage.String
+	}
+
+	return &run, nil
+}
+
 // ListRunsByPipeline returns a paginated list of runs for a specific pipeline.
 func (s *Sqlite) ListRunsByPipeline(ctx context.Context, pipelineID string, page, perPage int) (*storage.PaginationResult[storage.PipelineRun], error) {
 	if page < 1 {
