@@ -80,6 +80,7 @@ type Driver interface {
 	SaveRun(ctx context.Context, pipelineID string) (*PipelineRun, error)
 	GetRun(ctx context.Context, runID string) (*PipelineRun, error)
 	ListRunsByPipeline(ctx context.Context, pipelineID string, page, perPage int) (*PaginationResult[PipelineRun], error)
+	SearchRunsByPipeline(ctx context.Context, pipelineID, query string, page, perPage int) (*PaginationResult[PipelineRun], error)
 	UpdateRunStatus(ctx context.Context, runID string, status RunStatus, errorMessage string) error
 
 	// Resource version operations
@@ -87,6 +88,18 @@ type Driver interface {
 	GetLatestResourceVersion(ctx context.Context, resourceName string) (*ResourceVersion, error)
 	ListResourceVersions(ctx context.Context, resourceName string, limit int) ([]ResourceVersion, error)
 	GetVersionsAfter(ctx context.Context, resourceName string, afterVersion map[string]string) ([]ResourceVersion, error)
+
+	// Full-text search operations
+	//
+	// SearchPipelines returns pipelines whose name or content match query using
+	// FTS5. An empty query returns all pipelines (same as ListPipelines).
+	SearchPipelines(ctx context.Context, query string, page, perPage int) (*PaginationResult[Pipeline], error)
+
+	// Search returns records whose indexed text matches query, scoped to paths
+	// that begin with prefix. Set automatically indexes content on write so no
+	// separate indexing step is required. prefix follows the same convention as
+	// Set (no namespace; the implementation adds it internally).
+	Search(ctx context.Context, prefix, query string) (Results, error)
 }
 
 type Payload map[string]any

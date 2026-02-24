@@ -95,6 +95,34 @@ func NewSqlite(dsn string, namespace string, _ *slog.Logger) (storage.Driver, er
 		return nil, fmt.Errorf("failed to create resource_versions table: %w", err)
 	}
 
+	// FTS5 virtual table for pipeline full-text search (name + content).
+	//nolint: noctx
+	_, err = writer.Exec(`
+		CREATE VIRTUAL TABLE IF NOT EXISTS pipelines_fts USING fts5(
+			id UNINDEXED,
+			name,
+			content,
+			tokenize='unicode61'
+		);
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pipelines_fts table: %w", err)
+	}
+
+	// FTS5 virtual table for general full-text search over any stored record.
+	// content holds ANSI-stripped text extracted from the JSON payload.
+	//nolint: noctx
+	_, err = writer.Exec(`
+		CREATE VIRTUAL TABLE IF NOT EXISTS data_fts USING fts5(
+			path UNINDEXED,
+			content,
+			tokenize='unicode61'
+		);
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create data_fts table: %w", err)
+	}
+
 	writer.SetMaxIdleConns(1)
 	writer.SetMaxOpenConns(1)
 
@@ -126,6 +154,22 @@ func (s *Sqlite) Set(ctx context.Context, prefix string, payload any) error {
 	`, path, contents, s.namespace)
 	if err != nil {
 		return fmt.Errorf("failed to insert task: %w", err)
+	}
+
+	// Keep the FTS index in sync: delete any stale entry then insert fresh.
+	_, err = s.writer.ExecContext(ctx, `
+		DELETE FROM data_fts WHERE rowid IN (
+			SELECT rowid FROM data_fts WHERE path = ?
+		)
+	`, path)
+	if err != nil {
+		return fmt.Errorf("failed to clear data_fts: %w", err)
+	}
+
+	text := stripANSI(extractTextFromJSON(contents))
+	_, err = s.writer.ExecContext(ctx, `INSERT INTO data_fts(path, content) VALUES (?, ?)`, path, path+" "+text)
+	if err != nil {
+		return fmt.Errorf("failed to index data_fts: %w", err)
 	}
 
 	return nil
@@ -227,6 +271,24 @@ func (s *Sqlite) SavePipeline(ctx context.Context, name, content, driverDSN, web
 	`, id, name, content, driverDSN, webhookSecret, now.Format(time.RFC3339), now.Format(time.RFC3339))
 	if err != nil {
 		return nil, fmt.Errorf("failed to save pipeline: %w", err)
+	}
+
+	// Keep FTS index in sync: delete any existing entry then re-insert.
+	_, err = s.writer.ExecContext(ctx, `
+		DELETE FROM pipelines_fts WHERE rowid IN (
+			SELECT rowid FROM pipelines_fts WHERE id = ?
+		)
+	`, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to clear pipelines_fts: %w", err)
+	}
+
+	_, err = s.writer.ExecContext(ctx,
+		`INSERT INTO pipelines_fts(id, name, content) VALUES (?, ?, ?)`,
+		id, name, content,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to index pipeline: %w", err)
 	}
 
 	return &storage.Pipeline{
@@ -484,6 +546,93 @@ func (s *Sqlite) ListRunsByPipeline(ctx context.Context, pipelineID string, page
 	}, nil
 }
 
+// SearchRunsByPipeline returns a paginated list of runs for a specific pipeline
+// filtered by query matching the run ID, status, or error message.
+// When query is empty it behaves like ListRunsByPipeline.
+func (s *Sqlite) SearchRunsByPipeline(ctx context.Context, pipelineID, query string, page, perPage int) (*storage.PaginationResult[storage.PipelineRun], error) {
+	if query == "" {
+		return s.ListRunsByPipeline(ctx, pipelineID, page, perPage)
+	}
+
+	if page < 1 {
+		page = 1
+	}
+	if perPage < 1 {
+		perPage = 20
+	}
+
+	offset := (page - 1) * perPage
+	like := "%" + query + "%"
+
+	var totalItems int
+	err := s.writer.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM pipeline_runs
+		WHERE pipeline_id = ?
+		  AND (id LIKE ? OR status LIKE ? OR error_message LIKE ?)
+	`, pipelineID, like, like, like).Scan(&totalItems)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count run search results: %w", err)
+	}
+
+	rows, err := s.writer.QueryContext(ctx, `
+		SELECT id, pipeline_id, status, started_at, completed_at, error_message, created_at
+		FROM pipeline_runs
+		WHERE pipeline_id = ?
+		  AND (id LIKE ? OR status LIKE ? OR error_message LIKE ?)
+		ORDER BY created_at DESC
+		LIMIT ? OFFSET ?
+	`, pipelineID, like, like, like, perPage, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search runs: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var runs []storage.PipelineRun
+
+	for rows.Next() {
+		var run storage.PipelineRun
+		var status string
+		var createdAt string
+		var startedAt, completedAt, errorMessage sql.NullString
+
+		if err := rows.Scan(&run.ID, &run.PipelineID, &status, &startedAt, &completedAt, &errorMessage, &createdAt); err != nil {
+			return nil, fmt.Errorf("failed to scan run search result: %w", err)
+		}
+
+		run.Status = storage.RunStatus(status)
+		run.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+
+		if startedAt.Valid {
+			t, _ := time.Parse(time.RFC3339, startedAt.String)
+			run.StartedAt = &t
+		}
+		if completedAt.Valid {
+			t, _ := time.Parse(time.RFC3339, completedAt.String)
+			run.CompletedAt = &t
+		}
+		if errorMessage.Valid {
+			run.ErrorMessage = errorMessage.String
+		}
+
+		runs = append(runs, run)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating run search results: %w", err)
+	}
+
+	totalPages := (totalItems + perPage - 1) / perPage
+
+	return &storage.PaginationResult[storage.PipelineRun]{
+		Items:      runs,
+		Page:       page,
+		PerPage:    perPage,
+		TotalItems: totalItems,
+		TotalPages: totalPages,
+		HasNext:    page < totalPages,
+	}, nil
+}
+
 func (s *Sqlite) UpdateRunStatus(ctx context.Context, runID string, status storage.RunStatus, errorMessage string) error {
 	now := time.Now().UTC()
 
@@ -712,6 +861,158 @@ func (s *Sqlite) GetVersionsAfter(ctx context.Context, resourceName string, afte
 	}
 
 	return versions, nil
+}
+
+// SearchPipelines returns pipelines whose name or content contain query using
+// the FTS5 index. When query is empty it behaves like ListPipelines.
+func (s *Sqlite) SearchPipelines(ctx context.Context, query string, page, perPage int) (*storage.PaginationResult[storage.Pipeline], error) {
+	if query == "" {
+		return s.ListPipelines(ctx, page, perPage)
+	}
+
+	if page < 1 {
+		page = 1
+	}
+
+	if perPage < 1 {
+		perPage = 20
+	}
+
+	ftsQuery := sanitizeFTSQuery(query)
+	offset := (page - 1) * perPage
+
+	var totalItems int
+
+	err := s.writer.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM pipelines
+		WHERE id IN (SELECT id FROM pipelines_fts WHERE pipelines_fts MATCH ?)
+	`, ftsQuery).Scan(&totalItems)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count pipeline search results: %w", err)
+	}
+
+	rows, err := s.writer.QueryContext(ctx, `
+		SELECT p.id, p.name, p.content, p.driver_dsn, p.webhook_secret, p.created_at, p.updated_at
+		FROM pipelines p
+		WHERE p.id IN (SELECT id FROM pipelines_fts WHERE pipelines_fts MATCH ?)
+		ORDER BY p.created_at DESC
+		LIMIT ? OFFSET ?
+	`, ftsQuery, perPage, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search pipelines: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var pipelines []storage.Pipeline
+
+	for rows.Next() {
+		var pipeline storage.Pipeline
+		var createdAt, updatedAt string
+
+		if err := rows.Scan(
+			&pipeline.ID, &pipeline.Name, &pipeline.Content,
+			&pipeline.DriverDSN, &pipeline.WebhookSecret,
+			&createdAt, &updatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan pipeline search result: %w", err)
+		}
+
+		pipeline.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+		pipeline.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
+		pipelines = append(pipelines, pipeline)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating pipeline search results: %w", err)
+	}
+
+	totalPages := (totalItems + perPage - 1) / perPage
+
+	return &storage.PaginationResult[storage.Pipeline]{
+		Items:      pipelines,
+		Page:       page,
+		PerPage:    perPage,
+		TotalItems: totalItems,
+		TotalPages: totalPages,
+		HasNext:    page < totalPages,
+	}, nil
+}
+
+// Search returns records whose indexed text matches query and whose path begins
+// with prefix. prefix follows the same convention as Set (no namespace prefix).
+func (s *Sqlite) Search(ctx context.Context, prefix, query string) (storage.Results, error) {
+	if query == "" {
+		return nil, nil
+	}
+
+	ftsQuery := sanitizeFTSQuery(query)
+	fullPrefix := filepath.Clean("/" + s.namespace + "/" + prefix)
+
+	rows, err := s.writer.QueryContext(ctx, `
+		SELECT
+			COALESCE(t.id, 0),
+			f.path,
+			COALESCE(
+				json_object(
+					'status',     json_extract(t.payload, '$.status'),
+					'elapsed',    json_extract(t.payload, '$.elapsed'),
+					'started_at', json_extract(t.payload, '$.started_at')
+				),
+				'{}'
+			) AS payload
+		FROM data_fts f
+		LEFT JOIN tasks t ON t.path = f.path
+		WHERE data_fts MATCH ? AND f.path LIKE ? || '/%'
+		ORDER BY COALESCE(t.id, f.rowid) ASC
+	`, ftsQuery, fullPrefix)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var results storage.Results
+
+	for rows.Next() {
+		var result storage.Result
+		var payloadBytes []byte
+
+		if err := rows.Scan(&result.ID, &result.Path, &payloadBytes); err != nil {
+			return nil, fmt.Errorf("failed to scan search result: %w", err)
+		}
+
+		if err := json.Unmarshal(payloadBytes, &result.Payload); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal search payload: %w", err)
+		}
+
+		results = append(results, result)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating search results: %w", err)
+	}
+
+	return results, nil
+}
+
+// sanitizeFTSQuery converts a freeform user query into a safe FTS5 query.
+// Each whitespace-separated token is treated as a literal prefix match term,
+// preventing accidental use of FTS5 boolean operators (AND, OR, NOT, etc.).
+func sanitizeFTSQuery(q string) string {
+	words := strings.Fields(q)
+	if len(words) == 0 {
+		return ""
+	}
+
+	terms := make([]string, 0, len(words))
+
+	for _, w := range words {
+		// Escape any embedded double-quotes and wrap as a quoted literal with
+		// prefix matching (*) so incremental search works naturally.
+		safe := strings.ReplaceAll(w, `"`, `""`)
+		terms = append(terms, `"`+safe+`"*`)
+	}
+
+	return strings.Join(terms, " ")
 }
 
 func init() {
