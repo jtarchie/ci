@@ -31,7 +31,12 @@ type Sqlite struct {
 func NewSqlite(dsn string, namespace string, _ *slog.Logger) (storage.Driver, error) {
 	dsn = strings.TrimPrefix(dsn, "sqlite://")
 
-	writer, err := lqs.Open("sqlite", dsn, "PRAGMA foreign_keys = ON;")
+	writer, err := lqs.Open("sqlite", dsn, `
+		PRAGMA journal_mode = WAL;
+		PRAGMA synchronous = NORMAL;
+		PRAGMA foreign_keys = ON;
+		PRAGMA busy_timeout = 5000;
+	`)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
@@ -45,7 +50,11 @@ func NewSqlite(dsn string, namespace string, _ *slog.Logger) (storage.Driver, er
 	writer.SetMaxIdleConns(1)
 	writer.SetMaxOpenConns(1)
 
-	reader, err := lqs.Open("sqlite", dsn, "PRAGMA foreign_keys = ON;")
+	reader, err := lqs.Open("sqlite", dsn, `
+		PRAGMA foreign_keys = ON;
+		PRAGMA busy_timeout = 5000;
+		PRAGMA query_only = ON;
+	`)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
