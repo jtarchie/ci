@@ -25,6 +25,8 @@ require (
 	github.com/go-task/slim-sprig/v3 v3.0.0
 	github.com/goccy/go-yaml v1.19.2
 	github.com/hetznercloud/hcloud-go/v2 v2.36.0
+	github.com/imroc/req/v3 v3.57.0
+	github.com/jtarchie/lqs v0.0.0-20241231214705-8a34e6c2a6fc
 	github.com/kdomanski/iso9660 v0.4.0
 	github.com/klauspost/compress v1.18.4
 	github.com/labstack/echo/v4 v4.15.1
@@ -127,7 +129,6 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.8 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/icholy/digest v1.1.0 // indirect
-	github.com/imroc/req/v3 v3.57.0 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kevinburke/ssh_config v1.6.0 // indirect
