@@ -11,25 +11,25 @@ import (
 	"time"
 
 	"github.com/jtarchie/ci/orchestra"
-	"github.com/jtarchie/ci/orchestra/cache"
 	"github.com/jtarchie/ci/secrets"
 	"github.com/jtarchie/ci/storage"
 )
 
 type PipelineRunner struct {
-	client         orchestra.Driver
-	storage        storage.Driver
-	ctx            context.Context //nolint: containedctx
-	logger         *slog.Logger
-	volumes        []orchestra.Volume
-	namespace      string
-	runID          string
-	mu             sync.Mutex // Protects callIndex
-	callIndex      int        // Tracks how many times Run() has been called
-	secretsManager secrets.Manager
-	pipelineID     string
-	secretValues   []string        // Cached secret values for redaction
-	preseededTars  map[string]io.Reader // volume name → tar reader for pre-seeding
+	client           orchestra.Driver
+	storage          storage.Driver
+	ctx              context.Context //nolint: containedctx
+	logger           *slog.Logger
+	volumes          []orchestra.Volume
+	namespace        string
+	runID            string
+	mu               sync.Mutex // Protects callIndex
+	callIndex        int        // Tracks how many times Run() has been called
+	secretsManager   secrets.Manager
+	pipelineID       string
+	secretValues     []string                    // Cached secret values for redaction
+	preseededVolumes map[string]orchestra.Volume // volume name → pre-created volume
+	outputCallback   OutputCallback              // Global output callback for all tasks
 }
 
 func NewPipelineRunner(
@@ -51,10 +51,17 @@ func NewPipelineRunner(
 	}
 }
 
-// SetPreseededTars configures the pipeline runner to seed named volumes from
-// the provided tar readers when CreateVolume is called for a matching name.
-func (c *PipelineRunner) SetPreseededTars(tars map[string]io.Reader) {
-	c.preseededTars = tars
+// SetPreseededVolumes configures the pipeline runner to reuse pre-created,
+// already-seeded volumes when CreateVolume is called for a matching name.
+func (c *PipelineRunner) SetPreseededVolumes(vols map[string]orchestra.Volume) {
+	c.preseededVolumes = vols
+}
+
+// SetOutputCallback sets a global output callback that is applied to every
+// task run by this pipeline runner. Individual tasks may override this via
+// their own OnOutput field.
+func (c *PipelineRunner) SetOutputCallback(cb OutputCallback) {
+	c.outputCallback = cb
 }
 
 // SetSecretsManager configures the pipeline runner to load secrets
@@ -122,27 +129,26 @@ func (c *PipelineRunner) CreateVolume(input VolumeInput) (*VolumeResult, error) 
 	logger := c.logger
 	logger.Debug("volume.create.pipeline.request", "input", input)
 
+	// If a pre-created volume exists for this name, reuse it.
+	if c.preseededVolumes != nil {
+		if vol, ok := c.preseededVolumes[input.Name]; ok && vol != nil {
+			logger.Info("volume.create.reuse_preseeded", "volume", input.Name)
+
+			c.volumes = append(c.volumes, vol)
+
+			return &VolumeResult{
+				volume: vol,
+				Name:   vol.Name(),
+				Path:   vol.Path(),
+			}, nil
+		}
+	}
+
 	volume, err := c.client.CreateVolume(ctx, input.Name, input.Size)
 	if err != nil {
 		logger.Error("volume.create.pipeline.error", "err", err)
 
 		return nil, fmt.Errorf("could not create volume: %w", err)
-	}
-
-	// If a pre-seeded tar is registered for this volume name, copy its contents in.
-	if c.preseededTars != nil {
-		if reader, ok := c.preseededTars[input.Name]; ok && reader != nil {
-			accessor, ok := c.client.(cache.VolumeDataAccessor)
-			if !ok {
-				return nil, fmt.Errorf("driver %q does not support volume data access for pre-seeding", c.client.Name())
-			}
-
-			if err := accessor.CopyToVolume(ctx, volume.Name(), reader); err != nil {
-				return nil, fmt.Errorf("could not seed volume %q: %w", input.Name, err)
-			}
-
-			logger.Debug("volume.preseed.done", "volume", input.Name)
-		}
 	}
 
 	// Track volume for cleanup
@@ -183,6 +189,7 @@ type RunInput struct {
 	Name       string                  `json:"name"`
 	Privileged bool                    `json:"privileged"`
 	Stdin      string                  `json:"stdin"`
+	WorkDir    string                  `json:"work_dir"`
 	// OnOutput is called with streaming output chunks as the container runs.
 	// If provided, the callback receives (stream, data) where stream is "stdout" or "stderr".
 	OnOutput OutputCallback `json:"-"` // Not serialized from JS, set programmatically
@@ -267,7 +274,12 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 		}
 	}
 
-	logger.Debug("container.run.start")
+	// Apply global output callback if no per-task callback is set.
+	if input.OnOutput == nil && c.outputCallback != nil {
+		input.OnOutput = c.outputCallback
+	}
+
+	logger.Info("container.run.start", "image", input.Image, "command", append([]string{input.Command.Path}, input.Command.Args...))
 
 	// Persist task status to storage so the UI can display progress
 	storageKey := c.taskStorageKey(stepID)
@@ -307,6 +319,7 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 			Privileged: input.Privileged,
 			Stdin:      stdinReader,
 			User:       input.Command.User,
+			WorkDir:    input.WorkDir,
 		},
 	)
 	if err != nil {
@@ -385,7 +398,11 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 	cancelStream()
 	streamWg.Wait()
 
-	logger.Debug("container.status", "exitCode", containerStatus.ExitCode())
+	if containerStatus.ExitCode() != 0 {
+		logger.Warn("container.run.failed", "exitCode", containerStatus.ExitCode())
+	} else {
+		logger.Info("container.run.done", "exitCode", containerStatus.ExitCode())
+	}
 
 	defer func() {
 		err := container.Cleanup(ctx)
@@ -429,11 +446,12 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 		stderrStr = RedactSecrets(stderrStr, c.secretValues)
 	}
 
-	logger.Debug("container.logs", "stdout", stdoutStr, "stderr", stderrStr)
-
 	status := "success"
 	if containerStatus.ExitCode() != 0 {
 		status = "failure"
+		logger.Warn("container.run.output", "stdout", stdoutStr, "stderr", stderrStr)
+	} else {
+		logger.Debug("container.logs", "stdout", stdoutStr, "stderr", stderrStr)
 	}
 
 	c.setTaskStatus(storageKey, map[string]any{
@@ -462,46 +480,66 @@ func (c *PipelineRunner) streamLogsWithCallback(
 ) {
 	logger := c.logger
 
-	// Use a pipe to capture streaming output
-	pr, pw := io.Pipe()
+	stdoutPR, stdoutPW := io.Pipe()
+	stderrPR, stderrPW := io.Pipe()
 
-	var streamWg sync.WaitGroup
+	var wg sync.WaitGroup
 
-	streamWg.Go(func() {
-		defer func() { _ = pw.Close() }()
+	// Stream logs from the container into the two pipes.
+	wg.Go(func() {
+		defer func() { _ = stdoutPW.Close() }()
+		defer func() { _ = stderrPW.Close() }()
 
-		err := container.Logs(ctx, pw, io.Discard, true)
+		err := container.Logs(ctx, stdoutPW, stderrPW, true)
 		if err != nil && ctx.Err() == nil {
 			logger.Debug("container.streamLogs.error", "err", err)
 		}
 	})
 
-	// Read from pipe in chunks and invoke callback
+	// Read stdout chunks and invoke callback.
+	wg.Go(func() {
+		c.readStreamChunks(ctx, stdoutPR, "stdout", stdout, callback, logger)
+	})
+
+	// Read stderr chunks and invoke callback.
+	wg.Go(func() {
+		c.readStreamChunks(ctx, stderrPR, "stderr", stderr, callback, logger)
+	})
+
+	wg.Wait()
+}
+
+// readStreamChunks reads from r in 4 KiB chunks, appends to builder,
+// and invokes callback for the given stream name.
+func (c *PipelineRunner) readStreamChunks(
+	ctx context.Context,
+	r io.Reader,
+	stream string,
+	builder *strings.Builder,
+	callback OutputCallback,
+	logger *slog.Logger,
+) {
 	buf := make([]byte, 4096)
 
 	for {
-		n, err := pr.Read(buf)
+		n, err := r.Read(buf)
 		if n > 0 {
 			chunk := string(buf[:n])
-			stdout.WriteString(chunk)
+			builder.WriteString(chunk)
 
-			// Invoke callback with the chunk
-			// Only invoke if stream context is still active
 			if ctx.Err() == nil {
-				callback("stdout", chunk)
+				callback(stream, chunk)
 			}
 		}
 
 		if err != nil {
 			if err != io.EOF && ctx.Err() == nil {
-				logger.Debug("container.streamLogs.read.error", "err", err)
+				logger.Debug("container.streamLogs.read.error", "stream", stream, "err", err)
 			}
 
 			break
 		}
 	}
-
-	streamWg.Wait()
 }
 
 // CleanupVolumes cleans up all tracked volumes.

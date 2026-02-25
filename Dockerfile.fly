@@ -31,6 +31,7 @@ FROM alpine:latest
 RUN apk add --no-cache \
   ca-certificates \
   libstdc++ \
+  sqlite \
   glib
 
 WORKDIR /app

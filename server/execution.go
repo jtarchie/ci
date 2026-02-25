@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/jtarchie/ci/orchestra"
+	"github.com/jtarchie/ci/orchestra/cache"
 	"github.com/jtarchie/ci/runtime"
 	"github.com/jtarchie/ci/secrets"
 	"github.com/jtarchie/ci/storage"
@@ -215,11 +217,15 @@ func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *stor
 
 // RunByNameSync executes a stored pipeline by name, synchronously.
 // It writes SSE events (stdout, stderr lines as data events; an exit event at completion)
-// to the provided http.ResponseWriter. The writer must already have SSE headers set.
+// to the provided http.ResponseWriter.
 //
 // The pipeline is looked up by exact name; ErrNotFound is returned if missing.
 // Args are passed to the pipeline via pipelineContext.args.
-// If workdirTar is non-nil, the tar stream is used to pre-seed a volume named "workdir".
+//
+// If workdirTar is non-nil, a "workdir" volume is created and seeded from the
+// tar stream *before* the SSE response starts. This ensures the HTTP request
+// body is fully consumed while the connection is still in request mode, which
+// is required for correct behaviour through reverse proxies.
 func (s *ExecutionService) RunByNameSync(
 	ctx context.Context,
 	name string,
@@ -246,11 +252,78 @@ func (s *ExecutionService) RunByNameSync(
 		driverDSN = s.DefaultDriver
 	}
 
+	// --- Pre-seed workdir volume (consumes HTTP body before SSE starts) ---
+	var preseededVolumes map[string]orchestra.Volume
+	var driver orchestra.Driver
+
+	if workdirTar != nil {
+		namespace := "ci-" + run.ID
+
+		driverConfig, orchestrator, dErr := orchestra.GetFromDSN(driverDSN)
+		if dErr != nil {
+			return fmt.Errorf("could not parse driver DSN: %w", dErr)
+		}
+
+		if driverConfig.Namespace != "" {
+			namespace = driverConfig.Namespace
+		}
+
+		driver, dErr = orchestrator(namespace, s.logger, driverConfig.Params)
+		if dErr != nil {
+			return fmt.Errorf("could not create driver: %w", dErr)
+		}
+
+		driver, dErr = cache.WrapWithCaching(driver, driverConfig.Params, s.logger)
+		if dErr != nil {
+			_ = driver.Close()
+			return fmt.Errorf("could not init cache layer: %w", dErr)
+		}
+
+		vol, vErr := driver.CreateVolume(ctx, "workdir", 0)
+		if vErr != nil {
+			_ = driver.Close()
+			return fmt.Errorf("could not create workdir volume: %w", vErr)
+		}
+
+		accessor, ok := driver.(cache.VolumeDataAccessor)
+		if !ok {
+			_ = vol.Cleanup(ctx)
+			_ = driver.Close()
+			return fmt.Errorf("driver %q does not support volume data access", driver.Name())
+		}
+
+		s.logger.Info("workdir.preseed.start")
+
+		if cErr := accessor.CopyToVolume(ctx, vol.Name(), workdirTar); cErr != nil {
+			_ = vol.Cleanup(ctx)
+			_ = driver.Close()
+			return fmt.Errorf("could not seed workdir volume: %w", cErr)
+		}
+
+		s.logger.Info("workdir.preseed.done")
+
+		preseededVolumes = map[string]orchestra.Volume{"workdir": vol}
+		// Close the driver after RunByNameSync returns (after ExecutePipeline
+		// completes). ExecutePipeline reuses this driver instance via opts.Driver
+		// and skips creating/closing its own.
+		defer func() { _ = driver.Close() }()
+	}
+
+	// --- SSE headers — only written after the request body is consumed ---
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.WriteHeader(http.StatusOK)
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
+
 	opts := runtime.ExecutorOptions{
 		RunID:                 run.ID,
 		PipelineID:            pipeline.ID,
 		Args:                  args,
-		WorkdirTar:            workdirTar,
+		PreseededVolumes:      preseededVolumes,
+		Driver:                driver,
 		DisableNotifications:  !IsFeatureEnabled(FeatureNotifications, s.AllowedFeatures),
 		DisableFetch:          !IsFeatureEnabled(FeatureFetch, s.AllowedFeatures),
 		FetchTimeout:          s.FetchTimeout,
@@ -258,6 +331,20 @@ func (s *ExecutionService) RunByNameSync(
 	}
 	if IsFeatureEnabled(FeatureSecrets, s.AllowedFeatures) {
 		opts.SecretsManager = s.SecretsManager
+	}
+
+	// Stream stdout/stderr as SSE data events while the pipeline runs.
+	var writeMu sync.Mutex
+	opts.OutputCallback = func(stream, data string) {
+		writeMu.Lock()
+		defer writeMu.Unlock()
+
+		evt, _ := json.Marshal(map[string]string{"stream": stream, "data": data})
+		fmt.Fprintf(w, "data: %s\n\n", evt) //nolint:errcheck
+
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
 	}
 
 	execErr := runtime.ExecutePipeline(ctx, pipeline.Content, driverDSN, s.store, s.logger, opts)
@@ -269,6 +356,7 @@ func (s *ExecutionService) RunByNameSync(
 	if execErr != nil {
 		exitCode = 1
 		finalStatus = storage.RunStatusFailed
+		// TODO: we never display this error message anywhere in the UI - consider surfacing it in the run details page or similar
 		errMsg = execErr.Error()
 	}
 
@@ -277,8 +365,13 @@ func (s *ExecutionService) RunByNameSync(
 	}
 
 	// Write SSE exit event.
-	exitData, _ := json.Marshal(map[string]any{"event": "exit", "code": exitCode, "run_id": run.ID})
-	fmt.Fprintf(w, "data: %s\n\n", exitData)
+	exitEvent := map[string]any{"event": "exit", "code": exitCode, "run_id": run.ID}
+	if errMsg != "" {
+		exitEvent["message"] = errMsg
+	}
+
+	exitData, _ := json.Marshal(exitEvent)
+	fmt.Fprintf(w, "data: %s\n\n", exitData) //nolint:errcheck
 	if f, ok := w.(http.Flusher); ok {
 		f.Flush()
 	}

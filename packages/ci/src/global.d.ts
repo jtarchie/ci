@@ -39,6 +39,7 @@ declare global {
     name: string;
     privileged?: boolean;
     stdin?: string;
+    work_dir?: string;
     // Callback invoked with streaming output chunks as the container runs
     onOutput?: OutputCallback;
     timeout?: string;

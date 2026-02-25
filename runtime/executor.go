@@ -3,7 +3,6 @@ package runtime
 import (
 	"context"
 	"fmt"
-	"io"
 	"log/slog"
 	"time"
 
@@ -44,10 +43,16 @@ type ExecutorOptions struct {
 	FetchMaxResponseBytes int64
 	// Args contains CLI arguments passed to the pipeline via pipelineContext.args.
 	Args []string
-	// WorkdirTar is a tar reader containing the client's working directory.
-	// If non-nil, a volume named "workdir" is made available to the pipeline
-	// pre-seeded with these contents when the pipeline calls runtime.createVolume("workdir", ...).
-	WorkdirTar io.Reader
+	// PreseededVolumes maps volume names to pre-created, already-seeded volumes.
+	// When the pipeline calls runtime.createVolume("name"), a matching
+	// pre-created volume is reused instead of creating a new one.
+	PreseededVolumes map[string]orchestra.Volume
+	// OutputCallback, if set, is applied to every container task so that
+	// stdout/stderr chunks are forwarded to the caller in real time.
+	OutputCallback func(stream string, data string)
+	// Driver, if set, is used for pipeline execution instead of creating
+	// one from the driver DSN. The caller owns the driver lifecycle.
+	Driver orchestra.Driver
 }
 
 // ExecutePipeline executes a pipeline with the given content and driver DSN.
@@ -77,26 +82,33 @@ func ExecutePipeline(
 
 	logger.Info("driver.initialize")
 
-	driverConfig, orchestrator, err := orchestra.GetFromDSN(driverDSN)
-	if err != nil {
-		return fmt.Errorf("could not parse driver DSN (%q): %w", driverDSN, err)
-	}
+	var driver orchestra.Driver
 
-	// Use namespace from DSN if provided
-	if driverConfig.Namespace != "" {
-		namespace = driverConfig.Namespace
-	}
+	if opts.Driver != nil {
+		// Reuse the caller-provided driver (caller manages lifecycle).
+		driver = opts.Driver
+	} else {
+		driverConfig, orchestrator, err := orchestra.GetFromDSN(driverDSN)
+		if err != nil {
+			return fmt.Errorf("could not parse driver DSN (%q): %w", driverDSN, err)
+		}
 
-	driver, err := orchestrator(namespace, logger, driverConfig.Params)
-	if err != nil {
-		return fmt.Errorf("could not create orchestrator client: %w", err)
-	}
-	defer func() { _ = driver.Close() }()
+		// Use namespace from DSN if provided
+		if driverConfig.Namespace != "" {
+			namespace = driverConfig.Namespace
+		}
 
-	// Wrap driver with caching if cache parameters are present
-	driver, err = cache.WrapWithCaching(driver, driverConfig.Params, logger)
-	if err != nil {
-		return fmt.Errorf("could not initialize cache layer: %w", err)
+		driver, err = orchestrator(namespace, logger, driverConfig.Params)
+		if err != nil {
+			return fmt.Errorf("could not create orchestrator client: %w", err)
+		}
+		defer func() { _ = driver.Close() }()
+
+		// Wrap driver with caching if cache parameters are present
+		driver, err = cache.WrapWithCaching(driver, driverConfig.Params, logger)
+		if err != nil {
+			return fmt.Errorf("could not initialize cache layer: %w", err)
+		}
 	}
 
 	logger.Info("pipeline.executing")
@@ -118,14 +130,17 @@ func ExecutePipeline(
 		Args:                  opts.Args,
 	}
 
-	// If a workdir tar was provided, make it available as a pre-seeded volume.
-	if opts.WorkdirTar != nil {
-		executeOpts.PreseededTars = map[string]io.Reader{"workdir": opts.WorkdirTar}
+	// If pre-seeded volumes were provided, pass them through.
+	if opts.PreseededVolumes != nil {
+		executeOpts.PreseededVolumes = opts.PreseededVolumes
 	}
 
-	err = js.ExecuteWithOptions(ctx, content, driver, store, executeOpts)
-	if err != nil {
-		return fmt.Errorf("could not execute pipeline: %w", err)
+	if opts.OutputCallback != nil {
+		executeOpts.OutputCallback = opts.OutputCallback
+	}
+
+	if execErr := js.ExecuteWithOptions(ctx, content, driver, store, executeOpts); execErr != nil {
+		return fmt.Errorf("could not execute pipeline: %w", execErr)
 	}
 
 	logger.Info("pipeline.completed.success")

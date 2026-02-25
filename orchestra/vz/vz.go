@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -525,7 +526,12 @@ func (v *VZ) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.C
 	}
 
 	// Execute the command via agent
-	pid, err := v.agent.Exec(task.Command[0], task.Command[1:], env, stdinData)
+	execCommand := task.Command
+	if task.WorkDir != "" {
+		execCommand = []string{"/bin/sh", "-c", "cd " + task.WorkDir + " && exec " + strings.Join(task.Command, " ")}
+	}
+
+	pid, err := v.agent.Exec(execCommand[0], execCommand[1:], env, stdinData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to exec command: %w", err)
 	}

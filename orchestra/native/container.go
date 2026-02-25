@@ -120,7 +120,11 @@ func (n *Native) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 	//nolint:gosec
 	command := exec.CommandContext(ctx, task.Command[0], task.Command[1:]...)
 
-	command.Dir = dir
+	if task.WorkDir != "" {
+		command.Dir = filepath.Join(dir, task.WorkDir)
+	} else {
+		command.Dir = dir
+	}
 
 	env := []string{}
 	for k, v := range task.Env {

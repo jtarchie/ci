@@ -41,6 +41,8 @@ type sseEvent struct {
 }
 
 func (c *Run) Run(logger *slog.Logger) error {
+	logger = logger.WithGroup("pipeline.run")
+
 	serverURL := strings.TrimSuffix(c.ServerURL, "/")
 	endpoint := serverURL + "/api/pipelines/" + c.Name + "/run"
 
@@ -83,6 +85,8 @@ func (c *Run) Run(logger *slog.Logger) error {
 				return
 			}
 
+			logger.Info("pipeline.run.workdir", "path", cwd, "ignore", c.Ignore)
+
 			ff, err := mw.CreateFormFile("workdir", "workdir.tar.zst")
 			if err != nil {
 				writeErr = fmt.Errorf("could not create workdir part: %w", err)
@@ -106,6 +110,8 @@ func (c *Run) Run(logger *slog.Logger) error {
 			}
 		}
 	}()
+
+	logger.Info("pipeline.run.trigger", "name", c.Name, "url", endpoint, "args", c.Args)
 
 	req, err := http.NewRequest(http.MethodPost, endpoint, pr)
 	if err != nil {
@@ -137,6 +143,8 @@ func (c *Run) Run(logger *slog.Logger) error {
 		return fmt.Errorf("server returned %d: %s", resp.StatusCode, string(body))
 	}
 
+	logger.Info("pipeline.run.streaming")
+
 	// Read SSE stream line-by-line.
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
@@ -154,6 +162,11 @@ func (c *Run) Run(logger *slog.Logger) error {
 
 		switch evt.Event {
 		case "exit":
+			if evt.Message != "" {
+				fmt.Fprintln(os.Stderr, evt.Message)
+			}
+
+			logger.Info("pipeline.run.exit", "code", evt.Code, "run_id", evt.RunID)
 			os.Exit(evt.Code) //nolint:gocritic // intentional: propagate exit code
 		case "error":
 			fmt.Fprintln(os.Stderr, "error:", evt.Message)
@@ -162,9 +175,9 @@ func (c *Run) Run(logger *slog.Logger) error {
 			// stdout/stderr data event
 			switch evt.Stream {
 			case "stderr":
-				fmt.Fprint(os.Stderr, evt.Data)
+				fmt.Fprint(os.Stderr, evt.Data) //nolint:errcheck
 			default:
-				fmt.Fprint(os.Stdout, evt.Data)
+				fmt.Fprint(os.Stdout, evt.Data) //nolint:errcheck
 			}
 		}
 	}
@@ -192,8 +205,12 @@ func tarDirectory(dir string, w io.Writer, ignorePatterns []string) error {
 			return err
 		}
 
-		// Always include the root itself.
-		if relPath != "." && len(ignorePatterns) > 0 {
+		// Skip the root "." directory entry — extractors handle it implicitly.
+		if relPath == "." {
+			return nil
+		}
+
+		if len(ignorePatterns) > 0 {
 			if ignorePath(relPath, info.IsDir(), ignorePatterns) {
 				if info.IsDir() {
 					return filepath.SkipDir
@@ -203,12 +220,28 @@ func tarDirectory(dir string, w io.Writer, ignorePatterns []string) error {
 			}
 		}
 
+		// Only follow regular files and directories; skip symlinks, devices, etc.
+		if !info.Mode().IsRegular() && !info.IsDir() {
+			return nil
+		}
+
 		hdr, err := tar.FileInfoHeader(info, "")
 		if err != nil {
 			return fmt.Errorf("could not build tar header for %q: %w", relPath, err)
 		}
 
 		hdr.Name = relPath
+		// Produce portable headers: clear OS-specific fields that confuse
+		// minimal tar implementations (e.g. busybox).
+		hdr.Uid = 0
+		hdr.Gid = 0
+		hdr.Uname = ""
+		hdr.Gname = ""
+		hdr.AccessTime = time.Time{}
+		hdr.ChangeTime = time.Time{}
+		hdr.Xattrs = nil     //nolint:staticcheck // clear macOS xattrs
+		hdr.PAXRecords = nil // avoid PAX extensions
+		hdr.Format = tar.FormatGNU
 
 		if err := tw.WriteHeader(hdr); err != nil {
 			return fmt.Errorf("could not write tar header for %q: %w", relPath, err)
