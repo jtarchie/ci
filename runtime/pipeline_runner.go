@@ -550,5 +550,3 @@ func (c *PipelineRunner) setTaskStatus(key string, payload map[string]any) {
 		c.logger.Error("task.status.persist.error", "key", key, "err", err)
 	}
 }
-
-

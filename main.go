@@ -21,10 +21,10 @@ import (
 )
 
 type CLI struct {
-	Runner      commands.Runner      `cmd:"" help:"Run a pipeline"`
-	Resource    commands.Resource    `cmd:"" help:"Execute a native resource operation"`
-	Transpile   commands.Transpile   `cmd:"" help:"Transpile a pipeline"`
-	Server      commands.Server      `cmd:"" help:"Run a server"`
+	Runner         commands.Runner         `cmd:"" help:"Run a pipeline"`
+	Resource       commands.Resource       `cmd:"" help:"Execute a native resource operation"`
+	Transpile      commands.Transpile      `cmd:"" help:"Transpile a pipeline"`
+	Server         commands.Server         `cmd:"" help:"Run a server"`
 	SetPipeline    commands.SetPipeline    `cmd:"" help:"Upload a pipeline to the server"  name:"set-pipeline"`
 	DeletePipeline commands.DeletePipeline `cmd:"" help:"Delete a pipeline from the server" name:"delete-pipeline"`
 
