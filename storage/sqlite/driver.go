@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -13,9 +14,13 @@ import (
 	"github.com/georgysavva/scany/v2/sqlscan"
 	"github.com/jtarchie/ci/runtime"
 	"github.com/jtarchie/ci/storage"
+	"github.com/jtarchie/lqs"
 	"github.com/samber/lo"
 	_ "modernc.org/sqlite"
 )
+
+//go:embed schema.sql
+var schemaSQL string
 
 type Sqlite struct {
 	writer    *sql.DB
@@ -26,107 +31,21 @@ type Sqlite struct {
 func NewSqlite(dsn string, namespace string, _ *slog.Logger) (storage.Driver, error) {
 	dsn = strings.TrimPrefix(dsn, "sqlite://")
 
-	writer, err := sql.Open("sqlite", dsn)
+	writer, err := lqs.Open("sqlite", dsn, "PRAGMA foreign_keys = ON;")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
 	//nolint: noctx
-	_, err = writer.Exec(`
-		CREATE TABLE IF NOT EXISTS tasks (
-			id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-			path TEXT NOT NULL,
-			payload BLOB,
-			created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-			UNIQUE(path)
-		) STRICT;
-	`)
+	_, err = writer.Exec(schemaSQL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create tasks table: %w", err)
-	}
-
-	//nolint: noctx
-	_, err = writer.Exec(`
-		CREATE TABLE IF NOT EXISTS pipelines (
-			id TEXT NOT NULL PRIMARY KEY,
-			name TEXT NOT NULL,
-			content TEXT NOT NULL,
-			driver_dsn TEXT NOT NULL,
-			webhook_secret TEXT NOT NULL DEFAULT '',
-			created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-			updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-		) STRICT;
-	`)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create pipelines table: %w", err)
-	}
-
-	//nolint: noctx
-	_, err = writer.Exec(`
-		CREATE TABLE IF NOT EXISTS pipeline_runs (
-			id TEXT NOT NULL PRIMARY KEY,
-			pipeline_id TEXT NOT NULL,
-			status TEXT NOT NULL,
-			started_at TEXT,
-			completed_at TEXT,
-			error_message TEXT,
-			created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-			FOREIGN KEY (pipeline_id) REFERENCES pipelines(id)
-		) STRICT;
-	`)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create pipeline_runs table: %w", err)
-	}
-
-	//nolint: noctx
-	_, err = writer.Exec(`
-		CREATE TABLE IF NOT EXISTS resource_versions (
-			id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-			resource_name TEXT NOT NULL,
-			version BLOB NOT NULL,
-			job_name TEXT,
-			fetched_at TEXT DEFAULT CURRENT_TIMESTAMP,
-			UNIQUE(resource_name, version)
-		) STRICT;
-		CREATE INDEX IF NOT EXISTS idx_resource_versions_name ON resource_versions(resource_name);
-		CREATE INDEX IF NOT EXISTS idx_resource_versions_fetched ON resource_versions(resource_name, fetched_at DESC);
-	`)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create resource_versions table: %w", err)
-	}
-
-	// FTS5 virtual table for pipeline full-text search (name + content).
-	//nolint: noctx
-	_, err = writer.Exec(`
-		CREATE VIRTUAL TABLE IF NOT EXISTS pipelines_fts USING fts5(
-			id UNINDEXED,
-			name,
-			content,
-			tokenize='unicode61'
-		);
-	`)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create pipelines_fts table: %w", err)
-	}
-
-	// FTS5 virtual table for general full-text search over any stored record.
-	// content holds ANSI-stripped text extracted from the JSON payload.
-	//nolint: noctx
-	_, err = writer.Exec(`
-		CREATE VIRTUAL TABLE IF NOT EXISTS data_fts USING fts5(
-			path UNINDEXED,
-			content,
-			tokenize='unicode61'
-		);
-	`)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create data_fts table: %w", err)
+		return nil, fmt.Errorf("failed to apply schema: %w", err)
 	}
 
 	writer.SetMaxIdleConns(1)
 	writer.SetMaxOpenConns(1)
 
-	reader, err := sql.Open("sqlite", dsn+"?mode=ro&immutable=1")
+	reader, err := lqs.Open("sqlite", dsn, "PRAGMA foreign_keys = ON;")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
