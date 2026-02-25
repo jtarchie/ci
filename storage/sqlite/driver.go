@@ -253,6 +253,30 @@ func (s *Sqlite) GetPipeline(ctx context.Context, id string) (*storage.Pipeline,
 	return &pipeline, nil
 }
 
+// GetPipelineByName retrieves the most recently updated pipeline with the given name.
+func (s *Sqlite) GetPipelineByName(ctx context.Context, name string) (*storage.Pipeline, error) {
+	var pipeline storage.Pipeline
+	var createdAt, updatedAt string
+
+	err := s.writer.QueryRowContext(ctx, `
+		SELECT id, name, content, driver_dsn, webhook_secret, created_at, updated_at
+		FROM pipelines WHERE name = ?
+		ORDER BY updated_at DESC LIMIT 1
+	`, name).Scan(&pipeline.ID, &pipeline.Name, &pipeline.Content, &pipeline.DriverDSN, &pipeline.WebhookSecret, &createdAt, &updatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, storage.ErrNotFound
+		}
+
+		return nil, fmt.Errorf("failed to get pipeline by name: %w", err)
+	}
+
+	pipeline.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+	pipeline.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
+
+	return &pipeline, nil
+}
+
 // ListPipelines returns a paginated list of pipelines in the database.
 func (s *Sqlite) ListPipelines(ctx context.Context, page, perPage int) (*storage.PaginationResult[storage.Pipeline], error) {
 	if page < 1 {

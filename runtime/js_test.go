@@ -78,3 +78,39 @@ func TestYAMLAndAssert(t *testing.T) {
 	`, nil, nil)
 	assert.Expect(err).NotTo(HaveOccurred())
 }
+
+func TestPipelineContextArgs(t *testing.T) {
+	t.Parallel()
+
+	assert := NewGomegaWithT(t)
+
+	js := runtime.NewJS(slog.Default())
+	err := js.ExecuteWithOptions(context.Background(), `
+		async function pipeline() {
+			assert.equal(pipelineContext.args.length, 2);
+			assert.equal(pipelineContext.args[0], "hello");
+			assert.equal(pipelineContext.args[1], "world");
+		};
+
+		export { pipeline };
+	`, nil, nil, runtime.ExecuteOptions{
+		Args: []string{"hello", "world"},
+	})
+	assert.Expect(err).NotTo(HaveOccurred())
+}
+
+func TestPipelineContextArgsDefaultsToEmpty(t *testing.T) {
+	t.Parallel()
+
+	assert := NewGomegaWithT(t)
+
+	js := runtime.NewJS(slog.Default())
+	err := js.Execute(context.Background(), `
+		async function pipeline() {
+			assert.equal(pipelineContext.args.length, 0);
+		};
+
+		export { pipeline };
+	`, nil, nil)
+	assert.Expect(err).NotTo(HaveOccurred())
+}

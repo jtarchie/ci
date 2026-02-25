@@ -197,6 +197,57 @@ func TestExecutionAPI(t *testing.T) {
 				err = client.Close()
 				assert.Expect(err).NotTo(HaveOccurred())
 			})
+
+			t.Run("POST /api/pipelines/:name/run returns SSE exit event", func(t *testing.T) {
+				t.Parallel()
+				assert := NewGomegaWithT(t)
+
+				buildFile, err := os.CreateTemp(t.TempDir(), "")
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = buildFile.Close() }()
+
+				client, err := init(buildFile.Name(), "namespace", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = client.Close() }()
+
+				_, err = client.SavePipeline(context.Background(), "my-pipeline", "export const pipeline = async () => {};", "native://", "")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				req := httptest.NewRequest(http.MethodPost, "/api/pipelines/my-pipeline/run", nil)
+				rec := httptest.NewRecorder()
+				router.ServeHTTP(rec, req)
+
+				assert.Expect(rec.Code).To(Equal(http.StatusOK))
+				assert.Expect(rec.Header().Get("Content-Type")).To(ContainSubstring("text/event-stream"))
+				assert.Expect(rec.Body.String()).To(ContainSubstring(`"event":"exit"`))
+				assert.Expect(rec.Body.String()).To(ContainSubstring(`"code":0`))
+			})
+
+			t.Run("POST /api/pipelines/:name/run returns error event for unknown pipeline", func(t *testing.T) {
+				t.Parallel()
+				assert := NewGomegaWithT(t)
+
+				buildFile, err := os.CreateTemp(t.TempDir(), "")
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = buildFile.Close() }()
+
+				client, err := init(buildFile.Name(), "namespace", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = client.Close() }()
+
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				req := httptest.NewRequest(http.MethodPost, "/api/pipelines/nonexistent/run", nil)
+				rec := httptest.NewRecorder()
+				router.ServeHTTP(rec, req)
+
+				assert.Expect(rec.Code).To(Equal(http.StatusOK))
+				assert.Expect(rec.Body.String()).To(ContainSubstring(`"event":"error"`))
+			})
 		})
 	})
 }

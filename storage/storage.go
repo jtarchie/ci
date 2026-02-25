@@ -73,6 +73,7 @@ type Driver interface {
 	// Pipeline CRUD operations
 	SavePipeline(ctx context.Context, name, content, driverDSN, webhookSecret string) (*Pipeline, error)
 	GetPipeline(ctx context.Context, id string) (*Pipeline, error)
+	GetPipelineByName(ctx context.Context, name string) (*Pipeline, error)
 	ListPipelines(ctx context.Context, page, perPage int) (*PaginationResult[Pipeline], error)
 	DeletePipeline(ctx context.Context, id string) error
 

@@ -5,6 +5,10 @@
 This is a development repository for CI/CD system. These notes can probably be
 inferred from the `git` commit messages. I'm journaling for my own benefit.
 
+- 2026-02-25:
+  - Added `ci run` command for remote pipeline execution by name. Pipelines are
+    stored on the server via `ci set-pipeline`; `ci run` triggers them over HTTP
+    and streams output back in real time. See [run.md](run.md) for details.
 - 2026-02-22:
   - Added encrypted secrets management with AES-256-GCM and pluggable backends.
     See [secrets.md](secrets.md) for details.
