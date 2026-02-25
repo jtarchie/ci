@@ -27,4 +27,5 @@ type Task struct {
 	Privileged      bool
 	Stdin           io.Reader
 	User            string
+	WorkDir         string
 }

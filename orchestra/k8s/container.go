@@ -402,6 +402,11 @@ func (k *K8s) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.
 		"orchestra.task":      sanitizeLabel(task.ID),
 	}
 
+	workDir := task.WorkDir
+	if workDir == "" {
+		workDir = filepath.Join("/tmp", jobName)
+	}
+
 	podTemplateSpec := corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: labels,
@@ -415,7 +420,7 @@ func (k *K8s) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.
 					Command:      task.Command,
 					Env:          env,
 					VolumeMounts: volumeMounts,
-					WorkingDir:   filepath.Join("/tmp", jobName),
+					WorkingDir:   workDir,
 					Resources:    resources,
 					Stdin:        enabledStdin,
 					StdinOnce:    enabledStdin,

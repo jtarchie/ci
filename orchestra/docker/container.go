@@ -150,6 +150,11 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 		resources.Memory = task.ContainerLimits.Memory
 	}
 
+	workDir := task.WorkDir
+	if workDir == "" {
+		workDir = filepath.Join("/tmp", containerName)
+	}
+
 	response, err := d.client.ContainerCreate(
 		ctx,
 		&container.Config{
@@ -161,7 +166,7 @@ func (d *Docker) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 				"orchestra.namespace": d.namespace,
 			},
 			Env:        env,
-			WorkingDir: filepath.Join("/tmp", containerName),
+			WorkingDir: workDir,
 			OpenStdin:  enabledStdin,
 			StdinOnce:  enabledStdin,
 			User:       task.User,

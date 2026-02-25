@@ -245,8 +245,8 @@ func TestExecutionAPI(t *testing.T) {
 				rec := httptest.NewRecorder()
 				router.ServeHTTP(rec, req)
 
-				assert.Expect(rec.Code).To(Equal(http.StatusOK))
-				assert.Expect(rec.Body.String()).To(ContainSubstring(`"event":"error"`))
+				assert.Expect(rec.Code).To(Equal(http.StatusNotFound))
+				assert.Expect(rec.Body.String()).To(ContainSubstring(`"error"`))
 			})
 		})
 	})

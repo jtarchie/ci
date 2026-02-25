@@ -14,7 +14,7 @@ tasks:
     cmds:
       - deno fmt --ignore=server/templates/,backwards/bundle.js,server/static/dist/bundle.js .
       - deno lint --rules-exclude=no-window,no-process-global,no-node-globals --ignore=server/static/dist/,server/templates/,backwards/bundle.js .
-      - deno check backwards/src/ examples/both/
+      - deno check backwards/src/ examples/both/*.ts examples/both/hello-world.js
       - shellcheck bin/*.sh
       - shfmt -w bin/
       - gofmt -w .

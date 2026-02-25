@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	fly "github.com/superfly/fly-go"
@@ -185,10 +186,13 @@ func (f *Fly) CopyToVolume(ctx context.Context, volumeName string, reader io.Rea
 
 	session.Stdin = reader
 
+	var stderrBuf strings.Builder
+	session.Stderr = &stderrBuf
+
 	f.logger.Debug("fly.cache.copytov.start", "volume", volumeName)
 
 	if err := session.Run("tar xf - -C /volume"); err != nil {
-		return fmt.Errorf("failed to extract data to volume: %w", err)
+		return fmt.Errorf("failed to extract data to volume (stderr: %s): %w", stderrBuf.String(), err)
 	}
 
 	f.logger.Info("fly.cache.copytov.done", "volume", volumeName)

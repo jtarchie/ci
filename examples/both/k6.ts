@@ -18,6 +18,7 @@ const pipeline = async () => {
       path: "k6",
       args: pipelineContext.args,
     },
+    work_dir: "/workspace",
     mounts: {
       "/workspace": workdir,
     },

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"strings"
 	"time"
@@ -47,9 +46,13 @@ type ExecuteOptions struct {
 	FetchMaxResponseBytes int64
 	// Args contains CLI arguments passed to the pipeline via pipelineContext.args.
 	Args []string
-	// PreseededTars maps volume names to tar readers that seed newly created
-	// volumes with matching names. Used by the workdir upload feature.
-	PreseededTars map[string]io.Reader
+	// PreseededVolumes maps volume names to pre-created, already-seeded volumes.
+	// When the pipeline calls runtime.createVolume(name), a matching pre-created
+	// volume is reused instead of allocating a new one.
+	PreseededVolumes map[string]orchestra.Volume
+	// OutputCallback, if set, is applied to every container task so that
+	// stdout/stderr chunks are forwarded to the caller in real time.
+	OutputCallback OutputCallback
 }
 
 type JS struct {
@@ -127,8 +130,12 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 			pipelineRunner.SetSecretsManager(opts.SecretsManager, opts.PipelineID)
 		}
 
-		if opts.PreseededTars != nil {
-			pipelineRunner.SetPreseededTars(opts.PreseededTars)
+		if opts.PreseededVolumes != nil {
+			pipelineRunner.SetPreseededVolumes(opts.PreseededVolumes)
+		}
+
+		if opts.OutputCallback != nil {
+			pipelineRunner.SetOutputCallback(opts.OutputCallback)
 		}
 
 		runner = pipelineRunner

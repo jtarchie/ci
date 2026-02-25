@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"strings"
 	"sync"
 	"time"
 
@@ -282,10 +283,16 @@ func (f *Fly) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.
 		guest.MemoryMB = int(task.ContainerLimits.Memory / (1024 * 1024)) // Convert bytes to MB
 	}
 
+	initExec := task.Command
+	if task.WorkDir != "" {
+		// Fly SDK's MachineInit doesn't support WorkDir, so wrap with shell cd
+		initExec = []string{"/bin/sh", "-c", "cd " + task.WorkDir + " && exec " + strings.Join(task.Command, " ")}
+	}
+
 	config := &fly.MachineConfig{
 		Image: task.Image,
 		Init: fly.MachineInit{
-			Exec: task.Command,
+			Exec: initExec,
 		},
 		Env:         env,
 		Guest:       guest,

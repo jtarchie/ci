@@ -804,10 +804,8 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 					data, _ := io.ReadAll(part)
 					_ = json.Unmarshal(data, &args)
 				case "workdir":
-					// Decompress the zstd-compressed tar stream sent by the client.
 					zr, zErr := zstd.NewReader(part)
 					if zErr != nil {
-						// Malformed frame header — skip without crashing.
 						break
 					}
 					defer zr.Close()
@@ -829,26 +827,26 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 		}
 
 		w := ctx.Response().Writer
-		ctx.Response().Header().Set("Content-Type", "text/event-stream")
-		ctx.Response().Header().Set("Cache-Control", "no-cache")
-		ctx.Response().Header().Set("Connection", "keep-alive")
-		ctx.Response().WriteHeader(http.StatusOK)
-		if f, ok := w.(http.Flusher); ok {
-			f.Flush()
-		}
 
 		err := execService.RunByNameSync(ctx.Request().Context(), name, args, workdirTar, w)
 		if err != nil {
-			if errors.Is(err, storage.ErrNotFound) {
-				errData, _ := json.Marshal(map[string]string{"event": "error", "message": "pipeline not found"})
-				fmt.Fprintf(w, "data: %s\n\n", errData)
-				if f, ok := w.(http.Flusher); ok {
-					f.Flush()
+			// SSE headers may not have been written yet (e.g. pipeline
+			// lookup or workdir seeding failed before the SSE phase).
+			// If headers haven't been committed, return a proper HTTP error.
+			if !ctx.Response().Committed {
+				if errors.Is(err, storage.ErrNotFound) {
+					return ctx.JSON(http.StatusNotFound, map[string]string{
+						"error": "pipeline not found",
+					})
 				}
-				return nil
+				return ctx.JSON(http.StatusInternalServerError, map[string]string{
+					"error": err.Error(),
+				})
 			}
+
+			// Headers already committed (SSE mode): send error as SSE event.
 			errData, _ := json.Marshal(map[string]string{"event": "error", "message": err.Error()})
-			fmt.Fprintf(w, "data: %s\n\n", errData)
+			fmt.Fprintf(w, "data: %s\n\n", errData) //nolint:errcheck
 			if f, ok := w.(http.Flusher); ok {
 				f.Flush()
 			}

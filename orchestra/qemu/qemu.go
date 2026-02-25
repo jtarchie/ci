@@ -523,7 +523,12 @@ func (q *QEMU) RunContainer(ctx context.Context, task orchestra.Task) (orchestra
 	}
 
 	// Execute the command via QGA
-	pid, err := q.qga.Exec(task.Command[0], task.Command[1:], env, stdinData)
+	execCommand := task.Command
+	if task.WorkDir != "" {
+		execCommand = []string{"/bin/sh", "-c", "cd " + task.WorkDir + " && exec " + strings.Join(task.Command, " ")}
+	}
+
+	pid, err := q.qga.Exec(execCommand[0], execCommand[1:], env, stdinData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to exec command: %w", err)
 	}
