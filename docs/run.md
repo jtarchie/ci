@@ -69,7 +69,7 @@ const result = await runtime.run({
 
 ## k6 load-testing example
 
-See [examples/both/k6.ts](../examples/both/k6.ts) for a complete example.
+See [examples/run/k6.ts](../examples/run/k6.ts) for a complete example.
 
 ```typescript
 const pipeline = async () => {
