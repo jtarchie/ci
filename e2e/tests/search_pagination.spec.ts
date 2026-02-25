@@ -89,10 +89,7 @@ test.describe("Pipeline Search", () => {
 // ─── Pipeline Pagination ──────────────────────────────────────────────────────
 
 test.describe("Pipeline Pagination", () => {
-  test("shows Next button when pipelines exceed per-page limit", async ({
-    page,
-    request,
-  }) => {
+  test("shows Next button when pipelines exceed per-page limit", async ({ page, request }) => {
     // Create 2 pipelines; per_page=1 forces pagination
     await createPipeline(
       request,
@@ -111,10 +108,7 @@ test.describe("Pipeline Pagination", () => {
     await expect(page.getByText("Next →")).toBeVisible();
   });
 
-  test("navigates to next page and back to previous", async ({
-    page,
-    request,
-  }) => {
+  test("navigates to next page and back to previous", async ({ page, request }) => {
     await createPipeline(
       request,
       uniqueName("pgnav-a"),
@@ -176,10 +170,7 @@ test.describe("Pipeline Pagination", () => {
     expect(page1Name).not.toBe(page2Name);
   });
 
-  test("pipeline search filters results on current page", async ({
-    page,
-    request,
-  }) => {
+  test("pipeline search filters results on current page", async ({ page, request }) => {
     // Create 25 pipelines sharing a unique keyword so search returns >20 hits
     const keyword = `srchpg${Date.now()}`;
     const promises = Array.from({ length: 22 }, (_, i) =>
@@ -187,8 +178,7 @@ test.describe("Pipeline Pagination", () => {
         request,
         `${keyword}-${i}`,
         `export const pipeline = async () => {};`,
-      ),
-    );
+      ));
     await Promise.all(promises);
 
     await page.goto("/pipelines/");
@@ -217,10 +207,7 @@ test.describe("Pipeline Pagination", () => {
 // ─── Runs Search ─────────────────────────────────────────────────────────────
 
 test.describe("Runs Search", () => {
-  test("search input is visible on pipeline detail page", async ({
-    page,
-    request,
-  }) => {
+  test("search input is visible on pipeline detail page", async ({ page, request }) => {
     const id = await createPipeline(
       request,
       uniqueName("run-srchvis"),
@@ -234,10 +221,7 @@ test.describe("Runs Search", () => {
     ).toBeVisible();
   });
 
-  test("shows no-match message for unmatched query", async ({
-    page,
-    request,
-  }) => {
+  test("shows no-match message for unmatched query", async ({ page, request }) => {
     const id = await createPipeline(
       request,
       uniqueName("run-srchemp"),
@@ -322,10 +306,7 @@ test.describe("Runs Search", () => {
 // ─── Runs Pagination ──────────────────────────────────────────────────────────
 
 test.describe("Runs Pagination", () => {
-  test("shows pagination when runs exceed per-page limit", async ({
-    page,
-    request,
-  }) => {
+  test("shows pagination when runs exceed per-page limit", async ({ page, request }) => {
     const id = await createPipeline(
       request,
       uniqueName("runs-pag"),
@@ -418,10 +399,7 @@ test.describe("Runs Pagination", () => {
 test.describe("Tasks Search", () => {
   // The search input is present even before any tasks load; verify with a
   // lightweight native pipeline that completes quickly.
-  test("search input is visible on the tasks page", async ({
-    page,
-    request,
-  }) => {
+  test("search input is visible on the tasks page", async ({ page, request }) => {
     const id = await createPipeline(
       request,
       uniqueName("tasks-srchvis"),
@@ -495,10 +473,7 @@ test.describe("Tasks Search (Docker)", () => {
     await expect(page.getByText("marker-task")).toBeVisible({ timeout: 5000 });
   });
 
-  test("task search shows empty results when no output matches", async ({
-    page,
-    request,
-  }) => {
+  test("task search shows empty results when no output matches", async ({ page, request }) => {
     const id = await createPipeline(
       request,
       uniqueName("tasks-srchempty"),
