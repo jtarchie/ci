@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"strings"
 	"time"
@@ -46,6 +47,9 @@ type ExecuteOptions struct {
 	FetchMaxResponseBytes int64
 	// Args contains CLI arguments passed to the pipeline via pipelineContext.args.
 	Args []string
+	// PreseededTars maps volume names to tar readers that seed newly created
+	// volumes with matching names. Used by the workdir upload feature.
+	PreseededTars map[string]io.Reader
 }
 
 type JS struct {
@@ -121,6 +125,10 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 		pipelineRunner := NewPipelineRunner(ctx, driver, storage, j.logger, opts.Namespace, opts.RunID)
 		if opts.SecretsManager != nil {
 			pipelineRunner.SetSecretsManager(opts.SecretsManager, opts.PipelineID)
+		}
+
+		if opts.PreseededTars != nil {
+			pipelineRunner.SetPreseededTars(opts.PreseededTars)
 		}
 
 		runner = pipelineRunner

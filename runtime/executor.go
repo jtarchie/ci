@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"time"
 
@@ -43,6 +44,10 @@ type ExecutorOptions struct {
 	FetchMaxResponseBytes int64
 	// Args contains CLI arguments passed to the pipeline via pipelineContext.args.
 	Args []string
+	// WorkdirTar is a tar reader containing the client's working directory.
+	// If non-nil, a volume named "workdir" is made available to the pipeline
+	// pre-seeded with these contents when the pipeline calls runtime.createVolume("workdir", ...).
+	WorkdirTar io.Reader
 }
 
 // ExecutePipeline executes a pipeline with the given content and driver DSN.
@@ -111,6 +116,11 @@ func ExecutePipeline(
 		FetchTimeout:          opts.FetchTimeout,
 		FetchMaxResponseBytes: opts.FetchMaxResponseBytes,
 		Args:                  opts.Args,
+	}
+
+	// If a workdir tar was provided, make it available as a pre-seeded volume.
+	if opts.WorkdirTar != nil {
+		executeOpts.PreseededTars = map[string]io.Reader{"workdir": opts.WorkdirTar}
 	}
 
 	err = js.ExecuteWithOptions(ctx, content, driver, store, executeOpts)

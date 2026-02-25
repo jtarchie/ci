@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -218,10 +219,12 @@ func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *stor
 //
 // The pipeline is looked up by exact name; ErrNotFound is returned if missing.
 // Args are passed to the pipeline via pipelineContext.args.
+// If workdirTar is non-nil, the tar stream is used to pre-seed a volume named "workdir".
 func (s *ExecutionService) RunByNameSync(
 	ctx context.Context,
 	name string,
 	args []string,
+	workdirTar io.Reader,
 	w http.ResponseWriter,
 ) error {
 	pipeline, err := s.store.GetPipelineByName(ctx, name)
@@ -247,6 +250,7 @@ func (s *ExecutionService) RunByNameSync(
 		RunID:                 run.ID,
 		PipelineID:            pipeline.ID,
 		Args:                  args,
+		WorkdirTar:            workdirTar,
 		DisableNotifications:  !IsFeatureEnabled(FeatureNotifications, s.AllowedFeatures),
 		DisableFetch:          !IsFeatureEnabled(FeatureFetch, s.AllowedFeatures),
 		FetchTimeout:          s.FetchTimeout,
