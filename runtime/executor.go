@@ -41,6 +41,8 @@ type ExecutorOptions struct {
 	FetchTimeout time.Duration
 	// FetchMaxResponseBytes is the maximum response body size for fetch() calls.
 	FetchMaxResponseBytes int64
+	// Args contains CLI arguments passed to the pipeline via pipelineContext.args.
+	Args []string
 }
 
 // ExecutePipeline executes a pipeline with the given content and driver DSN.
@@ -108,6 +110,7 @@ func ExecutePipeline(
 		DisableFetch:          opts.DisableFetch,
 		FetchTimeout:          opts.FetchTimeout,
 		FetchMaxResponseBytes: opts.FetchMaxResponseBytes,
+		Args:                  opts.Args,
 	}
 
 	err = js.ExecuteWithOptions(ctx, content, driver, store, executeOpts)

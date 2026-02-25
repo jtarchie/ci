@@ -200,6 +200,45 @@ func TestPipelineStorage(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				assert.Expect(results).To(BeEmpty())
 			})
+
+			t.Run("GetPipelineByName returns the most recent pipeline with that name", func(t *testing.T) {
+				t.Parallel()
+				assert := NewGomegaWithT(t)
+
+				buildFile, err := os.CreateTemp(t.TempDir(), "")
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = buildFile.Close() }()
+
+				client, err := init(buildFile.Name(), "namespace", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = client.Close() }()
+
+				ctx := context.Background()
+
+				saved, err := client.SavePipeline(ctx, "k6", "export { pipeline };", "native://", "")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				retrieved, err := client.GetPipelineByName(ctx, "k6")
+				assert.Expect(err).NotTo(HaveOccurred())
+				assert.Expect(retrieved.ID).To(Equal(saved.ID))
+				assert.Expect(retrieved.Name).To(Equal("k6"))
+			})
+
+			t.Run("GetPipelineByName returns ErrNotFound for unknown name", func(t *testing.T) {
+				t.Parallel()
+				assert := NewGomegaWithT(t)
+
+				buildFile, err := os.CreateTemp(t.TempDir(), "")
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = buildFile.Close() }()
+
+				client, err := init(buildFile.Name(), "namespace", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = client.Close() }()
+
+				_, err = client.GetPipelineByName(context.Background(), "nonexistent")
+				assert.Expect(err).To(Equal(storage.ErrNotFound))
+			})
 		})
 	})
 }

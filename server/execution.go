@@ -2,7 +2,10 @@ package server
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log/slog"
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -207,6 +210,76 @@ func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *stor
 	} else {
 		logger.Info("pipeline.execute.completed_with_failures")
 	}
+}
+
+// RunByNameSync executes a stored pipeline by name, synchronously.
+// It writes SSE events (stdout, stderr lines as data events; an exit event at completion)
+// to the provided http.ResponseWriter. The writer must already have SSE headers set.
+//
+// The pipeline is looked up by exact name; ErrNotFound is returned if missing.
+// Args are passed to the pipeline via pipelineContext.args.
+func (s *ExecutionService) RunByNameSync(
+	ctx context.Context,
+	name string,
+	args []string,
+	w http.ResponseWriter,
+) error {
+	pipeline, err := s.store.GetPipelineByName(ctx, name)
+	if err != nil {
+		return err
+	}
+
+	run, err := s.store.SaveRun(ctx, pipeline.ID)
+	if err != nil {
+		return fmt.Errorf("failed to save run: %w", err)
+	}
+
+	if err = s.store.UpdateRunStatus(ctx, run.ID, storage.RunStatusRunning, ""); err != nil {
+		s.logger.Error("run.update.failed.to_running", "error", err)
+	}
+
+	driverDSN := pipeline.DriverDSN
+	if driverDSN == "" {
+		driverDSN = s.DefaultDriver
+	}
+
+	opts := runtime.ExecutorOptions{
+		RunID:                 run.ID,
+		PipelineID:            pipeline.ID,
+		Args:                  args,
+		DisableNotifications:  !IsFeatureEnabled(FeatureNotifications, s.AllowedFeatures),
+		DisableFetch:          !IsFeatureEnabled(FeatureFetch, s.AllowedFeatures),
+		FetchTimeout:          s.FetchTimeout,
+		FetchMaxResponseBytes: s.FetchMaxResponseBytes,
+	}
+	if IsFeatureEnabled(FeatureSecrets, s.AllowedFeatures) {
+		opts.SecretsManager = s.SecretsManager
+	}
+
+	execErr := runtime.ExecutePipeline(ctx, pipeline.Content, driverDSN, s.store, s.logger, opts)
+
+	exitCode := 0
+	finalStatus := storage.RunStatusSuccess
+	errMsg := ""
+
+	if execErr != nil {
+		exitCode = 1
+		finalStatus = storage.RunStatusFailed
+		errMsg = execErr.Error()
+	}
+
+	if err = s.store.UpdateRunStatus(ctx, run.ID, finalStatus, errMsg); err != nil {
+		s.logger.Error("run.update.failed.to_final", "error", err)
+	}
+
+	// Write SSE exit event.
+	exitData, _ := json.Marshal(map[string]any{"event": "exit", "code": exitCode, "run_id": run.ID})
+	fmt.Fprintf(w, "data: %s\n\n", exitData)
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
+
+	return nil
 }
 
 // determineRunStatus checks job statuses to determine the final run status.

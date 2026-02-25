@@ -44,6 +44,8 @@ type ExecuteOptions struct {
 	FetchTimeout time.Duration
 	// FetchMaxResponseBytes is the maximum response body size for fetch() calls.
 	FetchMaxResponseBytes int64
+	// Args contains CLI arguments passed to the pipeline via pipelineContext.args.
+	Args []string
 }
 
 type JS struct {
@@ -225,10 +227,16 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 		triggeredBy = "webhook"
 	}
 
+	args := opts.Args
+	if args == nil {
+		args = []string{}
+	}
+
 	pipelineContext := map[string]any{
 		"runID":       opts.RunID,
 		"pipelineID":  opts.PipelineID,
 		"triggeredBy": triggeredBy,
+		"args":        args,
 	}
 	if driver != nil {
 		pipelineContext["driverName"] = driver.Name()

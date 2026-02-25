@@ -779,6 +779,45 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 
 		return ctx.JSON(http.StatusOK, run)
 	})
+
+	// POST /api/pipelines/:name/run - Run a stored pipeline by name (synchronous SSE stream)
+	api.POST("/pipelines/:name/run", func(ctx echo.Context) error {
+		name := ctx.Param("name")
+
+		var req struct {
+			Args []string `json:"args"`
+		}
+		// Ignore decode errors; default to empty args.
+		_ = json.NewDecoder(ctx.Request().Body).Decode(&req)
+
+		w := ctx.Response().Writer
+		ctx.Response().Header().Set("Content-Type", "text/event-stream")
+		ctx.Response().Header().Set("Cache-Control", "no-cache")
+		ctx.Response().Header().Set("Connection", "keep-alive")
+		ctx.Response().WriteHeader(http.StatusOK)
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+
+		err := execService.RunByNameSync(ctx.Request().Context(), name, req.Args, w)
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				errData, _ := json.Marshal(map[string]string{"event": "error", "message": "pipeline not found"})
+				fmt.Fprintf(w, "data: %s\n\n", errData)
+				if f, ok := w.(http.Flusher); ok {
+					f.Flush()
+				}
+				return nil
+			}
+			errData, _ := json.Marshal(map[string]string{"event": "error", "message": err.Error()})
+			fmt.Fprintf(w, "data: %s\n\n", errData)
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+			}
+		}
+
+		return nil
+	})
 }
 
 func registerWebhookRoutes(router *echo.Echo, store storage.Driver, execService *ExecutionService, webhookTimeout time.Duration, allowedFeatures []Feature) {

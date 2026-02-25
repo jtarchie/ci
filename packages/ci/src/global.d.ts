@@ -71,6 +71,8 @@ declare global {
     pipelineID?: string;
     driverName?: string;
     triggeredBy?: string;
+    /** Arguments passed from `ci run <name> [args...]` */
+    args: string[];
   }
   const pipelineContext: PipelineContext;
 
