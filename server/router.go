@@ -19,6 +19,7 @@ import (
 	"github.com/jtarchie/ci/runtime"
 	"github.com/jtarchie/ci/secrets"
 	"github.com/jtarchie/ci/storage"
+	"github.com/klauspost/compress/zstd"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	slogecho "github.com/samber/slog-echo"
@@ -784,11 +785,48 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 	api.POST("/pipelines/:name/run", func(ctx echo.Context) error {
 		name := ctx.Param("name")
 
-		var req struct {
-			Args []string `json:"args"`
+		var args []string
+		var workdirTar io.Reader
+
+		// Try multipart streaming first (preferred: allows large workdir tars without buffering).
+		if mr, err := ctx.Request().MultipartReader(); err == nil {
+			for {
+				part, partErr := mr.NextPart()
+				if partErr == io.EOF {
+					break
+				}
+				if partErr != nil {
+					break
+				}
+
+				switch part.FormName() {
+				case "args":
+					data, _ := io.ReadAll(part)
+					_ = json.Unmarshal(data, &args)
+				case "workdir":
+					// Decompress the zstd-compressed tar stream sent by the client.
+					zr, zErr := zstd.NewReader(part)
+					if zErr != nil {
+						// Malformed frame header — skip without crashing.
+						break
+					}
+					defer zr.Close()
+					workdirTar = zr
+				}
+
+				if workdirTar != nil {
+					// workdir part found, stop iterating to preserve the reader.
+					break
+				}
+			}
+		} else {
+			// Fall back to JSON body (no workdir support in this path).
+			var req struct {
+				Args []string `json:"args"`
+			}
+			_ = json.NewDecoder(ctx.Request().Body).Decode(&req)
+			args = req.Args
 		}
-		// Ignore decode errors; default to empty args.
-		_ = json.NewDecoder(ctx.Request().Body).Decode(&req)
 
 		w := ctx.Response().Writer
 		ctx.Response().Header().Set("Content-Type", "text/event-stream")
@@ -799,7 +837,7 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 			f.Flush()
 		}
 
-		err := execService.RunByNameSync(ctx.Request().Context(), name, req.Args, w)
+		err := execService.RunByNameSync(ctx.Request().Context(), name, args, workdirTar, w)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
 				errData, _ := json.Marshal(map[string]string{"event": "error", "message": "pipeline not found"})

@@ -2,6 +2,8 @@ package cache
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"log/slog"
 
 	"github.com/jtarchie/ci/orchestra"
@@ -106,4 +108,26 @@ func (d *CachingDriver) GetContainer(ctx context.Context, containerID string) (o
 	return d.inner.GetContainer(ctx, containerID)
 }
 
+// CopyToVolume implements VolumeDataAccessor by delegating to the inner driver.
+// This allows the caching driver to participate in workdir pre-seeding.
+func (d *CachingDriver) CopyToVolume(ctx context.Context, volumeName string, reader io.Reader) error {
+	accessor, ok := d.inner.(VolumeDataAccessor)
+	if !ok {
+		return fmt.Errorf("inner driver %q does not support volume data access", d.inner.Name())
+	}
+
+	return accessor.CopyToVolume(ctx, volumeName, reader)
+}
+
+// CopyFromVolume implements VolumeDataAccessor by delegating to the inner driver.
+func (d *CachingDriver) CopyFromVolume(ctx context.Context, volumeName string) (io.ReadCloser, error) {
+	accessor, ok := d.inner.(VolumeDataAccessor)
+	if !ok {
+		return nil, fmt.Errorf("inner driver %q does not support volume data access", d.inner.Name())
+	}
+
+	return accessor.CopyFromVolume(ctx, volumeName)
+}
+
 var _ orchestra.Driver = (*CachingDriver)(nil)
+var _ VolumeDataAccessor = (*CachingDriver)(nil)

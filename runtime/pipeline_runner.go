@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jtarchie/ci/orchestra"
+	"github.com/jtarchie/ci/orchestra/cache"
 	"github.com/jtarchie/ci/secrets"
 	"github.com/jtarchie/ci/storage"
 )
@@ -27,7 +28,8 @@ type PipelineRunner struct {
 	callIndex      int        // Tracks how many times Run() has been called
 	secretsManager secrets.Manager
 	pipelineID     string
-	secretValues   []string // Cached secret values for redaction
+	secretValues   []string        // Cached secret values for redaction
+	preseededTars  map[string]io.Reader // volume name → tar reader for pre-seeding
 }
 
 func NewPipelineRunner(
@@ -47,6 +49,12 @@ func NewPipelineRunner(
 		namespace: namespace,
 		runID:     runID,
 	}
+}
+
+// SetPreseededTars configures the pipeline runner to seed named volumes from
+// the provided tar readers when CreateVolume is called for a matching name.
+func (c *PipelineRunner) SetPreseededTars(tars map[string]io.Reader) {
+	c.preseededTars = tars
 }
 
 // SetSecretsManager configures the pipeline runner to load secrets
@@ -119,6 +127,22 @@ func (c *PipelineRunner) CreateVolume(input VolumeInput) (*VolumeResult, error) 
 		logger.Error("volume.create.pipeline.error", "err", err)
 
 		return nil, fmt.Errorf("could not create volume: %w", err)
+	}
+
+	// If a pre-seeded tar is registered for this volume name, copy its contents in.
+	if c.preseededTars != nil {
+		if reader, ok := c.preseededTars[input.Name]; ok && reader != nil {
+			accessor, ok := c.client.(cache.VolumeDataAccessor)
+			if !ok {
+				return nil, fmt.Errorf("driver %q does not support volume data access for pre-seeding", c.client.Name())
+			}
+
+			if err := accessor.CopyToVolume(ctx, volume.Name(), reader); err != nil {
+				return nil, fmt.Errorf("could not seed volume %q: %w", input.Name, err)
+			}
+
+			logger.Debug("volume.preseed.done", "volume", input.Name)
+		}
 	}
 
 	// Track volume for cleanup
