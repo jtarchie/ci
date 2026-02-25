@@ -25,7 +25,8 @@ type CLI struct {
 	Resource    commands.Resource    `cmd:"" help:"Execute a native resource operation"`
 	Transpile   commands.Transpile   `cmd:"" help:"Transpile a pipeline"`
 	Server      commands.Server      `cmd:"" help:"Run a server"`
-	SetPipeline commands.SetPipeline `cmd:"" help:"Upload a pipeline to the server" name:"set-pipeline"`
+	SetPipeline    commands.SetPipeline    `cmd:"" help:"Upload a pipeline to the server"  name:"set-pipeline"`
+	DeletePipeline commands.DeletePipeline `cmd:"" help:"Delete a pipeline from the server" name:"delete-pipeline"`
 
 	LogLevel  slog.Level `default:"info"             env:"CI_LOG_LEVEL"   help:"Set the log level (debug, info, warn, error)"`
 	AddSource bool       `env:"CI_ADD_SOURCE"        help:"Add source code location to log messages"`

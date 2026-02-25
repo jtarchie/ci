@@ -97,6 +97,14 @@
                 role="menuitem">
                 View Source
               </a>
+              <button
+                hx-delete="/api/pipelines/{{ .Pipeline.ID }}"
+                hx-confirm="Are you sure you want to delete this pipeline and all its runs? This cannot be undone."
+                hx-on::after-request="if(event.detail.successful) window.location.href='/pipelines/'"
+                class="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:bg-gray-100 dark:focus:bg-gray-700"
+                role="menuitem">
+                Delete Pipeline
+              </button>
             </div>
           </details>
         </div>

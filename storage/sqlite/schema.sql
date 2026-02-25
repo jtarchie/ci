@@ -77,3 +77,17 @@ WHERE
   path = OLD.path;
 
 END;
+
+-- Remove task data stored under .../{namespace}/pipeline/{run_id}/... when a pipeline run is deleted.
+-- This fires for each run row cascade-deleted from pipeline_runs (e.g. when deleting a pipeline),
+-- and the existing data_fts_delete trigger then cleans the FTS index for each removed task row.
+-- The leading '%' matches any namespace prefix prepended by the storage layer.
+CREATE TRIGGER IF NOT EXISTS pipeline_runs_tasks_delete
+AFTER
+  DELETE ON pipeline_runs BEGIN
+DELETE FROM
+  tasks
+WHERE
+  path LIKE '%/pipeline/' || OLD.id || '/%';
+
+END;

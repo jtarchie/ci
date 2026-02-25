@@ -157,6 +157,49 @@ func TestPipelineStorage(t *testing.T) {
 				err = client.DeletePipeline(context.Background(), "non-existent-id")
 				assert.Expect(err).To(Equal(storage.ErrNotFound))
 			})
+
+			t.Run("DeletePipeline cascades to runs and task data", func(t *testing.T) {
+				t.Parallel()
+				assert := NewGomegaWithT(t)
+
+				buildFile, err := os.CreateTemp(t.TempDir(), "")
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = buildFile.Close() }()
+
+				client, err := init(buildFile.Name(), "namespace", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = client.Close() }()
+
+				ctx := context.Background()
+
+				pipeline, err := client.SavePipeline(ctx, "cascade-test", "export { pipeline };", "native://", "")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				run, err := client.SaveRun(ctx, pipeline.ID)
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				taskPath := "/pipeline/" + run.ID + "/tasks/0-echo-task"
+				err = client.Set(ctx, taskPath, map[string]string{"status": "running"})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				// Verify task data exists before deletion
+				results, err := client.GetAll(ctx, "/pipeline/"+run.ID+"/", []string{"status"})
+				assert.Expect(err).NotTo(HaveOccurred())
+				assert.Expect(results).NotTo(BeEmpty())
+
+				// Delete the pipeline; runs and task data should cascade-delete
+				err = client.DeletePipeline(ctx, pipeline.ID)
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				// Run should be gone
+				_, err = client.GetRun(ctx, run.ID)
+				assert.Expect(err).To(Equal(storage.ErrNotFound))
+
+				// Task data should be gone
+				results, err = client.GetAll(ctx, "/pipeline/"+run.ID+"/", []string{"status"})
+				assert.Expect(err).NotTo(HaveOccurred())
+				assert.Expect(results).To(BeEmpty())
+			})
 		})
 	})
 }
