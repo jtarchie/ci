@@ -123,7 +123,12 @@ func (c *Container) Logs(ctx context.Context, stdout, stderr io.Writer, follow b
 			}
 		}
 
-		nextToken = token
+		// Only advance the token when the API returned a non-empty one.
+		// An empty token means "no new logs yet" — preserving the last valid
+		// token prevents re-fetching the entire log history on the next poll.
+		if token != "" {
+			nextToken = token
+		}
 
 		if !follow {
 			return nil
@@ -135,9 +140,14 @@ func (c *Container) Logs(ctx context.Context, stdout, stderr io.Writer, follow b
 		c.mu.Unlock()
 
 		if done {
-			// One final fetch to get any remaining logs
-			finalEntries, _, err := c.fetchLogs(ctx, nextToken)
-			if err == nil {
+			// Drain any remaining logs that arrived after the last poll.
+			// Continue advancing the token so we don't replay already-seen entries.
+			for {
+				finalEntries, finalToken, err := c.fetchLogs(ctx, nextToken)
+				if err != nil || len(finalEntries) == 0 {
+					break
+				}
+
 				for _, entry := range finalEntries {
 					writer := stdout
 					if entry.Level == "error" || entry.Level == "warning" {
@@ -147,6 +157,12 @@ func (c *Container) Logs(ctx context.Context, stdout, stderr io.Writer, follow b
 					if entry.Provider == "app" {
 						_, _ = fmt.Fprintln(writer, entry.Message)
 					}
+				}
+
+				if finalToken != "" {
+					nextToken = finalToken
+				} else {
+					break
 				}
 			}
 
