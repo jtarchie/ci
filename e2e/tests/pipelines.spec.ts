@@ -543,65 +543,6 @@ test.describe("Live Updates", () => {
     });
   });
 
-  // This test is flaky due to Docker image pull times and container startup latency
-  // The behavior is validated by the other tests - this specifically tests htmx state preservation
-  test.skip("preserves expanded tasks during live updates", async ({ page, request }) => {
-    const pipelineName = uniqueName("preserve-expand-test");
-    // Create a pipeline with multiple steps - step-1 completes first, step-2 is slow
-    await createPipeline(
-      request,
-      pipelineName,
-      `export const pipeline = async () => { 
-        await runtime.run({
-          name: "step-1",
-          image: "alpine",
-          command: { path: "echo", args: ["quick"] }
-        });
-        await runtime.run({
-          name: "step-2",
-          image: "alpine",
-          command: { path: "sleep", args: ["6"] }
-        });
-      };`,
-      "docker://",
-    );
-
-    await page.goto("/pipelines/");
-    await page.getByRole("link", { name: pipelineName }).click();
-
-    // Trigger the pipeline
-    await page.getByRole("button", { name: /trigger run/i }).click();
-    await expect(page.getByText(/triggered successfully/i)).toBeVisible({
-      timeout: 5000,
-    });
-
-    // Wait for the run to appear and click Tasks
-    const tasksLink = page.getByRole("link", { name: "Tasks" }).first();
-    await expect(tasksLink).toBeVisible({ timeout: 15000 });
-    await tasksLink.click();
-
-    // Wait for at least one task to appear (step-1 should complete quickly)
-    await expect(page.locator(".task-item").first()).toBeVisible({
-      timeout: 60000,
-    });
-
-    // Expand the first task
-    const firstTask = page.locator(".task-item").first();
-    await firstTask.click();
-
-    // Verify it's expanded (has open attribute)
-    await expect(firstTask).toHaveAttribute("open", "");
-
-    // Wait for a polling cycle (3 seconds + buffer)
-    await page.waitForTimeout(5000);
-
-    // The task should still be expanded after the poll
-    await expect(page.locator(".task-item").first()).toHaveAttribute(
-      "open",
-      "",
-    );
-  });
-
   test("run status transitions from queued to running to completed", async ({ page, request }) => {
     const pipelineName = uniqueName("status-transition-test");
     await createPipeline(
