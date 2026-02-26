@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 
 CREATE TABLE IF NOT EXISTS pipelines (
   id TEXT NOT NULL PRIMARY KEY,
-  name TEXT NOT NULL,
+  name TEXT NOT NULL UNIQUE,
   content TEXT NOT NULL,
   driver_dsn TEXT NOT NULL,
   webhook_secret TEXT NOT NULL DEFAULT '',
@@ -42,7 +42,7 @@ CREATE INDEX IF NOT EXISTS idx_resource_versions_fetched ON resource_versions(re
 
 -- FTS5 virtual table for pipeline full-text search (name + content).
 CREATE VIRTUAL TABLE IF NOT EXISTS pipelines_fts USING fts5(
-  id UNINDEXED,
+  id,
   name,
   content,
   tokenize = 'unicode61'
@@ -51,7 +51,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS pipelines_fts USING fts5(
 -- FTS5 virtual table for general full-text search over any stored record.
 -- content holds ANSI-stripped text extracted from the JSON payload.
 CREATE VIRTUAL TABLE IF NOT EXISTS data_fts USING fts5(
-  path UNINDEXED,
+  path,
   content,
   tokenize = 'unicode61'
 );

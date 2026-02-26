@@ -185,20 +185,33 @@ func (s *Sqlite) Close() error {
 }
 
 // SavePipeline creates or updates a pipeline in the database.
+// Pipeline names are unique; saving with an existing name updates the record
+// while preserving the original ID so existing pipeline_runs references remain valid.
 func (s *Sqlite) SavePipeline(ctx context.Context, name, content, driverDSN, webhookSecret string) (*storage.Pipeline, error) {
-	id := runtime.PipelineID(name, content)
+	newID := runtime.PipelineID(name, content)
 	now := time.Now().UTC()
+
+	// Look up any existing pipeline by name so we can preserve its ID and clean up FTS.
+	var existingID string
+	_ = s.writer.QueryRowContext(ctx, `SELECT id FROM pipelines WHERE name = ?`, name).Scan(&existingID)
 
 	_, err := s.writer.ExecContext(ctx, `
 		INSERT INTO pipelines (id, name, content, driver_dsn, webhook_secret, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(id) DO UPDATE SET
+		ON CONFLICT(name) DO UPDATE SET
+			content=excluded.content,
 			driver_dsn=excluded.driver_dsn,
 			webhook_secret=excluded.webhook_secret,
 			updated_at=excluded.updated_at
-	`, id, name, content, driverDSN, webhookSecret, now.Format(time.RFC3339), now.Format(time.RFC3339))
+	`, newID, name, content, driverDSN, webhookSecret, now.Format(time.RFC3339), now.Format(time.RFC3339))
 	if err != nil {
 		return nil, fmt.Errorf("failed to save pipeline: %w", err)
+	}
+
+	// The stored ID is the pre-existing one (if updating) or the new hash (if inserting).
+	storedID := newID
+	if existingID != "" {
+		storedID = existingID
 	}
 
 	// Keep FTS index in sync: delete any existing entry then re-insert.
@@ -206,21 +219,21 @@ func (s *Sqlite) SavePipeline(ctx context.Context, name, content, driverDSN, web
 		DELETE FROM pipelines_fts WHERE rowid IN (
 			SELECT rowid FROM pipelines_fts WHERE id = ?
 		)
-	`, id)
+	`, storedID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to clear pipelines_fts: %w", err)
 	}
 
 	_, err = s.writer.ExecContext(ctx,
 		`INSERT INTO pipelines_fts(id, name, content) VALUES (?, ?, ?)`,
-		id, name, content,
+		storedID, name, content,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to index pipeline: %w", err)
 	}
 
 	return &storage.Pipeline{
-		ID:            id,
+		ID:            storedID,
 		Name:          name,
 		Content:       content,
 		DriverDSN:     driverDSN,
