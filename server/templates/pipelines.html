@@ -11,7 +11,10 @@
   <div class="container mx-auto p-4">
     <div
       class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-6">
-      <h1 class="text-3xl font-bold dark:text-white">Pipelines</h1>
+      <div>
+        <h1 class="text-3xl font-bold dark:text-white">Pipelines</h1>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage and trigger your CI/CD pipelines. Select a pipeline to view its runs.</p>
+      </div>
       <div class="text-sm text-gray-600 dark:text-gray-400">
         {{ .Pagination.TotalItems }} pipeline{{ if ne .Pagination.TotalItems 1
         }}s{{ end }}

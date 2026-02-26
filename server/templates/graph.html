@@ -1,4 +1,4 @@
-{{ template "head" dict "Title" "Pipeline Graph" }}
+{{ template "head" dict "Title" (default "Task Graph" .Title) }}
 <!-- Breadcrumb navigation -->
 <nav
   class="px-3 py-2 sm:px-4 sm:py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex items-center gap-1 sm:gap-2 flex-wrap text-sm sm:text-base"
@@ -7,8 +7,17 @@
   <a href="/pipelines/"
     class="text-blue-600 dark:text-blue-400 hover:underline">Pipelines</a>
   {{ if .RunID }}
+  {{ if .Pipeline }}
   <span class="text-gray-500" aria-hidden="true">/</span>
-  <span class="text-gray-800 dark:text-white">Run: {{ .RunID }}</span>
+  <a href="/pipelines/{{ .Pipeline.ID }}/"
+    class="text-blue-600 dark:text-blue-400 hover:underline">{{ .Pipeline.Name
+    }}</a>
+  {{ end }}
+  <span class="text-gray-500" aria-hidden="true">/</span>
+  <a href="/runs/{{ .RunID }}/tasks"
+    class="text-blue-600 dark:text-blue-400 hover:underline">Run {{ .RunID }}</a>
+  <span class="text-gray-500" aria-hidden="true">/</span>
+  <span class="text-gray-800 dark:text-white font-medium">Graph</span>
   {{ else }}
   <span class="text-gray-500" aria-hidden="true">/</span>
   <a href="/graph/"
@@ -37,7 +46,7 @@
     <div
       class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
       <div class="flex items-center gap-3">
-        <h1 class="text-2xl font-bold dark:text-white">Pipeline Graph</h1>
+        <h1 class="text-2xl font-bold dark:text-white">Task Graph</h1>
         {{ if .IsActive }}
         <span
           class="flex items-center gap-2 text-sm text-yellow-600 dark:text-yellow-400">

@@ -2,8 +2,9 @@
 {{ if eq (len .PipelineRows) 0 }}
 <tr>
   <td colspan="5"
-    class="px-6 py-8 text-center text-gray-500 dark:text-gray-400 italic">
-    No pipelines found.
+    class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+    <p class="italic">No pipelines found.</p>
+    <p class="text-xs mt-1">Create a pipeline using the CLI or API to get started.</p>
   </td>
 </tr>
 {{ else }}

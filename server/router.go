@@ -450,12 +450,24 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 		run, runErr := store.GetRun(ctx.Request().Context(), runID)
 		isActive := runErr == nil && (run.Status == storage.RunStatusQueued || run.Status == storage.RunStatusRunning)
 
+		// Look up the pipeline for breadcrumb navigation
+		var pipeline *storage.Pipeline
+		title := "Tasks"
+		if runErr == nil && run.PipelineID != "" {
+			pipeline, _ = store.GetPipeline(ctx.Request().Context(), run.PipelineID)
+			if pipeline != nil {
+				title = "Tasks \u2014 " + pipeline.Name
+			}
+		}
+
 		return ctx.Render(http.StatusOK, "results.html", map[string]any{
 			"Tree":     results.AsTree(),
 			"Path":     lookupPath,
 			"RunID":    runID,
 			"IsActive": isActive,
 			"Run":      run,
+			"Pipeline": pipeline,
+			"Title":    title,
 		})
 	})
 
@@ -472,6 +484,16 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 		run, runErr := store.GetRun(ctx.Request().Context(), runID)
 		isActive := runErr == nil && (run.Status == storage.RunStatusQueued || run.Status == storage.RunStatusRunning)
 
+		// Look up the pipeline for breadcrumb navigation
+		var pipeline *storage.Pipeline
+		title := "Task Graph"
+		if runErr == nil && run.PipelineID != "" {
+			pipeline, _ = store.GetPipeline(ctx.Request().Context(), run.PipelineID)
+			if pipeline != nil {
+				title = "Task Graph — " + pipeline.Name
+			}
+		}
+
 		tree := results.AsTree()
 		treeJSON, err := json.Marshal(tree)
 		if err != nil {
@@ -484,6 +506,8 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 			"Path":     lookupPath,
 			"RunID":    runID,
 			"IsActive": isActive,
+			"Pipeline": pipeline,
+			"Title":    title,
 		})
 	})
 
