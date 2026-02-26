@@ -1,9 +1,9 @@
-# fly.toml app configuration file generated for ci-app on 2026-02-21T07:37:40-05:00
+# fly.toml app configuration file generated for ci on 2026-02-25T20:02:05-05:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'ci-app'
+app = 'ci'
 primary_region = 'sjc'
 
 [build]

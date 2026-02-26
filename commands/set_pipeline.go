@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -197,7 +198,14 @@ func (c *SetPipeline) Run(logger *slog.Logger) error {
 
 	fmt.Printf("Pipeline '%s' uploaded successfully!\n", pipeline.Name)
 	fmt.Printf("  ID: %s\n", pipeline.ID)
-	fmt.Printf("  Server: %s\n", c.ServerURL)
+
+	displayURL := c.ServerURL
+	if parsed, err := url.Parse(c.ServerURL); err == nil && parsed.User != nil {
+		parsed.User = nil
+		displayURL = parsed.String()
+	}
+
+	fmt.Printf("  Server: %s\n", displayURL)
 
 	if c.Driver != "" {
 		fmt.Printf("  Driver: %s\n", c.Driver)

@@ -1,6 +1,7 @@
 package commands_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -382,5 +383,40 @@ export { pipeline };
 		for _, h := range authHeaders {
 			assert.Expect(h).To(HavePrefix("Basic "))
 		}
+	})
+
+	t.Run("credentials are redacted from the server URL in output", func(t *testing.T) {
+		// Not parallel — captures os.Stdout, which is not goroutine-safe.
+		assert := NewGomegaWithT(t)
+
+		ps := newPipelineServer()
+		server := httptest.NewServer(ps)
+		defer server.Close()
+
+		serverURLWithAuth := "http://admin:supersecret@" + server.Listener.Addr().String()
+
+		pipelineFile := writePipeline(t, t.TempDir(), "my-pipeline.js", minimalJS)
+
+		cmd := commands.SetPipeline{
+			Pipeline:  pipelineFile,
+			ServerURL: serverURLWithAuth,
+		}
+
+		// Capture stdout.
+		origStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		err := cmd.Run(slog.Default())
+
+		_ = w.Close()
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+		os.Stdout = origStdout
+
+		assert.Expect(err).NotTo(HaveOccurred())
+		output := buf.String()
+		assert.Expect(output).NotTo(ContainSubstring("supersecret"))
+		assert.Expect(output).To(ContainSubstring(server.Listener.Addr().String()))
 	})
 }
