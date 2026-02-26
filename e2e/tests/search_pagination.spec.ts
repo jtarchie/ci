@@ -417,5 +417,3 @@ test.describe("Tasks Search", () => {
     await expect(page.getByLabel("Search task output")).toBeVisible();
   });
 });
-
-

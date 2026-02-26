@@ -137,10 +137,11 @@ func TestDriverRestriction(t *testing.T) {
 
 				assert.Expect(rec.Code).To(Equal(http.StatusCreated))
 
-				var resp storage.Pipeline
+				var resp map[string]any
 				err = json.Unmarshal(rec.Body.Bytes(), &resp)
 				assert.Expect(err).NotTo(HaveOccurred())
-				assert.Expect(resp.DriverDSN).To(Equal("native"))
+				_, hasDriver := resp["driver_dsn"]
+				assert.Expect(hasDriver).To(BeFalse())
 			})
 
 			t.Run("GET /api/drivers returns allowed drivers list", func(t *testing.T) {

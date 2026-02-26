@@ -33,19 +33,29 @@ type PipelineRequest struct {
 	WebhookSecret string `json:"webhook_secret"`
 }
 
+// PipelineAPIResponse is a sanitized pipeline representation for the public API.
+type PipelineAPIResponse struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 // PipelineRow is a view model for the pipeline listing page that pairs a
 // pipeline with its most recent run (nil if no runs exist yet).
 type PipelineRow struct {
-	Pipeline  storage.Pipeline
-	LatestRun *storage.PipelineRun
+	Pipeline   storage.Pipeline
+	LatestRun  *storage.PipelineRun
+	DriverName string
 }
 
 // buildPipelineRows fetches the latest run for each pipeline and returns
 // a slice of PipelineRow view models ready for the template.
-func buildPipelineRows(ctx context.Context, store storage.Driver, pipelines []storage.Pipeline) []PipelineRow {
+func buildPipelineRows(ctx context.Context, store storage.Driver, pipelines []storage.Pipeline, defaultDriver string) []PipelineRow {
 	rows := make([]PipelineRow, 0, len(pipelines))
 	for _, p := range pipelines {
-		row := PipelineRow{Pipeline: p}
+		row := PipelineRow{Pipeline: p, DriverName: driverNameFromDSN(p.DriverDSN, defaultDriver)}
 		run, err := store.GetLatestRunByPipeline(ctx, p.ID)
 		if err == nil {
 			row.LatestRun = run
@@ -53,6 +63,36 @@ func buildPipelineRows(ctx context.Context, store storage.Driver, pipelines []st
 		rows = append(rows, row)
 	}
 	return rows
+}
+
+func driverNameFromDSN(dsn, defaultDriver string) string {
+	if strings.TrimSpace(dsn) == "" {
+		if defaultDriver != "" {
+			return defaultDriver
+		}
+		return "default"
+	}
+
+	config, err := orchestra.ParseDriverDSN(dsn)
+	if err != nil || config.Name == "" {
+		return "unknown"
+	}
+
+	return config.Name
+}
+
+func toPipelineAPIResponse(pipeline *storage.Pipeline) PipelineAPIResponse {
+	if pipeline == nil {
+		return PipelineAPIResponse{}
+	}
+
+	return PipelineAPIResponse{
+		ID:        pipeline.ID,
+		Name:      pipeline.Name,
+		Content:   pipeline.Content,
+		CreatedAt: pipeline.CreatedAt,
+		UpdatedAt: pipeline.UpdatedAt,
+	}
 }
 
 // RouterOptions configures the router.
@@ -216,7 +256,7 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 			}
 		}
 
-		rows := buildPipelineRows(ctx.Request().Context(), store, result.Items)
+		rows := buildPipelineRows(ctx.Request().Context(), store, result.Items, execService.DefaultDriver)
 
 		return ctx.Render(http.StatusOK, "pipelines.html", map[string]any{
 			"PipelineRows": rows,
@@ -257,7 +297,7 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 			}
 		}
 
-		rows := buildPipelineRows(ctx.Request().Context(), store, result.Items)
+		rows := buildPipelineRows(ctx.Request().Context(), store, result.Items, execService.DefaultDriver)
 
 		return ctx.Render(http.StatusOK, "_pipelines_content", map[string]any{
 			"PipelineRows": rows,
@@ -315,8 +355,10 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 			}
 		}
 
+		driverName := driverNameFromDSN(pipeline.DriverDSN, execService.DefaultDriver)
 		return ctx.Render(http.StatusOK, "pipeline_detail.html", map[string]any{
 			"Pipeline":   pipeline,
+			"DriverName": driverName,
 			"Runs":       result.Items,
 			"Pagination": result,
 			"Query":      q,
@@ -639,7 +681,7 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 			})
 		}
 
-		return ctx.JSON(http.StatusCreated, pipeline)
+		return ctx.JSON(http.StatusCreated, toPipelineAPIResponse(pipeline))
 	})
 
 	// GET /api/pipelines - List all pipelines
@@ -674,7 +716,20 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 			}
 		}
 
-		return ctx.JSON(http.StatusOK, result)
+		items := make([]PipelineAPIResponse, 0, len(result.Items))
+		for i := range result.Items {
+			item := result.Items[i]
+			items = append(items, toPipelineAPIResponse(&item))
+		}
+
+		return ctx.JSON(http.StatusOK, storage.PaginationResult[PipelineAPIResponse]{
+			Items:      items,
+			Page:       result.Page,
+			PerPage:    result.PerPage,
+			TotalItems: result.TotalItems,
+			TotalPages: result.TotalPages,
+			HasNext:    result.HasNext,
+		})
 	})
 
 	// GET /api/pipelines/:id - Get a specific pipeline
@@ -694,7 +749,7 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 			})
 		}
 
-		return ctx.JSON(http.StatusOK, pipeline)
+		return ctx.JSON(http.StatusOK, toPipelineAPIResponse(pipeline))
 	})
 
 	// DELETE /api/pipelines/:id - Delete a pipeline
