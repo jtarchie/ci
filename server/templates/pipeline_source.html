@@ -20,7 +20,9 @@
       class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-6">
       <div>
         <h1 class="text-3xl font-bold dark:text-white">Pipeline Source</h1>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">TypeScript/JavaScript source code for <strong>{{ .Pipeline.Name }}</strong>.</p>
+        <p
+          class="text-sm text-gray-500 dark:text-gray-400 mt-1">TypeScript/JavaScript
+          source code for <strong>{{ .Pipeline.Name }}</strong>.</p>
       </div>
       <a href="/pipelines/{{ .Pipeline.ID }}/"
         class="text-sm text-blue-600 dark:text-blue-400 hover:underline">
