@@ -132,9 +132,9 @@ func (c *SetPipeline) Run(logger *slog.Logger) error {
 	_ = listResp.Body.Close()
 
 	if listResp.StatusCode == http.StatusOK {
-		var existing []storage.Pipeline
-		if json.Unmarshal(listBody, &existing) == nil {
-			for _, p := range existing {
+		var result storage.PaginationResult[storage.Pipeline]
+		if json.Unmarshal(listBody, &result) == nil {
+			for _, p := range result.Items {
 				if p.Name == name {
 					logger.Info("pipeline.delete.existing", "id", p.ID)
 

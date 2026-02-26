@@ -51,14 +51,14 @@ func (c *DeletePipeline) Run(logger *slog.Logger) error {
 		return fmt.Errorf("server error listing pipelines (%d): %s", listResp.StatusCode, string(listBody))
 	}
 
-	var pipelines []storage.Pipeline
-	if err := json.Unmarshal(listBody, &pipelines); err != nil {
+	var result storage.PaginationResult[storage.Pipeline]
+	if err := json.Unmarshal(listBody, &result); err != nil {
 		return fmt.Errorf("could not parse pipeline list: %w", err)
 	}
 
 	var matched []storage.Pipeline
 
-	for _, p := range pipelines {
+	for _, p := range result.Items {
 		if p.ID == c.Name || p.Name == c.Name {
 			matched = append(matched, p)
 		}

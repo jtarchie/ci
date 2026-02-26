@@ -1,11 +1,12 @@
 package commands_test
 
 import (
+	"context"
 	"log/slog"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/jtarchie/ci/commands"
+	"github.com/jtarchie/ci/server"
 	"github.com/jtarchie/ci/storage"
 	. "github.com/onsi/gomega"
 )
@@ -13,84 +14,94 @@ import (
 func TestDeletePipeline(t *testing.T) {
 	t.Parallel()
 
-	t.Run("deletes a pipeline by name", func(t *testing.T) {
-		t.Parallel()
-		assert := NewGomegaWithT(t)
+	storage.Each(func(driverName string, _ storage.InitFunc) {
+		t.Run(driverName, func(t *testing.T) {
+			t.Parallel()
 
-		ps := newPipelineServer(
-			storage.Pipeline{ID: "abc-123", Name: "my-pipeline"},
-		)
-		server := httptest.NewServer(ps)
-		defer server.Close()
+			t.Run("deletes a pipeline by name", func(t *testing.T) {
+				t.Parallel()
+				assert := NewGomegaWithT(t)
 
-		cmd := commands.DeletePipeline{
-			Name:      "my-pipeline",
-			ServerURL: server.URL,
-		}
+				client, ts := newTestServer(t, server.RouterOptions{})
 
-		err := cmd.Run(slog.Default())
-		assert.Expect(err).NotTo(HaveOccurred())
-		assert.Expect(ps.pipelines).To(BeEmpty())
-	})
+				_, err := client.SavePipeline(context.Background(), "my-pipeline", "content", "docker://", "")
+				assert.Expect(err).NotTo(HaveOccurred())
 
-	t.Run("deletes a pipeline by ID", func(t *testing.T) {
-		t.Parallel()
-		assert := NewGomegaWithT(t)
+				cmd := commands.DeletePipeline{
+					Name:      "my-pipeline",
+					ServerURL: ts.URL,
+				}
 
-		ps := newPipelineServer(
-			storage.Pipeline{ID: "abc-123", Name: "my-pipeline"},
-		)
-		server := httptest.NewServer(ps)
-		defer server.Close()
+				err = cmd.Run(slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
 
-		cmd := commands.DeletePipeline{
-			Name:      "abc-123",
-			ServerURL: server.URL,
-		}
+				result, err := client.ListPipelines(context.Background(), 1, 100)
+				assert.Expect(err).NotTo(HaveOccurred())
+				assert.Expect(result.Items).To(BeEmpty())
+			})
 
-		err := cmd.Run(slog.Default())
-		assert.Expect(err).NotTo(HaveOccurred())
-		assert.Expect(ps.pipelines).To(BeEmpty())
-	})
+			t.Run("deletes a pipeline by ID", func(t *testing.T) {
+				t.Parallel()
+				assert := NewGomegaWithT(t)
 
-	t.Run("returns error when pipeline not found", func(t *testing.T) {
-		t.Parallel()
-		assert := NewGomegaWithT(t)
+				client, ts := newTestServer(t, server.RouterOptions{})
 
-		ps := newPipelineServer()
-		server := httptest.NewServer(ps)
-		defer server.Close()
+				saved, err := client.SavePipeline(context.Background(), "my-pipeline", "content", "docker://", "")
+				assert.Expect(err).NotTo(HaveOccurred())
 
-		cmd := commands.DeletePipeline{
-			Name:      "non-existent",
-			ServerURL: server.URL,
-		}
+				cmd := commands.DeletePipeline{
+					Name:      saved.ID,
+					ServerURL: ts.URL,
+				}
 
-		err := cmd.Run(slog.Default())
-		assert.Expect(err).To(HaveOccurred())
-		assert.Expect(err.Error()).To(ContainSubstring("no pipeline found"))
-	})
+				err = cmd.Run(slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
 
-	t.Run("deletes all pipelines matching a name", func(t *testing.T) {
-		t.Parallel()
-		assert := NewGomegaWithT(t)
+				result, err := client.ListPipelines(context.Background(), 1, 100)
+				assert.Expect(err).NotTo(HaveOccurred())
+				assert.Expect(result.Items).To(BeEmpty())
+			})
 
-		ps := newPipelineServer(
-			storage.Pipeline{ID: "id-1", Name: "duplicate"},
-			storage.Pipeline{ID: "id-2", Name: "duplicate"},
-			storage.Pipeline{ID: "id-3", Name: "keep-me"},
-		)
-		server := httptest.NewServer(ps)
-		defer server.Close()
+			t.Run("returns error when pipeline not found", func(t *testing.T) {
+				t.Parallel()
+				assert := NewGomegaWithT(t)
 
-		cmd := commands.DeletePipeline{
-			Name:      "duplicate",
-			ServerURL: server.URL,
-		}
+				_, ts := newTestServer(t, server.RouterOptions{})
 
-		err := cmd.Run(slog.Default())
-		assert.Expect(err).NotTo(HaveOccurred())
-		assert.Expect(ps.pipelines).To(HaveLen(1))
-		assert.Expect(ps.pipelines[0].Name).To(Equal("keep-me"))
+				cmd := commands.DeletePipeline{
+					Name:      "non-existent",
+					ServerURL: ts.URL,
+				}
+
+				err := cmd.Run(slog.Default())
+				assert.Expect(err).To(HaveOccurred())
+				assert.Expect(err.Error()).To(ContainSubstring("no pipeline found"))
+			})
+
+			t.Run("does not affect other pipelines when deleting by name", func(t *testing.T) {
+				t.Parallel()
+				assert := NewGomegaWithT(t)
+
+				client, ts := newTestServer(t, server.RouterOptions{})
+
+				_, err := client.SavePipeline(context.Background(), "to-delete", "content", "docker://", "")
+				assert.Expect(err).NotTo(HaveOccurred())
+				_, err = client.SavePipeline(context.Background(), "keep-me", "content", "docker://", "")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				cmd := commands.DeletePipeline{
+					Name:      "to-delete",
+					ServerURL: ts.URL,
+				}
+
+				err = cmd.Run(slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				result, err := client.ListPipelines(context.Background(), 1, 100)
+				assert.Expect(err).NotTo(HaveOccurred())
+				assert.Expect(result.Items).To(HaveLen(1))
+				assert.Expect(result.Items[0].Name).To(Equal("keep-me"))
+			})
+		})
 	})
 }
