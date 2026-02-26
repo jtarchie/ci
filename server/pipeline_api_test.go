@@ -52,13 +52,14 @@ func TestPipelineAPI(t *testing.T) {
 
 				assert.Expect(rec.Code).To(Equal(http.StatusCreated))
 
-				var resp storage.Pipeline
+				var resp map[string]any
 				err = json.Unmarshal(rec.Body.Bytes(), &resp)
 				assert.Expect(err).NotTo(HaveOccurred())
-				assert.Expect(resp.ID).NotTo(BeEmpty())
-				assert.Expect(resp.Name).To(Equal("test-pipeline"))
-				assert.Expect(resp.Content).To(Equal("export { pipeline };"))
-				assert.Expect(resp.DriverDSN).To(Equal("docker://"))
+				assert.Expect(resp["id"]).NotTo(BeNil())
+				assert.Expect(resp["name"]).To(Equal("test-pipeline"))
+				assert.Expect(resp["content"]).To(Equal("export { pipeline };"))
+				_, hasDriver := resp["driver_dsn"]
+				assert.Expect(hasDriver).To(BeFalse())
 			})
 
 			t.Run("POST /api/pipelines returns 400 for missing name", func(t *testing.T) {
@@ -113,10 +114,16 @@ func TestPipelineAPI(t *testing.T) {
 
 				assert.Expect(rec.Code).To(Equal(http.StatusOK))
 
-				var result storage.PaginationResult[storage.Pipeline]
+				var result map[string]any
 				err = json.Unmarshal(rec.Body.Bytes(), &result)
 				assert.Expect(err).NotTo(HaveOccurred())
-				assert.Expect(result.Items).To(HaveLen(1))
+				items, ok := result["items"].([]any)
+				assert.Expect(ok).To(BeTrue())
+				assert.Expect(items).To(HaveLen(1))
+				item, ok := items[0].(map[string]any)
+				assert.Expect(ok).To(BeTrue())
+				_, hasDriver := item["driver_dsn"]
+				assert.Expect(hasDriver).To(BeFalse())
 			})
 
 			t.Run("GET /api/pipelines/:id retrieves a pipeline", func(t *testing.T) {
@@ -143,11 +150,13 @@ func TestPipelineAPI(t *testing.T) {
 
 				assert.Expect(rec.Code).To(Equal(http.StatusOK))
 
-				var resp storage.Pipeline
+				var resp map[string]any
 				err = json.Unmarshal(rec.Body.Bytes(), &resp)
 				assert.Expect(err).NotTo(HaveOccurred())
-				assert.Expect(resp.ID).To(Equal(saved.ID))
-				assert.Expect(resp.Name).To(Equal("my-pipeline"))
+				assert.Expect(resp["id"]).To(Equal(saved.ID))
+				assert.Expect(resp["name"]).To(Equal("my-pipeline"))
+				_, hasDriver := resp["driver_dsn"]
+				assert.Expect(hasDriver).To(BeFalse())
 			})
 
 			t.Run("GET /api/pipelines/:id returns 404 for non-existent", func(t *testing.T) {
