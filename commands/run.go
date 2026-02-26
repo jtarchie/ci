@@ -47,90 +47,95 @@ func (c *Run) Run(logger *slog.Logger) error {
 	serverURL := strings.TrimSuffix(c.ServerURL, "/")
 	endpoint := serverURL + "/api/pipelines/" + c.Name + "/run"
 
-	// Build multipart body via a pipe so the HTTP client streams outbound data
-	// as we write it, without buffering the entire tar to memory.
-	pr, pw := io.Pipe()
-	mw := multipart.NewWriter(pw)
+	// Build the multipart body into a temp file so we know Content-Length.
+	// This avoids HTTP chunked transfer encoding, which flushes every small
+	// write to the TCP connection and is extremely slow over high-latency links.
+	tmpFile, err := os.CreateTemp("", "ci-upload-*.bin")
+	if err != nil {
+		return fmt.Errorf("could not create temp file: %w", err)
+	}
 
-	go func() {
-		var writeErr error
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	defer func() { _ = tmpFile.Close() }()
 
-		defer func() {
-			_ = mw.Close()
-			pw.CloseWithError(writeErr)
-		}()
+	mw := multipart.NewWriter(tmpFile)
 
-		// Field: args — JSON-encoded array of strings.
-		argsData, err := json.Marshal(c.Args)
+	// Field: args — JSON-encoded array of strings.
+	argsData, err := json.Marshal(c.Args)
+	if err != nil {
+		return fmt.Errorf("could not encode args: %w", err)
+	}
+
+	fw, err := mw.CreateFormField("args")
+	if err != nil {
+		return fmt.Errorf("could not create args field: %w", err)
+	}
+
+	if _, err = fw.Write(argsData); err != nil {
+		return fmt.Errorf("could not write args: %w", err)
+	}
+
+	// File: workdir — zstd-compressed tar archive of the current working directory.
+	if !c.NoWorkdir {
+		cwd, err := os.Getwd()
 		if err != nil {
-			writeErr = fmt.Errorf("could not encode args: %w", err)
-			return
+			return fmt.Errorf("could not determine working directory: %w", err)
 		}
 
-		fw, err := mw.CreateFormField("args")
+		logger.Info("pipeline.run.workdir", "path", cwd, "ignore", c.Ignore)
+
+		ff, err := mw.CreateFormFile("workdir", "workdir.tar.zst")
 		if err != nil {
-			writeErr = fmt.Errorf("could not create args field: %w", err)
-			return
+			return fmt.Errorf("could not create workdir part: %w", err)
 		}
 
-		if _, err = fw.Write(argsData); err != nil {
-			writeErr = fmt.Errorf("could not write args: %w", err)
-			return
+		zw, err := zstd.NewWriter(ff, zstd.WithEncoderLevel(zstd.SpeedFastest))
+		if err != nil {
+			return fmt.Errorf("could not create zstd writer: %w", err)
 		}
 
-		// File: workdir — zstd-compressed tar archive of the current working directory.
-		if !c.NoWorkdir {
-			cwd, err := os.Getwd()
-			if err != nil {
-				writeErr = fmt.Errorf("could not determine working directory: %w", err)
-				return
-			}
-
-			logger.Info("pipeline.run.workdir", "path", cwd, "ignore", c.Ignore)
-
-			ff, err := mw.CreateFormFile("workdir", "workdir.tar.zst")
-			if err != nil {
-				writeErr = fmt.Errorf("could not create workdir part: %w", err)
-				return
-			}
-
-			zw, err := zstd.NewWriter(ff, zstd.WithEncoderLevel(zstd.SpeedFastest))
-			if err != nil {
-				writeErr = fmt.Errorf("could not create zstd writer: %w", err)
-				return
-			}
-
-			if err := tarDirectory(cwd, zw, c.Ignore); err != nil {
-				writeErr = fmt.Errorf("could not tar working directory: %w", err)
-				return
-			}
-
-			if err := zw.Close(); err != nil {
-				writeErr = fmt.Errorf("could not flush zstd stream: %w", err)
-				return
-			}
+		if err := tarDirectory(cwd, zw, c.Ignore); err != nil {
+			return fmt.Errorf("could not tar working directory: %w", err)
 		}
-	}()
 
-	logger.Info("pipeline.run.trigger", "name", c.Name, "url", endpoint, "args", c.Args)
+		if err := zw.Close(); err != nil {
+			return fmt.Errorf("could not flush zstd stream: %w", err)
+		}
+	}
 
-	bar := progressbar.NewOptions64(
-		-1, // unknown total — indeterminate mode
-		progressbar.OptionSetDescription("uploading workdir"),
+	if err := mw.Close(); err != nil {
+		return fmt.Errorf("could not close multipart writer: %w", err)
+	}
+
+	contentType := mw.FormDataContentType()
+
+	// Determine body size and rewind to the beginning.
+	bodySize, err := tmpFile.Seek(0, io.SeekEnd)
+	if err != nil {
+		return fmt.Errorf("could not determine upload size: %w", err)
+	}
+
+	if _, err := tmpFile.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("could not rewind temp file: %w", err)
+	}
+
+	logger.Info("pipeline.run.trigger", "name", c.Name, "url", endpoint, "args", c.Args, "upload_bytes", bodySize)
+
+	bar := progressbar.NewOptions64(bodySize,
+		progressbar.OptionSetDescription("uploading"),
 		progressbar.OptionSetWriter(os.Stderr),
 		progressbar.OptionShowBytes(true),
-		progressbar.OptionSpinnerType(14),
 		progressbar.OptionSetVisibility(!c.NoWorkdir),
 		progressbar.OptionOnCompletion(func() { fmt.Fprintln(os.Stderr) }),
 	)
 
-	barReader := progressbar.NewReader(pr, bar)
-	req, err := http.NewRequest(http.MethodPost, endpoint, &barReader)
+	req, err := http.NewRequest(http.MethodPost, endpoint, io.TeeReader(tmpFile, bar))
 	if err != nil {
 		return fmt.Errorf("could not create request: %w", err)
 	}
 
-	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.ContentLength = bodySize
+	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("Accept", "text/event-stream")
 
 	// Honour basic auth embedded in the server URL (mirrors set-pipeline pattern).
