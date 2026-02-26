@@ -239,6 +239,40 @@ func TestPipelineStorage(t *testing.T) {
 				_, err = client.GetPipelineByName(context.Background(), "nonexistent")
 				assert.Expect(err).To(Equal(storage.ErrNotFound))
 			})
+
+			t.Run("SavePipeline called twice with same name updates content instead of creating a second pipeline", func(t *testing.T) {
+				t.Parallel()
+				assert := NewGomegaWithT(t)
+
+				buildFile, err := os.CreateTemp(t.TempDir(), "")
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = buildFile.Close() }()
+
+				client, err := init(buildFile.Name(), "namespace", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = client.Close() }()
+
+				ctx := context.Background()
+
+				first, err := client.SavePipeline(ctx, "my-pipeline", "content-v1", "docker://", "")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				second, err := client.SavePipeline(ctx, "my-pipeline", "content-v2", "docker://", "")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				// The stable ID must not change across updates.
+				assert.Expect(second.ID).To(Equal(first.ID))
+
+				// Content must reflect the second call.
+				assert.Expect(second.Content).To(Equal("content-v2"))
+
+				// Only one pipeline should exist in the database.
+				result, err := client.ListPipelines(ctx, 1, 100)
+				assert.Expect(err).NotTo(HaveOccurred())
+				assert.Expect(result.Items).To(HaveLen(1))
+				assert.Expect(result.Items[0].Name).To(Equal("my-pipeline"))
+				assert.Expect(result.Items[0].Content).To(Equal("content-v2"))
+			})
 		})
 	})
 }
