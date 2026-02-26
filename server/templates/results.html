@@ -1,4 +1,4 @@
-{{ template "head" dict "Title" "Pipeline Visualizer" }}
+{{ template "head" dict "Title" (default "Tasks" .Title) }}
 <!-- Breadcrumb navigation -->
 <nav
   class="px-3 py-2 sm:px-4 sm:py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex items-center gap-1 sm:gap-2 flex-wrap text-sm sm:text-base"
@@ -7,8 +7,17 @@
   <a href="/pipelines/"
     class="text-blue-600 dark:text-blue-400 hover:underline">Pipelines</a>
   {{ if .RunID }}
+  {{ if .Pipeline }}
   <span class="text-gray-500" aria-hidden="true">/</span>
-  <span class="text-gray-800 dark:text-white">Run: {{ .RunID }}</span>
+  <a href="/pipelines/{{ .Pipeline.ID }}/"
+    class="text-blue-600 dark:text-blue-400 hover:underline">{{ .Pipeline.Name
+    }}</a>
+  {{ end }}
+  <span class="text-gray-500" aria-hidden="true">/</span>
+  <a href="/runs/{{ .RunID }}/tasks"
+    class="text-blue-600 dark:text-blue-400 hover:underline">Run {{ .RunID }}</a>
+  <span class="text-gray-500" aria-hidden="true">/</span>
+  <span class="text-gray-800 dark:text-white font-medium">Tasks</span>
   {{ else }}
   <span class="text-gray-500" aria-hidden="true">/</span>
   <a href="/tasks/"
@@ -37,7 +46,7 @@
     <div
       class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
       <div class="flex items-center gap-3">
-        <h1 class="text-3xl font-bold dark:text-white">Pipeline Visualizer</h1>
+        <h1 class="text-3xl font-bold dark:text-white">Tasks</h1>
         {{ if and .Run .Run.StartedAt }}
         <span class="text-sm text-gray-500 dark:text-gray-400 font-mono">
           {{ if .Run.CompletedAt }}
@@ -155,6 +164,7 @@
               clip-rule="evenodd" />
           </svg>
           <span id="stat-success" aria-label="Successful tasks">0</span>
+          <span class="text-xs hidden sm:inline">passed</span>
         </span>
         <span class="flex items-center gap-1 text-red-600 dark:text-red-400">
           <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"
@@ -164,6 +174,7 @@
               clip-rule="evenodd" />
           </svg>
           <span id="stat-failure" aria-label="Failed tasks">0</span>
+          <span class="text-xs hidden sm:inline">failed</span>
         </span>
         <span
           class="flex items-center gap-1 text-gray-500 dark:text-gray-400">
@@ -174,6 +185,7 @@
               clip-rule="evenodd" />
           </svg>
           <span id="stat-pending" aria-label="Pending tasks">0</span>
+          <span class="text-xs hidden sm:inline">pending</span>
         </span>
         <!-- Keyboard shortcuts help -->
         <div class="relative">

@@ -53,7 +53,7 @@ func TestRunViews(t *testing.T) {
 
 				assert.Expect(rec.Code).To(Equal(http.StatusOK))
 				assert.Expect(rec.Header().Get("Content-Type")).To(ContainSubstring("text/html"))
-				assert.Expect(rec.Body.String()).To(ContainSubstring("Pipeline Visualizer"))
+				assert.Expect(rec.Body.String()).To(ContainSubstring(">Tasks</h1>"))
 				assert.Expect(rec.Body.String()).To(ContainSubstring("test-job"))
 			})
 
@@ -89,7 +89,7 @@ func TestRunViews(t *testing.T) {
 
 				assert.Expect(rec.Code).To(Equal(http.StatusOK))
 				assert.Expect(rec.Header().Get("Content-Type")).To(ContainSubstring("text/html"))
-				assert.Expect(rec.Body.String()).To(ContainSubstring("Pipeline Graph"))
+				assert.Expect(rec.Body.String()).To(ContainSubstring("Task Graph"))
 				assert.Expect(rec.Body.String()).To(ContainSubstring("test-job"))
 			})
 
@@ -144,8 +144,8 @@ func TestRunViews(t *testing.T) {
 				router.ServeHTTP(rec, req)
 
 				assert.Expect(rec.Code).To(Equal(http.StatusOK))
-				// The template should show "Run: <runID>" in breadcrumb
-				assert.Expect(rec.Body.String()).To(ContainSubstring("Run: " + run.ID))
+				// The template should show "Run <runID>" in breadcrumb
+				assert.Expect(rec.Body.String()).To(ContainSubstring("Run " + run.ID))
 			})
 
 			t.Run("GET /runs/:id/graph includes correct link to tasks view", func(t *testing.T) {
