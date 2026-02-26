@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"time"
 
 	fly "github.com/superfly/fly-go"
 	"github.com/superfly/fly-go/flaps"
@@ -36,6 +37,10 @@ type Fly struct {
 	// Track volumes by name for reuse across containers
 	volumes           map[string]*Volume // mount name → Volume
 	volumeAttachments map[string]string  // volume ID → machine ID
+
+	// helperMachines tracks persistent suspended helper machines (volume ID → machine ID)
+	// so they can be resumed quickly instead of cold-booting on each use.
+	helperMachines map[string]string
 }
 
 func NewFly(namespace string, logger *slog.Logger, params map[string]string) (orchestra.Driver, error) {
@@ -82,6 +87,7 @@ func NewFly(namespace string, logger *slog.Logger, params map[string]string) (or
 		token:             token,
 		volumes:           make(map[string]*Volume),
 		volumeAttachments: make(map[string]string),
+		helperMachines:    make(map[string]string),
 	}
 
 	// If no app name provided, create an ephemeral one
@@ -121,9 +127,28 @@ func (f *Fly) Close() error {
 	copy(machineIDs, f.machineIDs)
 	volumeIDs := make([]string, len(f.volumeIDs))
 	copy(volumeIDs, f.volumeIDs)
+	helperMachineIDs := make([]string, 0, len(f.helperMachines))
+	for _, machineID := range f.helperMachines {
+		helperMachineIDs = append(helperMachineIDs, machineID)
+	}
 	f.mu.Unlock()
 
 	ctx := context.Background()
+
+	// Truly destroy persistent helper machines so their volumes can be deleted
+	for _, machineID := range helperMachineIDs {
+		f.logger.Debug("fly.helper.destroy", "machine", machineID)
+
+		_ = f.client.Kill(ctx, f.appName, machineID)
+
+		machine := &fly.Machine{ID: machineID}
+		_ = f.client.Wait(ctx, f.appName, machine, "stopped", 30*time.Second)
+
+		_ = f.client.Destroy(ctx, f.appName, fly.RemoveMachineInput{
+			ID:   machineID,
+			Kill: true,
+		}, "")
+	}
 
 	// Destroy all tracked machines
 	for _, machineID := range machineIDs {
