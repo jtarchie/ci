@@ -16,6 +16,7 @@ import (
 
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/klauspost/compress/zstd"
+	"github.com/schollz/progressbar/v3"
 )
 
 // Run is the `ci run` command. It triggers a stored pipeline by name on a
@@ -113,7 +114,18 @@ func (c *Run) Run(logger *slog.Logger) error {
 
 	logger.Info("pipeline.run.trigger", "name", c.Name, "url", endpoint, "args", c.Args)
 
-	req, err := http.NewRequest(http.MethodPost, endpoint, pr)
+	bar := progressbar.NewOptions64(
+		-1, // unknown total — indeterminate mode
+		progressbar.OptionSetDescription("uploading workdir"),
+		progressbar.OptionSetWriter(os.Stderr),
+		progressbar.OptionShowBytes(true),
+		progressbar.OptionSpinnerType(14),
+		progressbar.OptionSetVisibility(!c.NoWorkdir),
+		progressbar.OptionOnCompletion(func() { fmt.Fprintln(os.Stderr) }),
+	)
+
+	barReader := progressbar.NewReader(pr, bar)
+	req, err := http.NewRequest(http.MethodPost, endpoint, &barReader)
 	if err != nil {
 		return fmt.Errorf("could not create request: %w", err)
 	}
@@ -142,6 +154,8 @@ func (c *Run) Run(logger *slog.Logger) error {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("server returned %d: %s", resp.StatusCode, string(body))
 	}
+
+	_ = bar.Finish()
 
 	logger.Info("pipeline.run.streaming")
 
