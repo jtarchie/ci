@@ -257,7 +257,7 @@
   hx-swap="morph:innerHTML"
   {{ end }}
   data-run-active="{{ if .IsActive }}true{{ else }}false{{ end }}">
-  {{ template "renderPath" dict "Path" .Tree "Depth" 0 }}
+  {{ template "renderPath" dict "Path" .Tree "Depth" 0 "Order" 1 }}
 </div>
 {{ end }}
 

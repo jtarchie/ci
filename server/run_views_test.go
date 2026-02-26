@@ -179,6 +179,76 @@ func TestRunViews(t *testing.T) {
 				assert.Expect(rec.Body.String()).To(ContainSubstring("/runs/" + run.ID + "/tasks"))
 			})
 
+			t.Run("GET /runs/:id/tasks shows execution number for single task", func(t *testing.T) {
+				t.Parallel()
+				assert := NewGomegaWithT(t)
+
+				buildFile, err := os.CreateTemp(t.TempDir(), "")
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = buildFile.Close() }()
+
+				client, err := init(buildFile.Name(), "namespace", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = client.Close() }()
+
+				pipeline, err := client.SavePipeline(context.Background(), "k6-pipeline", "export const pipeline = async () => {};", "docker://", "")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				run, err := client.SaveRun(context.Background(), pipeline.ID)
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				// Single task - mirrors the k6 pipeline structure
+				err = client.Set(context.Background(), "/pipeline/"+run.ID+"/tasks/0-k6", map[string]any{"status": "success"})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				req := httptest.NewRequest(http.MethodGet, "/runs/"+run.ID+"/tasks", nil)
+				rec := httptest.NewRecorder()
+				router.ServeHTTP(rec, req)
+
+				assert.Expect(rec.Code).To(Equal(http.StatusOK))
+				// The execution number badge must not be empty — <no value> must not appear
+				assert.Expect(rec.Body.String()).NotTo(ContainSubstring("no value"))
+				// The number "1" must appear inside the badge span
+				assert.Expect(rec.Body.String()).To(MatchRegexp(`w-6 h-6[^>]*>\s*1\s*<`))
+			})
+
+			t.Run("GET /runs/:id/tasks shows correct execution numbers for multiple tasks", func(t *testing.T) {
+				t.Parallel()
+				assert := NewGomegaWithT(t)
+
+				buildFile, err := os.CreateTemp(t.TempDir(), "")
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = buildFile.Close() }()
+
+				client, err := init(buildFile.Name(), "namespace", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = client.Close() }()
+
+				pipeline, err := client.SavePipeline(context.Background(), "multi-pipeline", "export const pipeline = async () => {};", "docker://", "")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				run, err := client.SaveRun(context.Background(), pipeline.ID)
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				err = client.Set(context.Background(), "/pipeline/"+run.ID+"/tasks/0-task-a", map[string]any{"status": "success"})
+				assert.Expect(err).NotTo(HaveOccurred())
+				err = client.Set(context.Background(), "/pipeline/"+run.ID+"/tasks/1-task-b", map[string]any{"status": "success"})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				req := httptest.NewRequest(http.MethodGet, "/runs/"+run.ID+"/tasks", nil)
+				rec := httptest.NewRecorder()
+				router.ServeHTTP(rec, req)
+
+				assert.Expect(rec.Code).To(Equal(http.StatusOK))
+				assert.Expect(rec.Body.String()).NotTo(ContainSubstring("no value"))
+			})
+
 			t.Run("GET /runs/:id/tasks includes correct link to graph view", func(t *testing.T) {
 				t.Parallel()
 				assert := NewGomegaWithT(t)
