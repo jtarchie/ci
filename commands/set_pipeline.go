@@ -149,7 +149,7 @@ func (c *SetPipeline) Run(logger *slog.Logger) error {
 		}
 	}
 
-	logger.Info("pipeline.upload", "url", endpoint)
+	logger.Info("pipeline.upload", "url", redactURL(endpoint))
 
 	reqBody := pipelineRequest{
 		Name:          name,
