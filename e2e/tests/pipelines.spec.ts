@@ -59,7 +59,7 @@ test.describe("Pipeline Management UI", () => {
       await expect(page.getByRole("link", { name: pipelineName }))
         .toBeVisible();
       const row = page.locator("tr").filter({ hasText: pipelineName });
-      await expect(row.getByText("docker://", { exact: true })).toBeVisible();
+      await expect(row.getByText("docker", { exact: true })).toBeVisible();
     });
 
     test("shows trigger button for each pipeline", async ({ page, request }) => {
@@ -111,7 +111,7 @@ test.describe("Pipeline Management UI", () => {
       await page.getByRole("link", { name: pipelineName }).click();
 
       // Should show pipeline metadata
-      await expect(page.getByText("docker://")).toBeVisible();
+      await expect(page.getByText("docker")).toBeVisible();
       await expect(page.getByText(/Created/)).toBeVisible();
 
       // Should show the trigger button
@@ -273,8 +273,8 @@ test.describe("Pipeline Management UI", () => {
       // Should navigate to /runs/:id/tasks
       await expect(page).toHaveURL(/\/runs\/[^/]+\/tasks/);
 
-      // Should show the Pipeline Visualizer page
-      await expect(page.getByRole("heading", { name: /Pipeline Visualizer/i }))
+      // Should show the Tasks page
+      await expect(page.getByRole("heading", { name: /Tasks/i }))
         .toBeVisible();
     });
 
@@ -305,8 +305,8 @@ test.describe("Pipeline Management UI", () => {
       // Should navigate to /runs/:id/graph
       await expect(page).toHaveURL(/\/runs\/[^/]+\/graph/);
 
-      // Should show the Pipeline Graph page
-      await expect(page.getByRole("heading", { name: /Pipeline Graph/i }))
+      // Should show the Task Graph page
+      await expect(page.getByRole("heading", { name: /Task Graph/i }))
         .toBeVisible();
     });
   });
@@ -335,8 +335,8 @@ test.describe("Run Views", () => {
     await expect(tasksLink).toBeVisible({ timeout: 10000 });
     await tasksLink.click();
 
-    // Should show "Run: <runID>" in breadcrumb
-    await expect(page.getByText(/Run:/)).toBeVisible();
+    // Should show "Run <runID>" in breadcrumb
+    await expect(page.getByText(/Run\s/)).toBeVisible();
   });
 
   test("run tasks view has link to graph view", async ({ page, request }) => {
