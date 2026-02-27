@@ -22,7 +22,7 @@ COPY . .
 RUN cd server/static && npm ci && npm run build
 
 # Build the binary
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ci .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o ci .
 
 # Stage 2: Runtime
 FROM alpine:latest
