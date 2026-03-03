@@ -18,6 +18,7 @@ import (
 
 // PipelineRequest represents the JSON body for creating or updating a pipeline.
 type PipelineRequest struct {
+	Name          string            `json:"name,omitempty"`
 	Content       string            `json:"content"`
 	DriverDSN     string            `json:"driver_dsn"`
 	WebhookSecret string            `json:"webhook_secret"`
@@ -48,6 +49,53 @@ func toPipelineAPIResponse(pipeline *storage.Pipeline) PipelineAPIResponse {
 }
 
 func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *ExecutionService, webhookTimeout time.Duration, allowedDrivers []string, allowedFeatures []Feature, secretsMgr secrets.Manager) {
+	// POST /api/pipelines - Create a pipeline (name in body)
+	api.POST("/pipelines", func(ctx echo.Context) error {
+		var req PipelineRequest
+		if err := ctx.Bind(&req); err != nil {
+			return ctx.JSON(http.StatusBadRequest, map[string]string{
+				"error": "invalid request body",
+			})
+		}
+
+		if req.Name == "" {
+			return ctx.JSON(http.StatusBadRequest, map[string]string{
+				"error": "name is required",
+			})
+		}
+
+		if req.Content == "" {
+			return ctx.JSON(http.StatusBadRequest, map[string]string{
+				"error": "content is required",
+			})
+		}
+
+		if req.DriverDSN == "" {
+			req.DriverDSN = execService.DefaultDriver
+		}
+
+		if err := orchestra.IsDriverAllowed(req.DriverDSN, allowedDrivers); err != nil {
+			return ctx.JSON(http.StatusBadRequest, map[string]string{
+				"error": fmt.Sprintf("driver not allowed: %v", err),
+			})
+		}
+
+		if req.WebhookSecret != "" && !IsFeatureEnabled(FeatureWebhooks, allowedFeatures) {
+			return ctx.JSON(http.StatusBadRequest, map[string]string{
+				"error": "webhooks feature is not enabled",
+			})
+		}
+
+		pipeline, err := store.SavePipeline(ctx.Request().Context(), req.Name, req.Content, req.DriverDSN, req.WebhookSecret)
+		if err != nil {
+			return ctx.JSON(http.StatusInternalServerError, map[string]string{
+				"error": fmt.Sprintf("failed to save pipeline: %v", err),
+			})
+		}
+
+		return ctx.JSON(http.StatusCreated, toPipelineAPIResponse(pipeline))
+	})
+
 	// PUT /api/pipelines/:name - Create or update a pipeline by name
 	api.PUT("/pipelines/:name", func(ctx echo.Context) error {
 		name := ctx.Param("name")

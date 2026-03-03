@@ -107,6 +107,9 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 			if path == "/health" || path == "/health/" {
 				return true
 			}
+			if len(path) >= 4 && path[:4] == "/mcp" {
+				return true
+			}
 			return false
 		},
 	}))
@@ -161,6 +164,11 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	registerFeatureRoutes(api, allowedFeatures)
 
 	registerRunViewRoutes(web, store)
+
+	// MCP endpoint (authenticated)
+	mcpHandler := newMCPHandler(store)
+	web.Any("/mcp", echo.WrapHandler(mcpHandler))
+	web.Any("/mcp/*", echo.WrapHandler(mcpHandler))
 
 	return &Router{Echo: router, execService: execService, webGroup: web, allowedDrivers: allowedDrivers, allowedFeatures: allowedFeatures}, nil
 }
