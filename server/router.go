@@ -91,28 +91,6 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	execService.AllowedFeatures = allowedFeatures
 	execService.FetchTimeout = opts.FetchTimeout
 	execService.FetchMaxResponseBytes = opts.FetchMaxResponseBytes
-	router.Pre(middleware.AddTrailingSlashWithConfig(middleware.TrailingSlashConfig{
-		Skipper: func(c echo.Context) bool {
-			// Skip trailing slash middleware for static files, API routes, runs, and health
-			path := c.Request().URL.Path
-			if len(path) >= 7 && path[:7] == "/static" {
-				return true
-			}
-			if len(path) >= 4 && path[:4] == "/api" {
-				return true
-			}
-			if len(path) >= 5 && path[:5] == "/runs" {
-				return true
-			}
-			if path == "/health" || path == "/health/" {
-				return true
-			}
-			if len(path) >= 4 && path[:4] == "/mcp" {
-				return true
-			}
-			return false
-		},
-	}))
 	router.Use(slogecho.New(logger))
 	router.Use(middleware.Recover())
 
