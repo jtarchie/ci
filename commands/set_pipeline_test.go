@@ -158,9 +158,9 @@ export { pipeline };
 
 				_, realTS := newTestServer(t, server.RouterOptions{})
 
-				// Wrap the real router so that POST /api/pipelines always returns 500.
+				// Wrap the real router so that PUT /api/pipelines/* always returns 500.
 				wrapped := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					if r.Method == http.MethodPost {
+					if r.Method == http.MethodPut {
 						w.WriteHeader(http.StatusInternalServerError)
 						_ = json.NewEncoder(w).Encode(map[string]string{"error": "database error"})
 						return
@@ -206,8 +206,8 @@ export { pipeline };
 				assert.Expect(err).NotTo(HaveOccurred())
 				assert.Expect(result.Items).To(HaveLen(1))
 				assert.Expect(result.Items[0].Name).To(Equal("my-pipeline"))
-				// The old record was deleted by the command; the new one has a different ID.
-				assert.Expect(result.Items[0].ID).NotTo(Equal(existing.ID))
+				// In-place update preserves pipeline ID.
+				assert.Expect(result.Items[0].ID).To(Equal(existing.ID))
 			})
 
 			t.Run("idempotent: no delete when no pipeline with same name exists", func(t *testing.T) {

@@ -43,14 +43,13 @@ func TestFeatureRestriction(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				body := map[string]string{
-					"name":           "test-pipeline",
 					"content":        "export { pipeline };",
 					"driver_dsn":     "native",
 					"webhook_secret": "my-secret",
 				}
 				jsonBody, _ := json.Marshal(body)
 
-				req := httptest.NewRequest(http.MethodPost, "/api/pipelines", bytes.NewReader(jsonBody))
+				req := httptest.NewRequest(http.MethodPut, "/api/pipelines/test-pipeline", bytes.NewReader(jsonBody))
 				req.Header.Set("Content-Type", "application/json")
 				rec := httptest.NewRecorder()
 				router.ServeHTTP(rec, req)
@@ -78,19 +77,18 @@ func TestFeatureRestriction(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				body := map[string]string{
-					"name":           "test-pipeline",
 					"content":        "export { pipeline };",
 					"driver_dsn":     "native",
 					"webhook_secret": "my-secret",
 				}
 				jsonBody, _ := json.Marshal(body)
 
-				req := httptest.NewRequest(http.MethodPost, "/api/pipelines", bytes.NewReader(jsonBody))
+				req := httptest.NewRequest(http.MethodPut, "/api/pipelines/test-pipeline", bytes.NewReader(jsonBody))
 				req.Header.Set("Content-Type", "application/json")
 				rec := httptest.NewRecorder()
 				router.ServeHTTP(rec, req)
 
-				assert.Expect(rec.Code).To(Equal(http.StatusCreated))
+				assert.Expect(rec.Code).To(Equal(http.StatusOK))
 			})
 
 			t.Run("rejects webhook trigger when webhooks feature is disabled", func(t *testing.T) {
@@ -143,19 +141,18 @@ func TestFeatureRestriction(t *testing.T) {
 
 				// Should allow pipeline with webhook_secret
 				body := map[string]string{
-					"name":           "test-pipeline",
 					"content":        "export { pipeline };",
 					"driver_dsn":     "native",
 					"webhook_secret": "my-secret",
 				}
 				jsonBody, _ := json.Marshal(body)
 
-				req := httptest.NewRequest(http.MethodPost, "/api/pipelines", bytes.NewReader(jsonBody))
+				req := httptest.NewRequest(http.MethodPut, "/api/pipelines/test-pipeline", bytes.NewReader(jsonBody))
 				req.Header.Set("Content-Type", "application/json")
 				rec := httptest.NewRecorder()
 				router.ServeHTTP(rec, req)
 
-				assert.Expect(rec.Code).To(Equal(http.StatusCreated))
+				assert.Expect(rec.Code).To(Equal(http.StatusOK))
 			})
 
 			t.Run("rejects unknown feature name", func(t *testing.T) {
@@ -200,19 +197,18 @@ func TestFeatureRestriction(t *testing.T) {
 
 				// Should allow pipelines with webhook_secret (all features enabled)
 				body := map[string]string{
-					"name":           "test-pipeline",
 					"content":        "export { pipeline };",
 					"driver_dsn":     "native",
 					"webhook_secret": "my-secret",
 				}
 				jsonBody, _ := json.Marshal(body)
 
-				req := httptest.NewRequest(http.MethodPost, "/api/pipelines", bytes.NewReader(jsonBody))
+				req := httptest.NewRequest(http.MethodPut, "/api/pipelines/test-pipeline", bytes.NewReader(jsonBody))
 				req.Header.Set("Content-Type", "application/json")
 				rec := httptest.NewRecorder()
 				router.ServeHTTP(rec, req)
 
-				assert.Expect(rec.Code).To(Equal(http.StatusCreated))
+				assert.Expect(rec.Code).To(Equal(http.StatusOK))
 			})
 
 			t.Run("pipeline without webhook_secret works even when webhooks disabled", func(t *testing.T) {
@@ -236,18 +232,17 @@ func TestFeatureRestriction(t *testing.T) {
 
 				// Pipeline without webhook_secret should work fine
 				body := map[string]string{
-					"name":       "test-pipeline",
 					"content":    "export { pipeline };",
 					"driver_dsn": "native",
 				}
 				jsonBody, _ := json.Marshal(body)
 
-				req := httptest.NewRequest(http.MethodPost, "/api/pipelines", bytes.NewReader(jsonBody))
+				req := httptest.NewRequest(http.MethodPut, "/api/pipelines/test-pipeline", bytes.NewReader(jsonBody))
 				req.Header.Set("Content-Type", "application/json")
 				rec := httptest.NewRecorder()
 				router.ServeHTTP(rec, req)
 
-				assert.Expect(rec.Code).To(Equal(http.StatusCreated))
+				assert.Expect(rec.Code).To(Equal(http.StatusOK))
 			})
 		})
 	})

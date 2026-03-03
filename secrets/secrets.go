@@ -28,6 +28,12 @@ type Manager interface {
 	// Returns ErrNotFound if the secret does not exist.
 	Delete(ctx context.Context, scope string, key string) error
 
+	// ListByScope returns all secret keys in the given scope.
+	ListByScope(ctx context.Context, scope string) ([]string, error)
+
+	// DeleteByScope removes all secrets in the given scope.
+	DeleteByScope(ctx context.Context, scope string) error
+
 	// Close releases any resources held by the manager.
 	Close() error
 }

@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -18,19 +19,21 @@ import (
 )
 
 type SetPipeline struct {
-	Pipeline      string `arg:""                  help:"Path to pipeline file (JS, TS, or YAML)"  required:"" type:"existingfile"`
-	Name          string `help:"Name for the pipeline (defaults to filename without extension)" short:"n"`
-	ServerURL     string `env:"CI_SERVER_URL"      help:"URL of the CI server"                                           required:"" short:"s"`
-	Driver        string `env:"CI_DRIVER"          help:"Orchestrator driver DSN (e.g., 'docker', 'native', 'k8s')"      short:"d"`
-	WebhookSecret string `env:"CI_WEBHOOK_SECRET"  help:"Secret for webhook signature validation"                        short:"w"`
+	Pipeline      string   `arg:""                  help:"Path to pipeline file (JS, TS, or YAML)"  required:"" type:"existingfile"`
+	Name          string   `help:"Name for the pipeline (defaults to filename without extension)" short:"n"`
+	ServerURL     string   `env:"CI_SERVER_URL"      help:"URL of the CI server"                                           required:"" short:"s"`
+	Driver        string   `env:"CI_DRIVER"          help:"Orchestrator driver DSN (e.g., 'docker', 'native', 'k8s')"      short:"d"`
+	WebhookSecret string   `env:"CI_WEBHOOK_SECRET"  help:"Secret for webhook signature validation"                        short:"w"`
+	Secret        []string `help:"Set a pipeline-scoped secret as KEY=VALUE (can be repeated)" short:"e"`
+	SecretFile    string   `help:"Path to a file containing secrets in KEY=VALUE format (one per line)" type:"existingfile"`
 }
 
-// pipelineRequest matches the server's expected JSON body.
+// pipelineRequest matches the server's expected JSON body for PUT /api/pipelines/:name.
 type pipelineRequest struct {
-	Name          string `json:"name"`
-	Content       string `json:"content"`
-	DriverDSN     string `json:"driver_dsn"`
-	WebhookSecret string `json:"webhook_secret"`
+	Content       string            `json:"content"`
+	DriverDSN     string            `json:"driver_dsn"`
+	WebhookSecret string            `json:"webhook_secret"`
+	Secrets       map[string]string `json:"secrets,omitempty"`
 }
 
 func (c *SetPipeline) Run(logger *slog.Logger) error {
@@ -91,71 +94,23 @@ func (c *SetPipeline) Run(logger *slog.Logger) error {
 
 	logger.Info("pipeline.validate.success")
 
-	// Upload to server
-	serverURL := strings.TrimSuffix(c.ServerURL, "/")
-	endpoint := serverURL + "/api/pipelines"
-
-	// Helper: make an authenticated request, honouring basic auth in the server URL.
-	doRequest := func(method, url string, bodyBytes []byte) (*http.Response, error) {
-		var bodyReader io.Reader
-		if bodyBytes != nil {
-			bodyReader = bytes.NewReader(bodyBytes)
-		}
-
-		req, err := http.NewRequest(method, url, bodyReader)
-		if err != nil {
-			return nil, err
-		}
-
-		if bodyBytes != nil {
-			req.Header.Set("Content-Type", "application/json")
-		}
-
-		if req.URL.User != nil {
-			password, _ := req.URL.User.Password()
-			req.SetBasicAuth(req.URL.User.Username(), password)
-		}
-
-		return http.DefaultClient.Do(req)
-	}
-
-	// List existing pipelines and delete any with the same name (idempotent upsert
-	// for servers that do not yet support ON CONFLICT upsert).
-	logger.Info("pipeline.list")
-
-	listResp, err := doRequest(http.MethodGet, endpoint, nil)
+	// Parse secrets from --secret-file and --secret flags
+	secretsMap, err := c.parseSecrets()
 	if err != nil {
-		return fmt.Errorf("could not list pipelines: %w", err)
+		return err
 	}
 
-	listBody, _ := io.ReadAll(listResp.Body)
-	_ = listResp.Body.Close()
-
-	if listResp.StatusCode == http.StatusOK {
-		var result storage.PaginationResult[storage.Pipeline]
-		if json.Unmarshal(listBody, &result) == nil {
-			for _, p := range result.Items {
-				if p.Name == name {
-					logger.Info("pipeline.delete.existing", "id", p.ID)
-
-					delResp, err := doRequest(http.MethodDelete, endpoint+"/"+p.ID, nil)
-					if err != nil {
-						return fmt.Errorf("could not delete existing pipeline: %w", err)
-					}
-
-					_ = delResp.Body.Close()
-				}
-			}
-		}
-	}
+	// Upload to server via PUT /api/pipelines/:name
+	serverURL := strings.TrimSuffix(c.ServerURL, "/")
+	endpoint := serverURL + "/api/pipelines/" + url.PathEscape(name)
 
 	logger.Info("pipeline.upload", "url", redactURL(endpoint))
 
 	reqBody := pipelineRequest{
-		Name:          name,
 		Content:       finalContent,
 		DriverDSN:     c.Driver,
 		WebhookSecret: c.WebhookSecret,
+		Secrets:       secretsMap,
 	}
 
 	jsonBody, err := json.Marshal(reqBody)
@@ -163,7 +118,7 @@ func (c *SetPipeline) Run(logger *slog.Logger) error {
 		return fmt.Errorf("could not marshal request: %w", err)
 	}
 
-	resp, err := doRequest(http.MethodPost, endpoint, jsonBody)
+	resp, err := doAuthenticatedRequest(http.MethodPut, endpoint, jsonBody)
 	if err != nil {
 		return fmt.Errorf("could not connect to server: %w", err)
 	}
@@ -174,7 +129,7 @@ func (c *SetPipeline) Run(logger *slog.Logger) error {
 		return fmt.Errorf("could not read response: %w", err)
 	}
 
-	if resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusOK {
 		var errResp map[string]string
 		if json.Unmarshal(body, &errResp) == nil {
 			if msg, ok := errResp["error"]; ok {
@@ -211,5 +166,88 @@ func (c *SetPipeline) Run(logger *slog.Logger) error {
 		fmt.Printf("  Driver: %s\n", c.Driver)
 	}
 
+	if len(secretsMap) > 0 {
+		fmt.Printf("  Secrets: %d key(s) set\n", len(secretsMap))
+	}
+
 	return nil
+}
+
+// parseSecrets merges secrets from --secret-file and --secret flags.
+// Flag values take precedence over file values on key collision.
+func (c *SetPipeline) parseSecrets() (map[string]string, error) {
+	result := make(map[string]string)
+
+	// Parse --secret-file first (lower priority)
+	if c.SecretFile != "" {
+		f, err := os.Open(c.SecretFile)
+		if err != nil {
+			return nil, fmt.Errorf("could not open secret file: %w", err)
+		}
+		defer func() { _ = f.Close() }()
+
+		scanner := bufio.NewScanner(f)
+		lineNum := 0
+
+		for scanner.Scan() {
+			lineNum++
+			line := strings.TrimSpace(scanner.Text())
+
+			// Skip empty lines and comments
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+
+			key, value, found := parseSecretFlag(line)
+			if !found {
+				return nil, fmt.Errorf("invalid secret in file %q line %d: expected KEY=VALUE format, got %q", c.SecretFile, lineNum, line)
+			}
+
+			result[key] = value
+		}
+
+		if err := scanner.Err(); err != nil {
+			return nil, fmt.Errorf("could not read secret file: %w", err)
+		}
+	}
+
+	// Parse --secret flags (higher priority, overwrite file values)
+	for _, s := range c.Secret {
+		key, value, found := parseSecretFlag(s)
+		if !found {
+			return nil, fmt.Errorf("invalid --secret flag %q: expected KEY=VALUE format", s)
+		}
+
+		result[key] = value
+	}
+
+	if len(result) == 0 {
+		return nil, nil //nolint:nilnil
+	}
+
+	return result, nil
+}
+
+// doAuthenticatedRequest makes an HTTP request, honouring basic auth in the URL.
+func doAuthenticatedRequest(method, rawURL string, bodyBytes []byte) (*http.Response, error) {
+	var bodyReader io.Reader
+	if bodyBytes != nil {
+		bodyReader = bytes.NewReader(bodyBytes)
+	}
+
+	req, err := http.NewRequest(method, rawURL, bodyReader)
+	if err != nil {
+		return nil, err
+	}
+
+	if bodyBytes != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	if req.URL.User != nil {
+		password, _ := req.URL.User.Password()
+		req.SetBasicAuth(req.URL.User.Username(), password)
+	}
+
+	return http.DefaultClient.Do(req)
 }

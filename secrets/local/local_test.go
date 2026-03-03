@@ -198,4 +198,72 @@ func TestLocalBackend(t *testing.T) {
 		assert.Expect(err).To(HaveOccurred())
 		assert.Expect(err.Error()).To(ContainSubstring("key="))
 	})
+
+	t.Run("ListByScope returns all keys in a scope", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		mgr := newTestManager(t)
+		ctx := context.Background()
+
+		scope := secrets.PipelineScope("list-test")
+
+		err := mgr.Set(ctx, scope, "B_KEY", "val-b")
+		assert.Expect(err).NotTo(HaveOccurred())
+
+		err = mgr.Set(ctx, scope, "A_KEY", "val-a")
+		assert.Expect(err).NotTo(HaveOccurred())
+
+		// Different scope should not appear
+		err = mgr.Set(ctx, secrets.GlobalScope, "GLOBAL_KEY", "val-g")
+		assert.Expect(err).NotTo(HaveOccurred())
+
+		keys, err := mgr.ListByScope(ctx, scope)
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(keys).To(Equal([]string{"A_KEY", "B_KEY"}))
+	})
+
+	t.Run("ListByScope returns nil for empty scope", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		mgr := newTestManager(t)
+		ctx := context.Background()
+
+		keys, err := mgr.ListByScope(ctx, secrets.PipelineScope("nonexistent"))
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(keys).To(BeNil())
+	})
+
+	t.Run("DeleteByScope removes all secrets in scope", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		mgr := newTestManager(t)
+		ctx := context.Background()
+
+		scope := secrets.PipelineScope("del-scope-test")
+
+		err := mgr.Set(ctx, scope, "KEY1", "val1")
+		assert.Expect(err).NotTo(HaveOccurred())
+
+		err = mgr.Set(ctx, scope, "KEY2", "val2")
+		assert.Expect(err).NotTo(HaveOccurred())
+
+		// Different scope should survive
+		err = mgr.Set(ctx, secrets.GlobalScope, "GLOBAL", "val-g")
+		assert.Expect(err).NotTo(HaveOccurred())
+
+		err = mgr.DeleteByScope(ctx, scope)
+		assert.Expect(err).NotTo(HaveOccurred())
+
+		keys, err := mgr.ListByScope(ctx, scope)
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(keys).To(BeNil())
+
+		// Global scope unaffected
+		val, err := mgr.Get(ctx, secrets.GlobalScope, "GLOBAL")
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(val).To(Equal("val-g"))
+	})
 }

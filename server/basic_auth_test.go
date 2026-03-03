@@ -48,8 +48,7 @@ func TestBasicAuthDisabled(t *testing.T) {
 	router := setupRouterWithAuth(t, "", "")
 
 	// Create a pipeline for testing
-	req := httptest.NewRequest(http.MethodPost, "/api/pipelines", bytes.NewReader([]byte(`{
-		"name": "test-pipeline",
+	req := httptest.NewRequest(http.MethodPut, "/api/pipelines/test-pipeline", bytes.NewReader([]byte(`{
 		"content": "const pipeline = async () => {}; export { pipeline };",
 		"driver_dsn": "native://",
 		"webhook_secret": ""
@@ -58,15 +57,14 @@ func TestBasicAuthDisabled(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	router.ServeHTTP(rec, req)
-	assert.Expect(rec.Code).To(gomega.Equal(http.StatusCreated))
+	assert.Expect(rec.Code).To(gomega.Equal(http.StatusOK))
 }
 
 func TestBasicAuthMissingHeader(t *testing.T) {
 	assert := gomega.NewWithT(t)
 	router := setupRouterWithAuth(t, "testuser", "testpass")
 
-	req := httptest.NewRequest(http.MethodPost, "/api/pipelines", bytes.NewReader([]byte(`{
-		"name": "test-pipeline",
+	req := httptest.NewRequest(http.MethodPut, "/api/pipelines/test-pipeline", bytes.NewReader([]byte(`{
 		"content": "const pipeline = async () => {}; export { pipeline };",
 		"driver_dsn": "native://",
 		"webhook_secret": ""
@@ -82,8 +80,7 @@ func TestBasicAuthInvalidCredentials(t *testing.T) {
 	assert := gomega.NewWithT(t)
 	router := setupRouterWithAuth(t, "testuser", "testpass")
 
-	req := httptest.NewRequest(http.MethodPost, "/api/pipelines", bytes.NewReader([]byte(`{
-		"name": "test-pipeline",
+	req := httptest.NewRequest(http.MethodPut, "/api/pipelines/test-pipeline", bytes.NewReader([]byte(`{
 		"content": "const pipeline = async () => {}; export { pipeline };",
 		"driver_dsn": "native://",
 		"webhook_secret": ""
@@ -100,8 +97,7 @@ func TestBasicAuthWrongUsername(t *testing.T) {
 	assert := gomega.NewWithT(t)
 	router := setupRouterWithAuth(t, "testuser", "testpass")
 
-	req := httptest.NewRequest(http.MethodPost, "/api/pipelines", bytes.NewReader([]byte(`{
-		"name": "test-pipeline",
+	req := httptest.NewRequest(http.MethodPut, "/api/pipelines/test-pipeline", bytes.NewReader([]byte(`{
 		"content": "const pipeline = async () => {}; export { pipeline };",
 		"driver_dsn": "native://",
 		"webhook_secret": ""
@@ -118,8 +114,7 @@ func TestBasicAuthValidCredentials(t *testing.T) {
 	assert := gomega.NewWithT(t)
 	router := setupRouterWithAuth(t, "testuser", "testpass")
 
-	req := httptest.NewRequest(http.MethodPost, "/api/pipelines", bytes.NewReader([]byte(`{
-		"name": "test-pipeline",
+	req := httptest.NewRequest(http.MethodPut, "/api/pipelines/test-pipeline", bytes.NewReader([]byte(`{
 		"content": "const pipeline = async () => {}; export { pipeline };",
 		"driver_dsn": "native://",
 		"webhook_secret": ""
@@ -129,7 +124,7 @@ func TestBasicAuthValidCredentials(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	router.ServeHTTP(rec, req)
-	assert.Expect(rec.Code).To(gomega.Equal(http.StatusCreated))
+	assert.Expect(rec.Code).To(gomega.Equal(http.StatusOK))
 }
 
 func TestBasicAuthProtectsAllAPIEndpoints(t *testing.T) {
@@ -137,8 +132,7 @@ func TestBasicAuthProtectsAllAPIEndpoints(t *testing.T) {
 	router := setupRouterWithAuth(t, "testuser", "testpass")
 
 	// Create a pipeline first with auth
-	req := httptest.NewRequest(http.MethodPost, "/api/pipelines", bytes.NewReader([]byte(`{
-		"name": "test-pipeline",
+	req := httptest.NewRequest(http.MethodPut, "/api/pipelines/test-pipeline", bytes.NewReader([]byte(`{
 		"content": "const pipeline = async () => {}; export { pipeline };",
 		"driver_dsn": "native://",
 		"webhook_secret": ""
@@ -147,7 +141,7 @@ func TestBasicAuthProtectsAllAPIEndpoints(t *testing.T) {
 	req.SetBasicAuth("testuser", "testpass")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
-	assert.Expect(rec.Code).To(gomega.Equal(http.StatusCreated))
+	assert.Expect(rec.Code).To(gomega.Equal(http.StatusOK))
 
 	pipelineID := "test-pipeline"
 
@@ -248,8 +242,7 @@ func TestBasicAuthWebhooksSignatureOnly(t *testing.T) {
 	router := setupRouterWithAuth(t, "testuser", "testpass")
 
 	// Create a pipeline with no webhook secret (so no signature validation required)
-	req := httptest.NewRequest(http.MethodPost, "/api/pipelines", bytes.NewReader([]byte(`{
-		"name": "webhook-pipeline",
+	req := httptest.NewRequest(http.MethodPut, "/api/pipelines/webhook-pipeline", bytes.NewReader([]byte(`{
 		"content": "const pipeline = async () => {}; export { pipeline };",
 		"driver_dsn": "native://",
 		"webhook_secret": ""
@@ -258,7 +251,7 @@ func TestBasicAuthWebhooksSignatureOnly(t *testing.T) {
 	req.SetBasicAuth("testuser", "testpass")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
-	assert.Expect(rec.Code).To(gomega.Equal(http.StatusCreated))
+	assert.Expect(rec.Code).To(gomega.Equal(http.StatusOK))
 
 	// Webhook should be accessible without basic auth
 	req = httptest.NewRequest(http.MethodPost, "/api/webhooks/webhook-pipeline", nil)

@@ -23,7 +23,7 @@ func TestPipelineAPI(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			t.Run("POST /api/pipelines creates a pipeline", func(t *testing.T) {
+			t.Run("PUT /api/pipelines/:name creates a pipeline", func(t *testing.T) {
 				t.Parallel()
 				assert := NewGomegaWithT(t)
 
@@ -39,18 +39,17 @@ func TestPipelineAPI(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				body := map[string]string{
-					"name":       "test-pipeline",
 					"content":    "export { pipeline };",
 					"driver_dsn": "docker://",
 				}
 				jsonBody, _ := json.Marshal(body)
 
-				req := httptest.NewRequest(http.MethodPost, "/api/pipelines", bytes.NewReader(jsonBody))
+				req := httptest.NewRequest(http.MethodPut, "/api/pipelines/test-pipeline", bytes.NewReader(jsonBody))
 				req.Header.Set("Content-Type", "application/json")
 				rec := httptest.NewRecorder()
 				router.ServeHTTP(rec, req)
 
-				assert.Expect(rec.Code).To(Equal(http.StatusCreated))
+				assert.Expect(rec.Code).To(Equal(http.StatusOK))
 
 				var resp map[string]any
 				err = json.Unmarshal(rec.Body.Bytes(), &resp)
@@ -62,7 +61,7 @@ func TestPipelineAPI(t *testing.T) {
 				assert.Expect(hasDriver).To(BeFalse())
 			})
 
-			t.Run("POST /api/pipelines returns 400 for missing name", func(t *testing.T) {
+			t.Run("PUT /api/pipelines/:name returns 400 for missing content", func(t *testing.T) {
 				t.Parallel()
 				assert := NewGomegaWithT(t)
 
@@ -77,12 +76,10 @@ func TestPipelineAPI(t *testing.T) {
 				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				body := map[string]string{
-					"content": "export { pipeline };",
-				}
+				body := map[string]string{}
 				jsonBody, _ := json.Marshal(body)
 
-				req := httptest.NewRequest(http.MethodPost, "/api/pipelines", bytes.NewReader(jsonBody))
+				req := httptest.NewRequest(http.MethodPut, "/api/pipelines/test-pipeline", bytes.NewReader(jsonBody))
 				req.Header.Set("Content-Type", "application/json")
 				rec := httptest.NewRecorder()
 				router.ServeHTTP(rec, req)

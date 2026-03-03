@@ -161,6 +161,47 @@ func (l *Local) Delete(ctx context.Context, scope string, key string) error {
 	return nil
 }
 
+func (l *Local) ListByScope(ctx context.Context, scope string) ([]string, error) {
+	rows, err := l.db.QueryContext(ctx, `
+		SELECT key FROM secrets WHERE scope = ? ORDER BY key
+	`, scope)
+	if err != nil {
+		return nil, fmt.Errorf("could not list secrets by scope: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var keys []string
+
+	for rows.Next() {
+		var key string
+
+		if err := rows.Scan(&key); err != nil {
+			return nil, fmt.Errorf("could not scan secret key: %w", err)
+		}
+
+		keys = append(keys, key)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating secret keys: %w", err)
+	}
+
+	return keys, nil
+}
+
+func (l *Local) DeleteByScope(ctx context.Context, scope string) error {
+	_, err := l.db.ExecContext(ctx, `
+		DELETE FROM secrets WHERE scope = ?
+	`, scope)
+	if err != nil {
+		return fmt.Errorf("could not delete secrets by scope: %w", err)
+	}
+
+	l.logger.Info("secrets.deleted_by_scope", "scope", scope)
+
+	return nil
+}
+
 func (l *Local) Close() error {
 	return l.db.Close()
 }

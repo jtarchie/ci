@@ -6,20 +6,22 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/jtarchie/ci/orchestra"
+	"github.com/jtarchie/ci/secrets"
 	"github.com/jtarchie/ci/storage"
 	"github.com/klauspost/compress/zstd"
 	"github.com/labstack/echo/v4"
 )
 
-// PipelineRequest represents the JSON body for creating a pipeline.
+// PipelineRequest represents the JSON body for creating or updating a pipeline.
 type PipelineRequest struct {
-	Name          string `json:"name"`
-	Content       string `json:"content"`
-	DriverDSN     string `json:"driver_dsn"`
-	WebhookSecret string `json:"webhook_secret"`
+	Content       string            `json:"content"`
+	DriverDSN     string            `json:"driver_dsn"`
+	WebhookSecret string            `json:"webhook_secret"`
+	Secrets       map[string]string `json:"secrets,omitempty"`
 }
 
 // PipelineAPIResponse is a sanitized pipeline representation for the public API.
@@ -45,19 +47,21 @@ func toPipelineAPIResponse(pipeline *storage.Pipeline) PipelineAPIResponse {
 	}
 }
 
-func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *ExecutionService, webhookTimeout time.Duration, allowedDrivers []string, allowedFeatures []Feature) {
-	// POST /api/pipelines - Create a new pipeline
-	api.POST("/pipelines", func(ctx echo.Context) error {
+func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *ExecutionService, webhookTimeout time.Duration, allowedDrivers []string, allowedFeatures []Feature, secretsMgr secrets.Manager) {
+	// PUT /api/pipelines/:name - Create or update a pipeline by name
+	api.PUT("/pipelines/:name", func(ctx echo.Context) error {
+		name := ctx.Param("name")
+
+		if name == "" {
+			return ctx.JSON(http.StatusBadRequest, map[string]string{
+				"error": "name is required",
+			})
+		}
+
 		var req PipelineRequest
 		if err := ctx.Bind(&req); err != nil {
 			return ctx.JSON(http.StatusBadRequest, map[string]string{
 				"error": "invalid request body",
-			})
-		}
-
-		if req.Name == "" {
-			return ctx.JSON(http.StatusBadRequest, map[string]string{
-				"error": "name is required",
 			})
 		}
 
@@ -83,14 +87,66 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 			})
 		}
 
-		pipeline, err := store.SavePipeline(ctx.Request().Context(), req.Name, req.Content, req.DriverDSN, req.WebhookSecret)
+		// Validate secrets: require feature gate and secrets manager
+		if len(req.Secrets) > 0 {
+			if !IsFeatureEnabled(FeatureSecrets, allowedFeatures) {
+				return ctx.JSON(http.StatusBadRequest, map[string]string{
+					"error": "secrets feature is not enabled",
+				})
+			}
+
+			if secretsMgr == nil {
+				return ctx.JSON(http.StatusBadRequest, map[string]string{
+					"error": "secrets backend is not configured on the server",
+				})
+			}
+		}
+
+		pipeline, err := store.SavePipeline(ctx.Request().Context(), name, req.Content, req.DriverDSN, req.WebhookSecret)
 		if err != nil {
 			return ctx.JSON(http.StatusInternalServerError, map[string]string{
 				"error": fmt.Sprintf("failed to save pipeline: %v", err),
 			})
 		}
 
-		return ctx.JSON(http.StatusCreated, toPipelineAPIResponse(pipeline))
+		// Store per-pipeline secrets if provided
+		if len(req.Secrets) > 0 && secretsMgr != nil {
+			scope := secrets.PipelineScope(pipeline.ID)
+
+			// Enforce "fail if missing" policy: all existing keys must be present
+			existingKeys, err := secretsMgr.ListByScope(ctx.Request().Context(), scope)
+			if err != nil {
+				return ctx.JSON(http.StatusInternalServerError, map[string]string{
+					"error": fmt.Sprintf("failed to list existing secrets: %v", err),
+				})
+			}
+
+			for _, existingKey := range existingKeys {
+				if _, ok := req.Secrets[existingKey]; !ok {
+					return ctx.JSON(http.StatusBadRequest, map[string]string{
+						"error": fmt.Sprintf("missing existing secret key %q: all existing secrets must be included on update", existingKey),
+					})
+				}
+			}
+
+			// Write all secrets
+			// Sort keys for deterministic ordering
+			sortedKeys := make([]string, 0, len(req.Secrets))
+			for k := range req.Secrets {
+				sortedKeys = append(sortedKeys, k)
+			}
+			sort.Strings(sortedKeys)
+
+			for _, key := range sortedKeys {
+				if err := secretsMgr.Set(ctx.Request().Context(), scope, key, req.Secrets[key]); err != nil {
+					return ctx.JSON(http.StatusInternalServerError, map[string]string{
+						"error": fmt.Sprintf("failed to store secret %q: %v", key, err),
+					})
+				}
+			}
+		}
+
+		return ctx.JSON(http.StatusOK, toPipelineAPIResponse(pipeline))
 	})
 
 	// GET /api/pipelines - List all pipelines
@@ -174,6 +230,11 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 			return ctx.JSON(http.StatusInternalServerError, map[string]string{
 				"error": fmt.Sprintf("failed to delete pipeline: %v", err),
 			})
+		}
+
+		// Cascade delete pipeline-scoped secrets
+		if secretsMgr != nil {
+			_ = secretsMgr.DeleteByScope(ctx.Request().Context(), secrets.PipelineScope(id))
 		}
 
 		return ctx.NoContent(http.StatusNoContent)

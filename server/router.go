@@ -156,7 +156,7 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	// Create API group with basic auth middleware (for non-webhook endpoints)
 	api := router.Group("/api")
 	api.Use(newBasicAuthMiddleware(opts.BasicAuthUsername, opts.BasicAuthPassword))
-	registerPipelineRoutes(api, store, execService, webhookTimeout, allowedDrivers, allowedFeatures)
+	registerPipelineRoutes(api, store, execService, webhookTimeout, allowedDrivers, allowedFeatures, opts.SecretsManager)
 	registerDriverRoutes(api, allowedDrivers)
 	registerFeatureRoutes(api, allowedFeatures)
 
