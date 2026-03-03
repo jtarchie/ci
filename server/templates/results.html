@@ -245,6 +245,35 @@
 </main>
 
 {{ template "footer" }}
+<script>
+  // Preserve <details open> state across htmx morph swaps on #pipeline.
+  // Idiomorph matches nodes by id but still syncs attributes to match the
+  // incoming server HTML, which strips the `open` attribute from any expanded
+  // task accordion. We capture the set of open task ids before each swap and
+  // re-apply them immediately after.
+  (function () {
+    var openIds = null;
+
+    document.addEventListener('htmx:beforeSwap', function (evt) {
+      if (evt.detail.target && evt.detail.target.id === 'pipeline') {
+        openIds = [];
+        document.querySelectorAll('#pipeline details[open][id]').forEach(function (el) {
+          openIds.push(el.id);
+        });
+      }
+    });
+
+    document.addEventListener('htmx:afterSwap', function (evt) {
+      if (evt.detail.target && evt.detail.target.id === 'pipeline' && openIds) {
+        openIds.forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el) { el.open = true; }
+        });
+        openIds = null;
+      }
+    });
+  })();
+</script>
 {{ template "end" }}
 
 {{/* Tasks partial - used for htmx polling */}}
@@ -375,6 +404,7 @@ border-indigo-300 dark:border-indigo-600
 <details class="task-item 
     {{ template "getStatusColor" $path }} border rounded-md p-3 transition-all
   dark:text-gray-200"
+  id="task-{{ $path.FullPath | urlquery }}"
   tabindex="0"
   data-task-id="{{ $path.FullPath }}"
   data-task-status="{{ $path.Value.status }}">
@@ -417,7 +447,8 @@ border-indigo-300 dark:border-indigo-600
 {{- $path := .Path -}}
 {{- $depth := .Depth -}}
 <div class="group-container border-l-4 pl-4 {{ template "getGroupColor" $depth
-  }}">
+  }}"
+  id="group-{{ $path.FullPath | urlquery }}">
   <div class="flex items-center justify-between mb-2">
     <div class="flex items-center">
       {{/* Show status icon if status exists */}}
