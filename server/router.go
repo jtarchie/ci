@@ -134,6 +134,15 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	}
 	router.GET("/static/*", echo.WrapHandler(http.StripPrefix("/static/", http.FileServer(http.FS(staticFiles)))))
 
+	docsFiles, err := fs.Sub(docsFS, "docs/site")
+	if err != nil {
+		return nil, fmt.Errorf("could not create docs files: %w", err)
+	}
+	router.GET("/docs", func(ctx *echo.Context) error {
+		return ctx.Redirect(http.StatusMovedPermanently, "/docs/")
+	})
+	router.GET("/docs/*", echo.WrapHandler(http.StripPrefix("/docs/", http.FileServer(http.FS(docsFiles)))))
+
 	router.GET("/health", func(ctx *echo.Context) error {
 		return ctx.String(http.StatusOK, "OK")
 	})

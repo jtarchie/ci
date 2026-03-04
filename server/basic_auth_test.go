@@ -236,6 +236,21 @@ func TestBasicAuthStaticFilesPublic(t *testing.T) {
 	assert.Expect(rec.Code).NotTo(gomega.Equal(http.StatusUnauthorized))
 }
 
+func TestBasicAuthDocsPublic(t *testing.T) {
+	assert := gomega.NewWithT(t)
+	router := setupRouterWithAuth(t, "testuser", "testpass")
+
+	req := httptest.NewRequest(http.MethodGet, "/docs", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	assert.Expect(rec.Code).NotTo(gomega.Equal(http.StatusUnauthorized))
+
+	req = httptest.NewRequest(http.MethodGet, "/docs/", nil)
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	assert.Expect(rec.Code).NotTo(gomega.Equal(http.StatusUnauthorized))
+}
+
 func TestBasicAuthWebhooksSignatureOnly(t *testing.T) {
 	assert := gomega.NewWithT(t)
 	// Webhooks should not require basic auth, only signature validation

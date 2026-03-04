@@ -1,0 +1,16 @@
+{
+  "name": "ci-docs",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "VitePress docs for CI",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build && npm run build:embed",
+    "build:embed": "mkdir -p ../server/docs/site && rsync -a --delete .vitepress/dist/ ../server/docs/site/",
+    "preview": "vitepress preview"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.4"
+  }
+}

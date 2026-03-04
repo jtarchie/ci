@@ -24,6 +24,7 @@ jobs:
         with:
           cache: "npm"
           cache-dependency-path: |
+            docs/package-lock.json
             e2e/package-lock.json
             server/static/package-lock.json
       - uses: denoland/setup-deno@v2
@@ -75,13 +76,16 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
+            docs/node_modules
             server/static/node_modules
             server/static/dist
+            server/docs/site
             backwards/bundle.js
-          key: ${{ runner.os }}-build-${{ hashFiles('server/static/package-lock.json', 'backwards/src/**/*.ts') }}
+          key: ${{ runner.os }}-build-${{ hashFiles('docs/package-lock.json', 'docs/**/*.md', 'docs/.vitepress/config.ts', 'server/static/package-lock.json', 'backwards/src/**/*.ts') }}
           restore-keys: |
             ${{ runner.os }}-build-
       - run: task build:static
+      - run: task build:docs
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v8
       - name: Task

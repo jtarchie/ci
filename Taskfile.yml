@@ -4,9 +4,15 @@ tasks:
   build:
     cmds:
       - task: build:static
+      - task: build:docs
       - go generate ./...
   build:static:
     dir: server/static
+    cmds:
+      - npm install
+      - npm run build
+  build:docs:
+    dir: docs
     cmds:
       - npm install
       - npm run build
@@ -94,4 +100,6 @@ tasks:
       - cd examples && npx npm-check-updates -u && npm install
       - echo "Bumping npm dependencies in server/static..."
       - cd server/static && npx npm-check-updates -u && npm install
+      - echo "Bumping npm dependencies in docs..."
+      - cd docs && npx npm-check-updates -u && npm install
       - echo "All dependencies bumped! Run 'task' to test."

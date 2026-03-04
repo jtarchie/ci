@@ -19,6 +19,9 @@ var templatesFS embed.FS
 //go:embed static/dist/*
 var staticFS embed.FS
 
+//go:embed all:docs/site
+var docsFS embed.FS
+
 type TemplateRender struct {
 	templates *template.Template
 }
