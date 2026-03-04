@@ -204,11 +204,11 @@ func (s *Sqlite) Get(ctx context.Context, prefix string) (storage.Payload, error
 	// Use writer instead of reader to work with in-memory databases
 	// where each connection gets its own database.
 	// Use json() to convert JSONB back to regular JSON text.
-	err := s.writer.QueryRowContext(ctx, `
+	err := sqlscan.Get(ctx, s.writer, &payloadBytes, `
 		SELECT json(payload) FROM tasks WHERE path = ?
-	`, path).Scan(&payloadBytes)
+	`, path)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if sqlscan.NotFound(err) {
 			return nil, storage.ErrNotFound
 		}
 		return nil, fmt.Errorf("failed to get task: %w", err)
@@ -285,7 +285,7 @@ func (s *Sqlite) SavePipeline(ctx context.Context, name, content, driverDSN, web
 
 	// Look up any existing pipeline by name so we can preserve its ID and clean up FTS.
 	var existingID string
-	_ = s.writer.QueryRowContext(ctx, `SELECT id FROM pipelines WHERE name = ?`, name).Scan(&existingID)
+	_ = sqlscan.Get(ctx, s.writer, &existingID, `SELECT id FROM pipelines WHERE name = ?`, name)
 
 	_, err := s.writer.ExecContext(ctx, `
 		INSERT INTO pipelines (id, name, content, driver_dsn, webhook_secret, created_at, updated_at)
@@ -391,7 +391,7 @@ func (s *Sqlite) ListPipelines(ctx context.Context, page, perPage int) (*storage
 
 	// Get total count
 	var totalItems int
-	err := s.writer.QueryRowContext(ctx, `SELECT COUNT(*) FROM pipelines`).Scan(&totalItems)
+	err := sqlscan.Get(ctx, s.writer, &totalItems, `SELECT COUNT(*) FROM pipelines`)
 	if err != nil {
 		return nil, fmt.Errorf("failed to count pipelines: %w", err)
 	}
@@ -550,7 +550,7 @@ func (s *Sqlite) ListRunsByPipeline(ctx context.Context, pipelineID string, page
 
 	// Get total count for this pipeline
 	var totalItems int
-	err := s.writer.QueryRowContext(ctx, `SELECT COUNT(*) FROM pipeline_runs WHERE pipeline_id = ?`, pipelineID).Scan(&totalItems)
+	err := sqlscan.Get(ctx, s.writer, &totalItems, `SELECT COUNT(*) FROM pipeline_runs WHERE pipeline_id = ?`, pipelineID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to count runs: %w", err)
 	}
@@ -605,11 +605,11 @@ func (s *Sqlite) SearchRunsByPipeline(ctx context.Context, pipelineID, query str
 	ftsQuery := sanitizeFTSQuery(query)
 
 	var totalItems int
-	err := s.writer.QueryRowContext(ctx, `
+	err := sqlscan.Get(ctx, s.writer, &totalItems, `
 		SELECT COUNT(*) FROM pipeline_runs
 		WHERE pipeline_id = ?
 		  AND id IN (SELECT id FROM pipeline_runs_fts WHERE pipeline_runs_fts MATCH ?)
-	`, pipelineID, ftsQuery).Scan(&totalItems)
+	`, pipelineID, ftsQuery)
 	if err != nil {
 		return nil, fmt.Errorf("failed to count run search results: %w", err)
 	}
@@ -705,9 +705,9 @@ func (s *Sqlite) SaveResourceVersion(ctx context.Context, resourceName string, v
 	if err != nil {
 		// On conflict update doesn't return last insert id, fetch it
 		var fetchedID int64
-		err = s.writer.QueryRowContext(ctx, `
+		err = sqlscan.Get(ctx, s.writer, &fetchedID, `
 			SELECT id FROM resource_versions WHERE resource_name = ? AND version = jsonb(?)
-		`, resourceName, versionBytes).Scan(&fetchedID)
+		`, resourceName, versionBytes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get version id: %w", err)
 		}
@@ -796,12 +796,12 @@ func (s *Sqlite) GetVersionsAfter(ctx context.Context, resourceName string, afte
 
 	// First find the fetched_at time of the afterVersion
 	var afterFetchedAt string
-	err = s.writer.QueryRowContext(ctx, `
+	err = sqlscan.Get(ctx, s.writer, &afterFetchedAt, `
 		SELECT fetched_at FROM resource_versions
 		WHERE resource_name = ? AND version = jsonb(?)
-	`, resourceName, afterVersionBytes).Scan(&afterFetchedAt)
+	`, resourceName, afterVersionBytes)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if sqlscan.NotFound(err) {
 			// Version not found, return all versions
 			return s.ListResourceVersions(ctx, resourceName, 0)
 		}
@@ -853,10 +853,10 @@ func (s *Sqlite) SearchPipelines(ctx context.Context, query string, page, perPag
 
 	var totalItems int
 
-	err := s.writer.QueryRowContext(ctx, `
+	err := sqlscan.Get(ctx, s.writer, &totalItems, `
 		SELECT COUNT(*) FROM pipelines
 		WHERE id IN (SELECT id FROM pipelines_fts WHERE pipelines_fts MATCH ?)
-	`, ftsQuery).Scan(&totalItems)
+	`, ftsQuery)
 	if err != nil {
 		return nil, fmt.Errorf("failed to count pipeline search results: %w", err)
 	}

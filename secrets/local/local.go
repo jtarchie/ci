@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/georgysavva/scany/v2/sqlscan"
 	"github.com/jtarchie/ci/secrets"
 	_ "modernc.org/sqlite"
 )
@@ -82,11 +83,11 @@ func New(dsn string, logger *slog.Logger) (secrets.Manager, error) {
 func (l *Local) Get(ctx context.Context, scope string, key string) (string, error) {
 	var encryptedValue []byte
 
-	err := l.db.QueryRowContext(ctx, `
+	err := sqlscan.Get(ctx, l.db, &encryptedValue, `
 		SELECT encrypted_value FROM secrets WHERE scope = ? AND key = ?
-	`, scope, key).Scan(&encryptedValue)
+	`, scope, key)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if sqlscan.NotFound(err) {
 			return "", secrets.ErrNotFound
 		}
 
@@ -110,10 +111,10 @@ func (l *Local) Set(ctx context.Context, scope string, key string, value string)
 	// Determine next version
 	var currentVersion string
 
-	err = l.db.QueryRowContext(ctx, `
+	err = sqlscan.Get(ctx, l.db, &currentVersion, `
 		SELECT version FROM secrets WHERE scope = ? AND key = ?
-	`, scope, key).Scan(&currentVersion)
-	if err != nil && err != sql.ErrNoRows {
+	`, scope, key)
+	if err != nil && !sqlscan.NotFound(err) {
 		return fmt.Errorf("could not check existing secret: %w", err)
 	}
 
@@ -162,28 +163,13 @@ func (l *Local) Delete(ctx context.Context, scope string, key string) error {
 }
 
 func (l *Local) ListByScope(ctx context.Context, scope string) ([]string, error) {
-	rows, err := l.db.QueryContext(ctx, `
+	var keys []string
+
+	err := sqlscan.Select(ctx, l.db, &keys, `
 		SELECT key FROM secrets WHERE scope = ? ORDER BY key
 	`, scope)
 	if err != nil {
 		return nil, fmt.Errorf("could not list secrets by scope: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	var keys []string
-
-	for rows.Next() {
-		var key string
-
-		if err := rows.Scan(&key); err != nil {
-			return nil, fmt.Errorf("could not scan secret key: %w", err)
-		}
-
-		keys = append(keys, key)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating secret keys: %w", err)
 	}
 
 	return keys, nil
