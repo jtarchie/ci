@@ -442,6 +442,34 @@ func (s *Sqlite) DeletePipeline(ctx context.Context, id string) error {
 		return storage.ErrNotFound
 	}
 
+	// Remove the orphaned FTS entry (not cascade-deleted automatically).
+	if _, err := s.writer.ExecContext(ctx, `
+		DELETE FROM pipelines_fts WHERE rowid IN (
+			SELECT rowid FROM pipelines_fts WHERE id = ?
+		)
+	`, id); err != nil {
+		return fmt.Errorf("failed to delete pipelines_fts entry: %w", err)
+	}
+
+	// Merge FTS5 index segments to keep search fast.
+	if _, err := s.writer.ExecContext(ctx, `INSERT INTO pipelines_fts(pipelines_fts) VALUES('optimize')`); err != nil {
+		return fmt.Errorf("failed to optimize pipelines_fts: %w", err)
+	}
+
+	if _, err := s.writer.ExecContext(ctx, `INSERT INTO data_fts(data_fts) VALUES('optimize')`); err != nil {
+		return fmt.Errorf("failed to optimize data_fts: %w", err)
+	}
+
+	// Update query-planner statistics.
+	if _, err := s.writer.ExecContext(ctx, `PRAGMA optimize`); err != nil {
+		return fmt.Errorf("failed to run PRAGMA optimize: %w", err)
+	}
+
+	// Reclaim disk space freed by the deleted rows and their cascades.
+	if _, err := s.writer.ExecContext(ctx, `VACUUM`); err != nil {
+		return fmt.Errorf("failed to vacuum after delete: %w", err)
+	}
+
 	return nil
 }
 
