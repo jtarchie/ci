@@ -8,13 +8,15 @@ import (
 	"io"
 	"log/slog"
 	"mime/multipart"
-	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/bmatcuk/doublestar/v4"
+	"github.com/go-resty/resty/v2"
 	"github.com/klauspost/compress/zstd"
 	"github.com/schollz/progressbar/v3"
 )
@@ -129,35 +131,35 @@ func (c *Run) Run(logger *slog.Logger) error {
 		progressbar.OptionOnCompletion(func() { fmt.Fprintln(os.Stderr) }),
 	)
 
-	req, err := http.NewRequest(http.MethodPost, endpoint, io.TeeReader(tmpFile, bar))
-	if err != nil {
-		return fmt.Errorf("could not create request: %w", err)
+	client := resty.New()
+
+	// Extract basic auth from URL if present and strip it from the endpoint.
+	if parsed, err := url.Parse(endpoint); err == nil && parsed.User != nil {
+		password, _ := parsed.User.Password()
+		client.SetBasicAuth(parsed.User.Username(), password)
+		parsed.User = nil
+		endpoint = parsed.String()
 	}
 
-	req.ContentLength = bodySize
-	req.Header.Set("Content-Type", contentType)
-	req.Header.Set("Accept", "text/event-stream")
-
-	// Honour basic auth embedded in the server URL (mirrors set-pipeline pattern).
-	if u := req.URL.User; u != nil {
-		p, _ := u.Password()
-		req.SetBasicAuth(u.Username(), p)
-	}
-
-	client := &http.Client{}
 	if c.Timeout > 0 {
-		client.Timeout = c.Timeout
+		client.SetTimeout(c.Timeout)
 	}
 
-	resp, err := client.Do(req)
+	resp, err := client.R().
+		SetHeader("Content-Type", contentType).
+		SetHeader("Content-Length", strconv.FormatInt(bodySize, 10)).
+		SetHeader("Accept", "text/event-stream").
+		SetBody(io.TeeReader(tmpFile, bar)).
+		SetDoNotParseResponse(true).
+		Post(endpoint)
 	if err != nil {
 		return fmt.Errorf("could not connect to server: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { _ = resp.RawBody().Close() }()
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("server returned %d: %s", resp.StatusCode, string(body))
+	if resp.StatusCode() != 200 {
+		body, _ := io.ReadAll(resp.RawBody())
+		return fmt.Errorf("server returned %d: %s", resp.StatusCode(), string(body))
 	}
 
 	_ = bar.Finish()
@@ -165,7 +167,7 @@ func (c *Run) Run(logger *slog.Logger) error {
 	logger.Info("pipeline.run.streaming")
 
 	// Read SSE stream line-by-line.
-	scanner := bufio.NewScanner(resp.Body)
+	scanner := bufio.NewScanner(resp.RawBody())
 	for scanner.Scan() {
 		line := scanner.Text()
 		if !strings.HasPrefix(line, "data: ") {

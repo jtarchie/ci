@@ -2,17 +2,15 @@ package commands
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
-	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/go-resty/resty/v2"
 	"github.com/jtarchie/ci/backwards"
 	"github.com/jtarchie/ci/runtime"
 	"github.com/jtarchie/ci/storage"
@@ -113,31 +111,35 @@ func (c *SetPipeline) Run(logger *slog.Logger) error {
 		Secrets:       secretsMap,
 	}
 
-	jsonBody, err := json.Marshal(reqBody)
-	if err != nil {
-		return fmt.Errorf("could not marshal request: %w", err)
+	client := resty.New()
+
+	// Extract basic auth from URL if present and strip it from the endpoint.
+	if parsed, err := url.Parse(serverURL); err == nil && parsed.User != nil {
+		password, _ := parsed.User.Password()
+		client.SetBasicAuth(parsed.User.Username(), password)
+		parsed.User = nil
+		endpoint = parsed.String() + "/api/pipelines/" + url.PathEscape(name)
 	}
 
-	resp, err := doAuthenticatedRequest(http.MethodPut, endpoint, jsonBody)
+	resp, err := client.R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(reqBody).
+		Put(endpoint)
 	if err != nil {
 		return fmt.Errorf("could not connect to server: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("could not read response: %w", err)
-	}
+	body := resp.Body()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode() != 200 {
 		var errResp map[string]string
 		if json.Unmarshal(body, &errResp) == nil {
 			if msg, ok := errResp["error"]; ok {
-				return fmt.Errorf("server error (%d): %s", resp.StatusCode, msg)
+				return fmt.Errorf("server error (%d): %s", resp.StatusCode(), msg)
 			}
 		}
 
-		return fmt.Errorf("server error (%d): %s", resp.StatusCode, string(body))
+		return fmt.Errorf("server error (%d): %s", resp.StatusCode(), string(body))
 	}
 
 	// Parse the successful response
@@ -226,28 +228,4 @@ func (c *SetPipeline) parseSecrets() (map[string]string, error) {
 	}
 
 	return result, nil
-}
-
-// doAuthenticatedRequest makes an HTTP request, honouring basic auth in the URL.
-func doAuthenticatedRequest(method, rawURL string, bodyBytes []byte) (*http.Response, error) {
-	var bodyReader io.Reader
-	if bodyBytes != nil {
-		bodyReader = bytes.NewReader(bodyBytes)
-	}
-
-	req, err := http.NewRequest(method, rawURL, bodyReader)
-	if err != nil {
-		return nil, err
-	}
-
-	if bodyBytes != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-
-	if req.URL.User != nil {
-		password, _ := req.URL.User.Password()
-		req.SetBasicAuth(req.URL.User.Username(), password)
-	}
-
-	return http.DefaultClient.Do(req)
 }

@@ -28,6 +28,98 @@ type Sqlite struct {
 	namespace string
 }
 
+// pipelineScan is an intermediate struct for scanning pipeline rows.
+// SQLite stores timestamps as RFC3339 strings, so we scan into strings first.
+type pipelineScan struct {
+	ID            string `db:"id"`
+	Name          string `db:"name"`
+	Content       string `db:"content"`
+	DriverDSN     string `db:"driver_dsn"`
+	WebhookSecret string `db:"webhook_secret"`
+	CreatedAt     string `db:"created_at"`
+	UpdatedAt     string `db:"updated_at"`
+}
+
+func (p pipelineScan) toStorage() storage.Pipeline {
+	createdAt, _ := time.Parse(time.RFC3339, p.CreatedAt)
+	updatedAt, _ := time.Parse(time.RFC3339, p.UpdatedAt)
+
+	return storage.Pipeline{
+		ID:            p.ID,
+		Name:          p.Name,
+		Content:       p.Content,
+		DriverDSN:     p.DriverDSN,
+		WebhookSecret: p.WebhookSecret,
+		CreatedAt:     createdAt,
+		UpdatedAt:     updatedAt,
+	}
+}
+
+// pipelineRunScan is an intermediate struct for scanning pipeline run rows.
+type pipelineRunScan struct {
+	ID           string         `db:"id"`
+	PipelineID   string         `db:"pipeline_id"`
+	Status       string         `db:"status"`
+	StartedAt    sql.NullString `db:"started_at"`
+	CompletedAt  sql.NullString `db:"completed_at"`
+	ErrorMessage sql.NullString `db:"error_message"`
+	CreatedAt    string         `db:"created_at"`
+}
+
+func (p pipelineRunScan) toStorage() storage.PipelineRun {
+	run := storage.PipelineRun{
+		ID:         p.ID,
+		PipelineID: p.PipelineID,
+		Status:     storage.RunStatus(p.Status),
+	}
+
+	run.CreatedAt, _ = time.Parse(time.RFC3339, p.CreatedAt)
+
+	if p.StartedAt.Valid {
+		t, _ := time.Parse(time.RFC3339, p.StartedAt.String)
+		run.StartedAt = &t
+	}
+
+	if p.CompletedAt.Valid {
+		t, _ := time.Parse(time.RFC3339, p.CompletedAt.String)
+		run.CompletedAt = &t
+	}
+
+	if p.ErrorMessage.Valid {
+		run.ErrorMessage = p.ErrorMessage.String
+	}
+
+	return run
+}
+
+// resourceVersionScan is an intermediate struct for scanning resource version rows.
+type resourceVersionScan struct {
+	ID           int64          `db:"id"`
+	ResourceName string         `db:"resource_name"`
+	Version      []byte         `db:"version"`
+	JobName      sql.NullString `db:"job_name"`
+	FetchedAt    string         `db:"fetched_at"`
+}
+
+func (r resourceVersionScan) toStorage() (storage.ResourceVersion, error) {
+	rv := storage.ResourceVersion{
+		ID:           r.ID,
+		ResourceName: r.ResourceName,
+	}
+
+	rv.FetchedAt, _ = time.Parse(time.RFC3339, r.FetchedAt)
+
+	if r.JobName.Valid {
+		rv.JobName = r.JobName.String
+	}
+
+	if err := json.Unmarshal(r.Version, &rv.Version); err != nil {
+		return rv, fmt.Errorf("failed to unmarshal version: %w", err)
+	}
+
+	return rv, nil
+}
+
 func NewSqlite(dsn string, namespace string, _ *slog.Logger) (storage.Driver, error) {
 	dsn = strings.TrimPrefix(dsn, "sqlite://")
 
@@ -245,49 +337,45 @@ func (s *Sqlite) SavePipeline(ctx context.Context, name, content, driverDSN, web
 
 // GetPipeline retrieves a pipeline by its ID.
 func (s *Sqlite) GetPipeline(ctx context.Context, id string) (*storage.Pipeline, error) {
-	var pipeline storage.Pipeline
-	var createdAt, updatedAt string
+	var row pipelineScan
 
-	err := s.writer.QueryRowContext(ctx, `
+	err := sqlscan.Get(ctx, s.writer, &row, `
 		SELECT id, name, content, driver_dsn, webhook_secret, created_at, updated_at
 		FROM pipelines WHERE id = ?
-	`, id).Scan(&pipeline.ID, &pipeline.Name, &pipeline.Content, &pipeline.DriverDSN, &pipeline.WebhookSecret, &createdAt, &updatedAt)
+	`, id)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if sqlscan.NotFound(err) {
 			return nil, storage.ErrNotFound
 		}
 
 		return nil, fmt.Errorf("failed to get pipeline: %w", err)
 	}
 
-	pipeline.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
-	pipeline.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
+	p := row.toStorage()
 
-	return &pipeline, nil
+	return &p, nil
 }
 
 // GetPipelineByName retrieves the most recently updated pipeline with the given name.
 func (s *Sqlite) GetPipelineByName(ctx context.Context, name string) (*storage.Pipeline, error) {
-	var pipeline storage.Pipeline
-	var createdAt, updatedAt string
+	var row pipelineScan
 
-	err := s.writer.QueryRowContext(ctx, `
+	err := sqlscan.Get(ctx, s.writer, &row, `
 		SELECT id, name, content, driver_dsn, webhook_secret, created_at, updated_at
 		FROM pipelines WHERE name = ?
 		ORDER BY updated_at DESC LIMIT 1
-	`, name).Scan(&pipeline.ID, &pipeline.Name, &pipeline.Content, &pipeline.DriverDSN, &pipeline.WebhookSecret, &createdAt, &updatedAt)
+	`, name)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if sqlscan.NotFound(err) {
 			return nil, storage.ErrNotFound
 		}
 
 		return nil, fmt.Errorf("failed to get pipeline by name: %w", err)
 	}
 
-	pipeline.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
-	pipeline.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
+	p := row.toStorage()
 
-	return &pipeline, nil
+	return &p, nil
 }
 
 // ListPipelines returns a paginated list of pipelines in the database.
@@ -309,7 +397,9 @@ func (s *Sqlite) ListPipelines(ctx context.Context, page, perPage int) (*storage
 	}
 
 	// Get paginated results
-	rows, err := s.writer.QueryContext(ctx, `
+	var rows []pipelineScan
+
+	err = sqlscan.Select(ctx, s.writer, &rows, `
 		SELECT id, name, content, driver_dsn, webhook_secret, created_at, updated_at
 		FROM pipelines ORDER BY created_at DESC
 		LIMIT ? OFFSET ?
@@ -317,26 +407,10 @@ func (s *Sqlite) ListPipelines(ctx context.Context, page, perPage int) (*storage
 	if err != nil {
 		return nil, fmt.Errorf("failed to list pipelines: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
 
-	var pipelines []storage.Pipeline
-
-	for rows.Next() {
-		var pipeline storage.Pipeline
-		var createdAt, updatedAt string
-
-		err := rows.Scan(&pipeline.ID, &pipeline.Name, &pipeline.Content, &pipeline.DriverDSN, &pipeline.WebhookSecret, &createdAt, &updatedAt)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan pipeline: %w", err)
-		}
-
-		pipeline.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
-		pipeline.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
-		pipelines = append(pipelines, pipeline)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating pipelines: %w", err)
+	pipelines := make([]storage.Pipeline, 0, len(rows))
+	for _, row := range rows {
+		pipelines = append(pipelines, row.toStorage())
 	}
 
 	totalPages := (totalItems + perPage - 1) / perPage
@@ -394,79 +468,43 @@ func (s *Sqlite) SaveRun(ctx context.Context, pipelineID string) (*storage.Pipel
 
 // GetRun retrieves a pipeline run by its ID.
 func (s *Sqlite) GetRun(ctx context.Context, runID string) (*storage.PipelineRun, error) {
-	var run storage.PipelineRun
-	var status string
-	var createdAt string
-	var startedAt, completedAt, errorMessage sql.NullString
+	var row pipelineRunScan
 
-	err := s.writer.QueryRowContext(ctx, `
+	err := sqlscan.Get(ctx, s.writer, &row, `
 		SELECT id, pipeline_id, status, started_at, completed_at, error_message, created_at
 		FROM pipeline_runs WHERE id = ?
-	`, runID).Scan(&run.ID, &run.PipelineID, &status, &startedAt, &completedAt, &errorMessage, &createdAt)
+	`, runID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if sqlscan.NotFound(err) {
 			return nil, storage.ErrNotFound
 		}
 
 		return nil, fmt.Errorf("failed to get run: %w", err)
 	}
 
-	run.Status = storage.RunStatus(status)
-	run.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
-
-	if startedAt.Valid {
-		t, _ := time.Parse(time.RFC3339, startedAt.String)
-		run.StartedAt = &t
-	}
-
-	if completedAt.Valid {
-		t, _ := time.Parse(time.RFC3339, completedAt.String)
-		run.CompletedAt = &t
-	}
-
-	if errorMessage.Valid {
-		run.ErrorMessage = errorMessage.String
-	}
+	run := row.toStorage()
 
 	return &run, nil
 }
 
 // GetLatestRunByPipeline returns the most recent run for a pipeline, or ErrNotFound if none exist.
 func (s *Sqlite) GetLatestRunByPipeline(ctx context.Context, pipelineID string) (*storage.PipelineRun, error) {
-	var run storage.PipelineRun
-	var status string
-	var createdAt string
-	var startedAt, completedAt, errorMessage sql.NullString
+	var row pipelineRunScan
 
-	err := s.writer.QueryRowContext(ctx, `
+	err := sqlscan.Get(ctx, s.writer, &row, `
 		SELECT id, pipeline_id, status, started_at, completed_at, error_message, created_at
 		FROM pipeline_runs WHERE pipeline_id = ?
 		ORDER BY created_at DESC LIMIT 1
-	`, pipelineID).Scan(&run.ID, &run.PipelineID, &status, &startedAt, &completedAt, &errorMessage, &createdAt)
+	`, pipelineID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if sqlscan.NotFound(err) {
 			return nil, storage.ErrNotFound
 		}
 
 		return nil, fmt.Errorf("failed to get latest run: %w", err)
 	}
 
-	run.Status = storage.RunStatus(status)
-	run.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
-
-	if startedAt.Valid {
-		t, _ := time.Parse(time.RFC3339, startedAt.String)
-		run.StartedAt = &t
-	}
-
-	if completedAt.Valid {
-		t, _ := time.Parse(time.RFC3339, completedAt.String)
-		run.CompletedAt = &t
-	}
-
-	if errorMessage.Valid {
-		run.ErrorMessage = errorMessage.String
-	}
+	run := row.toStorage()
 
 	return &run, nil
 }
@@ -490,7 +528,9 @@ func (s *Sqlite) ListRunsByPipeline(ctx context.Context, pipelineID string, page
 	}
 
 	// Get paginated results
-	rows, err := s.writer.QueryContext(ctx, `
+	var rows []pipelineRunScan
+
+	err = sqlscan.Select(ctx, s.writer, &rows, `
 		SELECT id, pipeline_id, status, started_at, completed_at, error_message, created_at
 		FROM pipeline_runs WHERE pipeline_id = ?
 		ORDER BY created_at DESC
@@ -499,43 +539,10 @@ func (s *Sqlite) ListRunsByPipeline(ctx context.Context, pipelineID string, page
 	if err != nil {
 		return nil, fmt.Errorf("failed to list runs: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
 
-	var runs []storage.PipelineRun
-
-	for rows.Next() {
-		var run storage.PipelineRun
-		var status string
-		var createdAt string
-		var startedAt, completedAt, errorMessage sql.NullString
-
-		err := rows.Scan(&run.ID, &run.PipelineID, &status, &startedAt, &completedAt, &errorMessage, &createdAt)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan run: %w", err)
-		}
-
-		run.Status = storage.RunStatus(status)
-		run.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
-
-		if startedAt.Valid {
-			t, _ := time.Parse(time.RFC3339, startedAt.String)
-			run.StartedAt = &t
-		}
-
-		if completedAt.Valid {
-			t, _ := time.Parse(time.RFC3339, completedAt.String)
-			run.CompletedAt = &t
-		}
-
-		if errorMessage.Valid {
-			run.ErrorMessage = errorMessage.String
-		}
-
-		runs = append(runs, run)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating runs: %w", err)
+	runs := make([]storage.PipelineRun, 0, len(rows))
+	for _, row := range rows {
+		runs = append(runs, row.toStorage())
 	}
 
 	totalPages := (totalItems + perPage - 1) / perPage
@@ -579,7 +586,9 @@ func (s *Sqlite) SearchRunsByPipeline(ctx context.Context, pipelineID, query str
 		return nil, fmt.Errorf("failed to count run search results: %w", err)
 	}
 
-	rows, err := s.writer.QueryContext(ctx, `
+	var rows []pipelineRunScan
+
+	err = sqlscan.Select(ctx, s.writer, &rows, `
 		SELECT id, pipeline_id, status, started_at, completed_at, error_message, created_at
 		FROM pipeline_runs
 		WHERE pipeline_id = ?
@@ -590,40 +599,10 @@ func (s *Sqlite) SearchRunsByPipeline(ctx context.Context, pipelineID, query str
 	if err != nil {
 		return nil, fmt.Errorf("failed to search runs: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
 
-	var runs []storage.PipelineRun
-
-	for rows.Next() {
-		var run storage.PipelineRun
-		var status string
-		var createdAt string
-		var startedAt, completedAt, errorMessage sql.NullString
-
-		if err := rows.Scan(&run.ID, &run.PipelineID, &status, &startedAt, &completedAt, &errorMessage, &createdAt); err != nil {
-			return nil, fmt.Errorf("failed to scan run search result: %w", err)
-		}
-
-		run.Status = storage.RunStatus(status)
-		run.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
-
-		if startedAt.Valid {
-			t, _ := time.Parse(time.RFC3339, startedAt.String)
-			run.StartedAt = &t
-		}
-		if completedAt.Valid {
-			t, _ := time.Parse(time.RFC3339, completedAt.String)
-			run.CompletedAt = &t
-		}
-		if errorMessage.Valid {
-			run.ErrorMessage = errorMessage.String
-		}
-
-		runs = append(runs, run)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating run search results: %w", err)
+	runs := make([]storage.PipelineRun, 0, len(rows))
+	for _, row := range rows {
+		runs = append(runs, row.toStorage())
 	}
 
 	totalPages := (totalItems + perPage - 1) / perPage
@@ -718,32 +697,26 @@ func (s *Sqlite) SaveResourceVersion(ctx context.Context, resourceName string, v
 
 // GetLatestResourceVersion returns the most recently fetched version for a resource.
 func (s *Sqlite) GetLatestResourceVersion(ctx context.Context, resourceName string) (*storage.ResourceVersion, error) {
-	var rv storage.ResourceVersion
-	var versionBytes []byte
-	var fetchedAt string
-	var jobName sql.NullString
+	var row resourceVersionScan
 
-	err := s.writer.QueryRowContext(ctx, `
-		SELECT id, resource_name, json(version), job_name, fetched_at
+	err := sqlscan.Get(ctx, s.writer, &row, `
+		SELECT id, resource_name, json(version) AS version, job_name, fetched_at
 		FROM resource_versions
 		WHERE resource_name = ?
 		ORDER BY id DESC
 		LIMIT 1
-	`, resourceName).Scan(&rv.ID, &rv.ResourceName, &versionBytes, &jobName, &fetchedAt)
+	`, resourceName)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if sqlscan.NotFound(err) {
 			return nil, storage.ErrNotFound
 		}
+
 		return nil, fmt.Errorf("failed to get latest version: %w", err)
 	}
 
-	if err := json.Unmarshal(versionBytes, &rv.Version); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal version: %w", err)
-	}
-
-	rv.FetchedAt, _ = time.Parse(time.RFC3339, fetchedAt)
-	if jobName.Valid {
-		rv.JobName = jobName.String
+	rv, err := row.toStorage()
+	if err != nil {
+		return nil, err
 	}
 
 	return &rv, nil
@@ -755,8 +728,10 @@ func (s *Sqlite) ListResourceVersions(ctx context.Context, resourceName string, 
 		limit = 100
 	}
 
-	rows, err := s.writer.QueryContext(ctx, `
-		SELECT id, resource_name, json(version), job_name, fetched_at
+	var rows []resourceVersionScan
+
+	err := sqlscan.Select(ctx, s.writer, &rows, `
+		SELECT id, resource_name, json(version) AS version, job_name, fetched_at
 		FROM resource_versions
 		WHERE resource_name = ?
 		ORDER BY id ASC
@@ -765,35 +740,15 @@ func (s *Sqlite) ListResourceVersions(ctx context.Context, resourceName string, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to list versions: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
 
-	var versions []storage.ResourceVersion
-
-	for rows.Next() {
-		var rv storage.ResourceVersion
-		var versionBytes []byte
-		var fetchedAt string
-		var jobName sql.NullString
-
-		err := rows.Scan(&rv.ID, &rv.ResourceName, &versionBytes, &jobName, &fetchedAt)
+	versions := make([]storage.ResourceVersion, 0, len(rows))
+	for _, row := range rows {
+		rv, err := row.toStorage()
 		if err != nil {
-			return nil, fmt.Errorf("failed to scan version: %w", err)
-		}
-
-		if err := json.Unmarshal(versionBytes, &rv.Version); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal version: %w", err)
-		}
-
-		rv.FetchedAt, _ = time.Parse(time.RFC3339, fetchedAt)
-		if jobName.Valid {
-			rv.JobName = jobName.String
+			return nil, err
 		}
 
 		versions = append(versions, rv)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating versions: %w", err)
 	}
 
 	return versions, nil
@@ -825,8 +780,10 @@ func (s *Sqlite) GetVersionsAfter(ctx context.Context, resourceName string, afte
 		return nil, fmt.Errorf("failed to find after version: %w", err)
 	}
 
-	rows, err := s.writer.QueryContext(ctx, `
-		SELECT id, resource_name, json(version), job_name, fetched_at
+	var rows []resourceVersionScan
+
+	err = sqlscan.Select(ctx, s.writer, &rows, `
+		SELECT id, resource_name, json(version) AS version, job_name, fetched_at
 		FROM resource_versions
 		WHERE resource_name = ? AND fetched_at > ?
 		ORDER BY fetched_at ASC
@@ -834,35 +791,15 @@ func (s *Sqlite) GetVersionsAfter(ctx context.Context, resourceName string, afte
 	if err != nil {
 		return nil, fmt.Errorf("failed to get versions after: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
 
-	var versions []storage.ResourceVersion
-
-	for rows.Next() {
-		var rv storage.ResourceVersion
-		var versionBytes []byte
-		var fetchedAt string
-		var jobName sql.NullString
-
-		err := rows.Scan(&rv.ID, &rv.ResourceName, &versionBytes, &jobName, &fetchedAt)
+	versions := make([]storage.ResourceVersion, 0, len(rows))
+	for _, row := range rows {
+		rv, err := row.toStorage()
 		if err != nil {
-			return nil, fmt.Errorf("failed to scan version: %w", err)
-		}
-
-		if err := json.Unmarshal(versionBytes, &rv.Version); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal version: %w", err)
-		}
-
-		rv.FetchedAt, _ = time.Parse(time.RFC3339, fetchedAt)
-		if jobName.Valid {
-			rv.JobName = jobName.String
+			return nil, err
 		}
 
 		versions = append(versions, rv)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating versions: %w", err)
 	}
 
 	return versions, nil
@@ -896,7 +833,9 @@ func (s *Sqlite) SearchPipelines(ctx context.Context, query string, page, perPag
 		return nil, fmt.Errorf("failed to count pipeline search results: %w", err)
 	}
 
-	rows, err := s.writer.QueryContext(ctx, `
+	var rows []pipelineScan
+
+	err = sqlscan.Select(ctx, s.writer, &rows, `
 		SELECT p.id, p.name, p.content, p.driver_dsn, p.webhook_secret, p.created_at, p.updated_at
 		FROM pipelines p
 		WHERE p.id IN (SELECT id FROM pipelines_fts WHERE pipelines_fts MATCH ?)
@@ -906,29 +845,10 @@ func (s *Sqlite) SearchPipelines(ctx context.Context, query string, page, perPag
 	if err != nil {
 		return nil, fmt.Errorf("failed to search pipelines: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
 
-	var pipelines []storage.Pipeline
-
-	for rows.Next() {
-		var pipeline storage.Pipeline
-		var createdAt, updatedAt string
-
-		if err := rows.Scan(
-			&pipeline.ID, &pipeline.Name, &pipeline.Content,
-			&pipeline.DriverDSN, &pipeline.WebhookSecret,
-			&createdAt, &updatedAt,
-		); err != nil {
-			return nil, fmt.Errorf("failed to scan pipeline search result: %w", err)
-		}
-
-		pipeline.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
-		pipeline.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
-		pipelines = append(pipelines, pipeline)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating pipeline search results: %w", err)
+	pipelines := make([]storage.Pipeline, 0, len(rows))
+	for _, row := range rows {
+		pipelines = append(pipelines, row.toStorage())
 	}
 
 	totalPages := (totalItems + perPage - 1) / perPage
@@ -953,10 +873,12 @@ func (s *Sqlite) Search(ctx context.Context, prefix, query string) (storage.Resu
 	ftsQuery := sanitizeFTSQuery(query)
 	fullPrefix := filepath.Clean("/" + s.namespace + "/" + prefix)
 
-	rows, err := s.writer.QueryContext(ctx, `
+	var results storage.Results
+
+	err := sqlscan.Select(ctx, s.writer, &results, `
 		SELECT
-			COALESCE(t.id, 0),
-			f.path,
+			COALESCE(t.id, 0) AS id,
+			f.path AS path,
 			COALESCE(
 				json_object(
 					'status',     json_extract(t.payload, '$.status'),
@@ -972,28 +894,6 @@ func (s *Sqlite) Search(ctx context.Context, prefix, query string) (storage.Resu
 	`, ftsQuery, fullPrefix)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	var results storage.Results
-
-	for rows.Next() {
-		var result storage.Result
-		var payloadBytes []byte
-
-		if err := rows.Scan(&result.ID, &result.Path, &payloadBytes); err != nil {
-			return nil, fmt.Errorf("failed to scan search result: %w", err)
-		}
-
-		if err := json.Unmarshal(payloadBytes, &result.Payload); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal search payload: %w", err)
-		}
-
-		results = append(results, result)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating search results: %w", err)
 	}
 
 	return results, nil

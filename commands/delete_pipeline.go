@@ -3,11 +3,11 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
-	"net/http"
+	"net/url"
 	"strings"
 
+	"github.com/go-resty/resty/v2"
 	"github.com/jtarchie/ci/storage"
 )
 
@@ -22,37 +22,30 @@ func (c *DeletePipeline) Run(logger *slog.Logger) error {
 	serverURL := strings.TrimSuffix(c.ServerURL, "/")
 	endpoint := serverURL + "/api/pipelines"
 
-	doRequest := func(method, url string) (*http.Response, error) {
-		req, err := http.NewRequest(method, url, nil)
-		if err != nil {
-			return nil, err
-		}
+	client := resty.New()
 
-		if req.URL.User != nil {
-			password, _ := req.URL.User.Password()
-			req.SetBasicAuth(req.URL.User.Username(), password)
-		}
-
-		return http.DefaultClient.Do(req)
+	// Extract basic auth from URL if present and strip it from the base URL.
+	if parsed, err := url.Parse(serverURL); err == nil && parsed.User != nil {
+		password, _ := parsed.User.Password()
+		client.SetBasicAuth(parsed.User.Username(), password)
+		parsed.User = nil
+		endpoint = parsed.String() + "/api/pipelines"
 	}
 
 	// Resolve name → ID: fetch the pipeline list and match by name or ID.
 	logger.Info("pipeline.list")
 
-	listResp, err := doRequest(http.MethodGet, endpoint)
+	listResp, err := client.R().Get(endpoint)
 	if err != nil {
 		return fmt.Errorf("could not list pipelines: %w", err)
 	}
 
-	listBody, _ := io.ReadAll(listResp.Body)
-	_ = listResp.Body.Close()
-
-	if listResp.StatusCode != http.StatusOK {
-		return fmt.Errorf("server error listing pipelines (%d): %s", listResp.StatusCode, string(listBody))
+	if listResp.StatusCode() != 200 {
+		return fmt.Errorf("server error listing pipelines (%d): %s", listResp.StatusCode(), listResp.String())
 	}
 
 	var result storage.PaginationResult[storage.Pipeline]
-	if err := json.Unmarshal(listBody, &result); err != nil {
+	if err := json.Unmarshal(listResp.Body(), &result); err != nil {
 		return fmt.Errorf("could not parse pipeline list: %w", err)
 	}
 
@@ -71,16 +64,13 @@ func (c *DeletePipeline) Run(logger *slog.Logger) error {
 	for _, p := range matched {
 		logger.Info("pipeline.delete", "id", p.ID, "name", p.Name)
 
-		resp, err := doRequest(http.MethodDelete, endpoint+"/"+p.ID)
+		resp, err := client.R().Delete(endpoint + "/" + p.ID)
 		if err != nil {
 			return fmt.Errorf("could not delete pipeline %q (%s): %w", p.Name, p.ID, err)
 		}
 
-		body, _ := io.ReadAll(resp.Body)
-		_ = resp.Body.Close()
-
-		if resp.StatusCode != http.StatusNoContent {
-			return fmt.Errorf("server error deleting pipeline %q (%s) (%d): %s", p.Name, p.ID, resp.StatusCode, string(body))
+		if resp.StatusCode() != 204 {
+			return fmt.Errorf("server error deleting pipeline %q (%s) (%d): %s", p.Name, p.ID, resp.StatusCode(), resp.String())
 		}
 
 		fmt.Printf("Pipeline '%s' deleted successfully (ID: %s)\n", p.Name, p.ID)

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-	"github.com/imroc/req/v3"
+	"github.com/go-resty/resty/v2"
 )
 
 const (
@@ -169,29 +169,29 @@ func (f *FetchRuntime) Fetch(call goja.FunctionCall) goja.Value {
 }
 
 func (f *FetchRuntime) doFetch(url, method string, headers map[string]string, body string, timeout time.Duration) (*FetchResponse, error) {
-	client := req.C().
-		SetTimeout(timeout).
-		DisableAutoReadResponse()
+	client := resty.New().
+		SetTimeout(timeout)
 
 	r := client.R().
-		SetContext(f.ctx)
+		SetContext(f.ctx).
+		SetDoNotParseResponse(true)
 
 	for k, v := range headers {
 		r.SetHeader(k, v)
 	}
 
 	if body != "" {
-		r.SetBodyString(body)
+		r.SetBody(body)
 	}
 
-	resp, err := r.Send(method, url)
+	resp, err := r.Execute(method, url)
 	if err != nil {
 		return nil, fmt.Errorf("fetch failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { _ = resp.RawBody().Close() }()
 
 	// Read body with size limit
-	limited := io.LimitReader(resp.Body, f.maxResponseBytes+1)
+	limited := io.LimitReader(resp.RawBody(), f.maxResponseBytes+1)
 
 	bodyBytes, err := io.ReadAll(limited)
 	if err != nil {
@@ -204,13 +204,13 @@ func (f *FetchRuntime) doFetch(url, method string, headers map[string]string, bo
 
 	// Convert response headers (first value only)
 	respHeaders := make(map[string]string)
-	for k, v := range resp.Header {
+	for k, v := range resp.Header() {
 		if len(v) > 0 {
 			respHeaders[strings.ToLower(k)] = v[0]
 		}
 	}
 
-	statusCode := resp.StatusCode
+	statusCode := resp.StatusCode()
 
 	return &FetchResponse{
 		Status:     statusCode,
