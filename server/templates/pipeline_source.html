@@ -1,17 +1,20 @@
 {{ template "head" dict "Title" (printf "%s — Source" .Pipeline.Name) }}
 <!-- Breadcrumb navigation -->
 <nav
-  class="px-3 py-2 sm:px-4 sm:py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex items-center gap-1 sm:gap-2 flex-wrap text-sm sm:text-base"
-  role="navigation"
+  class="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 text-sm sm:text-base"
   aria-label="Breadcrumb">
-  <a href="/pipelines/"
-    class="text-blue-600 dark:text-blue-400 hover:underline">Pipelines</a>
-  <span class="text-gray-500" aria-hidden="true">/</span>
-  <a href="/pipelines/{{ .Pipeline.ID }}/"
-    class="text-blue-600 dark:text-blue-400 hover:underline">{{ .Pipeline.Name
-    }}</a>
-  <span class="text-gray-500" aria-hidden="true">/</span>
-  <span class="text-gray-800 dark:text-white font-medium">Source</span>
+  <ol
+    class="flex items-center list-none overflow-x-auto whitespace-nowrap px-4 py-2 sm:py-3">
+    <li><a href="/pipelines/"
+        class="text-blue-600 dark:text-blue-400 hover:underline">Pipelines</a></li>
+    <li class="text-gray-400 mx-1.5" aria-hidden="true">/</li>
+    <li><a href="/pipelines/{{ .Pipeline.ID }}/"
+        class="text-blue-600 dark:text-blue-400 hover:underline">{{
+        .Pipeline.Name }}</a></li>
+    <li class="text-gray-400 mx-1.5" aria-hidden="true">/</li>
+    <li><span
+        class="text-gray-800 dark:text-white font-medium">Source</span></li>
+  </ol>
 </nav>
 
 <main id="main-content" role="main">

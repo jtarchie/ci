@@ -1,45 +1,49 @@
 {{ template "head" dict "Title" (default "Task Graph" .Title) }}
 <!-- Breadcrumb navigation -->
 <nav
-  class="px-3 py-2 sm:px-4 sm:py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex items-center gap-1 sm:gap-2 flex-wrap text-sm sm:text-base"
-  role="navigation"
+  class="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 text-sm sm:text-base"
   aria-label="Breadcrumb">
-  <a href="/pipelines/"
-    class="text-blue-600 dark:text-blue-400 hover:underline">Pipelines</a>
-  {{ if .RunID }}
-  {{ if .Pipeline }}
-  <span class="text-gray-500" aria-hidden="true">/</span>
-  <a href="/pipelines/{{ .Pipeline.ID }}/"
-    class="text-blue-600 dark:text-blue-400 hover:underline">{{ .Pipeline.Name
-    }}</a>
-  {{ end }}
-  <span class="text-gray-500" aria-hidden="true">/</span>
-  <a href="/runs/{{ .RunID }}/tasks"
-    class="text-blue-600 dark:text-blue-400 hover:underline">Run {{ .RunID
-    }}</a>
-  <span class="text-gray-500" aria-hidden="true">/</span>
-  <span class="text-gray-800 dark:text-white font-medium">Graph</span>
-  {{ else }}
-  <span class="text-gray-500" aria-hidden="true">/</span>
-  <a href="/graph/"
-    class="text-blue-600 dark:text-blue-400 hover:underline">Graph</a>
-  {{ if and .Path (ne .Path "/") }}
-  {{ $parts := splitList "/" .Path }}
-  {{ $accumulated := "" }}
-  {{ range $i, $part := $parts }}
-  {{ if $part }}
-  {{ $accumulated = printf "%s/%s" $accumulated $part }}
-  <span class="text-gray-500" aria-hidden="true">/</span>
-  {{ if eq $i (sub (len $parts) 1) }}
-  <span class="text-gray-800 dark:text-white">{{ $part }}</span>
-  {{ else }}
-  <a href="/graph{{ $accumulated }}/"
-    class="text-blue-600 dark:text-blue-400 hover:underline">{{ $part }}</a>
-  {{ end }}
-  {{ end }}
-  {{ end }}
-  {{ end }}
-  {{ end }}
+  <ol
+    class="flex items-center list-none overflow-x-auto whitespace-nowrap px-4 py-2 sm:py-3">
+    <li><a href="/pipelines/"
+        class="text-blue-600 dark:text-blue-400 hover:underline">Pipelines</a></li>
+    {{ if .RunID }}
+    {{ if .Pipeline }}
+    <li class="text-gray-400 mx-1.5" aria-hidden="true">/</li>
+    <li><a href="/pipelines/{{ .Pipeline.ID }}/"
+        class="text-blue-600 dark:text-blue-400 hover:underline">{{
+        .Pipeline.Name }}</a></li>
+    {{ end }}
+    <li class="text-gray-400 mx-1.5" aria-hidden="true">/</li>
+    <li><a href="/runs/{{ .RunID }}/tasks"
+        class="text-blue-600 dark:text-blue-400 hover:underline">Run {{ .RunID
+        }}</a></li>
+    <li class="text-gray-400 mx-1.5" aria-hidden="true">/</li>
+    <li><span
+        class="text-gray-800 dark:text-white font-medium">Graph</span></li>
+    {{ else }}
+    <li class="text-gray-400 mx-1.5" aria-hidden="true">/</li>
+    <li><a href="/graph/"
+        class="text-blue-600 dark:text-blue-400 hover:underline">Graph</a></li>
+    {{ if and .Path (ne .Path "/") }}
+    {{ $parts := splitList "/" .Path }}
+    {{ $accumulated := "" }}
+    {{ range $i, $part := $parts }}
+    {{ if $part }}
+    {{ $accumulated = printf "%s/%s" $accumulated $part }}
+    <li class="text-gray-400 mx-1.5" aria-hidden="true">/</li>
+    {{ if eq $i (sub (len $parts) 1) }}
+    <li><span class="text-gray-800 dark:text-white">{{ $part }}</span></li>
+    {{ else }}
+    <li><a href="/graph{{ $accumulated }}/"
+        class="text-blue-600 dark:text-blue-400 hover:underline">{{ $part
+        }}</a></li>
+    {{ end }}
+    {{ end }}
+    {{ end }}
+    {{ end }}
+    {{ end }}
+  </ol>
 </nav>
 
 <main id="main-content" role="main">
