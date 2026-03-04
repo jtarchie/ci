@@ -76,59 +76,62 @@
         </span>
         {{ end }}
       </div>
-      <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-        <!-- Expand/Collapse All -->
-        <button id="expand-all"
-          class="w-full sm:w-auto px-3 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400"
-          aria-label="Expand all tasks"
-          title="Expand all tasks (keyboard: e)">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor"
-            viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round"
-              stroke-width="2" d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
-        <button id="collapse-all"
-          class="w-full sm:w-auto px-3 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400"
-          aria-label="Collapse all tasks"
-          title="Collapse all tasks (keyboard: c)">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor"
-            viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round"
-              stroke-width="2" d="M5 15l7-7 7 7" />
-          </svg>
-        </button>
+      <div
+        class="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+        <!-- Graph View button (matches Trigger button style) -->
         {{ if .RunID }}
-        {{ if and .Run .Run.PipelineID }}
-        <details class="relative">
+        <a href="/runs/{{ .RunID }}/graph"
+          class="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-center transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 sm:w-auto">
+          Graph View
+        </a>
+        {{ else }}
+        <a href="/graph{{ .Path }}/"
+          class="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-center transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 sm:w-auto">
+          Graph View
+        </a>
+        {{ end }}
+        <!-- ... menu (always shown, rightmost to keep dropdown on-screen) -->
+        <details class="relative sm:w-auto">
           <summary
-            class="flex items-center justify-center w-full sm:w-auto px-3 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400 list-none [&::-webkit-details-marker]:hidden"
+            class="flex items-center justify-center w-full sm:w-auto px-4 py-3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 dark:focus:ring-offset-gray-800 list-none [&::-webkit-details-marker]:hidden"
             aria-label="More actions"
             aria-haspopup="true">
             <span aria-hidden="true"
               class="text-base font-bold tracking-widest select-none">&middot;&middot;&middot;</span>
           </summary>
           <div
-            class="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 py-1"
+            class="absolute right-0 top-full mt-1 w-52 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 py-1"
             role="menu">
+            <button id="expand-all"
+              class="flex items-center justify-between w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:bg-gray-100 dark:focus:bg-gray-700"
+              role="menuitem"
+              aria-label="Expand all tasks"
+              title="Expand all tasks (keyboard: e)">
+              <span>Expand All</span>
+              <kbd
+                class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-600 rounded text-xs">e</kbd>
+            </button>
+            <button id="collapse-all"
+              class="flex items-center justify-between w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:bg-gray-100 dark:focus:bg-gray-700"
+              role="menuitem"
+              aria-label="Collapse all tasks"
+              title="Collapse all tasks (keyboard: c)">
+              <span>Collapse All</span>
+              <kbd
+                class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-600 rounded text-xs">c</kbd>
+            </button>
+            {{ if .RunID }}
+            {{ if and .Run .Run.PipelineID }}
+            <hr class="my-1 border-gray-200 dark:border-gray-700">
             <a href="/pipelines/{{ .Run.PipelineID }}/source/"
               class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:bg-gray-100 dark:focus:bg-gray-700"
               role="menuitem">
               View Source
             </a>
+            {{ end }}
+            {{ end }}
           </div>
         </details>
-        {{ end }}
-        <a href="/runs/{{ .RunID }}/graph"
-          class="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
-          Graph View
-        </a>
-        {{ else }}
-        <a href="/graph{{ .Path }}/"
-          class="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
-          Graph View
-        </a>
-        {{ end }}
       </div>
     </div>
 
