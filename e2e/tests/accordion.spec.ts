@@ -52,7 +52,7 @@ test.describe("Task Accordion State during Live Updates", () => {
       await page.getByRole("link", { name: pipelineName }).click();
 
       // Trigger the pipeline
-      await page.getByRole("button", { name: /trigger run/i }).click();
+      await page.getByRole("button", { name: /trigger/i }).click();
       await expect(page.getByText(/triggered successfully/i)).toBeVisible({
         timeout: 5000,
       });

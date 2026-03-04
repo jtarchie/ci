@@ -118,7 +118,7 @@ test.describe("Pipeline Management UI", () => {
       await expect(page.getByText(/Created/)).toBeVisible();
 
       // Should show the trigger button
-      await expect(page.getByRole("button", { name: /trigger run/i }))
+      await expect(page.getByRole("button", { name: /trigger/i }))
         .toBeVisible();
     });
 
@@ -215,7 +215,7 @@ test.describe("Pipeline Management UI", () => {
       await expect(page.getByText(/No runs yet/)).toBeVisible();
 
       // Trigger the pipeline
-      await page.getByRole("button", { name: /trigger run/i }).click();
+      await page.getByRole("button", { name: /trigger/i }).click();
 
       // Should show success toast
       await expect(page.getByText(/triggered successfully/i)).toBeVisible({
@@ -240,7 +240,7 @@ test.describe("Pipeline Management UI", () => {
       await page.getByRole("link", { name: pipelineName }).click();
 
       // Trigger the pipeline
-      await page.getByRole("button", { name: /trigger run/i }).click();
+      await page.getByRole("button", { name: /trigger/i }).click();
 
       // Wait for the run to complete (success or failed)
       // The status should change from queued -> running -> success/failed
@@ -261,7 +261,7 @@ test.describe("Pipeline Management UI", () => {
       await page.getByRole("link", { name: pipelineName }).click();
 
       // Trigger the pipeline and wait for it to appear
-      await page.getByRole("button", { name: /trigger run/i }).click();
+      await page.getByRole("button", { name: /trigger/i }).click();
       await expect(page.getByText(/triggered successfully/i)).toBeVisible({
         timeout: 5000,
       });
@@ -293,7 +293,7 @@ test.describe("Pipeline Management UI", () => {
       await page.getByRole("link", { name: pipelineName }).click();
 
       // Trigger the pipeline and wait for it to appear
-      await page.getByRole("button", { name: /trigger run/i }).click();
+      await page.getByRole("button", { name: /trigger/i }).click();
       await expect(page.getByText(/triggered successfully/i)).toBeVisible({
         timeout: 5000,
       });
@@ -328,7 +328,7 @@ test.describe("Run Views", () => {
     await page.getByRole("link", { name: pipelineName }).click();
 
     // Trigger the pipeline
-    await page.getByRole("button", { name: /trigger run/i }).click();
+    await page.getByRole("button", { name: /trigger/i }).click();
     await expect(page.getByText(/triggered successfully/i)).toBeVisible({
       timeout: 5000,
     });
@@ -354,7 +354,7 @@ test.describe("Run Views", () => {
     await page.getByRole("link", { name: pipelineName }).click();
 
     // Trigger the pipeline
-    await page.getByRole("button", { name: /trigger run/i }).click();
+    await page.getByRole("button", { name: /trigger/i }).click();
     await expect(page.getByText(/triggered successfully/i)).toBeVisible({
       timeout: 5000,
     });
@@ -385,7 +385,7 @@ test.describe("Run Views", () => {
     await page.getByRole("link", { name: pipelineName }).click();
 
     // Trigger the pipeline
-    await page.getByRole("button", { name: /trigger run/i }).click();
+    await page.getByRole("button", { name: /trigger/i }).click();
     await expect(page.getByText(/triggered successfully/i)).toBeVisible({
       timeout: 5000,
     });
@@ -449,7 +449,7 @@ test.describe("Live Updates", () => {
     await page.getByRole("link", { name: pipelineName }).click();
 
     // Trigger the pipeline
-    await page.getByRole("button", { name: /trigger run/i }).click();
+    await page.getByRole("button", { name: /trigger/i }).click();
 
     // Wait for the trigger to complete
     await expect(page.getByText(/triggered successfully/i)).toBeVisible({
@@ -483,7 +483,7 @@ test.describe("Live Updates", () => {
     await page.getByRole("link", { name: pipelineName }).click();
 
     // Trigger the pipeline
-    await page.getByRole("button", { name: /trigger run/i }).click();
+    await page.getByRole("button", { name: /trigger/i }).click();
     await expect(page.getByText(/triggered successfully/i)).toBeVisible({
       timeout: 5000,
     });
@@ -527,7 +527,7 @@ test.describe("Live Updates", () => {
     await page.getByRole("link", { name: pipelineName }).click();
 
     // Trigger the pipeline
-    await page.getByRole("button", { name: /trigger run/i }).click();
+    await page.getByRole("button", { name: /trigger/i }).click();
     await expect(page.getByText(/triggered successfully/i)).toBeVisible({
       timeout: 5000,
     });
@@ -565,7 +565,7 @@ test.describe("Live Updates", () => {
     await page.getByRole("link", { name: pipelineName }).click();
 
     // Trigger the pipeline
-    await page.getByRole("button", { name: /trigger run/i }).click();
+    await page.getByRole("button", { name: /trigger/i }).click();
     await expect(page.getByText(/triggered successfully/i)).toBeVisible({
       timeout: 5000,
     });
