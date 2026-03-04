@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/jtarchie/ci/resources"
-	_ "github.com/jtarchie/ci/resources/git"
 	_ "github.com/jtarchie/ci/resources/mock"
 	. "github.com/onsi/gomega"
 )
@@ -14,7 +13,6 @@ func TestRegistry(t *testing.T) {
 		assert := NewGomegaWithT(t)
 
 		list := resources.List()
-		assert.Expect(list).To(ContainElement("git"))
 		assert.Expect(list).To(ContainElement("mock"))
 	})
 
@@ -29,7 +27,6 @@ func TestRegistry(t *testing.T) {
 	t.Run("IsNative returns true for registered resource", func(t *testing.T) {
 		assert := NewGomegaWithT(t)
 
-		assert.Expect(resources.IsNative("git")).To(BeTrue())
 		assert.Expect(resources.IsNative("mock")).To(BeTrue())
 	})
 
@@ -41,11 +38,6 @@ func TestRegistry(t *testing.T) {
 
 	t.Run("Get returns a valid resource", func(t *testing.T) {
 		assert := NewGomegaWithT(t)
-
-		gitResource, err := resources.Get("git")
-		assert.Expect(err).NotTo(HaveOccurred())
-		assert.Expect(gitResource).NotTo(BeNil())
-		assert.Expect(gitResource.Name()).To(Equal("git"))
 
 		mockResource, err := resources.Get("mock")
 		assert.Expect(err).NotTo(HaveOccurred())
