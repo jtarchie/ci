@@ -6,12 +6,12 @@ import (
 	"net/http"
 
 	"github.com/jtarchie/ci/storage"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 func registerRunViewRoutes(web *echo.Group, store storage.Driver) {
 	// GET /runs/:id/tasks - Task tree view for a run
-	web.GET("/runs/:id/tasks", func(ctx echo.Context) error {
+	web.GET("/runs/:id/tasks", func(ctx *echo.Context) error {
 		runID := ctx.Param("id")
 		lookupPath := "/pipeline/" + runID + "/"
 
@@ -44,7 +44,7 @@ func registerRunViewRoutes(web *echo.Group, store storage.Driver) {
 	})
 
 	// GET /runs/:id/graph - Task graph view for a run
-	web.GET("/runs/:id/graph", func(ctx echo.Context) error {
+	web.GET("/runs/:id/graph", func(ctx *echo.Context) error {
 		runID := ctx.Param("id")
 		lookupPath := "/pipeline/" + runID + "/"
 
@@ -83,7 +83,7 @@ func registerRunViewRoutes(web *echo.Group, store storage.Driver) {
 	})
 
 	// GET /runs/:id/tasks-partial[/] - HTMX partial: tasks container for polling
-	tasksPartialHandler := func(ctx echo.Context) error {
+	tasksPartialHandler := func(ctx *echo.Context) error {
 		runID := ctx.Param("id")
 		lookupPath := "/pipeline/" + runID + "/"
 		q := ctx.QueryParam("q")
@@ -128,7 +128,7 @@ func registerRunViewRoutes(web *echo.Group, store storage.Driver) {
 	web.GET("/runs/:id/tasks-partial/", tasksPartialHandler)
 
 	// GET /runs/:id/graph-data[/] - HTMX partial: graph data JSON for polling
-	graphDataHandler := func(ctx echo.Context) error {
+	graphDataHandler := func(ctx *echo.Context) error {
 		runID := ctx.Param("id")
 		lookupPath := "/pipeline/" + runID + "/"
 

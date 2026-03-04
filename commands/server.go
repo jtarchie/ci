@@ -14,7 +14,7 @@ import (
 	"github.com/jtarchie/ci/server"
 	"github.com/jtarchie/ci/storage"
 	_ "github.com/jtarchie/ci/storage/sqlite"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 type Server struct {
@@ -96,7 +96,7 @@ func (c *Server) Run(logger *slog.Logger) error {
 		return fmt.Errorf("could not create router: %w", err)
 	}
 
-	router.ProtectedGroup().GET("/tasks/*", func(ctx echo.Context) error {
+	router.ProtectedGroup().GET("/tasks/*", func(ctx *echo.Context) error {
 		lookupPath := ctx.Param("*")
 		if lookupPath == "" || lookupPath[0] != '/' {
 			lookupPath = "/" + lookupPath
@@ -113,7 +113,7 @@ func (c *Server) Run(logger *slog.Logger) error {
 		})
 	})
 
-	router.ProtectedGroup().GET("/graph/*", func(ctx echo.Context) error {
+	router.ProtectedGroup().GET("/graph/*", func(ctx *echo.Context) error {
 		lookupPath := ctx.Param("*")
 		if lookupPath == "" || lookupPath[0] != '/' {
 			lookupPath = "/" + lookupPath
@@ -137,7 +137,7 @@ func (c *Server) Run(logger *slog.Logger) error {
 		})
 	})
 
-	router.ProtectedGroup().GET("/asciicast/*", func(ctx echo.Context) error {
+	router.ProtectedGroup().GET("/asciicast/*", func(ctx *echo.Context) error {
 		lookupPath := ctx.Param("*")
 		if lookupPath == "" || lookupPath[0] != '/' {
 			lookupPath = "/" + lookupPath
@@ -157,15 +157,17 @@ func (c *Server) Run(logger *slog.Logger) error {
 			return fmt.Errorf("stdout is not a string: %w", errors.ErrUnsupported)
 		}
 
-		ctx.Response().Header().Set(echo.HeaderContentType, "application/x-asciicast")
+		ctx.Response().Header().Set("Content-Type", "application/x-asciicast")
 		ctx.Response().WriteHeader(http.StatusOK)
 
-		err = server.ToAsciiCast(stdout, ctx.Response().Writer)
+		err = server.ToAsciiCast(stdout, ctx.Response())
 		if err != nil {
 			return fmt.Errorf("could not write asciicast: %w", err)
 		}
 
-		ctx.Response().Flush()
+		if f, ok := ctx.Response().(http.Flusher); ok {
+			f.Flush()
+		}
 
 		return nil
 	})

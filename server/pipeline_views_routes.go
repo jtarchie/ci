@@ -9,7 +9,7 @@ import (
 
 	"github.com/jtarchie/ci/orchestra"
 	"github.com/jtarchie/ci/storage"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // PipelineRow is a view model for the pipeline listing page that pairs a
@@ -53,7 +53,7 @@ func driverNameFromDSN(dsn, defaultDriver string) string {
 
 func registerPipelineViewRoutes(web *echo.Group, store storage.Driver, execService *ExecutionService) {
 	// GET /pipelines/ - Pipeline listing page
-	web.GET("/pipelines/", func(ctx echo.Context) error {
+	web.GET("/pipelines/", func(ctx *echo.Context) error {
 		q := ctx.QueryParam("q")
 
 		page := 1
@@ -93,7 +93,7 @@ func registerPipelineViewRoutes(web *echo.Group, store storage.Driver, execServi
 
 	// GET /pipelines/search[/] - HTMX partial: returns only the pipeline table
 	// rows filtered by the ?q= full-text search query.
-	pipelinesSearchHandler := func(ctx echo.Context) error {
+	pipelinesSearchHandler := func(ctx *echo.Context) error {
 		q := ctx.QueryParam("q")
 
 		page := 1
@@ -134,7 +134,7 @@ func registerPipelineViewRoutes(web *echo.Group, store storage.Driver, execServi
 	web.GET("/pipelines/search/", pipelinesSearchHandler)
 
 	// GET /pipelines/:id/ - Pipeline detail page
-	web.GET("/pipelines/:id/", func(ctx echo.Context) error {
+	web.GET("/pipelines/:id/", func(ctx *echo.Context) error {
 		id := ctx.Param("id")
 
 		pipeline, err := store.GetPipeline(ctx.Request().Context(), id)
@@ -190,7 +190,7 @@ func registerPipelineViewRoutes(web *echo.Group, store storage.Driver, execServi
 	})
 
 	// GET /pipelines/:id/runs-section[/] - HTMX partial: runs section for a pipeline
-	runsSectionHandler := func(ctx echo.Context) error {
+	runsSectionHandler := func(ctx *echo.Context) error {
 		id := ctx.Param("id")
 
 		page := 1
@@ -230,7 +230,7 @@ func registerPipelineViewRoutes(web *echo.Group, store storage.Driver, execServi
 	web.GET("/pipelines/:id/runs-section/", runsSectionHandler)
 
 	// GET /pipelines/:id/runs-search[/] - HTMX partial: runs-section filtered by ?q=
-	runsSearchHandler := func(ctx echo.Context) error {
+	runsSearchHandler := func(ctx *echo.Context) error {
 		id := ctx.Param("id")
 		q := ctx.QueryParam("q")
 
@@ -271,7 +271,7 @@ func registerPipelineViewRoutes(web *echo.Group, store storage.Driver, execServi
 	web.GET("/pipelines/:id/runs-search/", runsSearchHandler)
 
 	// GET /pipelines/:id/source[/] - Pipeline source view
-	sourceHandler := func(ctx echo.Context) error {
+	sourceHandler := func(ctx *echo.Context) error {
 		id := ctx.Param("id")
 		pipeline, err := store.GetPipeline(ctx.Request().Context(), id)
 		if err != nil {

@@ -9,9 +9,8 @@ import (
 
 	"github.com/jtarchie/ci/secrets"
 	"github.com/jtarchie/ci/storage"
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
-	slogecho "github.com/samber/slog-echo"
+	"github.com/labstack/echo/v5"
+	"github.com/labstack/echo/v5/middleware"
 )
 
 // RouterOptions configures the router.
@@ -54,12 +53,39 @@ func (r *Router) ProtectedGroup() *echo.Group {
 }
 
 // isHtmxRequest checks if the request is from htmx.
-func isHtmxRequest(ctx echo.Context) bool {
+func isHtmxRequest(ctx *echo.Context) bool {
 	return ctx.Request().Header.Get("HX-Request") == "true"
 }
 
 // newBasicAuthMiddleware creates a basic auth middleware using Echo's built-in BasicAuth.
 // If username/password are empty strings, the middleware is disabled (returns a no-op middleware).
+// newSlogMiddleware creates a request-logging middleware using slog.
+func newSlogMiddleware(logger *slog.Logger) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c *echo.Context) error {
+			start := time.Now()
+			req := c.Request()
+
+			err := next(c)
+
+			attrs := []slog.Attr{
+				slog.String("method", req.Method),
+				slog.String("path", req.URL.Path),
+				slog.Duration("latency", time.Since(start)),
+				slog.String("remote_ip", c.RealIP()),
+			}
+
+			if resp, rErr := echo.UnwrapResponse(c.Response()); rErr == nil {
+				attrs = append(attrs, slog.Int("status", resp.Status))
+			}
+
+			logger.LogAttrs(req.Context(), slog.LevelInfo, "request", attrs...)
+
+			return err
+		}
+	}
+}
+
 func newBasicAuthMiddleware(username, password string) echo.MiddlewareFunc {
 	if username == "" || password == "" {
 		// No basic auth configured, return a no-op middleware
@@ -68,7 +94,7 @@ func newBasicAuthMiddleware(username, password string) echo.MiddlewareFunc {
 		}
 	}
 
-	return middleware.BasicAuth(func(u, p string, ctx echo.Context) (bool, error) {
+	return middleware.BasicAuth(func(c *echo.Context, u, p string) (bool, error) {
 		return u == username && p == password, nil
 	})
 }
@@ -91,7 +117,7 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	execService.AllowedFeatures = allowedFeatures
 	execService.FetchTimeout = opts.FetchTimeout
 	execService.FetchMaxResponseBytes = opts.FetchMaxResponseBytes
-	router.Use(slogecho.New(logger))
+	router.Use(newSlogMiddleware(logger))
 	router.Use(middleware.Recover())
 
 	renderer, err := newTemplates()
@@ -108,10 +134,10 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	}
 	router.GET("/static/*", echo.WrapHandler(http.StripPrefix("/static/", http.FileServer(http.FS(staticFiles)))))
 
-	router.GET("/health", func(ctx echo.Context) error {
+	router.GET("/health", func(ctx *echo.Context) error {
 		return ctx.String(http.StatusOK, "OK")
 	})
-	router.GET("/health/", func(ctx echo.Context) error {
+	router.GET("/health/", func(ctx *echo.Context) error {
 		return ctx.String(http.StatusOK, "OK")
 	})
 
@@ -120,7 +146,7 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	web.Use(newBasicAuthMiddleware(opts.BasicAuthUsername, opts.BasicAuthPassword))
 
 	// Redirect root to pipelines list
-	web.GET("/", func(ctx echo.Context) error {
+	web.GET("/", func(ctx *echo.Context) error {
 		return ctx.Redirect(http.StatusMovedPermanently, "/pipelines/")
 	})
 

@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/jtarchie/ci/orchestra"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // parseAllowedDrivers parses a comma-separated list of driver names.
@@ -35,7 +35,7 @@ func parseAllowedDrivers(input string) []string {
 // registerDriverRoutes adds API endpoints for listing allowed drivers.
 func registerDriverRoutes(api *echo.Group, allowedDrivers []string) {
 	// GET /api/drivers - List allowed drivers
-	api.GET("/drivers", func(ctx echo.Context) error {
+	api.GET("/drivers", func(ctx *echo.Context) error {
 		var drivers []string
 
 		if len(allowedDrivers) == 1 && allowedDrivers[0] == "*" {
@@ -53,7 +53,7 @@ func registerDriverRoutes(api *echo.Group, allowedDrivers []string) {
 // registerFeatureRoutes adds API endpoints for listing allowed features.
 func registerFeatureRoutes(api *echo.Group, allowedFeatures []Feature) {
 	// GET /api/features - List allowed features
-	api.GET("/features", func(ctx echo.Context) error {
+	api.GET("/features", func(ctx *echo.Context) error {
 		features := make([]string, len(allowedFeatures))
 		for i, f := range allowedFeatures {
 			features[i] = string(f)

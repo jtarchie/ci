@@ -10,7 +10,7 @@ import (
 	"time"
 
 	sprig "github.com/go-task/slim-sprig/v3"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 //go:embed templates/*
@@ -23,7 +23,7 @@ type TemplateRender struct {
 	templates *template.Template
 }
 
-func (t *TemplateRender) Render(w io.Writer, name string, data any, c echo.Context) error {
+func (t *TemplateRender) Render(c *echo.Context, w io.Writer, name string, data any) error {
 	err := t.templates.ExecuteTemplate(w, name, data)
 	if err != nil {
 		return fmt.Errorf("could not execute template: %w", err)

@@ -12,12 +12,12 @@ import (
 
 	"github.com/jtarchie/ci/runtime"
 	"github.com/jtarchie/ci/storage"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 func registerWebhookRoutes(router *echo.Echo, store storage.Driver, execService *ExecutionService, webhookTimeout time.Duration, allowedFeatures []Feature) {
 	// ANY /api/webhooks/:id - Trigger pipeline execution via webhook
-	router.Any("/api/webhooks/:id", func(ctx echo.Context) error {
+	router.Any("/api/webhooks/:id", func(ctx *echo.Context) error {
 		if !IsFeatureEnabled(FeatureWebhooks, allowedFeatures) {
 			return ctx.JSON(http.StatusForbidden, map[string]string{
 				"error": "webhooks feature is not enabled",

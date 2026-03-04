@@ -13,7 +13,7 @@ import (
 	"github.com/jtarchie/ci/secrets"
 	"github.com/jtarchie/ci/storage"
 	"github.com/klauspost/compress/zstd"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // PipelineRequest represents the JSON body for creating or updating a pipeline.
@@ -49,7 +49,7 @@ func toPipelineAPIResponse(pipeline *storage.Pipeline) PipelineAPIResponse {
 
 func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *ExecutionService, webhookTimeout time.Duration, allowedDrivers []string, allowedFeatures []Feature, secretsMgr secrets.Manager) {
 	// PUT /api/pipelines/:name - Create or update a pipeline by name
-	api.PUT("/pipelines/:name", func(ctx echo.Context) error {
+	api.PUT("/pipelines/:name", func(ctx *echo.Context) error {
 		name := ctx.Param("name")
 
 		if name == "" {
@@ -150,7 +150,7 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 	})
 
 	// GET /api/pipelines - List all pipelines
-	api.GET("/pipelines", func(ctx echo.Context) error {
+	api.GET("/pipelines", func(ctx *echo.Context) error {
 		page := 1
 		perPage := 20
 
@@ -196,7 +196,7 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 	})
 
 	// GET /api/pipelines/:id - Get a specific pipeline
-	api.GET("/pipelines/:id", func(ctx echo.Context) error {
+	api.GET("/pipelines/:id", func(ctx *echo.Context) error {
 		id := ctx.Param("id")
 
 		pipeline, err := store.GetPipeline(ctx.Request().Context(), id)
@@ -216,7 +216,7 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 	})
 
 	// DELETE /api/pipelines/:id - Delete a pipeline
-	api.DELETE("/pipelines/:id", func(ctx echo.Context) error {
+	api.DELETE("/pipelines/:id", func(ctx *echo.Context) error {
 		id := ctx.Param("id")
 
 		err := store.DeletePipeline(ctx.Request().Context(), id)
@@ -241,7 +241,7 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 	})
 
 	// POST /api/pipelines/:id/trigger - Trigger pipeline execution
-	api.POST("/pipelines/:id/trigger", func(ctx echo.Context) error {
+	api.POST("/pipelines/:id/trigger", func(ctx *echo.Context) error {
 		id := ctx.Param("id")
 
 		if !execService.CanExecute() {
@@ -305,7 +305,7 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 	})
 
 	// GET /api/runs/:run_id/status - Get run status
-	api.GET("/runs/:run_id/status", func(ctx echo.Context) error {
+	api.GET("/runs/:run_id/status", func(ctx *echo.Context) error {
 		runID := ctx.Param("run_id")
 
 		run, err := store.GetRun(ctx.Request().Context(), runID)
@@ -325,7 +325,7 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 	})
 
 	// POST /api/pipelines/:name/run - Run a stored pipeline by name (synchronous SSE stream)
-	api.POST("/pipelines/:name/run", func(ctx echo.Context) error {
+	api.POST("/pipelines/:name/run", func(ctx *echo.Context) error {
 		name := ctx.Param("name")
 
 		var args []string
@@ -369,11 +369,12 @@ func registerPipelineRoutes(api *echo.Group, store storage.Driver, execService *
 			args = req.Args
 		}
 
-		w := ctx.Response().Writer
+		w := ctx.Response()
 
 		err := execService.RunByNameSync(ctx.Request().Context(), name, args, workdirTar, w)
 		if err != nil {
-			if !ctx.Response().Committed {
+			echoResp, _ := echo.UnwrapResponse(ctx.Response())
+			if echoResp == nil || !echoResp.Committed {
 				if errors.Is(err, storage.ErrNotFound) {
 					return ctx.JSON(http.StatusNotFound, map[string]string{
 						"error": "pipeline not found",

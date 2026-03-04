@@ -29,7 +29,7 @@ require (
 	github.com/jtarchie/lqs v0.0.0-20241231214705-8a34e6c2a6fc
 	github.com/kdomanski/iso9660 v0.4.0
 	github.com/klauspost/compress v1.18.4
-	github.com/labstack/echo/v4 v4.15.1
+	github.com/labstack/echo/v5 v5.0.4
 	github.com/lmittmann/tint v1.1.3
 	github.com/matoous/go-nanoid/v2 v2.1.0
 	github.com/mdlayher/vsock v1.2.1
@@ -40,7 +40,6 @@ require (
 	github.com/pkg/sftp v1.13.10
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 	github.com/samber/lo v1.53.0
-	github.com/samber/slog-echo v1.21.0
 	github.com/schollz/progressbar/v3 v3.19.0
 	github.com/superfly/fly-go v0.3.1
 	golang.org/x/crypto v0.48.0
@@ -136,9 +135,7 @@ require (
 	github.com/kevinburke/ssh_config v1.6.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/kr/fs v0.1.0 // indirect
-	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
-	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mdlayher/socket v0.5.1 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
@@ -173,8 +170,6 @@ require (
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/superfly/graphql v0.2.6 // indirect
 	github.com/superfly/macaroon v0.3.0 // indirect
-	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/vektah/gqlparser/v2 v2.5.32 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.4.1 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
