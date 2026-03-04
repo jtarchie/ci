@@ -143,14 +143,6 @@ func (h *Hetzner) Name() string {
 // workerLabelSelector returns the Hetzner label selector for all pool machines in this namespace.
 func (h *Hetzner) workerLabelSelector() string { return "ci-worker=" + h.namespace }
 
-// workerLabels returns base labels applied to every pool machine.
-func (h *Hetzner) workerLabels() map[string]string {
-	return map[string]string{
-		"ci-worker":        h.namespace,
-		"ci-worker-status": "busy",
-	}
-}
-
 // waitForWorkerSlot blocks until a worker slot is available (total pool < maxWorkers).
 // If reuseWorker is enabled and the pool is full, it attempts to claim an idle machine.
 // Returns (true, nil) if an idle machine was claimed and the driver is now connected.

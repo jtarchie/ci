@@ -197,7 +197,7 @@ func TestDigitalOcean(t *testing.T) {
 		}
 
 		var (
-			mu         sync.Mutex
+			mu          sync.Mutex
 			activeTasks []string
 			overlap     bool
 		)
