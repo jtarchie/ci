@@ -7,36 +7,30 @@ export default defineConfig({
   cleanUrls: false,
   themeConfig: {
     nav: [
-      { text: 'Guides', link: '/run' },
-      { text: 'Operations', link: '/secrets' },
-      { text: 'Drivers', link: '/driver-dsn' },
+      { text: 'Guides', link: '/guides/' },
+      { text: 'Operations', link: '/operations/' },
+      { text: 'Drivers', link: '/drivers/' },
     ],
-    sidebar: [
-      {
-        text: 'Guides',
-        items: [
-          { text: 'Run Pipelines', link: '/run' },
-          { text: 'MCP', link: '/mcp' },
-          { text: 'Webhooks', link: '/webhooks' },
-        ],
-      },
-      {
-        text: 'Operations',
-        items: [
-          { text: 'Secrets', link: '/secrets' },
-          { text: 'Caching', link: '/caching' },
-          { text: 'Feature Gates', link: '/feature-gates' },
-        ],
-      },
-      {
-        text: 'Drivers',
-        items: [
-          { text: 'Driver DSNs', link: '/driver-dsn' },
-          { text: 'Native Resources', link: '/native-resources' },
-          { text: 'Implementing Drivers', link: '/implementing-new-driver' },
-        ],
-      },
-    ],
+    sidebar: {
+      '/guides/': [
+        { text: 'Overview', link: '/guides/' },
+        { text: 'Run Pipelines', link: 'run' },
+        { text: 'Webhooks', link: 'webhooks' },
+        { text: 'MCP', link: 'mcp' },
+      ],
+      '/operations/': [
+        { text: 'Overview', link: '/operations/' },
+        { text: 'Secrets', link: 'secrets' },
+        { text: 'Caching', link: 'caching' },
+        { text: 'Feature Gates', link: 'feature-gates' },
+      ],
+      '/drivers/': [
+        { text: 'Overview', link: '/drivers/' },
+        { text: 'Driver DSNs', link: 'dsn' },
+        { text: 'Native Resources', link: 'native-resources' },
+        { text: 'Implementing Drivers', link: 'implementing-driver' },
+      ],
+    },
     socialLinks: [
       { icon: 'github', link: 'https://github.com/jtarchie/ci' },
     ],

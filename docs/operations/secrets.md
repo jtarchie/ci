@@ -203,5 +203,5 @@ secrets/
 New backends (e.g., HashiCorp Vault, AWS Secrets Manager) can be added by
 implementing the `secrets.Manager` interface and calling `secrets.Register()` in
 an `init()` function. See
-[implementing-new-driver.md](implementing-new-driver.md) for the analogous
+[implementing-driver](../drivers/implementing-driver.md) for the analogous
 pattern used by orchestra drivers.
