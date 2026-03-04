@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -120,5 +121,147 @@ func TestDigitalOcean(t *testing.T) {
 
 			return status.IsDone() && status.ExitCode() == 0
 		}, "10m", "5s").Should(BeTrue())
+	})
+
+	t.Run("reuse_worker parks and reclaims machine", func(t *testing.T) {
+		assert := NewGomegaWithT(t)
+
+		// Use a shared namespace so both drivers target the same worker pool
+		namespace := "test-" + gonanoid.Must()
+		params := map[string]string{
+			"token":        token,
+			"tags":         testTag,
+			"reuse_worker": "true",
+			"max_workers":  "1",
+		}
+
+		// First run: creates a new machine and parks it on close
+		client1, err := digitalocean.NewDigitalOcean(namespace, slog.Default(), params)
+		assert.Expect(err).NotTo(HaveOccurred())
+
+		container1, err := client1.RunContainer(
+			context.Background(),
+			orchestra.Task{
+				ID:      gonanoid.Must(),
+				Image:   "busybox",
+				Command: []string{"echo", "run1"},
+			},
+		)
+		assert.Expect(err).NotTo(HaveOccurred())
+
+		assert.Eventually(func() bool {
+			status, err := container1.Status(context.Background())
+			return err == nil && status.IsDone() && status.ExitCode() == 0
+		}, "10m", "5s").Should(BeTrue())
+
+		// Park the machine (reuse_worker=true means Close() parks instead of deletes)
+		assert.Expect(client1.Close()).NotTo(HaveOccurred())
+
+		// Second run: should claim the parked machine
+		client2, err := digitalocean.NewDigitalOcean(namespace, slog.Default(), params)
+		assert.Expect(err).NotTo(HaveOccurred())
+
+		defer func() {
+			// Final cleanup: park and then clean up idle machines manually
+			_ = client2.Close()
+			_ = digitalocean.CleanupOrphanedResources(context.Background(), token, slog.Default(), testTag)
+		}()
+
+		container2, err := client2.RunContainer(
+			context.Background(),
+			orchestra.Task{
+				ID:      gonanoid.Must(),
+				Image:   "busybox",
+				Command: []string{"echo", "run2"},
+			},
+		)
+		assert.Expect(err).NotTo(HaveOccurred())
+
+		assert.Eventually(func() bool {
+			status, err := container2.Status(context.Background())
+			return err == nil && status.IsDone() && status.ExitCode() == 0
+		}, "10m", "5s").Should(BeTrue())
+	})
+
+	t.Run("max_workers limits concurrent machines", func(t *testing.T) {
+		assert := NewGomegaWithT(t)
+
+		// Use a shared namespace so both drivers share the same worker pool
+		namespace := "test-" + gonanoid.Must()
+		params := map[string]string{
+			"token":         token,
+			"tags":          testTag,
+			"max_workers":   "1",
+			"poll_interval": "5s",
+			"wait_timeout":  "15m",
+		}
+
+		var (
+			mu         sync.Mutex
+			activeTasks []string
+			overlap     bool
+		)
+
+		run := func(label string) error {
+			client, err := digitalocean.NewDigitalOcean(namespace, slog.Default(), params)
+			if err != nil {
+				return err
+			}
+			defer func() { _ = client.Close() }()
+
+			container, err := client.RunContainer(
+				context.Background(),
+				orchestra.Task{
+					ID:      gonanoid.Must(),
+					Image:   "busybox",
+					Command: []string{"sleep", "5"},
+				},
+			)
+			if err != nil {
+				return err
+			}
+
+			mu.Lock()
+			activeTasks = append(activeTasks, label)
+			if len(activeTasks) > 1 {
+				overlap = true
+			}
+			mu.Unlock()
+
+			for {
+				status, err := container.Status(context.Background())
+				if err != nil {
+					time.Sleep(5 * time.Second)
+					continue
+				}
+				if status.IsDone() {
+					break
+				}
+				time.Sleep(5 * time.Second)
+			}
+
+			mu.Lock()
+			for i, a := range activeTasks {
+				if a == label {
+					activeTasks = append(activeTasks[:i], activeTasks[i+1:]...)
+					break
+				}
+			}
+			mu.Unlock()
+
+			return nil
+		}
+
+		var wg sync.WaitGroup
+		errs := make([]error, 2)
+
+		wg.Add(2)
+		go func() { defer wg.Done(); errs[0] = run("task-a") }()
+		go func() { defer wg.Done(); errs[1] = run("task-b") }()
+		wg.Wait()
+
+		assert.Expect(errs[0]).NotTo(HaveOccurred())
+		assert.Expect(errs[1]).NotTo(HaveOccurred())
+		assert.Expect(overlap).To(BeFalse(), "max_workers=1 should prevent concurrent execution")
 	})
 }

@@ -28,6 +28,9 @@ const (
 	DefaultDiskSizeGB    = 25              // Default disk size in GB
 	DefaultSSHTimeout    = 5 * time.Minute // Default timeout for SSH to become available
 	DefaultDockerTimeout = 5 * time.Minute // Default timeout for Docker to become available
+	DefaultMaxWorkers    = 1
+	DefaultPollInterval  = 10 * time.Second
+	DefaultWaitTimeout   = 10 * time.Minute
 )
 
 // sanitizeHostname converts a string to a valid hostname.
@@ -68,6 +71,12 @@ type DigitalOcean struct {
 
 	// Underlying docker driver connected to the droplet
 	dockerDriver orchestra.Driver
+
+	// Worker pool settings
+	maxWorkers   int
+	reuseWorker  bool
+	pollInterval time.Duration
+	waitTimeout  time.Duration
 }
 
 // NewDigitalOcean creates a new Digital Ocean driver instance.
@@ -91,16 +100,219 @@ func NewDigitalOcean(namespace string, logger *slog.Logger, params map[string]st
 	// volume names, and other resources that have hostname restrictions
 	sanitizedNamespace := sanitizeHostname(namespace)
 
+	// Parse worker pool settings
+	maxWorkersStr := orchestra.GetParam(params, "max_workers", "DIGITALOCEAN_MAX_WORKERS", strconv.Itoa(DefaultMaxWorkers))
+	maxWorkers, err := strconv.Atoi(maxWorkersStr)
+	if err != nil || maxWorkers < 1 {
+		return nil, fmt.Errorf("digitalocean: max_workers must be a positive integer, got %q", maxWorkersStr)
+	}
+
+	reuseWorkerStr := orchestra.GetParam(params, "reuse_worker", "DIGITALOCEAN_REUSE_WORKER", "false")
+	reuseWorker := reuseWorkerStr == "true" || reuseWorkerStr == "1"
+
+	pollIntervalStr := orchestra.GetParam(params, "poll_interval", "DIGITALOCEAN_POLL_INTERVAL", DefaultPollInterval.String())
+	pollInterval, err := time.ParseDuration(pollIntervalStr)
+	if err != nil {
+		return nil, fmt.Errorf("digitalocean: invalid poll_interval %q: %w", pollIntervalStr, err)
+	}
+
+	waitTimeoutStr := orchestra.GetParam(params, "wait_timeout", "DIGITALOCEAN_WAIT_TIMEOUT", DefaultWaitTimeout.String())
+	waitTimeout, err := time.ParseDuration(waitTimeoutStr)
+	if err != nil {
+		return nil, fmt.Errorf("digitalocean: invalid wait_timeout %q: %w", waitTimeoutStr, err)
+	}
+
 	return &DigitalOcean{
-		client:    client,
-		logger:    logger,
-		namespace: sanitizedNamespace,
-		params:    params,
+		client:       client,
+		logger:       logger,
+		namespace:    sanitizedNamespace,
+		params:       params,
+		maxWorkers:   maxWorkers,
+		reuseWorker:  reuseWorker,
+		pollInterval: pollInterval,
+		waitTimeout:  waitTimeout,
 	}, nil
 }
 
 func (d *DigitalOcean) Name() string {
 	return "digitalocean"
+}
+
+// workerTag returns the tag used to identify all worker machines in the pool for this namespace.
+func (d *DigitalOcean) workerTag() string { return "ci-worker-" + d.namespace }
+
+// busyTag returns the tag applied to machines currently claimed by a pipeline run.
+func (d *DigitalOcean) busyTag() string { return "ci-busy-" + d.namespace }
+
+// idleTag returns the tag applied to parked machines available for reuse.
+func (d *DigitalOcean) idleTag() string { return "ci-idle-" + d.namespace }
+
+// waitForWorkerSlot blocks until a worker slot is available (total pool < maxWorkers).
+// If reuseWorker is enabled and the pool is full, it attempts to claim an idle machine.
+// Returns (true, nil) if an idle machine was claimed and the driver is now connected.
+// Returns (false, nil) if a slot is free and the caller should create a new machine.
+func (d *DigitalOcean) waitForWorkerSlot(ctx context.Context) (bool, error) {
+	var deadline time.Time
+	if d.waitTimeout > 0 {
+		deadline = time.Now().Add(d.waitTimeout)
+	}
+
+	for {
+		// Count all worker droplets (idle + busy) in this namespace's pool
+		droplets, _, err := d.client.Droplets.ListByTag(ctx, d.workerTag(), &godo.ListOptions{PerPage: 200})
+		if err != nil {
+			return false, fmt.Errorf("failed to list worker droplets: %w", err)
+		}
+
+		if len(droplets) < d.maxWorkers {
+			// Slot available, caller should create a new machine
+			return false, nil
+		}
+
+		// At cap. If reuse_worker is enabled, try to claim an idle machine.
+		if d.reuseWorker {
+			claimed, err := d.claimIdleDroplet(ctx)
+			if err != nil {
+				return false, fmt.Errorf("failed to claim idle droplet: %w", err)
+			}
+			if claimed {
+				return true, nil
+			}
+		}
+
+		// No slot available; check timeout
+		if !deadline.IsZero() && time.Now().After(deadline) {
+			return false, fmt.Errorf("timeout waiting for worker slot after %s", d.waitTimeout)
+		}
+
+		d.logger.Info("digitalocean.worker.waiting", "current", len(droplets), "max", d.maxWorkers)
+
+		select {
+		case <-ctx.Done():
+			return false, ctx.Err()
+		case <-time.After(d.pollInterval):
+		}
+	}
+}
+
+// claimIdleDroplet attempts to find and exclusively claim an idle worker droplet.
+// It transitions the machine from idle→busy via tag manipulation and reconnects SSH+Docker.
+// Returns true if a machine was successfully claimed.
+func (d *DigitalOcean) claimIdleDroplet(ctx context.Context) (bool, error) {
+	idleDroplets, _, err := d.client.Droplets.ListByTag(ctx, d.idleTag(), &godo.ListOptions{PerPage: 200})
+	if err != nil {
+		return false, fmt.Errorf("failed to list idle droplets: %w", err)
+	}
+
+	for i := range idleDroplets {
+		droplet := &idleDroplets[i]
+		dropletID := strconv.Itoa(droplet.ID)
+
+		// Remove idle tag first, then add busy tag (best-effort optimistic claim)
+		_, err = d.client.Tags.UntagResources(ctx, d.idleTag(), &godo.UntagResourcesRequest{
+			Resources: []godo.Resource{{ID: dropletID, Type: godo.DropletResourceType}},
+		})
+		if err != nil {
+			d.logger.Warn("digitalocean.worker.claim.untag_idle.error", "droplet_id", droplet.ID, "err", err)
+			continue
+		}
+
+		_, err = d.client.Tags.TagResources(ctx, d.busyTag(), &godo.TagResourcesRequest{
+			Resources: []godo.Resource{{ID: dropletID, Type: godo.DropletResourceType}},
+		})
+		if err != nil {
+			d.logger.Warn("digitalocean.worker.claim.tag_busy.error", "droplet_id", droplet.ID, "err", err)
+			continue
+		}
+
+		// Re-fetch to verify we won the race (another concurrent instance may have claimed it)
+		freshDroplet, _, err := d.client.Droplets.Get(ctx, droplet.ID)
+		if err != nil {
+			d.logger.Warn("digitalocean.worker.claim.refetch.error", "droplet_id", droplet.ID, "err", err)
+			continue
+		}
+
+		hasBusy, hasIdle := false, false
+		for _, tag := range freshDroplet.Tags {
+			if tag == d.busyTag() {
+				hasBusy = true
+			}
+			if tag == d.idleTag() {
+				hasIdle = true
+			}
+		}
+
+		if !hasBusy || hasIdle {
+			d.logger.Debug("digitalocean.worker.claim.lost_race", "droplet_id", droplet.ID)
+			continue
+		}
+
+		d.logger.Info("digitalocean.worker.claimed_idle", "droplet_id", droplet.ID)
+
+		// Connect to the claimed machine
+		d.droplet = freshDroplet
+
+		publicIP, err := freshDroplet.PublicIPv4()
+		if err != nil {
+			return false, fmt.Errorf("failed to get claimed droplet IP: %w", err)
+		}
+
+		if err := d.waitForSSH(ctx, publicIP); err != nil {
+			return false, fmt.Errorf("failed to connect SSH to claimed droplet: %w", err)
+		}
+
+		if err := d.waitForDocker(ctx); err != nil {
+			return false, fmt.Errorf("failed to connect Docker to claimed droplet: %w", err)
+		}
+
+		dockerDriver, err := docker.NewDockerWithSSH(d.namespace, d.logger, d.sshClient)
+		if err != nil {
+			return false, fmt.Errorf("failed to create docker driver for claimed droplet: %w", err)
+		}
+
+		d.dockerDriver = dockerDriver
+
+		return true, nil
+	}
+
+	return false, nil
+}
+
+// parkDroplet parks the machine by transitioning it busy→idle without deleting it.
+func (d *DigitalOcean) parkDroplet(ctx context.Context) error {
+	if d.dockerDriver != nil {
+		if err := d.dockerDriver.Close(); err != nil {
+			d.logger.Warn("digitalocean.docker.close.error", "err", err)
+		}
+	}
+
+	if d.sshClient != nil {
+		if err := d.sshClient.Close(); err != nil {
+			d.logger.Warn("digitalocean.ssh.close.error", "err", err)
+		}
+	}
+
+	dropletID := strconv.Itoa(d.droplet.ID)
+
+	// Remove busy tag
+	_, err := d.client.Tags.UntagResources(ctx, d.busyTag(), &godo.UntagResourcesRequest{
+		Resources: []godo.Resource{{ID: dropletID, Type: godo.DropletResourceType}},
+	})
+	if err != nil {
+		d.logger.Warn("digitalocean.worker.park.untag_busy.error", "err", err)
+	}
+
+	// Add idle tag
+	_, err = d.client.Tags.TagResources(ctx, d.idleTag(), &godo.TagResourcesRequest{
+		Resources: []godo.Resource{{ID: dropletID, Type: godo.DropletResourceType}},
+	})
+	if err != nil {
+		d.logger.Warn("digitalocean.worker.park.tag_idle.error", "err", err)
+	}
+
+	d.logger.Info("digitalocean.worker.parked", "droplet_id", d.droplet.ID)
+
+	return nil
 }
 
 // ensureDroplet creates a droplet if one doesn't exist for this driver instance.
@@ -109,9 +321,7 @@ func (d *DigitalOcean) ensureDroplet(ctx context.Context, containerLimits orches
 		return nil
 	}
 
-	d.logger.Info("digitalocean.droplet.create")
-
-	// Generate SSH key for this session
+	// Ensure SSH key exists first (needed for both creating and claiming machines)
 	sshKeyID, sshKeyPath, err := d.ensureSSHKey(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to ensure SSH key: %w", err)
@@ -120,16 +330,30 @@ func (d *DigitalOcean) ensureDroplet(ctx context.Context, containerLimits orches
 	d.sshKeyID = sshKeyID
 	d.sshKeyPath = sshKeyPath
 
+	// Wait for a worker slot, potentially claiming an idle machine
+	claimed, err := d.waitForWorkerSlot(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to acquire worker slot: %w", err)
+	}
+
+	if claimed {
+		return nil
+	}
+
+	d.logger.Info("digitalocean.droplet.create")
+
 	image := orchestra.GetParam(d.params, "image", "DIGITALOCEAN_IMAGE", DefaultImage)
 	region := orchestra.GetParam(d.params, "region", "DIGITALOCEAN_REGION", DefaultRegion)
 	size := d.determineDropletSize(containerLimits)
 
 	dropletName := fmt.Sprintf("ci-%s", d.namespace)
 
-	// Build tags list: always include ci and namespace, plus any custom tags
+	// Build tags list: always include ci, namespace, and worker pool tags
 	tags := []string{
 		"ci",
 		fmt.Sprintf("namespace-%s", d.namespace),
+		d.workerTag(),
+		d.busyTag(),
 	}
 
 	// Add custom tags from DSN parameter
@@ -521,9 +745,14 @@ func (d *DigitalOcean) CreateVolume(ctx context.Context, name string, size int) 
 	return d.dockerDriver.CreateVolume(ctx, name, size)
 }
 
-// Close deletes the droplet and cleans up resources.
+// Close either parks the machine (if reuse_worker=true) or deletes it and cleans up resources.
 func (d *DigitalOcean) Close() error {
 	ctx := context.Background()
+
+	// If reuse_worker is enabled, park the machine instead of deleting it
+	if d.reuseWorker && d.droplet != nil {
+		return d.parkDroplet(ctx)
+	}
 
 	// Close docker driver first
 	if d.dockerDriver != nil {

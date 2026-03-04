@@ -27,6 +27,9 @@ const (
 	DefaultLocation      = "nbg1"      // Nuremberg, Germany
 	DefaultSSHTimeout    = 5 * time.Minute
 	DefaultDockerTimeout = 5 * time.Minute
+	DefaultMaxWorkers    = 1
+	DefaultPollInterval  = 10 * time.Second
+	DefaultWaitTimeout   = 10 * time.Minute
 )
 
 // sanitizeHostname converts a string to a valid hostname.
@@ -69,6 +72,12 @@ type Hetzner struct {
 
 	// Underlying docker driver connected to the server
 	dockerDriver orchestra.Driver
+
+	// Worker pool settings
+	maxWorkers   int
+	reuseWorker  bool
+	pollInterval time.Duration
+	waitTimeout  time.Duration
 }
 
 // NewHetzner creates a new Hetzner Cloud driver instance.
@@ -93,16 +102,203 @@ func NewHetzner(namespace string, logger *slog.Logger, params map[string]string)
 	// volume names, and other resources that have hostname restrictions
 	sanitizedNamespace := sanitizeHostname(namespace)
 
+	// Parse worker pool settings
+	maxWorkersStr := orchestra.GetParam(params, "max_workers", "HETZNER_MAX_WORKERS", strconv.Itoa(DefaultMaxWorkers))
+	maxWorkers, err := strconv.Atoi(maxWorkersStr)
+	if err != nil || maxWorkers < 1 {
+		return nil, fmt.Errorf("hetzner: max_workers must be a positive integer, got %q", maxWorkersStr)
+	}
+
+	reuseWorkerStr := orchestra.GetParam(params, "reuse_worker", "HETZNER_REUSE_WORKER", "false")
+	reuseWorker := reuseWorkerStr == "true" || reuseWorkerStr == "1"
+
+	pollIntervalStr := orchestra.GetParam(params, "poll_interval", "HETZNER_POLL_INTERVAL", DefaultPollInterval.String())
+	pollInterval, err := time.ParseDuration(pollIntervalStr)
+	if err != nil {
+		return nil, fmt.Errorf("hetzner: invalid poll_interval %q: %w", pollIntervalStr, err)
+	}
+
+	waitTimeoutStr := orchestra.GetParam(params, "wait_timeout", "HETZNER_WAIT_TIMEOUT", DefaultWaitTimeout.String())
+	waitTimeout, err := time.ParseDuration(waitTimeoutStr)
+	if err != nil {
+		return nil, fmt.Errorf("hetzner: invalid wait_timeout %q: %w", waitTimeoutStr, err)
+	}
+
 	return &Hetzner{
-		client:    client,
-		logger:    logger,
-		namespace: sanitizedNamespace,
-		params:    params,
+		client:       client,
+		logger:       logger,
+		namespace:    sanitizedNamespace,
+		params:       params,
+		maxWorkers:   maxWorkers,
+		reuseWorker:  reuseWorker,
+		pollInterval: pollInterval,
+		waitTimeout:  waitTimeout,
 	}, nil
 }
 
 func (h *Hetzner) Name() string {
 	return "hetzner"
+}
+
+// workerLabelSelector returns the Hetzner label selector for all pool machines in this namespace.
+func (h *Hetzner) workerLabelSelector() string { return "ci-worker=" + h.namespace }
+
+// workerLabels returns base labels applied to every pool machine.
+func (h *Hetzner) workerLabels() map[string]string {
+	return map[string]string{
+		"ci-worker":        h.namespace,
+		"ci-worker-status": "busy",
+	}
+}
+
+// waitForWorkerSlot blocks until a worker slot is available (total pool < maxWorkers).
+// If reuseWorker is enabled and the pool is full, it attempts to claim an idle machine.
+// Returns (true, nil) if an idle machine was claimed and the driver is now connected.
+// Returns (false, nil) if a slot is free and the caller should create a new machine.
+func (h *Hetzner) waitForWorkerSlot(ctx context.Context) (bool, error) {
+	var deadline time.Time
+	if h.waitTimeout > 0 {
+		deadline = time.Now().Add(h.waitTimeout)
+	}
+
+	for {
+		// Count all worker servers (idle + busy) in this namespace's pool
+		servers, err := h.client.Server.AllWithOpts(ctx, hcloud.ServerListOpts{
+			ListOpts: hcloud.ListOpts{LabelSelector: h.workerLabelSelector()},
+		})
+		if err != nil {
+			return false, fmt.Errorf("failed to list worker servers: %w", err)
+		}
+
+		if len(servers) < h.maxWorkers {
+			// Slot available, caller should create a new machine
+			return false, nil
+		}
+
+		// At cap. If reuse_worker is enabled, try to claim an idle machine.
+		if h.reuseWorker {
+			claimed, err := h.claimIdleServer(ctx)
+			if err != nil {
+				return false, fmt.Errorf("failed to claim idle server: %w", err)
+			}
+			if claimed {
+				return true, nil
+			}
+		}
+
+		// No slot available; check timeout
+		if !deadline.IsZero() && time.Now().After(deadline) {
+			return false, fmt.Errorf("timeout waiting for worker slot after %s", h.waitTimeout)
+		}
+
+		h.logger.Info("hetzner.worker.waiting", "current", len(servers), "max", h.maxWorkers)
+
+		select {
+		case <-ctx.Done():
+			return false, ctx.Err()
+		case <-time.After(h.pollInterval):
+		}
+	}
+}
+
+// claimIdleServer attempts to find and exclusively claim an idle worker server.
+// It transitions the machine from idle→busy via label update and reconnects SSH+Docker.
+// Returns true if a machine was successfully claimed.
+func (h *Hetzner) claimIdleServer(ctx context.Context) (bool, error) {
+	idleServers, err := h.client.Server.AllWithOpts(ctx, hcloud.ServerListOpts{
+		ListOpts: hcloud.ListOpts{LabelSelector: h.workerLabelSelector() + ",ci-worker-status=idle"},
+	})
+	if err != nil {
+		return false, fmt.Errorf("failed to list idle servers: %w", err)
+	}
+
+	for _, server := range idleServers {
+		// Build updated labels: copy existing and set status to busy
+		newLabels := make(map[string]string, len(server.Labels))
+		for k, v := range server.Labels {
+			newLabels[k] = v
+		}
+		newLabels["ci-worker-status"] = "busy"
+
+		_, _, err := h.client.Server.Update(ctx, server, hcloud.ServerUpdateOpts{
+			Labels: newLabels,
+		})
+		if err != nil {
+			h.logger.Warn("hetzner.worker.claim.update.error", "server_id", server.ID, "err", err)
+			continue
+		}
+
+		// Re-fetch to verify we won the race
+		freshServer, _, err := h.client.Server.GetByID(ctx, server.ID)
+		if err != nil {
+			h.logger.Warn("hetzner.worker.claim.refetch.error", "server_id", server.ID, "err", err)
+			continue
+		}
+
+		if freshServer.Labels["ci-worker-status"] != "busy" {
+			h.logger.Debug("hetzner.worker.claim.lost_race", "server_id", server.ID)
+			continue
+		}
+
+		h.logger.Info("hetzner.worker.claimed_idle", "server_id", server.ID)
+
+		// Connect to the claimed machine
+		h.server = freshServer
+
+		publicIP := freshServer.PublicNet.IPv4.IP.String()
+
+		if err := h.waitForSSH(ctx, publicIP); err != nil {
+			return false, fmt.Errorf("failed to connect SSH to claimed server: %w", err)
+		}
+
+		if err := h.waitForDocker(ctx); err != nil {
+			return false, fmt.Errorf("failed to connect Docker to claimed server: %w", err)
+		}
+
+		dockerDriver, err := docker.NewDockerWithSSH(h.namespace, h.logger, h.sshClient)
+		if err != nil {
+			return false, fmt.Errorf("failed to create docker driver for claimed server: %w", err)
+		}
+
+		h.dockerDriver = dockerDriver
+
+		return true, nil
+	}
+
+	return false, nil
+}
+
+// parkServer parks the machine by transitioning it busy→idle without deleting it.
+func (h *Hetzner) parkServer(ctx context.Context) error {
+	if h.dockerDriver != nil {
+		if err := h.dockerDriver.Close(); err != nil {
+			h.logger.Warn("hetzner.docker.close_error", "err", err)
+		}
+	}
+
+	if h.sshClient != nil {
+		if err := h.sshClient.Close(); err != nil {
+			h.logger.Warn("hetzner.ssh.close_error", "err", err)
+		}
+	}
+
+	// Build updated labels with idle status
+	newLabels := make(map[string]string, len(h.server.Labels))
+	for k, v := range h.server.Labels {
+		newLabels[k] = v
+	}
+	newLabels["ci-worker-status"] = "idle"
+
+	_, _, err := h.client.Server.Update(ctx, h.server, hcloud.ServerUpdateOpts{
+		Labels: newLabels,
+	})
+	if err != nil {
+		h.logger.Warn("hetzner.worker.park.update.error", "err", err)
+	}
+
+	h.logger.Info("hetzner.worker.parked", "server_id", h.server.ID)
+
+	return nil
 }
 
 // ensureServer creates a server if one doesn't exist for this driver instance.
@@ -111,9 +307,7 @@ func (h *Hetzner) ensureServer(ctx context.Context, containerLimits orchestra.Co
 		return nil
 	}
 
-	h.logger.Info("hetzner.server.creating")
-
-	// Generate SSH key for this session
+	// Ensure SSH key exists first (needed for both creating and claiming machines)
 	sshKey, sshKeyPath, err := h.ensureSSHKey(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to ensure SSH key: %w", err)
@@ -121,6 +315,18 @@ func (h *Hetzner) ensureServer(ctx context.Context, containerLimits orchestra.Co
 
 	h.sshKey = sshKey
 	h.sshKeyPath = sshKeyPath
+
+	// Wait for a worker slot, potentially claiming an idle machine
+	claimed, err := h.waitForWorkerSlot(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to acquire worker slot: %w", err)
+	}
+
+	if claimed {
+		return nil
+	}
+
+	h.logger.Info("hetzner.server.creating")
 
 	image := orchestra.GetParam(h.params, "image", "HETZNER_IMAGE", DefaultImage)
 	location := orchestra.GetParam(h.params, "location", "HETZNER_LOCATION", DefaultLocation)
@@ -158,10 +364,12 @@ func (h *Hetzner) ensureServer(ctx context.Context, containerLimits orchestra.Co
 		return fmt.Errorf("location %s not found", location)
 	}
 
-	// Build labels map: always include ci and namespace, plus any custom labels
+	// Build labels map: always include ci, namespace, and worker pool labels
 	labels := map[string]string{
-		"ci":        "true",
-		"namespace": h.namespace,
+		"ci":               "true",
+		"namespace":        h.namespace,
+		"ci-worker":        h.namespace,
+		"ci-worker-status": "busy",
 	}
 
 	// Add custom labels from DSN parameter (format: key1=value1,key2=value2)
@@ -550,9 +758,14 @@ func (h *Hetzner) CreateVolume(ctx context.Context, name string, size int) (orch
 	return h.dockerDriver.CreateVolume(ctx, name, size)
 }
 
-// Close deletes the server and cleans up resources.
+// Close either parks the machine (if reuse_worker=true) or deletes it and cleans up resources.
 func (h *Hetzner) Close() error {
 	ctx := context.Background()
+
+	// If reuse_worker is enabled, park the machine instead of deleting it
+	if h.reuseWorker && h.server != nil {
+		return h.parkServer(ctx)
+	}
 
 	// Close docker driver first
 	if h.dockerDriver != nil {

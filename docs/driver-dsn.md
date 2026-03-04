@@ -118,18 +118,18 @@ The DigitalOcean driver creates an on-demand droplet running Docker and
 delegates container operations to it. When the driver is closed, the droplet is
 automatically deleted.
 
-| Parameter       | Description                                        | Default       | Example                             |
-| --------------- | -------------------------------------------------- | ------------- | ----------------------------------- |
-| `token`         | DigitalOcean API token                             | (required)    | `digitalocean:token=dop_v1_xxx`     |
-| `image`         | Droplet image slug                                 | `docker-20-04`| `digitalocean:image=docker-24-04`   |
-| `size`          | Droplet size slug or `auto`                        | `s-1vcpu-1gb` | `digitalocean:size=s-2vcpu-4gb`     |
-| `region`        | Droplet region                                     | `nyc3`        | `digitalocean:region=sfo3`          |
-| `disk_size`     | Disk size for Docker volumes (GB)                  | `25`          | `digitalocean:disk_size=50`         |
-| `tags`          | Comma-separated custom tags                        | (none)        | `digitalocean:tags=prod,myapp`      |
-| `max_workers`   | Maximum concurrent droplets in the pool (≥ 1)      | `1`           | `digitalocean:max_workers=3`        |
-| `reuse_worker`  | Park droplets on close instead of deleting them    | `false`       | `digitalocean:reuse_worker=true`    |
-| `poll_interval` | How often to check for a free worker slot          | `10s`         | `digitalocean:poll_interval=5s`     |
-| `wait_timeout`  | Max time to wait for a slot (`0` = no limit)       | `10m`         | `digitalocean:wait_timeout=30m`     |
+| Parameter       | Description                                     | Default        | Example                           |
+| --------------- | ----------------------------------------------- | -------------- | --------------------------------- |
+| `token`         | DigitalOcean API token                          | (required)     | `digitalocean:token=dop_v1_xxx`   |
+| `image`         | Droplet image slug                              | `docker-20-04` | `digitalocean:image=docker-24-04` |
+| `size`          | Droplet size slug or `auto`                     | `s-1vcpu-1gb`  | `digitalocean:size=s-2vcpu-4gb`   |
+| `region`        | Droplet region                                  | `nyc3`         | `digitalocean:region=sfo3`        |
+| `disk_size`     | Disk size for Docker volumes (GB)               | `25`           | `digitalocean:disk_size=50`       |
+| `tags`          | Comma-separated custom tags                     | (none)         | `digitalocean:tags=prod,myapp`    |
+| `max_workers`   | Maximum concurrent droplets in the pool (≥ 1)   | `1`            | `digitalocean:max_workers=3`      |
+| `reuse_worker`  | Park droplets on close instead of deleting them | `false`        | `digitalocean:reuse_worker=true`  |
+| `poll_interval` | How often to check for a free worker slot       | `10s`          | `digitalocean:poll_interval=5s`   |
+| `wait_timeout`  | Max time to wait for a slot (`0` = no limit)    | `10m`          | `digitalocean:wait_timeout=30m`   |
 
 **Auto-sizing**: When `size=auto`, the driver automatically selects an
 appropriate droplet size based on the pipeline's `container_limits` (CPU and
@@ -169,26 +169,26 @@ DIGITALOCEAN_TOKEN=dop_v1_xxx --driver=digitalocean
 
 **Environment Variables**:
 
-| Variable                        | Description                                   |
-| ------------------------------- | --------------------------------------------- |
-| `DIGITALOCEAN_TOKEN`            | API token (alternative to DSN)                |
-| `DIGITALOCEAN_IMAGE`            | Default image slug                            |
-| `DIGITALOCEAN_SIZE`             | Default size slug                             |
-| `DIGITALOCEAN_REGION`           | Default region                                |
-| `DIGITALOCEAN_DISK_SIZE`        | Default disk size (GB)                        |
-| `DIGITALOCEAN_TAGS`             | Default custom tags                           |
-| `DIGITALOCEAN_MAX_WORKERS`      | Default max concurrent droplets               |
-| `DIGITALOCEAN_REUSE_WORKER`     | Default reuse-worker flag (`true`/`false`)    |
-| `DIGITALOCEAN_POLL_INTERVAL`    | Default poll interval (e.g. `10s`)            |
-| `DIGITALOCEAN_WAIT_TIMEOUT`     | Default wait timeout (e.g. `10m`, `0` = none)|
+| Variable                     | Description                                   |
+| ---------------------------- | --------------------------------------------- |
+| `DIGITALOCEAN_TOKEN`         | API token (alternative to DSN)                |
+| `DIGITALOCEAN_IMAGE`         | Default image slug                            |
+| `DIGITALOCEAN_SIZE`          | Default size slug                             |
+| `DIGITALOCEAN_REGION`        | Default region                                |
+| `DIGITALOCEAN_DISK_SIZE`     | Default disk size (GB)                        |
+| `DIGITALOCEAN_TAGS`          | Default custom tags                           |
+| `DIGITALOCEAN_MAX_WORKERS`   | Default max concurrent droplets               |
+| `DIGITALOCEAN_REUSE_WORKER`  | Default reuse-worker flag (`true`/`false`)    |
+| `DIGITALOCEAN_POLL_INTERVAL` | Default poll interval (e.g. `10s`)            |
+| `DIGITALOCEAN_WAIT_TIMEOUT`  | Default wait timeout (e.g. `10m`, `0` = none) |
 
 **Resource Tagging**: All droplets are automatically tagged with `ci` and
 `namespace-<namespace>`. Worker pool management adds additional tags:
 
-| Tag | Meaning |
-| --- | ------- |
-| `ci-worker-<namespace>` | Machine belongs to this namespace's pool (used for `max_workers` counting) |
-| `ci-busy-<namespace>`   | Machine is currently claimed by a running pipeline |
+| Tag                     | Meaning                                                                           |
+| ----------------------- | --------------------------------------------------------------------------------- |
+| `ci-worker-<namespace>` | Machine belongs to this namespace's pool (used for `max_workers` counting)        |
+| `ci-busy-<namespace>`   | Machine is currently claimed by a running pipeline                                |
 | `ci-idle-<namespace>`   | Machine is parked and available for reuse (only present when `reuse_worker=true`) |
 
 Custom tags can be added via the `tags` parameter alongside the automatic pool
@@ -199,10 +199,10 @@ tags.
 - Before creating a new droplet, the driver counts all `ci-worker-<namespace>`
   tagged droplets. If the count equals `max_workers`, it blocks (polling every
   `poll_interval`) until a slot becomes free.
-- When `reuse_worker=true`, `Close()` transitions the droplet
-  `busy → idle` instead of deleting it. The next driver instance with the same
-  namespace will claim the idle droplet (reconnecting SSH) rather than spinning
-  up a new one. Idle machines still count toward `max_workers`.
+- When `reuse_worker=true`, `Close()` transitions the droplet `busy → idle`
+  instead of deleting it. The next driver instance with the same namespace will
+  claim the idle droplet (reconnecting SSH) rather than spinning up a new one.
+  Idle machines still count toward `max_workers`.
 - If `wait_timeout` is exceeded before a slot opens, the call returns an error.
   Set `wait_timeout=0` to block indefinitely.
 
@@ -217,20 +217,20 @@ The Hetzner driver creates an on-demand cloud server running Docker and
 delegates container operations to it. When the driver is closed, the server is
 automatically deleted.
 
-| Parameter        | Description                                       | Default     | Example                         |
-| ---------------- | ------------------------------------------------- | ----------- | ------------------------------- |
-| `token`          | Hetzner Cloud API token                           | (required)  | `hetzner:token=xxx`             |
-| `image`          | Server image name                                 | `docker-ce` | `hetzner:image=ubuntu-22.04`    |
-| `server_type`    | Server type slug or `auto`                        | `cx23`      | `hetzner:server_type=cx33`      |
-| `location`       | Server location                                   | `nbg1`      | `hetzner:location=fsn1`         |
-| `disk_size`      | Disk size for Docker volumes (GB)                 | `10`        | `hetzner:disk_size=50`          |
-| `ssh_timeout`    | Timeout for SSH availability                      | `5m`        | `hetzner:ssh_timeout=10m`       |
-| `docker_timeout` | Timeout for Docker availability                   | `5m`        | `hetzner:docker_timeout=10m`    |
-| `labels`         | Comma-separated key=value labels                  | (none)      | `hetzner:labels=env=prod,app=x` |
-| `max_workers`    | Maximum concurrent servers in the pool (≥ 1)      | `1`         | `hetzner:max_workers=3`         |
-| `reuse_worker`   | Park servers on close instead of deleting them    | `false`     | `hetzner:reuse_worker=true`     |
-| `poll_interval`  | How often to check for a free worker slot         | `10s`       | `hetzner:poll_interval=5s`      |
-| `wait_timeout`   | Max time to wait for a slot (`0` = no limit)      | `10m`       | `hetzner:wait_timeout=30m`      |
+| Parameter        | Description                                    | Default     | Example                         |
+| ---------------- | ---------------------------------------------- | ----------- | ------------------------------- |
+| `token`          | Hetzner Cloud API token                        | (required)  | `hetzner:token=xxx`             |
+| `image`          | Server image name                              | `docker-ce` | `hetzner:image=ubuntu-22.04`    |
+| `server_type`    | Server type slug or `auto`                     | `cx23`      | `hetzner:server_type=cx33`      |
+| `location`       | Server location                                | `nbg1`      | `hetzner:location=fsn1`         |
+| `disk_size`      | Disk size for Docker volumes (GB)              | `10`        | `hetzner:disk_size=50`          |
+| `ssh_timeout`    | Timeout for SSH availability                   | `5m`        | `hetzner:ssh_timeout=10m`       |
+| `docker_timeout` | Timeout for Docker availability                | `5m`        | `hetzner:docker_timeout=10m`    |
+| `labels`         | Comma-separated key=value labels               | (none)      | `hetzner:labels=env=prod,app=x` |
+| `max_workers`    | Maximum concurrent servers in the pool (≥ 1)   | `1`         | `hetzner:max_workers=3`         |
+| `reuse_worker`   | Park servers on close instead of deleting them | `false`     | `hetzner:reuse_worker=true`     |
+| `poll_interval`  | How often to check for a free worker slot      | `10s`       | `hetzner:poll_interval=5s`      |
+| `wait_timeout`   | Max time to wait for a slot (`0` = no limit)   | `10m`       | `hetzner:wait_timeout=30m`      |
 
 **Auto-sizing**: When `server_type=auto`, the driver automatically selects an
 appropriate server type based on the pipeline's `container_limits` (CPU and
@@ -268,29 +268,29 @@ HETZNER_TOKEN=xxx --driver=hetzner
 
 **Environment Variables**:
 
-| Variable                    | Description                                   |
-| --------------------------- | --------------------------------------------- |
-| `HETZNER_TOKEN`             | API token (alternative to DSN)                |
-| `HETZNER_IMAGE`             | Default image name                            |
-| `HETZNER_SERVER_TYPE`       | Default server type slug                      |
-| `HETZNER_LOCATION`          | Default location                              |
-| `HETZNER_DISK_SIZE`         | Default disk size (GB)                        |
-| `HETZNER_SSH_TIMEOUT`       | Default SSH timeout                           |
-| `HETZNER_DOCKER_TIMEOUT`    | Default Docker timeout                        |
-| `HETZNER_LABELS`            | Default custom labels                         |
-| `HETZNER_MAX_WORKERS`       | Default max concurrent servers                |
-| `HETZNER_REUSE_WORKER`      | Default reuse-worker flag (`true`/`false`)    |
-| `HETZNER_POLL_INTERVAL`     | Default poll interval (e.g. `10s`)            |
-| `HETZNER_WAIT_TIMEOUT`      | Default wait timeout (e.g. `10m`, `0` = none)|
+| Variable                 | Description                                   |
+| ------------------------ | --------------------------------------------- |
+| `HETZNER_TOKEN`          | API token (alternative to DSN)                |
+| `HETZNER_IMAGE`          | Default image name                            |
+| `HETZNER_SERVER_TYPE`    | Default server type slug                      |
+| `HETZNER_LOCATION`       | Default location                              |
+| `HETZNER_DISK_SIZE`      | Default disk size (GB)                        |
+| `HETZNER_SSH_TIMEOUT`    | Default SSH timeout                           |
+| `HETZNER_DOCKER_TIMEOUT` | Default Docker timeout                        |
+| `HETZNER_LABELS`         | Default custom labels                         |
+| `HETZNER_MAX_WORKERS`    | Default max concurrent servers                |
+| `HETZNER_REUSE_WORKER`   | Default reuse-worker flag (`true`/`false`)    |
+| `HETZNER_POLL_INTERVAL`  | Default poll interval (e.g. `10s`)            |
+| `HETZNER_WAIT_TIMEOUT`   | Default wait timeout (e.g. `10m`, `0` = none) |
 
 **Resource Labeling**: All servers are automatically labeled with `ci=true` and
 `namespace=<namespace>`. Worker pool management uses additional labels:
 
-| Label | Value | Meaning |
-| ----- | ----- | ------- |
-| `ci-worker` | `<namespace>` | Server belongs to this namespace's pool (used for `max_workers` counting) |
-| `ci-worker-status` | `busy` | Server is currently claimed by a running pipeline |
-| `ci-worker-status` | `idle` | Server is parked and available for reuse (only when `reuse_worker=true`) |
+| Label              | Value         | Meaning                                                                   |
+| ------------------ | ------------- | ------------------------------------------------------------------------- |
+| `ci-worker`        | `<namespace>` | Server belongs to this namespace's pool (used for `max_workers` counting) |
+| `ci-worker-status` | `busy`        | Server is currently claimed by a running pipeline                         |
+| `ci-worker-status` | `idle`        | Server is parked and available for reuse (only when `reuse_worker=true`)  |
 
 Custom labels can be added via the `labels` parameter alongside the automatic
 pool labels.
@@ -298,13 +298,12 @@ pool labels.
 **Worker Pool Behaviour**:
 
 - Before creating a new server, the driver counts all servers with label
-  `ci-worker=<namespace>`. If the count equals `max_workers`, it blocks
-  (polling every `poll_interval`) until a slot becomes free.
-- When `reuse_worker=true`, `Close()` updates the server's
-  `ci-worker-status` label from `busy` to `idle` instead of deleting the
-  server. The next driver instance with the same namespace will claim the idle
-  server (reconnecting SSH) rather than creating a new one. Idle servers still
-  count toward `max_workers`.
+  `ci-worker=<namespace>`. If the count equals `max_workers`, it blocks (polling
+  every `poll_interval`) until a slot becomes free.
+- When `reuse_worker=true`, `Close()` updates the server's `ci-worker-status`
+  label from `busy` to `idle` instead of deleting the server. The next driver
+  instance with the same namespace will claim the idle server (reconnecting SSH)
+  rather than creating a new one. Idle servers still count toward `max_workers`.
 - If `wait_timeout` is exceeded before a slot opens, the call returns an error.
   Set `wait_timeout=0` to block indefinitely.
 
