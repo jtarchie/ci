@@ -559,7 +559,7 @@ func (s *Sqlite) ListRunsByPipeline(ctx context.Context, pipelineID string, page
 }
 
 // SearchRunsByPipeline returns a paginated list of runs for a specific pipeline
-// filtered by query matching the run ID, status, or error message.
+// filtered by query matching the run ID, status, or error message using FTS5.
 // When query is empty it behaves like ListRunsByPipeline.
 func (s *Sqlite) SearchRunsByPipeline(ctx context.Context, pipelineID, query string, page, perPage int) (*storage.PaginationResult[storage.PipelineRun], error) {
 	if query == "" {
@@ -574,14 +574,14 @@ func (s *Sqlite) SearchRunsByPipeline(ctx context.Context, pipelineID, query str
 	}
 
 	offset := (page - 1) * perPage
-	like := "%" + query + "%"
+	ftsQuery := sanitizeFTSQuery(query)
 
 	var totalItems int
 	err := s.writer.QueryRowContext(ctx, `
 		SELECT COUNT(*) FROM pipeline_runs
 		WHERE pipeline_id = ?
-		  AND (id LIKE ? OR status LIKE ? OR error_message LIKE ?)
-	`, pipelineID, like, like, like).Scan(&totalItems)
+		  AND id IN (SELECT id FROM pipeline_runs_fts WHERE pipeline_runs_fts MATCH ?)
+	`, pipelineID, ftsQuery).Scan(&totalItems)
 	if err != nil {
 		return nil, fmt.Errorf("failed to count run search results: %w", err)
 	}
@@ -592,10 +592,10 @@ func (s *Sqlite) SearchRunsByPipeline(ctx context.Context, pipelineID, query str
 		SELECT id, pipeline_id, status, started_at, completed_at, error_message, created_at
 		FROM pipeline_runs
 		WHERE pipeline_id = ?
-		  AND (id LIKE ? OR status LIKE ? OR error_message LIKE ?)
+		  AND id IN (SELECT id FROM pipeline_runs_fts WHERE pipeline_runs_fts MATCH ?)
 		ORDER BY created_at DESC
 		LIMIT ? OFFSET ?
-	`, pipelineID, like, like, like, perPage, offset)
+	`, pipelineID, ftsQuery, perPage, offset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search runs: %w", err)
 	}

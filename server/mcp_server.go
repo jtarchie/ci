@@ -17,7 +17,8 @@ func buildMCPServer(store storage.Driver) *mcp.Server {
 	}, &mcp.ServerOptions{
 		Instructions: "Use these tools to inspect CI pipeline runs, tasks, and agents. " +
 			"Start with get_run to get the run status, then list_run_tasks to see all tasks and their outputs. " +
-			"Use search_tasks to do full-text search within a run's task output.",
+			"Use search_tasks with a run_id to search task stdout/stderr within a specific run, " +
+			"or with a pipeline_id to search across all runs for that pipeline (by ID, status, or error message).",
 	})
 
 	// Tool: get_run
@@ -71,18 +72,55 @@ func buildMCPServer(store storage.Driver) *mcp.Server {
 
 	// Tool: search_tasks
 	type SearchTasksInput struct {
-		RunID string `json:"run_id" jsonschema:"The run ID to search within"`
-		Query string `json:"query"  jsonschema:"Full-text search query (FTS5 syntax)"`
+		RunID      string `json:"run_id,omitempty"      jsonschema:"The run ID to search task output within (provide either run_id or pipeline_id)"`
+		PipelineID string `json:"pipeline_id,omitempty" jsonschema:"The pipeline ID to search runs within (provide either run_id or pipeline_id)"`
+		Query      string `json:"query"                 jsonschema:"Full-text search query (FTS5 syntax)"`
+		Page       *int   `json:"page,omitempty"        jsonschema:"Page number 1-based (default 1, only used with pipeline_id)"`
+		PerPage    *int   `json:"per_page,omitempty"    jsonschema:"Results per page (default 20, only used with pipeline_id)"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
-		Name:        "search_tasks",
-		Description: "Full-text search within the tasks of a run. Useful for finding specific error messages, stack traces, or task names without fetching all output.",
+		Name: "search_tasks",
+		Description: "Full-text search in two modes: " +
+			"(1) provide run_id to search task stdout/stderr within a specific run — useful for finding error messages or stack traces; " +
+			"(2) provide pipeline_id to search across all runs for that pipeline by run ID, status, or error message — mirrors the pipeline runs search in the web UI.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, input SearchTasksInput) (*mcp.CallToolResult, any, error) {
-		prefix := fmt.Sprintf("/pipeline/%s/", input.RunID)
+		if input.RunID == "" && input.PipelineID == "" {
+			return nil, nil, fmt.Errorf("either run_id or pipeline_id must be provided")
+		}
 
-		results, err := store.Search(ctx, prefix, input.Query)
+		// Mode 1: search task output within a specific run
+		if input.RunID != "" {
+			prefix := fmt.Sprintf("/pipeline/%s/", input.RunID)
+
+			results, err := store.Search(ctx, prefix, input.Query)
+			if err != nil {
+				return nil, nil, fmt.Errorf("could not search tasks: %w", err)
+			}
+
+			data, err := json.Marshal(results)
+			if err != nil {
+				return nil, nil, fmt.Errorf("could not marshal search results: %w", err)
+			}
+
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{&mcp.TextContent{Text: string(data)}},
+			}, nil, nil
+		}
+
+		// Mode 2: search runs for a pipeline (mirrors the web UI runs-search endpoint)
+		page := 1
+		if input.Page != nil && *input.Page > 0 {
+			page = *input.Page
+		}
+
+		perPage := 20
+		if input.PerPage != nil && *input.PerPage > 0 {
+			perPage = *input.PerPage
+		}
+
+		results, err := store.SearchRunsByPipeline(ctx, input.PipelineID, input.Query, page, perPage)
 		if err != nil {
-			return nil, nil, fmt.Errorf("could not search tasks: %w", err)
+			return nil, nil, fmt.Errorf("could not search runs: %w", err)
 		}
 
 		data, err := json.Marshal(results)

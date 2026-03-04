@@ -50,11 +50,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS pipelines_fts USING fts5(
 
 -- FTS5 virtual table for general full-text search over any stored record.
 -- content holds ANSI-stripped text extracted from the JSON payload.
-CREATE VIRTUAL TABLE IF NOT EXISTS data_fts USING fts5(
-  path,
-  content,
-  tokenize = 'unicode61'
-);
+CREATE VIRTUAL TABLE IF NOT EXISTS data_fts USING fts5(path, content, tokenize = 'unicode61');
 
 -- Remove FTS entries when a pipeline is deleted.
 CREATE TRIGGER IF NOT EXISTS pipelines_fts_delete
@@ -75,6 +71,76 @@ DELETE FROM
   data_fts
 WHERE
   path = OLD.path;
+
+END;
+
+-- FTS5 virtual table for pipeline run search (id, status, error_message).
+CREATE VIRTUAL TABLE IF NOT EXISTS pipeline_runs_fts USING fts5(
+  id,
+  status,
+  error_message,
+  tokenize = 'unicode61'
+);
+
+-- Populate FTS when a run is created.
+CREATE TRIGGER IF NOT EXISTS pipeline_runs_fts_insert
+AFTER
+INSERT
+  ON pipeline_runs BEGIN
+INSERT INTO
+  pipeline_runs_fts(id, status, error_message)
+VALUES
+  (
+    NEW.id,
+    NEW.status,
+    COALESCE(NEW.error_message, '')
+  );
+
+END;
+
+-- Keep FTS in sync when a run's status or error_message changes.
+CREATE TRIGGER IF NOT EXISTS pipeline_runs_fts_update
+AFTER
+UPDATE
+  ON pipeline_runs BEGIN
+DELETE FROM
+  pipeline_runs_fts
+WHERE
+  rowid IN (
+    SELECT
+      rowid
+    FROM
+      pipeline_runs_fts
+    WHERE
+      id = OLD.id
+  );
+
+INSERT INTO
+  pipeline_runs_fts(id, status, error_message)
+VALUES
+  (
+    NEW.id,
+    NEW.status,
+    COALESCE(NEW.error_message, '')
+  );
+
+END;
+
+-- Remove FTS entries when a run is deleted.
+CREATE TRIGGER IF NOT EXISTS pipeline_runs_fts_delete
+AFTER
+  DELETE ON pipeline_runs BEGIN
+DELETE FROM
+  pipeline_runs_fts
+WHERE
+  rowid IN (
+    SELECT
+      rowid
+    FROM
+      pipeline_runs_fts
+    WHERE
+      id = OLD.id
+  );
 
 END;
 

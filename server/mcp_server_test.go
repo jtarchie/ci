@@ -193,20 +193,64 @@ func TestMCPSearchTasks(t *testing.T) {
 
 	session := setupMCPSession(t, store)
 
-	result, err := session.CallTool(ctx, &mcp.CallToolParams{
-		Name: "search_tasks",
-		Arguments: map[string]any{
-			"run_id": run.ID,
-			"query":  "unique-token-xyz",
-		},
-	})
-	assert.Expect(err).NotTo(HaveOccurred())
-	assert.Expect(result.IsError).To(BeFalse())
+	t.Run("run_id mode searches task output within a run", func(t *testing.T) {
+		t.Parallel()
+		assert := NewWithT(t)
 
-	text := result.Content[0].(*mcp.TextContent).Text
-	var tasks storage.Results
-	assert.Expect(json.Unmarshal([]byte(text), &tasks)).NotTo(HaveOccurred())
-	assert.Expect(tasks).To(HaveLen(1))
+		result, err := session.CallTool(ctx, &mcp.CallToolParams{
+			Name: "search_tasks",
+			Arguments: map[string]any{
+				"run_id": run.ID,
+				"query":  "unique-token-xyz",
+			},
+		})
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(result.IsError).To(BeFalse())
+
+		text := result.Content[0].(*mcp.TextContent).Text
+		var tasks storage.Results
+		assert.Expect(json.Unmarshal([]byte(text), &tasks)).NotTo(HaveOccurred())
+		assert.Expect(tasks).To(HaveLen(1))
+	})
+
+	t.Run("pipeline_id mode searches runs for a pipeline", func(t *testing.T) {
+		t.Parallel()
+		assert := NewWithT(t)
+
+		// create a second run with a distinct error so it shows up in search
+		run2, err := store.SaveRun(ctx, pipeline.ID)
+		assert.Expect(err).NotTo(HaveOccurred())
+		err = store.UpdateRunStatus(ctx, run2.ID, storage.RunStatusFailed, "unique-pipeline-error-token")
+		assert.Expect(err).NotTo(HaveOccurred())
+
+		result, err := session.CallTool(ctx, &mcp.CallToolParams{
+			Name: "search_tasks",
+			Arguments: map[string]any{
+				"pipeline_id": pipeline.ID,
+				"query":       "unique-pipeline-error-token",
+			},
+		})
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(result.IsError).To(BeFalse())
+
+		text := result.Content[0].(*mcp.TextContent).Text
+		var page storage.PaginationResult[storage.PipelineRun]
+		assert.Expect(json.Unmarshal([]byte(text), &page)).NotTo(HaveOccurred())
+		assert.Expect(page.Items).To(HaveLen(1))
+		assert.Expect(page.Items[0].ID).To(Equal(run2.ID))
+	})
+
+	t.Run("returns error when neither run_id nor pipeline_id is provided", func(t *testing.T) {
+		t.Parallel()
+		assert := NewWithT(t)
+
+		result, err := session.CallTool(ctx, &mcp.CallToolParams{
+			Name:      "search_tasks",
+			Arguments: map[string]any{"query": "anything"},
+		})
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(result.IsError).To(BeTrue())
+	})
 }
 
 func TestMCPSearchPipelines(t *testing.T) {

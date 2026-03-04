@@ -5,6 +5,10 @@
 This is a development repository for CI/CD system. These notes can probably be
 inferred from the `git` commit messages. I'm journaling for my own benefit.
 
+- 2026-03-03:
+  - Added MCP server at `/mcp` for AI-assisted pipeline inspection. Provides
+    `get_run`, `list_run_tasks`, `search_tasks`, and `search_pipelines` tools.
+    See [mcp.md](mcp.md) for VS Code setup and usage.
 - 2026-02-25:
   - Added `ci run` command for remote pipeline execution by name. Pipelines are
     stored on the server via `ci set-pipeline`; `ci run` triggers them over HTTP
