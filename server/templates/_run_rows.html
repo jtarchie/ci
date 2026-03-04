@@ -77,15 +77,15 @@
     <span class="text-gray-400 dark:text-gray-500">—</span>
     {{ end }}
   </td>
-  <td class="px-6 py-4 text-right">
-    <div class="flex items-center justify-end gap-2">
+  <td class="px-3 py-2 sm:px-6 sm:py-4 text-right">
+    <div class="flex items-center justify-end gap-1.5">
       <a href="/runs/{{ .ID }}/tasks"
-        class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded text-sm transition-colors"
+        class="px-2 py-1 text-xs sm:px-3 sm:py-1.5 sm:text-sm bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded transition-colors"
         title="View task list">
         Tasks
       </a>
       <a href="/runs/{{ .ID }}/graph"
-        class="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900 dark:hover:bg-blue-800 text-blue-700 dark:text-blue-200 rounded text-sm transition-colors"
+        class="px-2 py-1 text-xs sm:px-3 sm:py-1.5 sm:text-sm bg-blue-100 hover:bg-blue-200 dark:bg-blue-900 dark:hover:bg-blue-800 text-blue-700 dark:text-blue-200 rounded transition-colors"
         title="View dependency graph">
         Graph
       </a>

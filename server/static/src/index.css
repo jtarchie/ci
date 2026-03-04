@@ -280,20 +280,6 @@ body {
   outline-offset: 2px;
 }
 
-/* Ensure minimum touch target size */
-@media (hover: none) and (pointer: coarse) {
-  button,
-  a,
-  input,
-  select,
-  textarea,
-  [role="button"],
-  [tabindex]:not([tabindex="-1"]) {
-    min-height: 44px;
-    min-width: 44px;
-  }
-}
-
 /* Better table scrolling on mobile */
 .overflow-x-auto {
   overscroll-behavior-x: contain;
