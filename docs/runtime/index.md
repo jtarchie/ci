@@ -1,6 +1,8 @@
 # Pipeline Runtime API
 
-The runtime is the JavaScript/TypeScript execution environment for pipelines. It provides globals and functions for running containers, managing volumes, sending HTTP requests, and accessing pipeline context.
+The runtime is the JavaScript/TypeScript execution environment for pipelines. It
+provides globals and functions for running containers, managing volumes, sending
+HTTP requests, and accessing pipeline context.
 
 ## Global API
 

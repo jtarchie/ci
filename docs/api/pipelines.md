@@ -61,6 +61,7 @@ curl -X POST http://localhost:8080/api/pipelines/my-pipeline/run \
 ```
 
 Response is an SSE stream with events:
+
 - `{"stream":"stdout","data":"..."}` — container stdout
 - `{"stream":"stderr","data":"..."}` — container stderr
 - `{"event":"exit","code":0,"run_id":"..."}` — pipeline finished

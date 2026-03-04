@@ -1,6 +1,7 @@
 # MCP (Model Context Protocol)
 
-The server exposes a Model Context Protocol endpoint for AI assistants and LLM integrations.
+The server exposes a Model Context Protocol endpoint for AI assistants and LLM
+integrations.
 
 `POST /mcp` or WebSocket `/mcp`
 

@@ -12,8 +12,10 @@ ci set-pipeline <pipeline-file> --server <url> [options]
 - `--name` — pipeline name (if omitted, derived from filename)
 - `--driver` — orchestration driver DSN
 - `--webhook-secret` — secret for webhook requests (optional)
-- `--basic-auth-username` — server basic auth user (env: `CI_BASIC_AUTH_USERNAME`)
-- `--basic-auth-password` — server basic auth password (env: `CI_BASIC_AUTH_PASSWORD`)
+- `--basic-auth-username` — server basic auth user (env:
+  `CI_BASIC_AUTH_USERNAME`)
+- `--basic-auth-password` — server basic auth password (env:
+  `CI_BASIC_AUTH_PASSWORD`)
 
 ## Example
 

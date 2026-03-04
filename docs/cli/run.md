@@ -11,7 +11,8 @@ ci run <name> [args...] --server-url <url> [options]
 - `--server-url` — CI server URL (required; env: `CI_SERVER_URL`)
 - `--timeout` — client-side deadline (env: `CI_TIMEOUT`)
 
-All positional arguments after `<name>` are passed to the pipeline as `pipelineContext.args`.
+All positional arguments after `<name>` are passed to the pipeline as
+`pipelineContext.args`.
 
 ## Example
 
@@ -21,4 +22,5 @@ ci run my-pipeline arg1 arg2 --server-url http://localhost:8080
 
 Inside the pipeline, `pipelineContext.args === ["arg1", "arg2"]`.
 
-See [Run Pipelines](../guides/run.md) for detailed examples including k6 load testing and background execution.
+See [Run Pipelines](../guides/run.md) for detailed examples including k6 load
+testing and background execution.

@@ -23,15 +23,16 @@ await runtime.run({
   name: "setup",
   image: "alpine",
   command: { path: "mkdir", args: ["-p", "/data"] },
-  mounts: { "/data": vol }
+  mounts: { "/data": vol },
 });
 
 await runtime.run({
   name: "consume",
   image: "alpine",
   command: { path: "cat", args: ["/data/output.txt"] },
-  mounts: { "/data": vol }
+  mounts: { "/data": vol },
 });
 ```
 
-Volumes are scoped to a single pipeline execution. After the pipeline completes, volumes are cleaned up by the driver.
+Volumes are scoped to a single pipeline execution. After the pipeline completes,
+volumes are cleaned up by the driver.

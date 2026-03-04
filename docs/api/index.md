@@ -15,9 +15,11 @@ All endpoints support optional basic authentication (if configured).
 
 ## Authentication
 
-If `--basic-auth-username` and `--basic-auth-password` are set on the server, include `Authorization: Basic <base64(user:pass)>` in requests.
+If `--basic-auth-username` and `--basic-auth-password` are set on the server,
+include `Authorization: Basic <base64(user:pass)>` in requests.
 
-Webhook endpoints do not require basic auth but may validate HMAC signatures (see [Webhooks](./webhooks.md)).
+Webhook endpoints do not require basic auth but may validate HMAC signatures
+(see [Webhooks](./webhooks.md)).
 
 ## Response Format
 

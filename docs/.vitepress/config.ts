@@ -1,38 +1,38 @@
-import { defineConfig } from 'vitepress';
+import { defineConfig } from "vitepress";
 
 export default defineConfig({
-  title: 'CI',
-  description: 'Local-first CI runtime documentation',
-  base: '/docs/',
+  title: "CI",
+  description: "Local-first CI runtime documentation",
+  base: "/docs/",
   cleanUrls: false,
   themeConfig: {
     nav: [
-      { text: 'Guides', link: '/guides/' },
-      { text: 'Operations', link: '/operations/' },
-      { text: 'Drivers', link: '/drivers/' },
+      { text: "Guides", link: "/guides/" },
+      { text: "Operations", link: "/operations/" },
+      { text: "Drivers", link: "/drivers/" },
     ],
     sidebar: {
-      '/guides/': [
-        { text: 'Overview', link: '/guides/' },
-        { text: 'Run Pipelines', link: 'run' },
-        { text: 'Webhooks', link: 'webhooks' },
-        { text: 'MCP', link: 'mcp' },
+      "/guides/": [
+        { text: "Overview", link: "/guides/" },
+        { text: "Run Pipelines", link: "run" },
+        { text: "Webhooks", link: "webhooks" },
+        { text: "MCP", link: "mcp" },
       ],
-      '/operations/': [
-        { text: 'Overview', link: '/operations/' },
-        { text: 'Secrets', link: 'secrets' },
-        { text: 'Caching', link: 'caching' },
-        { text: 'Feature Gates', link: 'feature-gates' },
+      "/operations/": [
+        { text: "Overview", link: "/operations/" },
+        { text: "Secrets", link: "secrets" },
+        { text: "Caching", link: "caching" },
+        { text: "Feature Gates", link: "feature-gates" },
       ],
-      '/drivers/': [
-        { text: 'Overview', link: '/drivers/' },
-        { text: 'Driver DSNs', link: 'dsn' },
-        { text: 'Native Resources', link: 'native-resources' },
-        { text: 'Implementing Drivers', link: 'implementing-driver' },
+      "/drivers/": [
+        { text: "Overview", link: "/drivers/" },
+        { text: "Driver DSNs", link: "dsn" },
+        { text: "Native Resources", link: "native-resources" },
+        { text: "Implementing Drivers", link: "implementing-driver" },
       ],
     },
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/jtarchie/ci' },
+      { icon: "github", link: "https://github.com/jtarchie/ci" },
     ],
   },
 });

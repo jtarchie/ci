@@ -8,7 +8,8 @@ ci runner <pipeline-file> [options]
 
 ## Options
 
-- `--driver` — orchestration driver (`docker`, `native`, `k8s`, etc.; default: `docker`)
+- `--driver` — orchestration driver (`docker`, `native`, `k8s`, etc.; default:
+  `docker`)
 - `--storage` — persistence backend (default: `sqlite://test.db`)
 - `--secret` — set pipeline-scoped secret (repeatable; format: `KEY=VALUE`)
 - `--global-secret` — set global secret (repeatable)

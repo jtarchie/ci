@@ -27,4 +27,5 @@ Response:
 
 The response reflects the `--allowed-features` configured on the server.
 
-See [Feature Gates](../operations/feature-gates.md) for details on specific features.
+See [Feature Gates](../operations/feature-gates.md) for details on specific
+features.

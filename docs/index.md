@@ -1,0 +1,46 @@
+# CI Documentation
+
+CI is a local-first pipeline runtime that executes JavaScript/TypeScript
+pipelines and supports Concourse-style YAML compatibility.
+
+## Getting Started
+
+- [Running pipelines](guides/run)
+- [Webhooks](guides/webhooks)
+- [MCP Integration](guides/mcp)
+
+## Operations
+
+- [Secrets Management](operations/secrets)
+- [Caching](operations/caching)
+- [Feature Gates](operations/feature-gates)
+
+## Drivers
+
+- [Driver DSN Reference](drivers/dsn)
+- [Native Resources](drivers/native-resources)
+- [Implementing a New Driver](drivers/implementing-driver)
+
+## API Reference
+
+- [API Overview](api/)
+- [Pipelines API](api/pipelines)
+- [Runs API](api/runs)
+- [Webhooks API](api/webhooks)
+
+## CLI Commands
+
+- [CLI Overview](cli/)
+- [Runner](cli/runner)
+- [Server](cli/server)
+
+## Runtime
+
+- [Runtime API](runtime/)
+- [runtime.run()](runtime/runtime-run)
+- [Volumes](runtime/volumes)
+
+## Notes
+
+Draft and exploratory material is under `docs/future/` and is not considered
+stable user-facing documentation.

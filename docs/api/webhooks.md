@@ -4,18 +4,23 @@ Trigger pipelines via HTTP webhooks.
 
 `POST /api/webhooks/:pipeline-id`
 
-Execute a pipeline in response to an HTTP request. The pipeline can read the incoming request and optionally send an HTTP response before continuing execution in the background.
+Execute a pipeline in response to an HTTP request. The pipeline can read the
+incoming request and optionally send an HTTP response before continuing
+execution in the background.
 
 ## Signature Validation (Optional)
 
-If the pipeline has a `webhook_secret` configured, requests must include an HMAC-SHA256 signature of the request body.
+If the pipeline has a `webhook_secret` configured, requests must include an
+HMAC-SHA256 signature of the request body.
 
 **Via header**:
+
 ```
 X-Webhook-Signature: <hex-encoded HMAC-SHA256>
 ```
 
 **Via query parameter**:
+
 ```
 /api/webhooks/:pipeline-id?signature=<hex-encoded HMAC-SHA256>
 ```
@@ -51,4 +56,5 @@ const pipeline = async () => {
 export { pipeline };
 ```
 
-See [Webhooks](../guides/webhooks.md) for detailed examples (GitHub, custom signatures, etc.).
+See [Webhooks](../guides/webhooks.md) for detailed examples (GitHub, custom
+signatures, etc.).

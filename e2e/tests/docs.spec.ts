@@ -5,6 +5,7 @@ test.describe("Docs", () => {
     await page.goto("/docs/");
 
     await expect(page).toHaveURL(/\/docs\//);
-    await expect(page.getByRole("heading", { name: "CI Documentation" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "CI Documentation" }))
+      .toBeVisible();
   });
 });

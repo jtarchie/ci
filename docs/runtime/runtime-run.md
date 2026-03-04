@@ -22,11 +22,11 @@ const result = await runtime.run(options);
 
 ```typescript
 {
-  code: number;          // exit code
-  stdout: string;        // captured stdout (redacted if secrets used)
-  stderr: string;        // captured stderr (redacted)
-  startedAt: string;     // ISO timestamp
-  endedAt: string;       // ISO timestamp
+  code: number; // exit code
+  stdout: string; // captured stdout (redacted if secrets used)
+  stderr: string; // captured stderr (redacted)
+  startedAt: string; // ISO timestamp
+  endedAt: string; // ISO timestamp
 }
 ```
 
@@ -39,8 +39,8 @@ const result = await runtime.run({
   command: { path: "go", args: ["test", "./..."] },
   env: {
     GOFLAGS: "-race",
-    DB_PASSWORD: "secret:db_password"  // resolved at runtime
-  }
+    DB_PASSWORD: "secret:db_password", // resolved at runtime
+  },
 });
 
 if (result.code !== 0) {

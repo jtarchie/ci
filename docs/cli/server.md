@@ -15,9 +15,11 @@ ci server [options]
 - `--allowed-features` — comma-separated list of feature gates to enable
 - `--secret` — set global secret (repeatable; format: `KEY=VALUE`)
 - `--secrets` — secrets backend DSN (e.g., `local://secrets.db?key=passphrase`)
-- `--basic-auth-username` — require basic auth on web UI (env: `CI_BASIC_AUTH_USERNAME`)
+- `--basic-auth-username` — require basic auth on web UI (env:
+  `CI_BASIC_AUTH_USERNAME`)
 - `--basic-auth-password` — basic auth password (env: `CI_BASIC_AUTH_PASSWORD`)
-- `--webhook-timeout` — time allowed for `http.respond()` in webhooks (default: `5s`)
+- `--webhook-timeout` — time allowed for `http.respond()` in webhooks (default:
+  `5s`)
 - `--log-level` — log level (`debug`, `info`, `warn`, `error`)
 - `--log-format` — log format (`json` or text)
 
@@ -33,6 +35,7 @@ ci server \
 ```
 
 The server provides:
+
 - Web UI at `http://localhost:8080/pipelines/`
 - JSON API at `http://localhost:8080/api/`
 - Webhook endpoint at `http://localhost:8080/api/webhooks/:pipeline-id`
