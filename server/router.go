@@ -150,24 +150,16 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 		return ctx.Redirect(http.StatusMovedPermanently, "/pipelines/")
 	})
 
-	registerPipelineViewRoutes(web, store, execService)
-
-	// Pipeline API endpoints
-	// Register webhooks first (without auth) on the main router
 	webhookTimeout := opts.WebhookTimeout
 	if webhookTimeout == 0 {
 		webhookTimeout = 5 * time.Second
 	}
-	registerWebhookRoutes(router, store, execService, webhookTimeout, allowedFeatures)
 
 	// Create API group with basic auth middleware (for non-webhook endpoints)
 	api := router.Group("/api")
 	api.Use(newBasicAuthMiddleware(opts.BasicAuthUsername, opts.BasicAuthPassword))
-	registerPipelineRoutes(api, store, execService, webhookTimeout, allowedDrivers, allowedFeatures, opts.SecretsManager)
-	registerDriverRoutes(api, allowedDrivers)
-	registerFeatureRoutes(api, allowedFeatures)
 
-	registerRunViewRoutes(web, store)
+	registerRoutes(router, api, web, store, execService, allowedDrivers, allowedFeatures, opts.SecretsManager, webhookTimeout)
 
 	// MCP endpoint (authenticated)
 	mcpHandler := newMCPHandler(store)
@@ -175,4 +167,32 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	web.Any("/mcp/*", echo.WrapHandler(mcpHandler))
 
 	return &Router{Echo: router, execService: execService, webGroup: web, allowedDrivers: allowedDrivers, allowedFeatures: allowedFeatures}, nil
+}
+
+// registerRoutes wires all controllers to their respective route groups.
+func registerRoutes(
+	router *echo.Echo,
+	api *echo.Group,
+	web *echo.Group,
+	store storage.Driver,
+	execService *ExecutionService,
+	allowedDrivers []string,
+	allowedFeatures []Feature,
+	secretsMgr secrets.Manager,
+	webhookTimeout time.Duration,
+) {
+	base := BaseController{store: store, execService: execService}
+
+	// API controllers (JSON responses)
+	(&APIPipelinesController{BaseController: base, allowedDrivers: allowedDrivers, allowedFeatures: allowedFeatures, secretsMgr: secretsMgr}).RegisterRoutes(api)
+	(&APIRunsController{BaseController: base}).RegisterRoutes(api)
+	(&APIDriversController{allowedDrivers: allowedDrivers}).RegisterRoutes(api)
+	(&APIFeaturesController{allowedFeatures: allowedFeatures}).RegisterRoutes(api)
+
+	// Webhooks registered on the main router (no auth group, before API group)
+	(&APIWebhooksController{BaseController: base, allowedFeatures: allowedFeatures, webhookTimeout: webhookTimeout}).RegisterRoutes(router)
+
+	// Web controllers (HTML responses)
+	(&WebPipelinesController{BaseController: base}).RegisterRoutes(web)
+	(&WebRunsController{BaseController: base}).RegisterRoutes(web)
 }
