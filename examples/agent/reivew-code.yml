@@ -1,0 +1,31 @@
+---
+# This pipeline should pass validation because 'git' resource type is defined
+resource_types:
+  - name: git-resource
+    type: registry-image
+    source:
+      repository: concourse/git-resource
+
+resources:
+  - name: my-repo
+    type: git-resource
+    source:
+      uri: https://github.com/example/repo.git
+
+jobs:
+  - name: review-code
+    plan:
+      - get: my-repo
+        trigger: true
+      - agent: review-code-agent
+        prompt: "Review my code changes in the last commit"
+        model: openrouter/google/gemini-3.1-flash-lite-preview
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: { repository: busybox }
+          inputs:
+            - name: my-repo
+          outputs:
+            - name: review-result
