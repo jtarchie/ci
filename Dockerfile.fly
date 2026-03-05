@@ -46,11 +46,8 @@ WORKDIR /app
 # Copy binary with correct ownership
 COPY --from=builder --chown=appuser:appgroup /app/ci .
 
-# Create data directory with correct ownership
-RUN mkdir -p /data && chown -R appuser:appgroup /data
-
-# Switch to non-root user
-USER appuser
+# Create data directory
+RUN mkdir -p /data
 
 # Set runtime environment variables
 ENV TZ=UTC \

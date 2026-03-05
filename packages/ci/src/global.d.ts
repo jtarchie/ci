@@ -140,6 +140,23 @@ declare global {
     ): StoredResourceVersion[];
   }
 
+  // Result returned by runtime.agent().
+  interface AgentResult {
+    text: string;
+    status: "success" | "failure";
+  }
+
+  // Input to runtime.agent().
+  interface AgentRunConfig {
+    name: string;
+    prompt: string;
+    model: string;
+    image: string;
+    mounts?: KnownMounts;
+    outputVolumePath?: string;
+    onOutput?: OutputCallback;
+  }
+
   namespace runtime {
     function createVolume(volume?: VolumeConfig): Promise<VolumeResult>;
     function run(task: RunTaskConfig): Promise<RunTaskResult>;
@@ -150,6 +167,13 @@ declare global {
      * Call `close()` on the returned handle when done to remove the container.
      */
     function startSandbox(config: SandboxConfig): Promise<SandboxHandle>;
+
+    /**
+     * Runs an LLM agent with a run_command tool backed by a sandbox container.
+     * The agent explores the sandbox environment using tool calls and returns
+     * its final response as text.
+     */
+    function agent(config: AgentRunConfig): Promise<AgentResult>;
   }
 
   /** Configuration for creating a sandbox. */
@@ -352,7 +376,7 @@ declare global {
     image_resource: ImageResource;
     inputs?: { name: string }[];
     outputs?: { name: string }[];
-    run: CommandConfig;
+    run?: CommandConfig;
     params?: ParamsConfig;
   }
 
@@ -425,7 +449,18 @@ declare global {
     fail_fast?: boolean;
   }
 
-  type Step = Task | Get | Put | Do | Try | InParallel | NotifyStep;
+  // Agent step: runs an LLM agent with a run_command tool in a sandbox container.
+  interface AgentStep extends StepHooks {
+    agent: string; // Agent name (used as step identifier)
+    prompt: string; // Instruction sent to the model
+    model: string; // "provider/model-name", e.g. "openrouter/google/gemini-3"
+    config?: TaskConfig; // image_resource, inputs, outputs
+    attempts?: number;
+    across?: AcrossVar[];
+    fail_fast?: boolean;
+  }
+
+  type Step = Task | Get | Put | Do | Try | InParallel | NotifyStep | AgentStep;
 
   // Pipeline configuration
   interface Job extends StepHooks {

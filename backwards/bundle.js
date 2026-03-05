@@ -238,6 +238,8 @@ var JobRunner = class {
     } else if ("notify" in step) {
       const name = Array.isArray(step.notify) ? step.notify.join("-") : step.notify;
       return `notify/${name}`;
+    } else if ("agent" in step) {
+      return `agent/${step.agent}`;
     }
     return "unknown";
   }
@@ -298,6 +300,11 @@ var JobRunner = class {
       );
     } else if ("notify" in step) {
       await this.processNotifyStep(
+        step,
+        `${pathContext}/${this.getStepIdentifier(step)}`
+      );
+    } else if ("agent" in step) {
+      await this.processAgentStep(
         step,
         `${pathContext}/${this.getStepIdentifier(step)}`
       );
@@ -780,6 +787,52 @@ var JobRunner = class {
       (type) => type.name === typeName
     );
     return resourceType;
+  }
+  async processAgentStep(step, pathContext) {
+    const storageKey = `${this.getBaseStorageKey()}/${pathContext}`;
+    storage.set(storageKey, { status: "pending" });
+    const image = step.config?.image_resource?.source?.repository ?? "busybox";
+    const mounts = {};
+    for (const input of step.config?.inputs ?? []) {
+      const knownMount = this.taskRunner.getKnownMounts()[input.name];
+      if (knownMount) {
+        mounts[input.name] = knownMount;
+      }
+    }
+    let outputVolumePath = "";
+    for (const output of step.config?.outputs ?? []) {
+      const knownMounts = this.taskRunner.getKnownMounts();
+      knownMounts[output.name] ||= await runtime.createVolume();
+      mounts[output.name] = knownMounts[output.name];
+      if (!outputVolumePath) {
+        outputVolumePath = knownMounts[output.name].path;
+      }
+    }
+    let accumulatedOutput = "";
+    try {
+      const result = await runtime.agent({
+        name: step.agent,
+        prompt: step.prompt,
+        model: step.model,
+        image,
+        mounts,
+        outputVolumePath,
+        onOutput: (_stream, data) => {
+          accumulatedOutput += data;
+          storage.set(storageKey, {
+            status: "running",
+            stdout: accumulatedOutput
+          });
+        }
+      });
+      storage.set(storageKey, {
+        status: "success",
+        stdout: result.text
+      });
+    } catch (error) {
+      storage.set(storageKey, { status: "failure" });
+      throw new TaskFailure(`Agent ${step.agent} failed: ${error}`);
+    }
   }
   async runTask(step, stdin, pathContext = "") {
     const storageKey = `${this.getBaseStorageKey()}/${pathContext}`;

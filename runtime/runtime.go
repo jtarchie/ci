@@ -1,21 +1,27 @@
 package runtime
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
 	"github.com/dop251/goja"
+
+	"github.com/jtarchie/ci/secrets"
 )
 
 type Runtime struct {
-	jsVM        *goja.Runtime
-	promises    *sync.WaitGroup
-	runner      Runner
-	tasks       chan func() error
-	namespace   string
-	runID       string
-	mu          sync.Mutex // Protects volumeIndex
-	volumeIndex int        // Counter for unnamed volumes
+	jsVM           *goja.Runtime
+	promises       *sync.WaitGroup
+	runner         Runner
+	tasks          chan func() error
+	namespace      string
+	runID          string
+	mu             sync.Mutex // Protects volumeIndex
+	volumeIndex    int        // Counter for unnamed volumes
+	secretsManager secrets.Manager
+	pipelineID     string
+	ctx            context.Context //nolint: containedctx
 }
 
 func NewRuntime(
@@ -289,6 +295,71 @@ func (r *Runtime) StartSandbox(call goja.FunctionCall) goja.Value {
 			err = resolve(sandboxObj)
 			if err != nil {
 				return fmt.Errorf("could not resolve startSandbox: %w", err)
+			}
+
+			return nil
+		}
+	}()
+
+	return r.jsVM.ToValue(promise)
+}
+
+// Agent runs an LLM agent step. Accepts an object with prompt, model, image,
+// mounts, outputVolumePath, and an optional onOutput callback.
+func (r *Runtime) Agent(call goja.FunctionCall) goja.Value {
+	promise, resolve, reject := r.jsVM.NewPromise()
+
+	if len(call.Arguments) == 0 {
+		_ = reject(r.jsVM.NewGoError(fmt.Errorf("agent requires an input object")))
+		return r.jsVM.ToValue(promise)
+	}
+
+	inputObj := call.Arguments[0].ToObject(r.jsVM)
+
+	var config AgentConfig
+	if err := r.jsVM.ExportTo(inputObj, &config); err != nil {
+		_ = reject(r.jsVM.NewGoError(fmt.Errorf("invalid agent input: %w", err)))
+		return r.jsVM.ToValue(promise)
+	}
+
+	// Extract optional onOutput callback.
+	onOutputVal := inputObj.Get("onOutput")
+	if onOutputVal != nil && !goja.IsUndefined(onOutputVal) && !goja.IsNull(onOutputVal) {
+		if onOutputFunc, ok := goja.AssertFunction(onOutputVal); ok {
+			config.OnOutput = func(stream, data string) {
+				r.tasks <- func() error {
+					_, _ = onOutputFunc(goja.Undefined(), r.jsVM.ToValue(stream), r.jsVM.ToValue(data))
+					return nil
+				}
+			}
+		}
+	}
+
+	r.promises.Add(1)
+
+	go func() {
+		ctx := r.ctx
+		if ctx == nil {
+			ctx = context.Background()
+		}
+
+		result, err := RunAgent(ctx, r.runner, r.secretsManager, r.pipelineID, config)
+
+		r.tasks <- func() error {
+			defer r.promises.Done()
+
+			if err != nil {
+				err = reject(err)
+				if err != nil {
+					return fmt.Errorf("could not reject agent: %w", err)
+				}
+
+				return nil
+			}
+
+			err = resolve(result)
+			if err != nil {
+				return fmt.Errorf("could not resolve agent: %w", err)
 			}
 
 			return nil

@@ -185,6 +185,9 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 	}
 
 	runtime := NewRuntime(jsVM, runner, opts.Namespace, opts.RunID)
+	runtime.secretsManager = opts.SecretsManager
+	runtime.pipelineID = opts.PipelineID
+	runtime.ctx = ctx
 
 	err = jsVM.Set("runtime", runtime)
 	if err != nil {

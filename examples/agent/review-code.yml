@@ -10,7 +10,7 @@ resources:
   - name: my-repo
     type: git-resource
     source:
-      uri: https://github.com/example/repo.git
+      uri: https://github.com/jtarchie/ci
 
 jobs:
   - name: review-code

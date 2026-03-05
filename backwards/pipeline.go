@@ -37,6 +37,10 @@ func NewPipeline(filename string) (string, error) {
 		return "", err
 	}
 
+	if err := validateSteps(config.Jobs); err != nil {
+		return "", err
+	}
+
 	contents, err = yaml.MarshalWithOptions(config, yaml.JSON())
 	if err != nil {
 		return "", fmt.Errorf("could not marshal pipeline: %w", err)
@@ -47,6 +51,21 @@ func NewPipeline(filename string) (string, error) {
 		"\n; const pipeline = createPipeline(config); export { pipeline };"
 
 	return pipeline, nil
+}
+
+// validateSteps checks that task steps have a required run.path field (unless using file:).
+func validateSteps(jobs Jobs) error {
+	for _, job := range jobs {
+		for i, step := range job.Plan {
+			if step.Task != "" && step.File == "" {
+				if step.TaskConfig == nil || step.TaskConfig.Run == nil || step.TaskConfig.Run.Path == "" {
+					return fmt.Errorf("task step %q in job %q (index %d) requires config.run.path", step.Task, job.Name, i)
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 // validateResourceTypes checks that every resource references a defined resource type.

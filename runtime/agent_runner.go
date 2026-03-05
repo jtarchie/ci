@@ -1,0 +1,269 @@
+package runtime
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"google.golang.org/adk/agent"
+	"google.golang.org/adk/agent/llmagent"
+	"google.golang.org/adk/model"
+	"google.golang.org/adk/runner"
+	"google.golang.org/adk/session"
+	adktool "google.golang.org/adk/tool"
+	"google.golang.org/adk/tool/functiontool"
+	"google.golang.org/genai"
+
+	genaianthropic "github.com/achetronic/adk-utils-go/genai/anthropic"
+	genaiopenai "github.com/achetronic/adk-utils-go/genai/openai"
+
+	"github.com/jtarchie/ci/secrets"
+)
+
+// AgentConfig is the configuration passed from JavaScript to runtime.agent().
+type AgentConfig struct {
+	Name             string                  `json:"name"`
+	Prompt           string                  `json:"prompt"`
+	Model            string                  `json:"model"`
+	Image            string                  `json:"image"`
+	Mounts           map[string]VolumeResult `json:"mounts"`
+	OutputVolumePath string                  `json:"outputVolumePath"`
+	// OnOutput is called with streaming chunks. Not serialised from JS.
+	OnOutput OutputCallback `json:"-"`
+}
+
+// AgentResult is returned to JavaScript after the agent completes.
+type AgentResult struct {
+	Text   string `json:"text"`
+	Status string `json:"status"` // "success" or "failure"
+}
+
+// runCommandInput is the tool schema for run_command.
+type runCommandInput struct {
+	Command string   `json:"command"`
+	Args    []string `json:"args"`
+}
+
+// runCommandOutput is the tool result schema for run_command.
+type runCommandOutput struct {
+	Stdout   string `json:"stdout"`
+	Stderr   string `json:"stderr"`
+	ExitCode int    `json:"exit_code"`
+}
+
+// defaultBaseURLs maps providers (that use the OpenAI-compatible API) to their base URLs.
+var defaultBaseURLs = map[string]string{
+	"openrouter": "https://openrouter.ai/api/v1",
+	"ollama":     "http://localhost:11434/v1",
+	"openai":     "https://api.openai.com/v1",
+}
+
+// splitModel splits "provider/model-name" into ("provider", "model-name").
+// For example: "openrouter/google/gemini-3" → ("openrouter", "google/gemini-3").
+func splitModel(model string) (provider, modelName string) {
+	idx := strings.Index(model, "/")
+	if idx < 0 {
+		return model, model
+	}
+
+	return model[:idx], model[idx+1:]
+}
+
+// resolveSecret looks up a secret key in pipeline → global scope order.
+// Falls back to the corresponding environment variable (PROVIDER_API_KEY) if not found.
+func resolveSecret(ctx context.Context, sm secrets.Manager, pipelineID, key string) string {
+	if sm != nil {
+		if pipelineID != "" {
+			val, err := sm.Get(ctx, secrets.PipelineScope(pipelineID), key)
+			if err == nil {
+				return val
+			}
+		}
+
+		val, err := sm.Get(ctx, secrets.GlobalScope, key)
+		if err == nil {
+			return val
+		}
+	}
+
+	return ""
+}
+
+// resolveModel builds an adk-compatible LLM model from provider + name + key.
+func resolveModel(provider, modelName, apiKey string) (model.LLM, error) {
+	switch provider {
+	case "anthropic":
+		return genaianthropic.New(genaianthropic.Config{
+			APIKey:    apiKey,
+			ModelName: modelName,
+		}), nil
+	default:
+		// openrouter, openai, ollama, etc. all speak OpenAI-compatible API.
+		baseURL := defaultBaseURLs[provider]
+		if baseURL == "" {
+			return nil, fmt.Errorf("unknown provider %q: set a base URL or use anthropic/openai/openrouter/ollama", provider)
+		}
+
+		return genaiopenai.New(genaiopenai.Config{
+			APIKey:    apiKey,
+			BaseURL:   baseURL,
+			ModelName: modelName,
+		}), nil
+	}
+}
+
+// RunAgent executes an LLM agent with a run_command tool backed by a sandbox container.
+// It writes a result.json to outputVolumePath when the agent finishes.
+func RunAgent(
+	ctx context.Context,
+	sandboxRunner Runner,
+	sm secrets.Manager,
+	pipelineID string,
+	config AgentConfig,
+) (*AgentResult, error) {
+	provider, modelName := splitModel(config.Model)
+
+	// Resolve API key: secrets (pipeline → global) then env var fallback.
+	apiKey := resolveSecret(ctx, sm, pipelineID, "agent/"+provider)
+	if apiKey == "" {
+		envKey := strings.ToUpper(strings.ReplaceAll(provider, "-", "_")) + "_API_KEY"
+		apiKey = os.Getenv(envKey)
+	}
+
+	// Start the sandbox container.
+	sandbox, err := sandboxRunner.StartSandbox(SandboxInput{
+		Image:  config.Image,
+		Name:   config.Name,
+		Mounts: config.Mounts,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("agent: failed to start sandbox: %w", err)
+	}
+
+	defer func() { _ = sandbox.Close() }()
+
+	// Build the run_command tool.
+	runCmd, err := functiontool.New[runCommandInput, runCommandOutput](
+		functiontool.Config{
+			Name:        "run_command",
+			Description: "Run a shell command in the sandbox container. Returns stdout, stderr, and exit code.",
+		},
+		func(_ adktool.Context, input runCommandInput) (runCommandOutput, error) {
+			var execInput ExecInput
+			execInput.Command.Path = input.Command
+			execInput.Command.Args = input.Args
+			execInput.OnOutput = config.OnOutput
+
+			result, execErr := sandbox.Exec(execInput)
+			if execErr != nil {
+				return runCommandOutput{}, execErr
+			}
+
+			return runCommandOutput{
+				Stdout:   result.Stdout,
+				Stderr:   result.Stderr,
+				ExitCode: result.Code,
+			}, nil
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("agent: failed to create run_command tool: %w", err)
+	}
+
+	// Resolve the LLM model.
+	llmModel, err := resolveModel(provider, modelName, apiKey)
+	if err != nil {
+		return nil, fmt.Errorf("agent: %w", err)
+	}
+
+	// Create the ADK agent.
+	myAgent, err := llmagent.New(llmagent.Config{
+		Name:        config.Name,
+		Model:       llmModel,
+		Description: "CI pipeline agent",
+		Instruction: config.Prompt,
+		Tools:       []adktool.Tool{runCmd},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("agent: failed to create agent: %w", err)
+	}
+
+	// Set up an in-memory session.
+	sessionService := session.InMemoryService()
+
+	sessResp, err := sessionService.Create(ctx, &session.CreateRequest{
+		AppName: "ci-agent",
+		UserID:  "pipeline",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("agent: failed to create session: %w", err)
+	}
+
+	runnr, err := runner.New(runner.Config{
+		AppName:        "ci-agent",
+		Agent:          myAgent,
+		SessionService: sessionService,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("agent: failed to create runner: %w", err)
+	}
+
+	// Run the agent, collecting the final text response.
+	userMsg := genai.NewContentFromText(config.Prompt, genai.RoleUser)
+
+	var textBuilder strings.Builder
+
+	var runErr error
+
+	for event, err := range runnr.Run(ctx, "pipeline", sessResp.Session.ID(), userMsg, agent.RunConfig{}) {
+		if err != nil {
+			if !errors.Is(err, context.Canceled) {
+				runErr = err
+			}
+
+			break
+		}
+
+		if event.Content == nil {
+			continue
+		}
+
+		for _, part := range event.Content.Parts {
+			if part.Text == "" {
+				continue
+			}
+
+			textBuilder.WriteString(part.Text)
+
+			if config.OnOutput != nil {
+				config.OnOutput("stdout", part.Text)
+			}
+		}
+	}
+
+	if runErr != nil {
+		return nil, fmt.Errorf("agent: run failed: %w", runErr)
+	}
+
+	finalText := textBuilder.String()
+	status := "success"
+
+	// Write result.json to the output volume if configured.
+	if config.OutputVolumePath != "" {
+		if mkErr := os.MkdirAll(config.OutputVolumePath, 0o755); mkErr == nil {
+			result := map[string]string{"status": status, "text": finalText}
+
+			data, _ := json.Marshal(result)
+			_ = os.WriteFile(filepath.Join(config.OutputVolumePath, "result.json"), data, 0o644)
+		}
+	}
+
+	return &AgentResult{
+		Text:   finalText,
+		Status: status,
+	}, nil
+}

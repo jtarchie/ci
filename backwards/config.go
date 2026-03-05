@@ -46,7 +46,7 @@ type TaskConfig struct {
 	Inputs          Inputs            `yaml:"inputs,omitempty"`
 	Outputs         Outputs           `yaml:"outputs,omitempty"`
 	Platform        string            `validate:"oneof='linux' 'darwin' 'windows'" yaml:"platform,omitempty"`
-	Run             TaskConfigRun     `validate:"required"                         yaml:"run,omitempty"`
+	Run             *TaskConfigRun    `yaml:"run,omitempty"`
 }
 
 type GetConfig struct {
@@ -122,6 +122,10 @@ type Step struct {
 	File            string           `yaml:"file,omitempty"`
 	Image           string           `yaml:"image,omitempty"`
 	Privileged      bool             `yaml:"privileged,omitempty"`
+
+	Agent  string `yaml:"agent,omitempty"`
+	Prompt string `yaml:"prompt,omitempty"`
+	Model  string `yaml:"model,omitempty"`
 
 	Get       string    `yaml:"get,omitempty"`
 	GetConfig GetConfig `yaml:",inline,omitempty"`
