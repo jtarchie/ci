@@ -153,6 +153,151 @@ func (r *Runtime) CreateVolume(input VolumeInput) *goja.Promise {
 	return promise
 }
 
+// StartSandbox starts a long-lived sandbox container and resolves with a JS object
+// exposing exec(config) and close() methods.
+func (r *Runtime) StartSandbox(call goja.FunctionCall) goja.Value {
+	promise, resolve, reject := r.jsVM.NewPromise()
+
+	if len(call.Arguments) == 0 {
+		_ = reject(r.jsVM.NewGoError(fmt.Errorf("startSandbox requires an input object")))
+		return r.jsVM.ToValue(promise)
+	}
+
+	inputObj := call.Arguments[0].ToObject(r.jsVM)
+
+	var input SandboxInput
+	if err := r.jsVM.ExportTo(inputObj, &input); err != nil {
+		_ = reject(r.jsVM.NewGoError(fmt.Errorf("invalid startSandbox input: %w", err)))
+		return r.jsVM.ToValue(promise)
+	}
+
+	r.promises.Add(1)
+
+	go func() {
+		handle, err := r.runner.StartSandbox(input)
+
+		r.tasks <- func() error {
+			defer r.promises.Done()
+
+			if err != nil {
+				err = reject(err)
+				if err != nil {
+					return fmt.Errorf("could not reject startSandbox: %w", err)
+				}
+
+				return nil
+			}
+
+			// Build the sandbox JS object with exec and close methods.
+			sandboxObj := r.jsVM.NewObject()
+			_ = sandboxObj.Set("id", handle.ID())
+
+			_ = sandboxObj.Set("exec", func(call goja.FunctionCall) goja.Value {
+				execPromise, execResolve, execReject := r.jsVM.NewPromise()
+
+				if len(call.Arguments) == 0 {
+					_ = execReject(r.jsVM.NewGoError(fmt.Errorf("exec requires an input object")))
+					return r.jsVM.ToValue(execPromise)
+				}
+
+				execInputObj := call.Arguments[0].ToObject(r.jsVM)
+
+				var execInput ExecInput
+				if err := r.jsVM.ExportTo(execInputObj, &execInput); err != nil {
+					_ = execReject(r.jsVM.NewGoError(fmt.Errorf("invalid exec input: %w", err)))
+					return r.jsVM.ToValue(execPromise)
+				}
+
+				// Check for onOutput callback.
+				onOutputVal := execInputObj.Get("onOutput")
+				if onOutputVal != nil && !goja.IsUndefined(onOutputVal) && !goja.IsNull(onOutputVal) {
+					if onOutputFunc, ok := goja.AssertFunction(onOutputVal); ok {
+						execInput.OnOutput = func(stream, data string) {
+							r.tasks <- func() error {
+								_, err := onOutputFunc(goja.Undefined(), r.jsVM.ToValue(stream), r.jsVM.ToValue(data))
+								if err != nil {
+									return nil
+								}
+
+								return nil
+							}
+						}
+					}
+				}
+
+				r.promises.Add(1)
+
+				go func() {
+					result, err := handle.Exec(execInput)
+
+					r.tasks <- func() error {
+						defer r.promises.Done()
+
+						if err != nil {
+							err = execReject(err)
+							if err != nil {
+								return fmt.Errorf("could not reject exec: %w", err)
+							}
+
+							return nil
+						}
+
+						err = execResolve(result)
+						if err != nil {
+							return fmt.Errorf("could not resolve exec: %w", err)
+						}
+
+						return nil
+					}
+				}()
+
+				return r.jsVM.ToValue(execPromise)
+			})
+
+			_ = sandboxObj.Set("close", func(call goja.FunctionCall) goja.Value {
+				closePromise, closeResolve, closeReject := r.jsVM.NewPromise()
+
+				r.promises.Add(1)
+
+				go func() {
+					err := handle.Close()
+
+					r.tasks <- func() error {
+						defer r.promises.Done()
+
+						if err != nil {
+							err = closeReject(err)
+							if err != nil {
+								return fmt.Errorf("could not reject close: %w", err)
+							}
+
+							return nil
+						}
+
+						err = closeResolve(goja.Undefined())
+						if err != nil {
+							return fmt.Errorf("could not resolve close: %w", err)
+						}
+
+						return nil
+					}
+				}()
+
+				return r.jsVM.ToValue(closePromise)
+			})
+
+			err = resolve(sandboxObj)
+			if err != nil {
+				return fmt.Errorf("could not resolve startSandbox: %w", err)
+			}
+
+			return nil
+		}
+	}()
+
+	return r.jsVM.ToValue(promise)
+}
+
 func (r *Runtime) Wait() error {
 	go func() {
 		r.promises.Wait()

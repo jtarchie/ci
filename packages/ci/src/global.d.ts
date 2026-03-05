@@ -143,6 +143,47 @@ declare global {
   namespace runtime {
     function createVolume(volume?: VolumeConfig): Promise<VolumeResult>;
     function run(task: RunTaskConfig): Promise<RunTaskResult>;
+
+    /**
+     * Starts a long-lived sandbox container kept alive with "tail -f /dev/null".
+     * Requires an image that has `tail` available (not distroless/scratch).
+     * Call `close()` on the returned handle when done to remove the container.
+     */
+    function startSandbox(config: SandboxConfig): Promise<SandboxHandle>;
+  }
+
+  /** Configuration for creating a sandbox. */
+  interface SandboxConfig {
+    image: string;
+    name: string;
+    env?: EnvVars;
+    mounts?: KnownMounts;
+    work_dir?: string;
+    privileged?: boolean;
+  }
+
+  /** Configuration for a single exec call inside a sandbox. */
+  interface SandboxExecConfig {
+    command: CommandConfig;
+    env?: EnvVars;
+    work_dir?: string;
+    stdin?: string;
+    timeout?: string;
+    /** Callback invoked with streaming output chunks as the command runs. */
+    onOutput?: OutputCallback;
+  }
+
+  /** Handle to a running sandbox container. */
+  interface SandboxHandle {
+    /** Driver-specific identifier for the sandbox container. */
+    id: string;
+    /**
+     * Runs a single command inside the sandbox.
+     * env and work_dir apply only to this invocation — they do not persist.
+     */
+    exec(config: SandboxExecConfig): Promise<RunTaskResult>;
+    /** Stops and removes the sandbox container. */
+    close(): Promise<void>;
   }
 
   namespace assert {

@@ -382,6 +382,150 @@ func TestDrivers(t *testing.T) {
 	})
 }
 
+func TestSandboxDrivers(t *testing.T) {
+	t.Parallel()
+
+	orchestra.Each(func(name string, init orchestra.InitFunc) {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			// Skip k8s tests if cluster is not available.
+			if name == "k8s" && !k8s.IsAvailable() {
+				t.Skip("Kubernetes cluster not available")
+			}
+
+			// Skip fly tests if token is not available.
+			if name == "fly" && os.Getenv("FLY_API_TOKEN") == "" {
+				t.Skip("FLY_API_TOKEN not set, skipping Fly integration tests")
+			}
+
+			// Check driver supports SandboxDriver interface using a probe client.
+			probeClient, err := init("test-"+gonanoid.Must(), slog.Default(), map[string]string{})
+			if err != nil {
+				t.Skipf("driver init failed: %v", err)
+			}
+
+			_, isSandbox := probeClient.(orchestra.SandboxDriver)
+			_ = probeClient.Close()
+
+			if !isSandbox {
+				t.Skipf("driver %q does not implement SandboxDriver", name)
+			}
+
+			newSandboxDriver := func(t *testing.T) orchestra.SandboxDriver {
+				t.Helper()
+
+				client, err := init("test-"+gonanoid.Must(), slog.Default(), map[string]string{})
+				if err != nil {
+					t.Fatalf("driver init failed: %v", err)
+				}
+
+				t.Cleanup(func() { _ = client.Close() })
+
+				return client.(orchestra.SandboxDriver)
+			}
+
+			t.Run("sequential commands share environment", func(t *testing.T) {
+				t.Parallel()
+
+				assert := NewGomegaWithT(t)
+
+				sandboxDriver := newSandboxDriver(t)
+
+				sandbox, err := sandboxDriver.StartSandbox(context.Background(), orchestra.Task{
+					ID:    gonanoid.Must(),
+					Image: "busybox",
+				})
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = sandbox.Cleanup(context.Background()) }()
+
+				// First exec: write a file to the working directory.
+				stdout, stderr := &strings.Builder{}, &strings.Builder{}
+				status, err := sandbox.Exec(context.Background(),
+					[]string{"sh", "-c", "echo hello-from-sandbox > /tmp/sandbox-test.txt"},
+					nil, "", nil, stdout, stderr)
+				assert.Expect(err).NotTo(HaveOccurred())
+				assert.Expect(status.ExitCode()).To(Equal(0))
+
+				// Second exec: read that file back.
+				stdout.Reset()
+				stderr.Reset()
+				status, err = sandbox.Exec(context.Background(),
+					[]string{"cat", "/tmp/sandbox-test.txt"},
+					nil, "", nil, stdout, stderr)
+				assert.Expect(err).NotTo(HaveOccurred())
+				assert.Expect(status.ExitCode()).To(Equal(0))
+				assert.Expect(stdout.String()).To(ContainSubstring("hello-from-sandbox"))
+			})
+
+			t.Run("exec respects env and workdir", func(t *testing.T) {
+				t.Parallel()
+
+				assert := NewGomegaWithT(t)
+
+				sandboxDriver := newSandboxDriver(t)
+
+				sandbox, err := sandboxDriver.StartSandbox(context.Background(), orchestra.Task{
+					ID:    gonanoid.Must(),
+					Image: "busybox",
+				})
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = sandbox.Cleanup(context.Background()) }()
+
+				stdout, stderr := &strings.Builder{}, &strings.Builder{}
+				status, err := sandbox.Exec(context.Background(),
+					[]string{"sh", "-c", "echo $GREET && pwd"},
+					map[string]string{"GREET": "hey-sandbox"},
+					"/tmp",
+					nil, stdout, stderr)
+				assert.Expect(err).NotTo(HaveOccurred())
+				assert.Expect(status.ExitCode()).To(Equal(0))
+				assert.Expect(stdout.String()).To(ContainSubstring("hey-sandbox"))
+				assert.Expect(stdout.String()).To(ContainSubstring("/tmp"))
+			})
+
+			t.Run("exec captures non-zero exit code", func(t *testing.T) {
+				t.Parallel()
+
+				assert := NewGomegaWithT(t)
+
+				sandboxDriver := newSandboxDriver(t)
+
+				sandbox, err := sandboxDriver.StartSandbox(context.Background(), orchestra.Task{
+					ID:    gonanoid.Must(),
+					Image: "busybox",
+				})
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = sandbox.Cleanup(context.Background()) }()
+
+				stdout, stderr := &strings.Builder{}, &strings.Builder{}
+				status, err := sandbox.Exec(context.Background(),
+					[]string{"sh", "-c", "exit 42"},
+					nil, "", nil, stdout, stderr)
+				assert.Expect(err).NotTo(HaveOccurred())
+				assert.Expect(status.ExitCode()).To(Equal(42))
+			})
+
+			t.Run("cleanup removes sandbox", func(t *testing.T) {
+				t.Parallel()
+
+				assert := NewGomegaWithT(t)
+
+				sandboxDriver := newSandboxDriver(t)
+
+				sandbox, err := sandboxDriver.StartSandbox(context.Background(), orchestra.Task{
+					ID:    gonanoid.Must(),
+					Image: "busybox",
+				})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				err = sandbox.Cleanup(context.Background())
+				assert.Expect(err).NotTo(HaveOccurred())
+			})
+		})
+	})
+}
+
 func TestParseDriverDSN(t *testing.T) {
 	t.Parallel()
 
