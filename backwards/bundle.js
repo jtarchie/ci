@@ -48,6 +48,7 @@ var TaskRunner = class {
         privileged: step.privileged ?? false,
         stdin: stdin ?? "",
         timeout: step.timeout,
+        storage_key: taskStorageKey,
         onOutput: (stream, data) => {
           if (stream === "stdout") {
             accumulatedStdout += data;
@@ -799,15 +800,12 @@ var JobRunner = class {
         mounts[input.name] = knownMount;
       }
     }
-    let outputVolumePath = "";
-    for (const output of step.config?.outputs ?? []) {
-      const knownMounts = this.taskRunner.getKnownMounts();
-      knownMounts[output.name] ||= await runtime.createVolume();
-      mounts[output.name] = knownMounts[output.name];
-      if (!outputVolumePath) {
-        outputVolumePath = knownMounts[output.name].path;
-      }
+    const outputs = step.config?.outputs ?? [];
+    for (const output of outputs) {
+      this.taskRunner.getKnownMounts()[output.name] ||= await runtime.createVolume({ name: output.name });
+      mounts[output.name] = this.taskRunner.getKnownMounts()[output.name];
     }
+    const outputVolumePath = outputs.length > 0 ? mounts[outputs[0].name]?.path ?? "" : "";
     let accumulatedOutput = "";
     try {
       const result = await runtime.agent({

@@ -1,22 +1,21 @@
 ---
-# This pipeline should pass validation because 'git' resource type is defined
-resource_types:
-  - name: git-resource
-    type: registry-image
-    source:
-      repository: concourse/git-resource
-
-resources:
-  - name: my-repo
-    type: git-resource
-    source:
-      uri: https://github.com/jtarchie/ci
-
 jobs:
   - name: review-code
     plan:
-      - get: my-repo
-        trigger: true
+      - task: git-repo
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: { repository: "alpine/git" }
+          outputs:
+            - name: my-repo
+          run:
+            path: sh
+            args:
+              - -c
+              - |
+                  git clone https://github.com/jtarchie/ci my-repo
       - agent: review-code-agent
         prompt: "Review my code changes in the last commit"
         model: openrouter/google/gemini-3.1-flash-lite-preview
@@ -24,7 +23,7 @@ jobs:
           platform: linux
           image_resource:
             type: registry-image
-            source: { repository: busybox }
+            source: { repository: alpine/git }
           inputs:
             - name: my-repo
           outputs:

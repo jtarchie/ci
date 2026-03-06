@@ -37,42 +37,57 @@ func (v *Volume) Cleanup(ctx context.Context) error {
 }
 
 func (f *Fly) CreateVolume(ctx context.Context, name string, size int) (orchestra.Volume, error) {
-	volumeName := sanitizeVolumeName(fmt.Sprintf("%s_%s", f.namespace, name))
-
-	// Check if we already have a volume with this name
+	// Check if we already have a logical volume with this name.
 	f.mu.Lock()
 	existing, ok := f.volumes[name]
 	f.mu.Unlock()
 
 	if ok {
-		f.logger.Info("fly.volume.reuse", "volume", existing.id, "name", volumeName)
+		f.logger.Info("fly.volume.reuse", "volume", existing.id, "name", name)
 		return existing, nil
 	}
 
-	if size <= 0 {
-		size = 1 // Fly volumes must be at least 1 GB
+	// All logical volumes share a single physical Fly volume per namespace.
+	// This avoids the Fly API's 1-volume-per-machine limit.
+	f.mu.Lock()
+	sharedID := f.sharedVolumeID
+	f.mu.Unlock()
+
+	if sharedID == "" {
+		// No shared volume yet — create one.
+		volumeName := sanitizeVolumeName(fmt.Sprintf("%s_workspace", f.namespace))
+
+		if size <= 0 {
+			size = 1 // Fly volumes must be at least 1 GB
+		}
+
+		f.logger.Debug("fly.volume.create.shared", "name", volumeName, "size_gb", size, "region", f.region)
+
+		vol, err := f.client.CreateVolume(ctx, f.appName, fly.CreateVolumeRequest{
+			Name:   volumeName,
+			Region: f.region,
+			SizeGb: &size,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create fly shared volume %q: %w", volumeName, err)
+		}
+
+		f.trackVolume(vol.ID)
+		f.logger.Info("fly.volume.created.shared", "volume", vol.ID, "name", volumeName)
+
+		f.mu.Lock()
+		f.sharedVolumeID = vol.ID
+		sharedID = vol.ID
+		f.mu.Unlock()
 	}
 
-	f.logger.Debug("fly.volume.create", "name", volumeName, "size_gb", size, "region", f.region)
-
-	vol, err := f.client.CreateVolume(ctx, f.appName, fly.CreateVolumeRequest{
-		Name:   volumeName,
-		Region: f.region,
-		SizeGb: &size,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create fly volume %q: %w", volumeName, err)
-	}
-
-	f.trackVolume(vol.ID)
-
-	f.logger.Info("fly.volume.created", "volume", vol.ID, "name", volumeName)
-
+	// Create a logical volume backed by the shared physical volume.
+	// Path is the subdirectory under /workspace in the container.
 	v := &Volume{
-		id:             vol.ID,
-		name:           volumeName,
+		id:             sharedID,
+		name:           sanitizeVolumeName(fmt.Sprintf("%s_%s", f.namespace, name)),
 		userFacingName: name,
-		path:           "/" + volumeName,
+		path:           "/workspace/" + name,
 		driver:         f,
 	}
 

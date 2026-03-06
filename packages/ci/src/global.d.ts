@@ -43,6 +43,9 @@ declare global {
     // Callback invoked with streaming output chunks as the container runs
     onOutput?: OutputCallback;
     timeout?: string;
+    // When set, overrides the auto-generated storage path used by the runtime
+    // so the caller's own storage entry is the single source of truth.
+    storage_key?: string;
   }
 
   interface RunTaskResult {

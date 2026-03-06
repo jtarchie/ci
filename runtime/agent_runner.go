@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"google.golang.org/adk/agent"
@@ -147,6 +146,25 @@ func RunAgent(
 	defer func() { _ = sandbox.Close() }()
 
 	// Build the run_command tool.
+	// Determine a common workdir from the mounts so the agent can reference
+	// files by relative path (e.g. "my-repo/main.go").
+	agentWorkDir := ""
+	if len(config.Mounts) > 0 {
+		// Use the parent of the first mount path as workdir.
+		// For Fly shared volumes: /workspace/my-repo → workdir /workspace
+		// For Docker: /tmp/container/my-repo → workdir /tmp/container
+		for _, vol := range config.Mounts {
+			if vol.Path != "" {
+				idx := strings.LastIndex(vol.Path, "/")
+				if idx > 0 {
+					agentWorkDir = vol.Path[:idx]
+				}
+
+				break
+			}
+		}
+	}
+
 	runCmd, err := functiontool.New[runCommandInput, runCommandOutput](
 		functiontool.Config{
 			Name:        "run_command",
@@ -156,6 +174,7 @@ func RunAgent(
 			var execInput ExecInput
 			execInput.Command.Path = input.Command
 			execInput.Command.Args = input.Args
+			execInput.WorkDir = agentWorkDir
 			execInput.OnOutput = config.OnOutput
 
 			result, execErr := sandbox.Exec(execInput)
@@ -180,12 +199,26 @@ func RunAgent(
 		return nil, fmt.Errorf("agent: %w", err)
 	}
 
+	// Build the instruction with mount path context so the LLM knows
+	// where files are located.
+	instruction := config.Prompt
+	if len(config.Mounts) > 0 {
+		instruction += "\n\nAvailable directories:\n"
+		for name, vol := range config.Mounts {
+			instruction += fmt.Sprintf("- %s (at %s)\n", name, vol.Path)
+		}
+
+		if agentWorkDir != "" {
+			instruction += fmt.Sprintf("Working directory: %s\n", agentWorkDir)
+		}
+	}
+
 	// Create the ADK agent.
 	myAgent, err := llmagent.New(llmagent.Config{
 		Name:        config.Name,
 		Model:       llmModel,
 		Description: "CI pipeline agent",
-		Instruction: config.Prompt,
+		Instruction: instruction,
 		Tools:       []adktool.Tool{runCmd},
 	})
 	if err != nil {
@@ -252,14 +285,21 @@ func RunAgent(
 	finalText := textBuilder.String()
 	status := "success"
 
-	// Write result.json to the output volume if configured.
+	// Write result.json to the output path inside the sandbox if configured.
 	if config.OutputVolumePath != "" {
-		if mkErr := os.MkdirAll(config.OutputVolumePath, 0o755); mkErr == nil {
-			result := map[string]string{"status": status, "text": finalText}
+		resultData := map[string]string{"status": status, "text": finalText}
+		data, _ := json.Marshal(resultData)
 
-			data, _ := json.Marshal(result)
-			_ = os.WriteFile(filepath.Join(config.OutputVolumePath, "result.json"), data, 0o644)
-		}
+		// Create the directory and write via sandbox exec (the path is inside the container).
+		writeCmd := fmt.Sprintf("mkdir -p %s && cat > %s/result.json",
+			config.OutputVolumePath, config.OutputVolumePath)
+
+		var execInput ExecInput
+		execInput.Command.Path = "sh"
+		execInput.Command.Args = []string{"-c", writeCmd}
+		execInput.Stdin = string(data)
+
+		_, _ = sandbox.Exec(execInput)
 	}
 
 	return &AgentResult{

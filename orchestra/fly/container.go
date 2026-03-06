@@ -242,8 +242,12 @@ func (f *Fly) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.
 	env := make(map[string]string)
 	maps.Copy(env, task.Env)
 
-	// Build machine mounts
+	// Build machine mounts — all logical mounts share a single physical volume
+	// mounted at /workspace, with each mount as a subdirectory.
 	var mounts []fly.MachineMount
+	var mountDirs []string // subdirectory names to create under /workspace
+
+	var sharedVolumeID string
 
 	for _, taskMount := range task.Mounts {
 		volume, err := f.CreateVolume(ctx, taskMount.Name, 1)
@@ -253,28 +257,32 @@ func (f *Fly) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.
 		}
 
 		flyVolume, _ := volume.(*Volume)
+		sharedVolumeID = flyVolume.id
+		mountDirs = append(mountDirs, taskMount.Path)
+	}
 
+	if sharedVolumeID != "" {
 		// If this volume is currently attached to another machine, destroy
 		// that machine first so the volume can be reattached.
 		f.mu.Lock()
-		oldMachineID, attached := f.volumeAttachments[flyVolume.id]
+		oldMachineID, attached := f.volumeAttachments[sharedVolumeID]
 		f.mu.Unlock()
 
 		if attached {
-			logger.Debug("fly.volume.detach", "volume", flyVolume.id, "oldMachine", oldMachineID)
+			logger.Debug("fly.volume.detach", "volume", sharedVolumeID, "oldMachine", oldMachineID)
 
-			err = f.client.Destroy(ctx, f.appName, fly.RemoveMachineInput{
+			err := f.client.Destroy(ctx, f.appName, fly.RemoveMachineInput{
 				ID:   oldMachineID,
 				Kill: true,
 			}, "")
 			if err != nil {
-				logger.Warn("fly.volume.detach.error", "volume", flyVolume.id, "machine", oldMachineID, "err", err)
+				logger.Warn("fly.volume.detach.error", "volume", sharedVolumeID, "machine", oldMachineID, "err", err)
 			}
 		}
 
 		mounts = append(mounts, fly.MachineMount{
-			Volume: flyVolume.id,
-			Path:   taskMount.Path,
+			Volume: sharedVolumeID,
+			Path:   "/workspace",
 		})
 	}
 
@@ -302,7 +310,18 @@ func (f *Fly) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.
 	initExec := task.Command
 	if task.WorkDir != "" {
 		// Fly SDK's MachineInit doesn't support WorkDir, so wrap with shell cd
-		initExec = []string{"/bin/sh", "-c", "cd " + task.WorkDir + " && exec " + strings.Join(task.Command, " ")}
+		initExec = []string{"/bin/sh", "-c", "cd " + shellescape(task.WorkDir) + " && exec " + shelljoin(task.Command)}
+	} else if len(mountDirs) > 0 {
+		// When using the shared workspace volume, create mount subdirectories
+		// and set the workdir to /workspace so relative paths resolve correctly.
+		var mkdirParts []string
+		for _, dir := range mountDirs {
+			mkdirParts = append(mkdirParts, "/workspace/"+dir)
+		}
+		initExec = []string{"/bin/sh", "-c",
+			"mkdir -p " + strings.Join(mkdirParts, " ") +
+				" && cd /workspace && exec " + shelljoin(task.Command),
+		}
 	}
 
 	config := &fly.MachineConfig{
@@ -378,9 +397,9 @@ func (f *Fly) RunContainer(ctx context.Context, task orchestra.Task) (orchestra.
 	f.trackMachine(machine.ID)
 
 	// Record volume→machine attachments for future detach
-	for _, mount := range mounts {
+	if sharedVolumeID != "" {
 		f.mu.Lock()
-		f.volumeAttachments[mount.Volume] = machine.ID
+		f.volumeAttachments[sharedVolumeID] = machine.ID
 		f.mu.Unlock()
 	}
 

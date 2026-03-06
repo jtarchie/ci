@@ -195,6 +195,11 @@ type RunInput struct {
 	OnOutput OutputCallback `json:"-"` // Not serialized from JS, set programmatically
 	// has to be string because goja doesn't support string -> time.Duration
 	Timeout string `json:"timeout"`
+	// StorageKey overrides the auto-generated tasks/<callIndex>-<name> storage path.
+	// When set (e.g. by the backwards TS layer), Go uses this path so that the
+	// caller's own storage entry is the single source of truth and no duplicate
+	// top-level tasks/ entry is created.
+	StorageKey string `json:"storage_key"`
 }
 
 type RunStatus string
@@ -232,6 +237,13 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 
 	logger = c.logger.With("task.id", taskID, "task.name", input.Name, "task.privileged", input.Privileged)
 
+	// Resolve the effective storage key early so both the secrets error path and
+	// the main status-tracking path use the same key.
+	effectiveStorageKey := c.taskStorageKey(stepID)
+	if input.StorageKey != "" {
+		effectiveStorageKey = input.StorageKey
+	}
+
 	// Inject secrets into the task environment.
 	// Secrets are loaded on demand from env keys prefixed with "secret:" or
 	// from all stored secrets for this pipeline.
@@ -251,7 +263,7 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 		if len(secretKeys) > 0 {
 			secretMap, err := c.loadSecrets(ctx, secretKeys)
 			if err != nil {
-				c.setTaskStatus(c.taskStorageKey(stepID), map[string]any{
+				c.setTaskStatus(effectiveStorageKey, map[string]any{
 					"status": "error",
 					"stderr": err.Error(),
 				})
@@ -281,8 +293,9 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 
 	logger.Info("container.run.start", "image", input.Image, "command", append([]string{input.Command.Path}, input.Command.Args...))
 
-	// Persist task status to storage so the UI can display progress
-	storageKey := c.taskStorageKey(stepID)
+	// Persist task status to storage so the UI can display progress.
+	// effectiveStorageKey was resolved above (honouring input.StorageKey).
+	storageKey := effectiveStorageKey
 	c.setTaskStatus(storageKey, map[string]any{"status": "pending"})
 
 	var mounts orchestra.Mounts

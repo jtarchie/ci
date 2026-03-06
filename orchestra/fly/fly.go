@@ -34,8 +34,11 @@ type Fly struct {
 	machineIDs []string
 	volumeIDs  []string
 
-	// Track volumes by name for reuse across containers
-	volumes           map[string]*Volume // mount name → Volume
+	// Shared workspace volume: all logical mounts share a single physical Fly
+	// volume (Fly machines only support 1 volume). Each mount name becomes a
+	// subdirectory under /workspace.
+	sharedVolumeID    string             // physical Fly volume ID (empty until first CreateVolume)
+	volumes           map[string]*Volume // mount name → logical Volume
 	volumeAttachments map[string]string  // volume ID → machine ID
 
 	// helperMachines tracks persistent suspended helper machines (volume ID → machine ID)
@@ -268,6 +271,23 @@ func sanitizeVolumeName(name string) string {
 
 func init() {
 	orchestra.Add("fly", NewFly)
+}
+
+// shellescape wraps a string in single quotes for safe use in shell commands.
+// Any embedded single quotes are escaped as '\” (end quote, escaped quote, start quote).
+func shellescape(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
+}
+
+// shelljoin quotes and joins a command slice into a single shell-safe string.
+// Each argument is individually escaped so spaces and special characters are preserved.
+func shelljoin(args []string) string {
+	quoted := make([]string, len(args))
+	for i, a := range args {
+		quoted[i] = shellescape(a)
+	}
+
+	return strings.Join(quoted, " ")
 }
 
 var (

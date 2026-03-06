@@ -52,9 +52,9 @@ export class TaskRunner {
     try {
       result = await runtime.run({
         command: {
-          path: step.config.run.path,
-          args: step.config.run.args || [],
-          user: step.config.run.user,
+          path: step.config.run!.path,
+          args: step.config.run!.args || [],
+          user: step.config.run!.user,
         },
         container_limits: step.config.container_limits,
         env: step.config.env,
@@ -64,6 +64,7 @@ export class TaskRunner {
         privileged: step.privileged ?? false,
         stdin: stdin ?? "",
         timeout: step.timeout,
+        storage_key: taskStorageKey,
         onOutput: (stream: "stdout" | "stderr", data: string) => {
           if (stream === "stdout") {
             accumulatedStdout += data;

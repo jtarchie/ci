@@ -360,6 +360,67 @@ func TestBackwardsCompatibility(t *testing.T) {
 		err := runner.Run(nil)
 		assert.Expect(err).NotTo(HaveOccurred())
 	})
+
+	// Regression test: ensure task storage paths are not duplicated at the top-level tasks/ prefix.
+	// Previously, PipelineRunner.Run() always wrote to /pipeline/{runID}/tasks/{callIndex}-{name}
+	// in addition to the TS layer's correctly-nested /pipeline/{runID}/jobs/{jobName}/... path.
+	t.Run("hello-world task paths not duplicated at top-level tasks/ prefix", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+
+		// Use a persistent DB so we can re-open it after the run to inspect stored paths.
+		dbFile, err := os.CreateTemp(t.TempDir(), "*.db")
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(dbFile.Close()).NotTo(HaveOccurred())
+		storageURL := fmt.Sprintf("sqlite://%s", dbFile.Name())
+
+		const pipelineFile = "../examples/both/hello-world.yml"
+		const runID = "hello-world-regression-test"
+
+		runner := commands.Runner{
+			Pipeline: pipelineFile,
+			Driver:   "native",
+			Storage:  storageURL,
+			RunID:    runID,
+		}
+		err = runner.Run(nil)
+		assert.Expect(err).NotTo(HaveOccurred())
+
+		// Re-open storage using the runtimeID derived from the pipeline's absolute path.
+		pipelinePath, err := filepath.Abs(pipelineFile)
+		assert.Expect(err).NotTo(HaveOccurred())
+		runtimeID := youtubeIDStyle(pipelinePath)
+
+		initStorage, found := storage.GetFromDSN(storageURL)
+		assert.Expect(found).To(BeTrue())
+
+		store, err := initStorage(storageURL, runtimeID, nil)
+		assert.Expect(err).NotTo(HaveOccurred())
+		defer func() { _ = store.Close() }()
+
+		// Fetch all stored entries for this run.
+		results, err := store.GetAll(context.Background(), "/pipeline/"+runID+"/", []string{"status"})
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(results).NotTo(BeEmpty(), "expected storage entries for hello-world run")
+
+		// Assert NO path uses the old auto-generated top-level /tasks/ prefix.
+		duplicateTasksPrefix := fmt.Sprintf("/pipeline/%s/tasks/", runID)
+		for _, result := range results {
+			assert.Expect(result.Path).NotTo(ContainSubstring(duplicateTasksPrefix),
+				"found duplicate auto-generated tasks/ path: %s", result.Path)
+		}
+
+		// Assert task paths ARE correctly nested under /jobs/hello-world/.
+		jobsPrefix := fmt.Sprintf("/pipeline/%s/jobs/hello-world/", runID)
+		var jobPaths []string
+		for _, result := range results {
+			if strings.Contains(result.Path, jobsPrefix) {
+				jobPaths = append(jobPaths, result.Path)
+			}
+		}
+		assert.Expect(jobPaths).NotTo(BeEmpty(), "expected task paths nested under /jobs/hello-world/")
+	})
 }
 
 func TestVersionEveryWithMock(t *testing.T) {
@@ -480,4 +541,5 @@ func TestVersionEveryWithMock(t *testing.T) {
 		assert.Expect(err).NotTo(HaveOccurred())
 		assert.Expect(pipeline).NotTo(BeEmpty())
 	})
+
 }

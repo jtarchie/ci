@@ -115,6 +115,9 @@ func (f *Fly) StartSandbox(ctx context.Context, task orchestra.Task) (orchestra.
 	maps.Copy(env, task.Env)
 
 	var mounts []fly.MachineMount
+	var mountDirs []string // subdirectory names to create under /workspace
+
+	var sharedVolumeID string
 
 	for _, taskMount := range task.Mounts {
 		volume, err := f.CreateVolume(ctx, taskMount.Name, 1)
@@ -123,9 +126,13 @@ func (f *Fly) StartSandbox(ctx context.Context, task orchestra.Task) (orchestra.
 		}
 
 		flyVolume, _ := volume.(*Volume)
+		sharedVolumeID = flyVolume.id
+		mountDirs = append(mountDirs, taskMount.Path)
+	}
 
+	if sharedVolumeID != "" {
 		f.mu.Lock()
-		oldMachineID, attached := f.volumeAttachments[flyVolume.id]
+		oldMachineID, attached := f.volumeAttachments[sharedVolumeID]
 		f.mu.Unlock()
 
 		if attached {
@@ -136,8 +143,8 @@ func (f *Fly) StartSandbox(ctx context.Context, task orchestra.Task) (orchestra.
 		}
 
 		mounts = append(mounts, fly.MachineMount{
-			Volume: flyVolume.id,
-			Path:   taskMount.Path,
+			Volume: sharedVolumeID,
+			Path:   "/workspace",
 		})
 	}
 
@@ -191,10 +198,34 @@ func (f *Fly) StartSandbox(ctx context.Context, task orchestra.Task) (orchestra.
 		return nil, fmt.Errorf("sandbox: machine did not start: %w", err)
 	}
 
-	logger.Debug("sandbox.started", "machineID", machine.ID)
-
-	return &FlySandbox{
+	sandbox := &FlySandbox{
 		machineID: machine.ID,
 		driver:    f,
-	}, nil
+	}
+
+	// Create mount subdirectories inside the shared workspace volume.
+	if len(mountDirs) > 0 {
+		var mkdirParts []string
+		for _, dir := range mountDirs {
+			mkdirParts = append(mkdirParts, "/workspace/"+dir)
+		}
+
+		_, err := f.client.Exec(ctx, f.appName, machine.ID, &fly.MachineExecRequest{
+			Cmd: "mkdir -p " + strings.Join(mkdirParts, " "),
+		})
+		if err != nil {
+			logger.Warn("sandbox.mkdir.error", "err", err)
+		}
+	}
+
+	// Record volume attachment for future detach.
+	if sharedVolumeID != "" {
+		f.mu.Lock()
+		f.volumeAttachments[sharedVolumeID] = machine.ID
+		f.mu.Unlock()
+	}
+
+	logger.Debug("sandbox.started", "machineID", machine.ID)
+
+	return sandbox, nil
 }
