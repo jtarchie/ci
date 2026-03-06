@@ -826,7 +826,6 @@ export class JobRunner {
     pathContext: string,
   ): Promise<void> {
     const storageKey = `${this.getBaseStorageKey()}/${pathContext}`;
-    storage.set(storageKey, { status: "pending" });
 
     const image = step.config?.image_resource?.source?.repository ?? "busybox";
 
@@ -851,6 +850,19 @@ export class JobRunner {
       : "";
 
     let accumulatedOutput = "";
+    const startedAt = new Date().toISOString();
+    const elapsedSince = () => {
+      const ms = Date.now() - new Date(startedAt).getTime();
+      const totalSeconds = Math.floor(ms / 1000);
+      const h = Math.floor(totalSeconds / 3600);
+      const m = Math.floor((totalSeconds % 3600) / 60);
+      const s = totalSeconds % 60;
+      if (h > 0) return `${h}h ${m}m ${s}s`;
+      if (m > 0) return `${m}m ${s}s`;
+      return `${s}s`;
+    };
+
+    storage.set(storageKey, { status: "pending", started_at: startedAt });
 
     try {
       const result = await runtime.agent({
@@ -864,6 +876,7 @@ export class JobRunner {
           accumulatedOutput += data;
           storage.set(storageKey, {
             status: "running",
+            started_at: startedAt,
             stdout: accumulatedOutput,
           });
         },
@@ -871,12 +884,18 @@ export class JobRunner {
 
       storage.set(storageKey, {
         status: "success",
+        started_at: startedAt,
+        elapsed: elapsedSince(),
         stdout: result.text,
         toolCalls: result.toolCalls,
         usage: result.usage,
       });
     } catch (error) {
-      storage.set(storageKey, { status: "failure" });
+      storage.set(storageKey, {
+        status: "failure",
+        started_at: startedAt,
+        elapsed: elapsedSince(),
+      });
       throw new TaskFailure(`Agent ${step.agent} failed: ${error}`);
     }
   }

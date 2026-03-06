@@ -298,9 +298,11 @@ func TestRunViews(t *testing.T) {
 				run, err := client.SaveRun(context.Background(), pipeline.ID)
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				// Agent task payload includes a usage sub-object
+				// Agent task payload includes a usage sub-object plus timing fields
 				err = client.Set(context.Background(), "/pipeline/"+run.ID+"/tasks/0-review", map[string]any{
-					"status": "success",
+					"status":     "success",
+					"started_at": "2026-03-06T10:00:00Z",
+					"elapsed":    "42s",
 					"usage": map[string]any{
 						"promptTokens":     1000,
 						"completionTokens": 250,
@@ -322,6 +324,8 @@ func TestRunViews(t *testing.T) {
 				// Usage badge must appear with tool count and token total
 				assert.Expect(rec.Body.String()).To(ContainSubstring("tools"))
 				assert.Expect(rec.Body.String()).To(ContainSubstring("tok"))
+				// Elapsed time must also appear
+				assert.Expect(rec.Body.String()).To(ContainSubstring("42s"))
 				// Must not leak template errors
 				assert.Expect(rec.Body.String()).NotTo(ContainSubstring("<no value>"))
 			})
