@@ -197,6 +197,9 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 	// Set up notification runtime (disabled when feature is gated)
 	notifier := NewNotifier(j.logger)
 	notifier.disabled = opts.DisableNotifications
+	if opts.SecretsManager != nil {
+		notifier.SetSecretsManager(opts.SecretsManager, opts.PipelineID)
+	}
 	notifyRuntime := NewNotifyRuntime(ctx, jsVM, notifier, runtime.promises, runtime.tasks)
 
 	err = jsVM.Set("notify", notifyRuntime)
@@ -206,6 +209,9 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 
 	// Set up native resource runner
 	resourceRunner := NewResourceRunner(ctx, j.logger)
+	if opts.SecretsManager != nil {
+		resourceRunner.SetSecretsManager(opts.SecretsManager, opts.PipelineID)
+	}
 
 	err = jsVM.Set("nativeResources", resourceRunner)
 	if err != nil {

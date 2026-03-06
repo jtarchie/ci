@@ -115,8 +115,13 @@ local://<sqlite-path>?key=<passphrase>
 
 ## Using Secrets in Pipelines
 
-Reference secrets in a task's `env` map by prefixing the value with `secret:`.
-The system resolves the actual value at runtime.
+Any string value prefixed with `secret:` is resolved from the secrets backend
+before it is used. This works across **task environment variables**, **native
+resource configuration**, and **notification config fields**.
+
+### Task Environment Variables
+
+Reference secrets in a task's `env` map:
 
 ```typescript
 const pipeline = async () => {
@@ -131,8 +136,8 @@ const pipeline = async () => {
       ],
     },
     env: {
-      API_KEY: "secret:API_KEY",
-      DB_PASSWORD: "secret:DB_PASSWORD",
+      API_KEY: "secret:API_KEY", // Resolved from secrets backend
+      NODE_ENV: "production", // Plain value, passed as-is
     },
   });
 };
@@ -140,14 +145,80 @@ const pipeline = async () => {
 export { pipeline };
 ```
 
-Regular (non-secret) environment variables work as before — only values with the
-`secret:` prefix trigger a secret lookup:
+### Native Resource Source and Params
+
+Secret references work in the `source` and `params` maps of native resource
+operations (`nativeResources.check`, `.fetch`, `.push`). Nested maps are walked
+recursively — only string values with the `secret:` prefix are substituted;
+non-string values such as numbers and booleans are left unchanged.
 
 ```typescript
-env: {
-  API_KEY: "secret:API_KEY",   // Resolved from secrets backend
-  NODE_ENV: "production",      // Plain value, passed as-is
-}
+const pipeline = async () => {
+  // check — source credentials resolved from secrets
+  const versions = nativeResources.check({
+    type: "git",
+    source: {
+      uri: "https://github.com/my-org/private-repo.git",
+      private_key: "secret:GIT_DEPLOY_KEY",
+    },
+  });
+
+  // fetch — nested source + params both resolved
+  const result = await nativeResources.fetch({
+    type: "s3",
+    source: {
+      bucket: "my-bucket",
+      credentials: {
+        access_key: "secret:AWS_ACCESS_KEY",
+        secret_key: "secret:AWS_SECRET_KEY",
+      },
+    },
+    version: versions.versions[0],
+    params: { unpack: true },
+    destDir: "/workspace",
+  });
+};
+
+export { pipeline };
+```
+
+### Notification Config Fields
+
+Secret references work in notification backend configuration fields: `token`
+(Slack), `webhook` (Teams), `url` (HTTP), and every entry in `headers` (HTTP).
+The secret is resolved at the moment `notify.send()` is called, not when
+`notify.setConfigs()` is called, so the stored config always uses the `secret:`
+prefix string as a placeholder.
+
+```typescript
+const pipeline = async () => {
+  notify.setConfigs({
+    // Slack — token resolved from secrets
+    "slack-builds": {
+      type: "slack",
+      token: "secret:SLACK_BOT_TOKEN",
+      channels: ["#builds"],
+    },
+    // Microsoft Teams — webhook resolved from secrets
+    "teams-alerts": {
+      type: "teams",
+      webhook: "secret:TEAMS_WEBHOOK_URL",
+    },
+    // HTTP — URL and Authorization header resolved from secrets
+    "http-hook": {
+      type: "http",
+      url: "secret:WEBHOOK_URL",
+      method: "POST",
+      headers: {
+        Authorization: "secret:WEBHOOK_TOKEN",
+      },
+    },
+  });
+
+  await notify.send({ name: "slack-builds", message: "Build started" });
+};
+
+export { pipeline };
 ```
 
 ## Scoping

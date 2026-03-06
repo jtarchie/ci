@@ -7,12 +7,15 @@ import (
 	"log/slog"
 
 	"github.com/jtarchie/ci/resources"
+	"github.com/jtarchie/ci/secrets"
 )
 
 // ResourceRunner provides methods for executing native resources.
 type ResourceRunner struct {
-	ctx    context.Context //nolint: containedctx
-	logger *slog.Logger
+	ctx            context.Context //nolint: containedctx
+	logger         *slog.Logger
+	secretsManager secrets.Manager
+	pipelineID     string
 }
 
 // NewResourceRunner creates a new ResourceRunner.
@@ -21,6 +24,13 @@ func NewResourceRunner(ctx context.Context, logger *slog.Logger) *ResourceRunner
 		ctx:    ctx,
 		logger: logger.WithGroup("resource.run"),
 	}
+}
+
+// SetSecretsManager configures the resource runner to resolve "secret:<KEY>"
+// references in Source and Params maps before each operation.
+func (r *ResourceRunner) SetSecretsManager(mgr secrets.Manager, pipelineID string) {
+	r.secretsManager = mgr
+	r.pipelineID = pipelineID
 }
 
 // ResourceCheckInput is the input for a Check operation from JS.
@@ -39,6 +49,10 @@ type ResourceCheckResult struct {
 func (r *ResourceRunner) Check(input ResourceCheckInput) (*ResourceCheckResult, error) {
 	logger := r.logger.With("type", input.Type, "operation", "resource.check")
 	logger.Debug("resource.check")
+
+	if err := resolveSecretsInMap(r.ctx, r.secretsManager, r.pipelineID, input.Source, nil); err != nil {
+		return nil, fmt.Errorf("could not resolve secrets in source: %w", err)
+	}
 
 	res, err := resources.Get(input.Type)
 	if err != nil {
@@ -87,6 +101,14 @@ type ResourceFetchResult struct {
 func (r *ResourceRunner) Fetch(input ResourceFetchInput) (*ResourceFetchResult, error) {
 	logger := r.logger.With("type", input.Type, "operation", "resource.fetch", "destDir", input.DestDir)
 	logger.Debug("resource.fetch")
+
+	if err := resolveSecretsInMap(r.ctx, r.secretsManager, r.pipelineID, input.Source, nil); err != nil {
+		return nil, fmt.Errorf("could not resolve secrets in source: %w", err)
+	}
+
+	if err := resolveSecretsInMap(r.ctx, r.secretsManager, r.pipelineID, input.Params, nil); err != nil {
+		return nil, fmt.Errorf("could not resolve secrets in params: %w", err)
+	}
 
 	res, err := resources.Get(input.Type)
 	if err != nil {
@@ -141,6 +163,14 @@ type ResourcePushResult struct {
 func (r *ResourceRunner) Push(input ResourcePushInput) (*ResourcePushResult, error) {
 	logger := r.logger.With("type", input.Type, "operation", "resource.push", "srcDir", input.SrcDir)
 	logger.Debug("resource.push")
+
+	if err := resolveSecretsInMap(r.ctx, r.secretsManager, r.pipelineID, input.Source, nil); err != nil {
+		return nil, fmt.Errorf("could not resolve secrets in source: %w", err)
+	}
+
+	if err := resolveSecretsInMap(r.ctx, r.secretsManager, r.pipelineID, input.Params, nil); err != nil {
+		return nil, fmt.Errorf("could not resolve secrets in params: %w", err)
+	}
 
 	res, err := resources.Get(input.Type)
 	if err != nil {

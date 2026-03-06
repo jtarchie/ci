@@ -11,6 +11,7 @@ import (
 
 	"github.com/dop251/goja"
 	sprig "github.com/go-task/slim-sprig/v3"
+	"github.com/jtarchie/ci/secrets"
 	"github.com/nikoksr/notify"
 	nhttp "github.com/nikoksr/notify/service/http"
 	"github.com/nikoksr/notify/service/msteams"
@@ -57,11 +58,13 @@ type NotifyResult struct {
 
 // Notifier handles notification sending with configuration management.
 type Notifier struct {
-	configs  map[string]NotifyConfig
-	context  NotifyContext
-	logger   *slog.Logger
-	mu       sync.RWMutex
-	disabled bool
+	configs        map[string]NotifyConfig
+	context        NotifyContext
+	logger         *slog.Logger
+	mu             sync.RWMutex
+	disabled       bool
+	secretsManager secrets.Manager
+	pipelineID     string
 }
 
 // NewNotifier creates a new Notifier instance.
@@ -70,6 +73,65 @@ func NewNotifier(logger *slog.Logger) *Notifier {
 		configs: make(map[string]NotifyConfig),
 		logger:  logger.WithGroup("notifier.send"),
 	}
+}
+
+// SetSecretsManager configures the notifier to resolve "secret:<KEY>"
+// references in notification config fields (Token, Webhook, URL, Headers)
+// before each send.
+func (n *Notifier) SetSecretsManager(mgr secrets.Manager, pipelineID string) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	n.secretsManager = mgr
+	n.pipelineID = pipelineID
+}
+
+// resolveConfigSecrets returns a copy of config with all "secret:<KEY>"
+// references in Token, Webhook, URL, and Headers resolved.
+func (n *Notifier) resolveConfigSecrets(ctx context.Context, config NotifyConfig) (NotifyConfig, error) {
+	n.mu.RLock()
+	mgr := n.secretsManager
+	pipelineID := n.pipelineID
+	n.mu.RUnlock()
+
+	if mgr == nil {
+		return config, nil
+	}
+
+	scalarFields := []struct {
+		name  string
+		field *string
+	}{
+		{"token", &config.Token},
+		{"webhook", &config.Webhook},
+		{"url", &config.URL},
+	}
+
+	for _, f := range scalarFields {
+		resolved, _, err := resolveSecretString(ctx, mgr, pipelineID, *f.field)
+		if err != nil {
+			return config, fmt.Errorf("notification field %q: %w", f.name, err)
+		}
+
+		*f.field = resolved
+	}
+
+	// Resolve headers.
+	if len(config.Headers) > 0 {
+		resolvedHeaders := make(map[string]string, len(config.Headers))
+		for k, v := range config.Headers {
+			resolved, _, err := resolveSecretString(ctx, mgr, pipelineID, v)
+			if err != nil {
+				return config, fmt.Errorf("notification header %q: %w", k, err)
+			}
+
+			resolvedHeaders[k] = resolved
+		}
+
+		config.Headers = resolvedHeaders
+	}
+
+	return config, nil
 }
 
 // SetConfigs sets the notification configurations.
@@ -140,6 +202,14 @@ func (n *Notifier) Send(ctx context.Context, name string, message string) error 
 		return fmt.Errorf("notification config %q not found", name)
 	}
 
+	// Resolve secret references in config fields.
+	var err error
+
+	config, err = n.resolveConfigSecrets(ctx, config)
+	if err != nil {
+		return fmt.Errorf("could not resolve secrets for notification %q: %w", name, err)
+	}
+
 	// Render the message template
 	renderedMessage, err := n.RenderTemplate(message)
 	if err != nil {
@@ -155,19 +225,21 @@ func (n *Notifier) Send(ctx context.Context, name string, message string) error 
 	// Create and configure the notify service
 	notifier := notify.New()
 
+	var configErr error
+
 	switch config.Type {
 	case "slack":
-		err = n.configureSlack(notifier, config)
+		configErr = n.configureSlack(notifier, config)
 	case "teams":
-		err = n.configureTeams(notifier, config)
+		configErr = n.configureTeams(notifier, config)
 	case "http":
-		err = n.configureHTTP(notifier, config)
+		configErr = n.configureHTTP(notifier, config)
 	default:
 		return fmt.Errorf("unsupported notification type: %s", config.Type)
 	}
 
-	if err != nil {
-		return fmt.Errorf("could not configure %s service: %w", config.Type, err)
+	if configErr != nil {
+		return fmt.Errorf("could not configure %s service: %w", config.Type, configErr)
 	}
 
 	// Send the notification
