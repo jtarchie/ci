@@ -37,8 +37,27 @@ type AgentConfig struct {
 
 // AgentResult is returned to JavaScript after the agent completes.
 type AgentResult struct {
-	Text   string `json:"text"`
-	Status string `json:"status"` // "success" or "failure"
+	Text      string           `json:"text"`
+	Status    string           `json:"status"` // "success" or "failure"
+	ToolCalls []ToolCallRecord `json:"toolCalls"`
+	Usage     AgentUsage       `json:"usage"`
+}
+
+// ToolCallRecord captures a single tool invocation and its result.
+type ToolCallRecord struct {
+	Name     string         `json:"name"`
+	Args     map[string]any `json:"args,omitempty"`
+	Result   map[string]any `json:"result,omitempty"`
+	ExitCode int            `json:"exitCode,omitempty"`
+}
+
+// AgentUsage tracks cumulative token counts and request stats.
+type AgentUsage struct {
+	PromptTokens     int32 `json:"promptTokens"`
+	CompletionTokens int32 `json:"completionTokens"`
+	TotalTokens      int32 `json:"totalTokens"`
+	LLMRequests      int   `json:"llmRequests"`
+	ToolCallCount    int   `json:"toolCallCount"`
 }
 
 // runCommandInput is the tool schema for run_command.
@@ -245,10 +264,16 @@ func RunAgent(
 		return nil, fmt.Errorf("agent: failed to create runner: %w", err)
 	}
 
-	// Run the agent, collecting the final text response.
+	// Run the agent, collecting the final text response, tool call history, and usage.
 	userMsg := genai.NewContentFromText(config.Prompt, genai.RoleUser)
 
 	var textBuilder strings.Builder
+	var toolCalls []ToolCallRecord
+	var usage AgentUsage
+
+	// pendingCalls tracks in-flight function calls by ID so we can pair them
+	// with the matching FunctionResponse later.
+	pendingCalls := make(map[string]*ToolCallRecord)
 
 	var runErr error
 
@@ -261,11 +286,53 @@ func RunAgent(
 			break
 		}
 
+		// Accumulate token usage from every LLM response.
+		if event.UsageMetadata != nil {
+			usage.PromptTokens += event.UsageMetadata.PromptTokenCount
+			usage.CompletionTokens += event.UsageMetadata.CandidatesTokenCount
+			usage.TotalTokens += event.UsageMetadata.TotalTokenCount
+			usage.LLMRequests++
+		}
+
 		if event.Content == nil {
 			continue
 		}
 
 		for _, part := range event.Content.Parts {
+			// Track function calls (tool invocations by the model).
+			if part.FunctionCall != nil {
+				fc := part.FunctionCall
+				record := &ToolCallRecord{
+					Name: fc.Name,
+					Args: fc.Args,
+				}
+
+				// Store by ID so we can attach the response later.
+				if fc.ID != "" {
+					pendingCalls[fc.ID] = record
+				}
+
+				toolCalls = append(toolCalls, *record)
+				usage.ToolCallCount++
+			}
+
+			// Track function responses (tool results).
+			if part.FunctionResponse != nil {
+				fr := part.FunctionResponse
+				if pending, ok := pendingCalls[fr.ID]; ok {
+					pending.Result = fr.Response
+					// Update the toolCalls slice entry.
+					for i := len(toolCalls) - 1; i >= 0; i-- {
+						if toolCalls[i].Name == pending.Name && toolCalls[i].Result == nil {
+							toolCalls[i].Result = fr.Response
+							break
+						}
+					}
+
+					delete(pendingCalls, fr.ID)
+				}
+			}
+
 			if part.Text == "" {
 				continue
 			}
@@ -303,7 +370,9 @@ func RunAgent(
 	}
 
 	return &AgentResult{
-		Text:   finalText,
-		Status: status,
+		Text:      finalText,
+		Status:    status,
+		ToolCalls: toolCalls,
+		Usage:     usage,
 	}, nil
 }

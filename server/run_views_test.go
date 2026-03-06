@@ -279,6 +279,92 @@ func TestRunViews(t *testing.T) {
 				// The template should have a link to /runs/:id/graph
 				assert.Expect(rec.Body.String()).To(ContainSubstring("/runs/" + run.ID + "/graph"))
 			})
+
+			t.Run("GET /runs/:id/tasks-partial/ shows agent usage badge when usage field is present", func(t *testing.T) {
+				t.Parallel()
+				assert := NewGomegaWithT(t)
+
+				buildFile, err := os.CreateTemp(t.TempDir(), "")
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = buildFile.Close() }()
+
+				client, err := init(buildFile.Name(), "namespace", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = client.Close() }()
+
+				pipeline, err := client.SavePipeline(context.Background(), "agent-pipeline", "export const pipeline = async () => {};", "docker://", "")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				run, err := client.SaveRun(context.Background(), pipeline.ID)
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				// Agent task payload includes a usage sub-object
+				err = client.Set(context.Background(), "/pipeline/"+run.ID+"/tasks/0-review", map[string]any{
+					"status": "success",
+					"usage": map[string]any{
+						"promptTokens":     1000,
+						"completionTokens": 250,
+						"totalTokens":      1250,
+						"llmRequests":      3,
+						"toolCallCount":    5,
+					},
+				})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				req := httptest.NewRequest(http.MethodGet, "/runs/"+run.ID+"/tasks-partial/", nil)
+				rec := httptest.NewRecorder()
+				router.ServeHTTP(rec, req)
+
+				assert.Expect(rec.Code).To(Equal(http.StatusOK))
+				// Usage badge must appear with tool count and token total
+				assert.Expect(rec.Body.String()).To(ContainSubstring("tools"))
+				assert.Expect(rec.Body.String()).To(ContainSubstring("tok"))
+				// Must not leak template errors
+				assert.Expect(rec.Body.String()).NotTo(ContainSubstring("<no value>"))
+			})
+
+			t.Run("GET /runs/:id/tasks-partial/ shows no usage badge for regular tasks", func(t *testing.T) {
+				t.Parallel()
+				assert := NewGomegaWithT(t)
+
+				buildFile, err := os.CreateTemp(t.TempDir(), "")
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = buildFile.Close() }()
+
+				client, err := init(buildFile.Name(), "namespace", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = client.Close() }()
+
+				pipeline, err := client.SavePipeline(context.Background(), "regular-pipeline", "export const pipeline = async () => {};", "docker://", "")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				run, err := client.SaveRun(context.Background(), pipeline.ID)
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				// Regular task — no usage field
+				err = client.Set(context.Background(), "/pipeline/"+run.ID+"/tasks/0-build", map[string]any{
+					"status":  "success",
+					"elapsed": "1.2s",
+				})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				req := httptest.NewRequest(http.MethodGet, "/runs/"+run.ID+"/tasks-partial/", nil)
+				rec := httptest.NewRecorder()
+				router.ServeHTTP(rec, req)
+
+				assert.Expect(rec.Code).To(Equal(http.StatusOK))
+				// No usage badge should appear
+				assert.Expect(rec.Body.String()).NotTo(ContainSubstring("tok"))
+				// Elapsed time should still show
+				assert.Expect(rec.Body.String()).To(ContainSubstring("1.2s"))
+				assert.Expect(rec.Body.String()).NotTo(ContainSubstring("<no value>"))
+			})
 		})
 	})
 }

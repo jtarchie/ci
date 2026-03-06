@@ -143,10 +143,29 @@ declare global {
     ): StoredResourceVersion[];
   }
 
+  // A single tool invocation and its result.
+  interface ToolCallRecord {
+    name: string;
+    args?: { [key: string]: unknown };
+    result?: { [key: string]: unknown };
+    exitCode?: number;
+  }
+
+  // Cumulative token counts and request stats.
+  interface AgentUsage {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    llmRequests: number;
+    toolCallCount: number;
+  }
+
   // Result returned by runtime.agent().
   interface AgentResult {
     text: string;
     status: "success" | "failure";
+    toolCalls: ToolCallRecord[];
+    usage: AgentUsage;
   }
 
   // Input to runtime.agent().

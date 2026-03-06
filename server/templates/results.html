@@ -426,7 +426,18 @@ border-indigo-300 dark:border-indigo-600
         <span class="font-medium">{{ $path.Name }}</span>
       </div>
     </div>
-    <div class="flex items-center pr-1">
+    <div class="flex items-center gap-2 pr-1">
+      {{ if $path.Value.usage }}
+      <span class="text-xs text-purple-400 dark:text-purple-500 font-mono"
+        title="{{ printf "%.0f" $path.Value.usage.llmRequests }} LLM requests,
+        {{ printf "%.0f" $path.Value.usage.totalTokens }} total tokens ({{
+        printf "%.0f" $path.Value.usage.promptTokens }} prompt + {{ printf
+        "%.0f" $path.Value.usage.completionTokens }} completion), {{ printf
+        "%.0f" $path.Value.usage.toolCallCount }} tool calls">
+        {{ printf "%.0f" $path.Value.usage.toolCallCount }} tools · {{ printf
+        "%.0f" $path.Value.usage.totalTokens }} tok
+      </span>
+      {{ end }}
       {{ if $path.Value.elapsed }}
       <span class="text-xs text-gray-400 dark:text-gray-500 font-mono">{{
         $path.Value.elapsed }}</span>

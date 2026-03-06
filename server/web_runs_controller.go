@@ -112,7 +112,7 @@ func (c *WebRunsController) TasksPartial(ctx *echo.Context) error {
 		})
 	}
 
-	results, err = c.store.GetAll(ctx.Request().Context(), lookupPath, []string{"status", "elapsed", "started_at"})
+	results, err = c.store.GetAll(ctx.Request().Context(), lookupPath, []string{"status", "elapsed", "started_at", "usage"})
 	if err != nil {
 		return fmt.Errorf("could not get all results: %w", err)
 	}

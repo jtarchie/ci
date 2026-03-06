@@ -872,6 +872,8 @@ export class JobRunner {
       storage.set(storageKey, {
         status: "success",
         stdout: result.text,
+        toolCalls: result.toolCalls,
+        usage: result.usage,
       });
     } catch (error) {
       storage.set(storageKey, { status: "failure" });
