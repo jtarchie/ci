@@ -109,6 +109,33 @@ type AcrossVar struct {
 	MaxInFlight int      `yaml:"max_in_flight,omitempty"`
 }
 
+// AgentLLMConfig configures language model generation parameters for an agent step.
+type AgentLLMConfig struct {
+	Temperature *float32 `yaml:"temperature,omitempty"`
+	MaxTokens   int32    `yaml:"max_tokens,omitempty"`
+}
+
+// AgentThinkingConfig enables extended thinking for supported models.
+// Budget sets the maximum thinking tokens (>= 1024).
+// Level is Gemini-specific: low | medium | high | minimal.
+type AgentThinkingConfig struct {
+	Budget int32  `yaml:"budget"`
+	Level  string `yaml:"level,omitempty"`
+}
+
+// AgentSafetyConfig maps harm category names to block thresholds.
+// Keys: harassment, hate_speech, sexually_explicit, dangerous_content.
+// Values: block_none, block_low_and_above, block_medium_and_above, block_only_high, off.
+type AgentSafetyConfig map[string]string
+
+// AgentContextGuardConfig enables context window management to prevent
+// conversations from exceeding the model's context limit.
+type AgentContextGuardConfig struct {
+	Strategy  string `yaml:"strategy"`             // threshold | sliding_window
+	MaxTurns  int    `yaml:"max_turns,omitempty"`  // sliding_window: compact after N turns
+	MaxTokens int    `yaml:"max_tokens,omitempty"` // threshold: manual context window override
+}
+
 type Step struct {
 	Assert *struct {
 		Code   *int   `yaml:"code,omitempty"`
@@ -126,6 +153,11 @@ type Step struct {
 	Agent  string `yaml:"agent,omitempty"`
 	Prompt string `yaml:"prompt,omitempty"`
 	Model  string `yaml:"model,omitempty"`
+
+	AgentLLM          *AgentLLMConfig          `yaml:"llm,omitempty"`
+	AgentThinking     *AgentThinkingConfig     `yaml:"thinking,omitempty"`
+	AgentSafety       AgentSafetyConfig        `yaml:"safety,omitempty"`
+	AgentContextGuard *AgentContextGuardConfig `yaml:"context_guard,omitempty"`
 
 	Get       string    `yaml:"get,omitempty"`
 	GetConfig GetConfig `yaml:",inline,omitempty"`

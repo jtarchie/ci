@@ -8,10 +8,17 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: "Guides", link: "/guides/" },
+      { text: "Runtime API", link: "/runtime/" },
       { text: "Operations", link: "/operations/" },
       { text: "Drivers", link: "/drivers/" },
     ],
     sidebar: {
+      "/runtime/": [
+        { text: "Overview", link: "/runtime/" },
+        { text: "runtime.run()", link: "runtime-run" },
+        { text: "runtime.agent()", link: "runtime-agent" },
+        { text: "Volumes", link: "volumes" },
+      ],
       "/guides/": [
         { text: "Overview", link: "/guides/" },
         { text: "Run Pipelines", link: "run" },

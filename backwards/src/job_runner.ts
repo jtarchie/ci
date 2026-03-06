@@ -872,6 +872,10 @@ export class JobRunner {
         image,
         mounts,
         outputVolumePath,
+        llm: step.llm,
+        thinking: step.thinking,
+        safety: step.safety,
+        context_guard: step.context_guard,
         onOutput: (_stream: "stdout" | "stderr", data: string) => {
           accumulatedOutput += data;
           storage.set(storageKey, {

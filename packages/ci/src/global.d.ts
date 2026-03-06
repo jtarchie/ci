@@ -168,6 +168,27 @@ declare global {
     usage: AgentUsage;
   }
 
+  // Language model generation parameters for agent steps.
+  interface AgentLLMConfig {
+    temperature?: number;
+    max_tokens?: number;
+  }
+
+  // Extended thinking configuration for supported models.
+  // budget is the maximum thinking tokens (>= 1024).
+  // level is Gemini-specific: low | medium | high | minimal.
+  interface AgentThinkingConfig {
+    budget: number;
+    level?: "low" | "medium" | "high" | "minimal";
+  }
+
+  // Context window management configuration.
+  interface AgentContextGuardConfig {
+    strategy: "threshold" | "sliding_window";
+    max_turns?: number;  // sliding_window: compact after N turns
+    max_tokens?: number; // threshold: manual context window override
+  }
+
   // Input to runtime.agent().
   interface AgentRunConfig {
     name: string;
@@ -177,6 +198,10 @@ declare global {
     mounts?: KnownMounts;
     outputVolumePath?: string;
     onOutput?: OutputCallback;
+    llm?: AgentLLMConfig;
+    thinking?: AgentThinkingConfig;
+    safety?: { [key: string]: string };
+    context_guard?: AgentContextGuardConfig;
   }
 
   namespace runtime {
@@ -477,6 +502,10 @@ declare global {
     prompt: string; // Instruction sent to the model
     model: string; // "provider/model-name", e.g. "openrouter/google/gemini-3"
     config?: TaskConfig; // image_resource, inputs, outputs
+    llm?: AgentLLMConfig;
+    thinking?: AgentThinkingConfig;
+    safety?: { [key: string]: string };
+    context_guard?: AgentContextGuardConfig;
     attempts?: number;
     across?: AcrossVar[];
     fail_fast?: boolean;

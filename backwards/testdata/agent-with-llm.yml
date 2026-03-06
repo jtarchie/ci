@@ -1,0 +1,26 @@
+---
+jobs:
+  - name: review-code
+    plan:
+      - agent: review-code-agent
+        prompt: "Review my code changes"
+        model: openrouter/google/gemini-3.1-flash-lite-preview
+        llm:
+          temperature: 0.2
+          max_tokens: 8192
+        thinking:
+          budget: 10000
+          level: medium
+        safety:
+          harassment: block_none
+          dangerous_content: block_none
+        context_guard:
+          strategy: threshold
+          max_tokens: 100000
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: { repository: alpine/git }
+          inputs:
+            - name: my-repo

@@ -19,18 +19,44 @@ import (
 
 	genaianthropic "github.com/achetronic/adk-utils-go/genai/anthropic"
 	genaiopenai "github.com/achetronic/adk-utils-go/genai/openai"
+	"github.com/achetronic/adk-utils-go/plugin/contextguard"
 
 	"github.com/jtarchie/ci/secrets"
 )
 
+// AgentLLMConfig controls LLM generation parameters.
+type AgentLLMConfig struct {
+	Temperature *float32 `json:"temperature,omitempty"`
+	MaxTokens   int32    `json:"max_tokens,omitempty"`
+}
+
+// AgentThinkingConfig enables extended thinking for supported models.
+// Budget sets the maximum thinking tokens (>= 1024).
+// Level is Gemini-specific: LOW | MEDIUM | HIGH | MINIMAL.
+type AgentThinkingConfig struct {
+	Budget int32  `json:"budget"`
+	Level  string `json:"level,omitempty"`
+}
+
+// AgentContextGuardConfig enables context window management.
+type AgentContextGuardConfig struct {
+	Strategy  string `json:"strategy"`
+	MaxTurns  int    `json:"max_turns,omitempty"`
+	MaxTokens int    `json:"max_tokens,omitempty"`
+}
+
 // AgentConfig is the configuration passed from JavaScript to runtime.agent().
 type AgentConfig struct {
-	Name             string                  `json:"name"`
-	Prompt           string                  `json:"prompt"`
-	Model            string                  `json:"model"`
-	Image            string                  `json:"image"`
-	Mounts           map[string]VolumeResult `json:"mounts"`
-	OutputVolumePath string                  `json:"outputVolumePath"`
+	Name             string                   `json:"name"`
+	Prompt           string                   `json:"prompt"`
+	Model            string                   `json:"model"`
+	Image            string                   `json:"image"`
+	Mounts           map[string]VolumeResult  `json:"mounts"`
+	OutputVolumePath string                   `json:"outputVolumePath"`
+	LLM              *AgentLLMConfig          `json:"llm,omitempty"`
+	Thinking         *AgentThinkingConfig     `json:"thinking,omitempty"`
+	Safety           map[string]string        `json:"safety,omitempty"`
+	ContextGuard     *AgentContextGuardConfig `json:"context_guard,omitempty"`
 	// OnOutput is called with streaming chunks. Not serialised from JS.
 	OnOutput OutputCallback `json:"-"`
 }
@@ -112,13 +138,30 @@ func resolveSecret(ctx context.Context, sm secrets.Manager, pipelineID, key stri
 }
 
 // resolveModel builds an adk-compatible LLM model from provider + name + key.
-func resolveModel(provider, modelName, apiKey string) (model.LLM, error) {
+// llmCfg sets temperature and output token limit for all providers.
+// thinkingCfg provides Anthropic-specific extended thinking budget.
+func resolveModel(provider, modelName, apiKey string, llmCfg *AgentLLMConfig, thinkingCfg *AgentThinkingConfig) (model.LLM, error) {
 	switch provider {
 	case "anthropic":
-		return genaianthropic.New(genaianthropic.Config{
+		cfg := genaianthropic.Config{
 			APIKey:    apiKey,
 			ModelName: modelName,
-		}), nil
+		}
+
+		if llmCfg != nil && llmCfg.MaxTokens > 0 {
+			cfg.MaxOutputTokens = int(llmCfg.MaxTokens)
+		}
+
+		if thinkingCfg != nil && thinkingCfg.Budget > 0 {
+			cfg.ThinkingBudgetTokens = int(thinkingCfg.Budget)
+			// Anthropic requires MaxOutputTokens > ThinkingBudgetTokens.
+			// Default to 8192 if not explicitly set.
+			if cfg.MaxOutputTokens == 0 {
+				cfg.MaxOutputTokens = 8192
+			}
+		}
+
+		return genaianthropic.New(cfg), nil
 	default:
 		// openrouter, openai, ollama, etc. all speak OpenAI-compatible API.
 		baseURL := defaultBaseURLs[provider]
@@ -132,6 +175,80 @@ func resolveModel(provider, modelName, apiKey string) (model.LLM, error) {
 			ModelName: modelName,
 		}), nil
 	}
+}
+
+// simpleRegistry is a fallback ModelRegistry for contextguard that returns
+// conservative defaults when the model is not in a curated database.
+type simpleRegistry struct{}
+
+func (simpleRegistry) ContextWindow(_ string) int    { return 128000 }
+func (simpleRegistry) DefaultMaxTokens(_ string) int { return 4096 }
+
+// harmCategoryFromString maps a YAML harm category key to a genai.HarmCategory.
+func harmCategoryFromString(s string) genai.HarmCategory {
+	return genai.HarmCategory("HARM_CATEGORY_" + strings.ToUpper(s))
+}
+
+// harmThresholdFromString maps a YAML threshold value to a genai.HarmBlockThreshold.
+func harmThresholdFromString(s string) genai.HarmBlockThreshold {
+	upper := strings.ToUpper(s)
+	// "off" → "OFF"; everything else needs the BLOCK_ prefix already present
+	// in the canonical names (e.g. "block_none" → "BLOCK_NONE").
+	switch upper {
+	case "OFF":
+		return genai.HarmBlockThreshold("OFF")
+	default:
+		return genai.HarmBlockThreshold(upper)
+	}
+}
+
+// buildGenerateContentConfig constructs a genai.GenerateContentConfig from the
+// agent config fields. Returns nil when no tuning is requested.
+func buildGenerateContentConfig(provider string, llmCfg *AgentLLMConfig, thinkingCfg *AgentThinkingConfig, safety map[string]string) *genai.GenerateContentConfig {
+	var gcc genai.GenerateContentConfig
+	has := false
+
+	if llmCfg != nil {
+		if llmCfg.Temperature != nil {
+			gcc.Temperature = llmCfg.Temperature
+			has = true
+		}
+
+		if llmCfg.MaxTokens > 0 {
+			gcc.MaxOutputTokens = llmCfg.MaxTokens
+			has = true
+		}
+	}
+
+	// For non-Anthropic providers, wire thinking via GenerateContentConfig.
+	if thinkingCfg != nil && provider != "anthropic" {
+		budget := thinkingCfg.Budget
+		tc := &genai.ThinkingConfig{ThinkingBudget: &budget}
+
+		if thinkingCfg.Level != "" {
+			tc.ThinkingLevel = genai.ThinkingLevel(strings.ToUpper(thinkingCfg.Level))
+		}
+
+		gcc.ThinkingConfig = tc
+		has = true
+	}
+
+	if len(safety) > 0 {
+		for category, threshold := range safety {
+			gcc.SafetySettings = append(gcc.SafetySettings, &genai.SafetySetting{
+				Category:  harmCategoryFromString(category),
+				Threshold: harmThresholdFromString(threshold),
+			})
+		}
+
+		has = true
+	}
+
+	if !has {
+		return nil
+	}
+
+	return &gcc
 }
 
 // RunAgent executes an LLM agent with a run_command tool backed by a sandbox container.
@@ -213,7 +330,7 @@ func RunAgent(
 	}
 
 	// Resolve the LLM model.
-	llmModel, err := resolveModel(provider, modelName, apiKey)
+	llmModel, err := resolveModel(provider, modelName, apiKey, config.LLM, config.Thinking)
 	if err != nil {
 		return nil, fmt.Errorf("agent: %w", err)
 	}
@@ -233,12 +350,15 @@ func RunAgent(
 	}
 
 	// Create the ADK agent.
+	genCfg := buildGenerateContentConfig(provider, config.LLM, config.Thinking, config.Safety)
+
 	myAgent, err := llmagent.New(llmagent.Config{
-		Name:        config.Name,
-		Model:       llmModel,
-		Description: "CI pipeline agent",
-		Instruction: instruction,
-		Tools:       []adktool.Tool{runCmd},
+		Name:                  config.Name,
+		Model:                 llmModel,
+		Description:           "CI pipeline agent",
+		Instruction:           instruction,
+		Tools:                 []adktool.Tool{runCmd},
+		GenerateContentConfig: genCfg,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("agent: failed to create agent: %w", err)
@@ -262,6 +382,40 @@ func RunAgent(
 	})
 	if err != nil {
 		return nil, fmt.Errorf("agent: failed to create runner: %w", err)
+	}
+
+	// Wire context guard plugin when requested.
+	if config.ContextGuard != nil {
+		cg := config.ContextGuard
+		guard := contextguard.New(simpleRegistry{})
+
+		var opts []contextguard.AgentOption
+
+		switch cg.Strategy {
+		case "sliding_window":
+			if cg.MaxTurns > 0 {
+				opts = append(opts, contextguard.WithSlidingWindow(cg.MaxTurns))
+			} else {
+				opts = append(opts, contextguard.WithSlidingWindow(30))
+			}
+		default: // threshold
+			if cg.MaxTokens > 0 {
+				opts = append(opts, contextguard.WithMaxTokens(cg.MaxTokens))
+			}
+		}
+
+		guard.Add(config.Name, llmModel, opts...)
+
+		pluginCfg := guard.PluginConfig()
+		runnr, err = runner.New(runner.Config{
+			AppName:        "ci-agent",
+			Agent:          myAgent,
+			SessionService: sessionService,
+			PluginConfig:   pluginCfg,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("agent: failed to create runner with context guard: %w", err)
+		}
 	}
 
 	// Run the agent, collecting the final text response, tool call history, and usage.

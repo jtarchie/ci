@@ -826,6 +826,10 @@ var JobRunner = class {
         image,
         mounts,
         outputVolumePath,
+        llm: step.llm,
+        thinking: step.thinking,
+        safety: step.safety,
+        context_guard: step.context_guard,
         onOutput: (_stream, data) => {
           accumulatedOutput += data;
           storage.set(storageKey, {
