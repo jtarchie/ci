@@ -50,6 +50,7 @@ func TestWebhookAPI(t *testing.T) {
 					"export const pipeline = async () => { console.log('running'); };",
 					"native://",
 					"",
+					"",
 				)
 				assert.Expect(err).NotTo(HaveOccurred())
 
@@ -115,6 +116,7 @@ func TestWebhookAPI(t *testing.T) {
 					"export const pipeline = async () => {};",
 					"native://",
 					"my-secret-key",
+					"",
 				)
 				assert.Expect(err).NotTo(HaveOccurred())
 
@@ -156,6 +158,7 @@ func TestWebhookAPI(t *testing.T) {
 					"export const pipeline = async () => {};",
 					"native://",
 					"query-secret",
+					"",
 				)
 				assert.Expect(err).NotTo(HaveOccurred())
 
@@ -196,6 +199,7 @@ func TestWebhookAPI(t *testing.T) {
 					"export const pipeline = async () => {};",
 					"native://",
 					"my-secret",
+					"",
 				)
 				assert.Expect(err).NotTo(HaveOccurred())
 
@@ -231,6 +235,7 @@ func TestWebhookAPI(t *testing.T) {
 					"export const pipeline = async () => {};",
 					"native://",
 					"correct-secret",
+					"",
 				)
 				assert.Expect(err).NotTo(HaveOccurred())
 
@@ -266,6 +271,7 @@ func TestWebhookAPI(t *testing.T) {
 					"export const pipeline = async () => {};",
 					"native://",
 					"", // No secret
+					"",
 				)
 				assert.Expect(err).NotTo(HaveOccurred())
 
@@ -302,6 +308,7 @@ func TestWebhookAPI(t *testing.T) {
 					"any-method-pipeline",
 					"export const pipeline = async () => {};",
 					"native://",
+					"",
 					"",
 				)
 				assert.Expect(err).NotTo(HaveOccurred())
@@ -360,6 +367,7 @@ func TestWebhookAPI(t *testing.T) {
 					"respond-pipeline",
 					content,
 					"native://",
+					"",
 					"",
 				)
 				assert.Expect(err).NotTo(HaveOccurred())

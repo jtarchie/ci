@@ -29,6 +29,7 @@ type SetPipeline struct {
 // pipelineRequest matches the server's expected JSON body for PUT /api/pipelines/:name.
 type pipelineRequest struct {
 	Content       string            `json:"content"`
+	ContentType   string            `json:"content_type"`
 	DriverDSN     string            `json:"driver_dsn"`
 	WebhookSecret string            `json:"webhook_secret"`
 	Secrets       map[string]string `json:"secrets,omitempty"`
@@ -56,38 +57,45 @@ func (c *SetPipeline) Run(logger *slog.Logger) error {
 	// Determine the file type and process accordingly
 	ext := strings.ToLower(filepath.Ext(c.Pipeline))
 
-	var finalContent string
+	var contentType string
 
 	switch ext {
 	case ".yml", ".yaml":
-		// Transpile YAML to TypeScript first
-		logger.Info("pipeline.transpile")
+		// Validate YAML structure and semantics, but do NOT transpile.
+		// Transpilation happens lazily at pipeline trigger time so that
+		// the latest pipeline_runner.ts bundle is always used.
+		logger.Info("pipeline.validate")
 
-		tsContent, err := backwards.NewPipeline(c.Pipeline)
-		if err != nil {
-			return fmt.Errorf("could not transpile YAML: %w", err)
+		if err := backwards.ValidatePipeline(content); err != nil {
+			return fmt.Errorf("pipeline validation failed: %w", err)
 		}
 
-		finalContent = tsContent
+		contentType = "yaml"
 
 	case ".ts":
-		// TypeScript - will be stored as-is, server can transpile if needed
-		finalContent = string(content)
+		// TypeScript — validate JS syntax before upload.
+		logger.Info("pipeline.validate")
+
+		_, err = runtime.TranspileAndValidate(string(content))
+		if err != nil {
+			return fmt.Errorf("pipeline validation failed: %w", err)
+		}
+
+		contentType = "ts"
 
 	case ".js":
-		// JavaScript - use as-is
-		finalContent = string(content)
+		// JavaScript — validate JS syntax before upload.
+		logger.Info("pipeline.validate")
+
+		_, err = runtime.TranspileAndValidate(string(content))
+		if err != nil {
+			return fmt.Errorf("pipeline validation failed: %w", err)
+		}
+
+		contentType = "js"
 
 	default:
 		return fmt.Errorf("unsupported file extension %q: expected .js, .ts, .yml, or .yaml", ext)
-	}
-
-	// Validate the pipeline syntax locally before uploading
-	logger.Info("pipeline.validate")
-
-	_, err = runtime.TranspileAndValidate(finalContent)
-	if err != nil {
-		return fmt.Errorf("pipeline validation failed: %w", err)
 	}
 
 	logger.Info("pipeline.validate.success")
@@ -105,7 +113,8 @@ func (c *SetPipeline) Run(logger *slog.Logger) error {
 	logger.Info("pipeline.upload", "url", redactURL(endpoint))
 
 	reqBody := pipelineRequest{
-		Content:       finalContent,
+		Content:       string(content),
+		ContentType:   contentType,
 		DriverDSN:     c.Driver,
 		WebhookSecret: c.WebhookSecret,
 		Secrets:       secretsMap,

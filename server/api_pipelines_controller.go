@@ -19,6 +19,7 @@ import (
 // PipelineRequest represents the JSON body for creating or updating a pipeline.
 type PipelineRequest struct {
 	Content       string            `json:"content"`
+	ContentType   string            `json:"content_type"`
 	DriverDSN     string            `json:"driver_dsn"`
 	WebhookSecret string            `json:"webhook_secret"`
 	Secrets       map[string]string `json:"secrets,omitempty"`
@@ -26,11 +27,12 @@ type PipelineRequest struct {
 
 // PipelineAPIResponse is a sanitized pipeline representation for the public API.
 type PipelineAPIResponse struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Content   string    `json:"content"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Content     string    `json:"content"`
+	ContentType string    `json:"content_type"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 func toPipelineAPIResponse(pipeline *storage.Pipeline) PipelineAPIResponse {
@@ -39,11 +41,12 @@ func toPipelineAPIResponse(pipeline *storage.Pipeline) PipelineAPIResponse {
 	}
 
 	return PipelineAPIResponse{
-		ID:        pipeline.ID,
-		Name:      pipeline.Name,
-		Content:   pipeline.Content,
-		CreatedAt: pipeline.CreatedAt,
-		UpdatedAt: pipeline.UpdatedAt,
+		ID:          pipeline.ID,
+		Name:        pipeline.Name,
+		Content:     pipeline.Content,
+		ContentType: pipeline.ContentType,
+		CreatedAt:   pipeline.CreatedAt,
+		UpdatedAt:   pipeline.UpdatedAt,
 	}
 }
 
@@ -175,7 +178,7 @@ func (c *APIPipelinesController) Upsert(ctx *echo.Context) error {
 		}
 	}
 
-	pipeline, err := c.store.SavePipeline(ctx.Request().Context(), name, req.Content, req.DriverDSN, req.WebhookSecret)
+	pipeline, err := c.store.SavePipeline(ctx.Request().Context(), name, req.Content, req.DriverDSN, req.WebhookSecret, req.ContentType)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, map[string]string{
 			"error": fmt.Sprintf("failed to save pipeline: %v", err),

@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/jtarchie/ci/backwards"
 	"github.com/jtarchie/ci/orchestra"
 	"github.com/jtarchie/ci/orchestra/cache"
 	"github.com/jtarchie/ci/runtime"
@@ -187,7 +188,19 @@ func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *stor
 	opts.FetchTimeout = s.FetchTimeout
 	opts.FetchMaxResponseBytes = s.FetchMaxResponseBytes
 
-	err = runtime.ExecutePipeline(ctx, pipeline.Content, driverDSN, s.store, logger, opts)
+	executableContent, err := resolveExecutableContent(pipeline)
+	if err != nil {
+		logger.Error("pipeline.transpile.failed", "error", err)
+
+		updateErr := s.store.UpdateRunStatus(ctx, run.ID, storage.RunStatusFailed, err.Error())
+		if updateErr != nil {
+			logger.Error("run.update.failed.to_failed", "error", updateErr)
+		}
+
+		return
+	}
+
+	err = runtime.ExecutePipeline(ctx, executableContent, driverDSN, s.store, logger, opts)
 	if err != nil {
 		logger.Error("pipeline.execute.failed", "error", err)
 
@@ -347,7 +360,12 @@ func (s *ExecutionService) RunByNameSync(
 		}
 	}
 
-	execErr := runtime.ExecutePipeline(ctx, pipeline.Content, driverDSN, s.store, s.logger, opts)
+	executableContent, execContentErr := resolveExecutableContent(pipeline)
+	if execContentErr != nil {
+		return fmt.Errorf("could not resolve pipeline content: %w", execContentErr)
+	}
+
+	execErr := runtime.ExecutePipeline(ctx, executableContent, driverDSN, s.store, s.logger, opts)
 
 	exitCode := 0
 	finalStatus := storage.RunStatusSuccess
@@ -404,4 +422,21 @@ func (s *ExecutionService) determineRunStatus(ctx context.Context, runID string,
 	}
 
 	return storage.RunStatusSuccess
+}
+
+// resolveExecutableContent returns JS/TS content ready for the runtime.
+// When the pipeline was stored as YAML it is transpiled on the fly so that
+// the latest pipeline_runner.ts bundle is always used. JS and TS content is
+// returned as-is.
+func resolveExecutableContent(pipeline *storage.Pipeline) (string, error) {
+	if pipeline.ContentType == storage.ContentTypeYAML {
+		ts, err := backwards.NewPipelineFromContent(pipeline.Content)
+		if err != nil {
+			return "", fmt.Errorf("could not transpile YAML pipeline %q: %w", pipeline.Name, err)
+		}
+
+		return ts, nil
+	}
+
+	return pipeline.Content, nil
 }

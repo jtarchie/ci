@@ -14,14 +14,21 @@ import (
 var pipelineJS string
 
 func NewPipeline(filename string) (string, error) {
-	var config Config
-
 	contents, err := os.ReadFile(filename)
 	if err != nil {
 		return "", fmt.Errorf("could not read pipeline: %w", err)
 	}
 
-	err = yaml.Unmarshal(contents, &config)
+	return NewPipelineFromContent(string(contents))
+}
+
+// NewPipelineFromContent transpiles a YAML pipeline string into a TypeScript
+// pipeline definition that can be executed by the JS runtime. Unlike NewPipeline
+// it accepts content directly instead of reading from a file.
+func NewPipelineFromContent(content string) (string, error) {
+	var config Config
+
+	err := yaml.Unmarshal([]byte(content), &config)
 	if err != nil {
 		return "", fmt.Errorf("could not unmarshal pipeline: %w", err)
 	}
@@ -41,16 +48,43 @@ func NewPipeline(filename string) (string, error) {
 		return "", err
 	}
 
-	contents, err = yaml.MarshalWithOptions(config, yaml.JSON())
+	jsonBytes, err := yaml.MarshalWithOptions(config, yaml.JSON())
 	if err != nil {
 		return "", fmt.Errorf("could not marshal pipeline: %w", err)
 	}
 
-	pipeline := "const config = " + string(contents) + ";\n" +
+	pipeline := "const config = " + string(jsonBytes) + ";\n" +
 		pipelineJS +
 		"\n; const pipeline = createPipeline(config); export { pipeline };"
 
 	return pipeline, nil
+}
+
+// ValidatePipeline validates that the given YAML content is a well-formed
+// pipeline definition without producing any output. It is suitable for early
+// error checking at set-pipeline time without performing transpilation.
+func ValidatePipeline(content []byte) error {
+	var config Config
+
+	if err := yaml.Unmarshal(content, &config); err != nil {
+		return fmt.Errorf("could not unmarshal pipeline: %w", err)
+	}
+
+	validate := validator.New(validator.WithRequiredStructEnabled())
+
+	if err := validate.Struct(config); err != nil {
+		return fmt.Errorf("could not validate pipeline: %w", err)
+	}
+
+	if err := validateResourceTypes(&config); err != nil {
+		return err
+	}
+
+	if err := validateSteps(config.Jobs); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // validateSteps checks that task steps have a required run.path field (unless using file:).

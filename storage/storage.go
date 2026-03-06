@@ -13,15 +13,25 @@ import (
 // ErrNotFound is returned when a requested key does not exist.
 var ErrNotFound = errors.New("not found")
 
+// ContentType represents the format of a pipeline's content.
+type ContentType = string
+
+const (
+	ContentTypeYAML       ContentType = "yaml"
+	ContentTypeTypeScript ContentType = "ts"
+	ContentTypeJavaScript ContentType = "js"
+)
+
 // Pipeline represents a stored pipeline definition.
 type Pipeline struct {
-	ID            string    `json:"id"`
-	Name          string    `json:"name"`
-	Content       string    `json:"content"`
-	DriverDSN     string    `json:"driver_dsn"`
-	WebhookSecret string    `json:"webhook_secret,omitempty"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	ID            string      `json:"id"`
+	Name          string      `json:"name"`
+	Content       string      `json:"content"`
+	ContentType   ContentType `json:"content_type"`
+	DriverDSN     string      `json:"driver_dsn"`
+	WebhookSecret string      `json:"webhook_secret,omitempty"`
+	CreatedAt     time.Time   `json:"created_at"`
+	UpdatedAt     time.Time   `json:"updated_at"`
 }
 
 // RunStatus represents the status of a pipeline run.
@@ -71,7 +81,7 @@ type Driver interface {
 	GetAll(ctx context.Context, prefix string, fields []string) (Results, error)
 
 	// Pipeline CRUD operations
-	SavePipeline(ctx context.Context, name, content, driverDSN, webhookSecret string) (*Pipeline, error)
+	SavePipeline(ctx context.Context, name, content, driverDSN, webhookSecret, contentType string) (*Pipeline, error)
 	GetPipeline(ctx context.Context, id string) (*Pipeline, error)
 	GetPipelineByName(ctx context.Context, name string) (*Pipeline, error)
 	ListPipelines(ctx context.Context, page, perPage int) (*PaginationResult[Pipeline], error)

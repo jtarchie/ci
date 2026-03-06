@@ -187,7 +187,7 @@ export { pipeline };
 				client, ts := newTestServer(t, server.RouterOptions{})
 
 				// Seed with an existing pipeline of the same name.
-				existing, err := client.SavePipeline(context.Background(), "my-pipeline", "old content", "native://", "")
+				existing, err := client.SavePipeline(context.Background(), "my-pipeline", "old content", "native://", "", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				pipelineFile := writePipeline(t, t.TempDir(), "my-pipeline.js", `
@@ -217,7 +217,7 @@ export { pipeline };
 				client, ts := newTestServer(t, server.RouterOptions{})
 
 				// Seed a pipeline with a different name — it must remain untouched.
-				_, err := client.SavePipeline(context.Background(), "other-pipeline", "content", "docker://", "")
+				_, err := client.SavePipeline(context.Background(), "other-pipeline", "content", "docker://", "", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				pipelineFile := writePipeline(t, t.TempDir(), "new-pipeline.js", minimalJS)
