@@ -1,3 +1,26 @@
+/**
+ * PocketCI Pipeline API
+ *
+ * A pipeline is a TypeScript (or JavaScript) module that exports a single
+ * `async` function named `pipeline`. The runtime calls it once per run.
+ *
+ * Minimal pipeline:
+ * ```typescript
+ * const pipeline = async () => {
+ *   const result = await runtime.run({
+ *     name: "hello",
+ *     image: "busybox",
+ *     command: { path: "echo", args: ["Hello, World!"] },
+ *   });
+ *   console.log(result.stdout);
+ * };
+ * export { pipeline };
+ * ```
+ *
+ * All globals documented below (`runtime`, `notify`, `assert`, `storage`,
+ * `http`, `YAML`, `pipelineContext`) are injected by the runtime — do NOT
+ * import them.
+ */
 // types for the pipeline
 declare global {
   // Common base types
@@ -26,10 +49,48 @@ declare global {
     code?: number | null;
   }
 
-  // Callback for streaming output from container
+  /**
+   * Callback invoked with streaming output chunks as a container runs.
+   * `stream` is `"stdout"` or `"stderr"`; `data` is a raw string chunk.
+   */
   type OutputCallback = (stream: "stdout" | "stderr", data: string) => void;
 
+  // ---------------------------------------------------------------------------
   // Runtime types
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Configuration for a single container task run via `runtime.run()`.
+   *
+   * **Mounts**: The keys of `mounts` are the directory names used *inside*
+   * the container, resolved relative to the container's working directory
+   * (or absolute if the key starts with `/`). Each value is a `VolumeResult`
+   * returned by `runtime.createVolume()`. Volumes persist data between tasks.
+   *
+   * **Commands**: `command.path` is the executable; `command.args` are its
+   * arguments (each as a separate string, not shell-split).
+   *
+   * @example
+   * ```typescript
+   * // Share data between two tasks via a named volume
+   * const src = await runtime.createVolume();
+   *
+   * await runtime.run({
+   *   name: "git-clone",
+   *   image: "alpine/git",
+   *   command: { path: "git", args: ["clone", "https://github.com/my/repo", "src"] },
+   *   mounts: { src }, // volume mounted at ./src inside the container
+   * });
+   *
+   * const result = await runtime.run({
+   *   name: "run-tests",
+   *   image: "golang:1.24",
+   *   command: { path: "go", args: ["test", "./..."] },
+   *   mounts: { src },     // same volume — sees the cloned repo
+   *   work_dir: src.path,  // absolute path to the volume on the host
+   * });
+   * ```
+   */
   interface RunTaskConfig {
     command: CommandConfig;
     container_limits?: ContainerLimits;
@@ -78,6 +139,16 @@ declare global {
     /** Arguments passed from `ci run <name> [args...]` */
     args: string[];
   }
+  /**
+   * Metadata about the current run, injected by the runtime.
+   * `args` contains any extra arguments passed via `ci run <name> [args...]`.
+   *
+   * @example
+   * ```typescript
+   * console.log(`run ${pipelineContext.runID} on ${pipelineContext.driverName}`);
+   * const branch = pipelineContext.args[0] ?? "main";
+   * ```
+   */
   const pipelineContext: PipelineContext;
 
   // HTTP / Webhook types
@@ -95,6 +166,21 @@ declare global {
     headers?: Record<string, string>;
   }
 
+  /**
+   * Webhook / HTTP integration. Only populated when the pipeline is triggered
+   * via an HTTP POST to its webhook endpoint.
+   *
+   * @example
+   * ```typescript
+   * const req = http.request();
+   * if (req) {
+   *   const payload = JSON.parse(req.body);
+   *   // respond immediately so the caller isn't blocked
+   *   http.respond({ status: 200, body: "accepted" });
+   *   // ... continue pipeline work ...
+   * }
+   * ```
+   */
   namespace http {
     /**
      * Returns the incoming HTTP request data when triggered via webhook.
@@ -120,8 +206,18 @@ declare global {
     job_name?: string;
   }
 
+  /**
+   * Persistent key-value store scoped to this pipeline run. Values are
+   * JSON-serialisable. Use it to pass results between pipeline restarts or
+   * to track resource versions across runs.
+   *
+   * @example
+   * ```typescript
+   * await storage.set("last-sha", result.stdout.trim());
+   * const prev = storage.get("last-sha") as string | null;
+   * ```
+   */
   namespace storage {
-    function set(key: string, value: unknown): Promise<void>;
     function get(key: string): unknown;
 
     // Resource version operations
@@ -204,8 +300,41 @@ declare global {
     context_guard?: AgentContextGuardConfig;
   }
 
+  /**
+   * Core container execution API. All functions are async and must be
+   * `await`-ed. Volumes created here persist for the lifetime of the run.
+   */
   namespace runtime {
+    /**
+     * Creates an ephemeral volume that can be shared between tasks via `mounts`.
+     * Returns a `VolumeResult` with a `path` (absolute host path) and `name`.
+     *
+     * @example
+     * ```typescript
+     * const output = await runtime.createVolume();
+     * // pass output as a mount key to runtime.run() or runtime.agent()
+     * ```
+     */
     function createVolume(volume?: VolumeConfig): Promise<VolumeResult>;
+
+    /**
+     * Runs a container task to completion and returns its stdout, stderr, and
+     * exit code. Throws if the container cannot be started.
+     *
+     * The task `name` is used for display in the UI and must be unique within
+     * a pipeline run.
+     *
+     * @example
+     * ```typescript
+     * const result = await runtime.run({
+     *   name: "build",
+     *   image: "golang:1.24",
+     *   command: { path: "go", args: ["build", "./..."] },
+     *   env: { CGO_ENABLED: "0" },
+     * });
+     * if (result.code !== 0) throw new Error(result.stderr);
+     * ```
+     */
     function run(task: RunTaskConfig): Promise<RunTaskResult>;
 
     /**
@@ -216,9 +345,33 @@ declare global {
     function startSandbox(config: SandboxConfig): Promise<SandboxHandle>;
 
     /**
-     * Runs an LLM agent with a run_command tool backed by a sandbox container.
-     * The agent explores the sandbox environment using tool calls and returns
-     * its final response as text.
+     * Runs an LLM agent that can execute shell commands inside a sandbox
+     * container. The agent iterates tool calls until it produces a final text
+     * response. Use `mounts` to give the agent read/write access to volumes
+     * populated by earlier tasks.
+     *
+     * `model` format: `"provider/model-name"` — see OpenRouter or the
+     * configured LLM gateway for available model IDs.
+     *
+     * @example
+     * ```typescript
+     * const repo = await runtime.createVolume();
+     * await runtime.run({
+     *   name: "clone",
+     *   image: "alpine/git",
+     *   command: { path: "git", args: ["clone", "https://github.com/my/repo", "repo"] },
+     *   mounts: { repo },
+     * });
+     *
+     * const review = await runtime.agent({
+     *   name: "code-review",
+     *   prompt: "Review the last commit and summarise any issues.",
+     *   model: "openrouter/google/gemini-2.5-flash",
+     *   image: "alpine/git",
+     *   mounts: { repo },
+     * });
+     * console.log(review.text);
+     * ```
      */
     function agent(config: AgentRunConfig): Promise<AgentResult>;
   }
@@ -257,6 +410,10 @@ declare global {
     close(): Promise<void>;
   }
 
+  /**
+   * Lightweight assertion helpers. A failing assertion throws an error that
+   * aborts the pipeline run and marks it as failed.
+   */
   namespace assert {
     function containsElement<T>(
       element: T,
@@ -273,6 +430,7 @@ declare global {
     function truthy(value: unknown, message?: string): void;
   }
 
+  /** Serialise/deserialise YAML inside pipeline scripts. */
   namespace YAML {
     function parse(text: string): object;
     function stringify(obj: object): string;
@@ -313,12 +471,50 @@ declare global {
     error?: string;
   }
 
+  /**
+   * Notification API. Configure backends once with `setConfigs`, then call
+   * `send` or `sendMultiple` at any point in the pipeline.
+   *
+   * Message templates use Go's `text/template` syntax with Sprig helpers.
+   * Available template variables mirror `NotifyContext` fields (e.g.
+   * `{{ .Status }}`, `{{ .PipelineName }}`).
+   *
+   * @example
+   * ```typescript
+   * notify.setConfigs({
+   *   slack: {
+   *     type: "slack",
+   *     token: "xoxb-...",
+   *     channels: ["#builds"],
+   *   },
+   * });
+   * notify.setContext({
+   *   pipelineName: "my-pipeline", jobName: "build", buildID: "1",
+   *   status: "running", startTime: new Date().toISOString(),
+   *   endTime: "", duration: "", environment: {}, taskResults: {},
+   * });
+   *
+   * // ... run tasks ...
+   *
+   * notify.updateStatus("success");
+   * await notify.send({
+   *   name: "slack",
+   *   message: "Build {{ .JobName }} finished: {{ .Status }}",
+   * });
+   * ```
+   */
   namespace notify {
+    /** Register one or more named notification backends. Call once at pipeline start. */
     function setConfigs(configs: Record<string, NotifyConfig>): void;
+    /** Set the context object used to render notification message templates. */
     function setContext(ctx: NotifyContext): void;
+    /** Update the `status` field of the current context (e.g. after tasks complete). */
     function updateStatus(status: string): void;
+    /** Update the `jobName` field of the current context. */
     function updateJobName(jobName: string): void;
+    /** Send a notification via the named backend configuration. */
     function send(input: NotifyInput): Promise<NotifyResult>;
+    /** Send the same message to multiple named backends in one call. */
     function sendMultiple(
       names: string[],
       message: string,
