@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vitepress dev",
     "build": "vitepress build && npm run build:embed",
-    "build:embed": "mkdir -p ../server/docs/site && rsync -a --delete .vitepress/dist/ ../server/docs/site/ && mkdir -p ../site/docs && rsync -a --delete .vitepress/dist/ ../site/docs/",
+    "build:embed": "mkdir -p ../server/docs/site && cp -r .vitepress/dist/. ../server/docs/site && mkdir -p ../site/docs && cp -r .vitepress/dist/. ../site/docs",
     "preview": "vitepress preview"
   },
   "devDependencies": {

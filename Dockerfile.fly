@@ -4,8 +4,6 @@
 # Stage 0: Build VitePress docs
 FROM node:alpine AS docs-builder
 
-RUN apk add --no-cache rsync
-
 WORKDIR /app/docs
 
 # Copy docs source
