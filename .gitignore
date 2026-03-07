@@ -192,3 +192,9 @@ dist
 /pocketci*
 server/docs/site/
 site/docs/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
