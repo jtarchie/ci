@@ -1,107 +1,78 @@
 # PocketCI
 
-Design principles:
-
-- Designed to be local first.
-- Runtime is accessible, not abstracted away.
+PocketCI is a local-first CI/CD runtime. You write pipelines in
+JavaScript/TypeScript, and it runs them in containers on your machine -- no
+hosted service, no YAML gymnastics, no waiting.
 
 <!-- deno-fmt-ignore-start -->
-> [!IMPORTANT]
-> This is a work in progress. It will change.
+> [!NOTE]
+> PocketCI is under active development. Things may change.
 <!-- deno-fmt-ignore-end -->
 
-The project represents a CI/CD that provides container orchestration
-capabilities for automation workflows. It allows users to define pipelines in
-JavaScript/TypeScript or YAML format (with backward compatibility for Concourse
-CI-style configurations). The system currently supports two orchestration
-drivers, Docker, k8s (experimental), Native, with Docker being the more
-feature-complete implementation.
+## What does a pipeline look like?
 
-The pipeline execution model follows a task-based approach where containers can
-be run with defined commands, environment variables, and shared volumes. The
-core architecture includes an orchestration layer that abstracts container
-operations, a runtime layer for JavaScript/TypeScript execution via Goja VM, and
-backward compatibility for Concourse-style YAML pipelines. The project is in
-active development, with recent additions focused on support for resource
-operations (get/put) and environment variables, with thorough integration
-testing across supported platforms.
+A pipeline is just an exported async function. You call `runtime.run()` to spin
+up containers, pass in commands, and get results back. Here's the gist:
 
-## Usage
+```ts
+const pipeline = async () => {
+  const result = await runtime.run({
+    name: "hello",
+    image: "alpine",
+    command: { path: "echo", args: ["Hello from PocketCI!"] },
+  });
+  assert.containsString(result.stdout, "Hello from PocketCI!");
+};
 
-### Running a Pipeline
+export { pipeline };
+```
 
-To execute a pipeline, use the runner command:
+That's a real, runnable pipeline. No build configs, no glue code. You have the
+full expressiveness of TypeScript -- loops, conditionals, error handling, shared
+volumes -- and it all runs inside containers managed by PocketCI.
+
+If you're coming from Concourse CI, PocketCI also supports YAML pipelines with
+backward compatibility. See the [guides](docs/guides/) for more on both formats.
+
+## Running it
+
+With Docker running, a single command executes a pipeline:
 
 ```bash
-go run main.go runner <pipeline-file>
+pocketci runner examples/both/hello-world.ts
 ```
 
-The runner supports both JavaScript/TypeScript and YAML pipeline formats:
+Or start the server for a web UI and API:
 
 ```bash
-# Run a JavaScript pipeline
-go run main.go runner examples/hello-world.js
-
-# Run a YAML pipeline (Concourse-style)
-go run main.go runner examples/hello-world.yml
+pocketci server
 ```
 
-**Note:** The runner executes the pipeline in a single iteration and then exits.
+The [CLI reference](docs/cli/) covers all available commands and options.
 
-### Viewing Pipeline Results
+## Why PocketCI?
 
-To view pipeline execution results in a web interface:
+Most CI systems are either cloud-hosted black boxes or complex self-hosted
+installations. PocketCI takes a different approach: your pipelines run locally,
+the runtime is transparent and programmable, and you can swap orchestration
+backends (Docker, Kubernetes, Fly.io, and others) without rewriting your
+pipelines. It stores everything in a single SQLite database.
 
-1. Start the server:
+## Documentation
+
+The full docs live under [`docs/`](docs/) and are served at `/docs/` when
+running the PocketCI server. Topics include the [runtime API](docs/runtime/),
+[secrets](docs/operations/secrets), [caching](docs/operations/caching),
+[driver configuration](docs/drivers/dsn), and
+[webhook integrations](docs/guides/webhooks).
+
+## Contributing
 
 ```bash
-go run main.go server
+brew bundle        # install toolchain
+task               # build, lint, test -- everything
 ```
 
-2. Open your browser and navigate to:
-
-```
-http://localhost:8080/tasks
-```
-
-The web interface displays the execution results and task tree. **Note:** The
-server does not provide live updates - you'll need to refresh the page to see
-new results.
-
-### Additional Options
-
-- **Storage:** Both runner and server use SQLite by default
-  (`sqlite://test.db`). You can specify a different storage location:
-
-```bash
-go run main.go runner --storage sqlite://my-pipeline.db examples/pipeline.js
-go run main.go server --storage sqlite://my-pipeline.db --port 9000
-```
-
-- **Orchestrator:** Choose between `docker` (default) and `native`
-  orchestration:
-
-```bash
-go run main.go runner --driver native examples/pipeline.js
-```
-
-- **Logging:** Control log level and format:
-
-```bash
-go run main.go runner --log-level debug --log-format json examples/pipeline.js
-```
-
-## Testing
-
-This is relying on strict integration testing at the moment. I'd like to keep
-the interfaces the same, but change underlying implementation.
-
-The platforms of `docker` and `native` are tested against.
-
-```bash
-brew bundle
-task
-```
-
-Please see `examples/` for real world usages. They are run as part of the test
-suite to.
+Take a look at [`examples/`](examples/) for real pipelines that run as part of
+the test suite. The project uses Go, TypeScript, and
+[go-task](https://taskfile.dev) as its build runner.
