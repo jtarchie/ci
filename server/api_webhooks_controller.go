@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/jtarchie/ci/runtime"
-	"github.com/jtarchie/ci/storage"
-	"github.com/jtarchie/ci/webhooks"
+	"github.com/jtarchie/pocketci/runtime"
+	"github.com/jtarchie/pocketci/storage"
+	"github.com/jtarchie/pocketci/webhooks"
 	"github.com/labstack/echo/v5"
 )
 

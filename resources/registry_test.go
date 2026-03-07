@@ -3,8 +3,8 @@ package resources_test
 import (
 	"testing"
 
-	"github.com/jtarchie/ci/resources"
-	_ "github.com/jtarchie/ci/resources/mock"
+	"github.com/jtarchie/pocketci/resources"
+	_ "github.com/jtarchie/pocketci/resources/mock"
 	. "github.com/onsi/gomega"
 )
 

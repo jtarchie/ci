@@ -1,18 +1,18 @@
-# ci run
+# pocketci run
 
 Execute a stored pipeline by name on a remote CI server. The server runs the
 pipeline; the client is a thin HTTP layer that streams output back to your
 terminal in real time.
 
 **Nothing runs locally.** Drivers, secrets, and configuration all live on the
-server. `ci run` is just a phone call to `ci server`.
+server. `pocketci run` is just a phone call to `pocketci server`.
 
 ## Quick start
 
 Register a pipeline once:
 
 ```bash
-ci set-pipeline k6.ts \
+pocketci set-pipeline k6.ts \
   --name k6 \
   --server-url http://localhost:8080 \
   --driver docker
@@ -22,19 +22,19 @@ Run it — everything after the pipeline name is forwarded to the pipeline as
 `pipelineContext.args`:
 
 ```bash
-ci run k6 run --vus=10 --duration=30s script.js \
+pocketci run k6 run --vus=10 --duration=30s script.js \
   --server-url http://localhost:8080
 ```
 
 ## CLI syntax
 
 ```
-ci run <name> [args...] --server-url <url> [--timeout <duration>]
+pocketci run <name> [args...] --server-url <url> [--timeout <duration>]
 ```
 
 | Flag / Env var                   | Default      | Description                              |
 | -------------------------------- | ------------ | ---------------------------------------- |
-| `--server-url` / `CI_SERVER_URL` | _(required)_ | URL of the `ci server` instance          |
+| `--server-url` / `CI_SERVER_URL` | _(required)_ | URL of the `pocketci server` instance    |
 | `--timeout` / `CI_TIMEOUT`       | none         | Client-side deadline for the full stream |
 
 All positional arguments after `<name>` are collected verbatim and passed
@@ -99,32 +99,33 @@ Register it and run your load test from the directory containing `script.js`:
 
 ```bash
 # Register once
-ci set-pipeline k6.ts --name k6 --server-url http://localhost:8080 --driver docker
+pocketci set-pipeline k6.ts --name k6 --server-url http://localhost:8080 --driver docker
 
 # Run from any directory — the current directory is available at /workspace
-ci run k6 run --vus=10 --duration=30s /workspace/script.js \
+pocketci run k6 run --vus=10 --duration=30s /workspace/script.js \
   --server-url http://localhost:8080
 ```
 
-The driver is a server concern — the same `ci run` command works whether the
-server uses Docker, Kubernetes, Hetzner, or any other configured driver.
+The driver is a server concern — the same `pocketci run` command works whether
+the server uses Docker, Kubernetes, Hetzner, or any other configured driver.
 
 ## Server configuration
 
-No extra server flags are required beyond the standard `ci server` setup. The
-`/api/pipelines/:name/run` endpoint is always available.
+No extra server flags are required beyond the standard `pocketci server` setup.
+The `/api/pipelines/:name/run` endpoint is always available.
 
 ```bash
-ci server \
+pocketci server \
   --port 8080 \
-  --storage sqlite://ci.db \
+  --storage sqlite://pocketci.db \
   --allowed-drivers docker
 ```
 
 ## Secrets
 
-Secrets are resolved server-side using the credentials stored with `ci server`.
-The client has no access to secrets — pass them via `ci set-pipeline` or the
-server's secrets backend, not as arguments to `ci run`.
+Secrets are resolved server-side using the credentials stored with
+`pocketci server`. The client has no access to secrets — pass them via
+`pocketci set-pipeline` or the server's secrets backend, not as arguments to
+`pocketci run`.
 
 See [secrets](../operations/secrets.md) for details.

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/georgysavva/scany/v2/sqlscan"
-	"github.com/jtarchie/ci/secrets"
+	"github.com/jtarchie/pocketci/secrets"
 	_ "modernc.org/sqlite"
 )
 

@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jtarchie/ci/orchestra"
-	vzdriver "github.com/jtarchie/ci/orchestra/vz"
+	"github.com/jtarchie/pocketci/orchestra"
+	vzdriver "github.com/jtarchie/pocketci/orchestra/vz"
 	gonanoid "github.com/matoous/go-nanoid/v2"
 	. "github.com/onsi/gomega"
 )

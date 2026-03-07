@@ -11,8 +11,8 @@ no manual curl required.
 ### 1. Start the server
 
 ```bash
-ci server \
-  --storage sqlite://ci.db \
+pocketci server \
+  --storage sqlite://pocketci.db \
   --basic-auth admin:yourpassword \
   --port 8080
 ```

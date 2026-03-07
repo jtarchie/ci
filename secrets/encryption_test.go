@@ -3,7 +3,7 @@ package secrets_test
 import (
 	"testing"
 
-	"github.com/jtarchie/ci/secrets"
+	"github.com/jtarchie/pocketci/secrets"
 	. "github.com/onsi/gomega"
 )
 

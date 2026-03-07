@@ -1,4 +1,4 @@
-/// <reference path="../../packages/ci/src/global.d.ts" />
+/// <reference path="../../packages/pocketci/src/global.d.ts" />
 
 import { PipelineRunner } from "./pipeline_runner.ts";
 

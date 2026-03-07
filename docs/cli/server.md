@@ -1,15 +1,15 @@
-# ci server
+# pocketci server
 
 Start an HTTP server that manages and executes pipelines.
 
 ```bash
-ci server [options]
+pocketci server [options]
 ```
 
 ## Options
 
 - `--port` — HTTP port (default: `8080`)
-- `--storage` — persistence backend DSN (default: `sqlite://ci.db`)
+- `--storage` — persistence backend DSN (default: `sqlite://pocketci.db`)
 - `--driver` — default orchestration driver
 - `--allowed-drivers` — comma-separated list of drivers to allow
 - `--allowed-features` — comma-separated list of feature gates to enable
@@ -26,9 +26,9 @@ ci server [options]
 ## Example
 
 ```bash
-ci server \
+pocketci server \
   --port 8080 \
-  --storage sqlite://ci.db \
+  --storage sqlite://pocketci.db \
   --allowed-drivers docker \
   --basic-auth-username admin \
   --basic-auth-password secret123

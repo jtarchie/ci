@@ -552,8 +552,8 @@ To enable VZ driver support:
 
 ```bash
 # After building
-go build -o ci .
-codesign -s - -f --entitlements entitlements.plist ./ci
+go build -o pocketci .
+codesign -s - -f --entitlements entitlements.plist ./pocketci
 
 # For test binaries
 go test -c ./orchestra/vz

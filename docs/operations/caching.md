@@ -49,8 +49,8 @@ s3://bucket-name/optional-prefix?region=us-east-1&endpoint=http://localhost:9000
 ### AWS S3
 
 ```bash
-ci run pipeline.yml \
-  --driver='docker://?cache=s3://my-ci-cache?region=us-west-2&cache_prefix=project-a'
+pocketci run pipeline.yml \
+  --driver='docker://?cache=s3://my-pocketci-cache?region=us-west-2&cache_prefix=project-a'
 ```
 
 ### MinIO (Local S3-Compatible)
@@ -66,7 +66,7 @@ docker run -p 9000:9000 -p 9001:9001 \
 aws --endpoint-url http://localhost:9000 s3 mb s3://cache-bucket
 
 # Run with caching
-ci run pipeline.yml \
+pocketci run pipeline.yml \
   --driver='docker://?cache=s3://cache-bucket?endpoint=http://localhost:9000&region=us-east-1'
 ```
 
@@ -74,11 +74,11 @@ ci run pipeline.yml \
 
 ```bash
 # Use gzip instead of zstd
-ci run pipeline.yml \
+pocketci run pipeline.yml \
   --driver='docker://?cache=s3://bucket&cache_compression=gzip'
 
 # Disable compression (faster for already-compressed data)
-ci run pipeline.yml \
+pocketci run pipeline.yml \
   --driver='docker://?cache=s3://bucket&cache_compression=none'
 ```
 
@@ -169,7 +169,7 @@ Examples:
 
 - `myproject/cache-node_modules.tar.zst`
 - `build-cache.tar.zst` (no prefix)
-- `ci/main/vendor.tar.gzip`
+- `pocketci/main/vendor.tar.gzip`
 
 ## Environment Variables
 
@@ -180,7 +180,7 @@ export AWS_ACCESS_KEY_ID=your-key
 export AWS_SECRET_ACCESS_KEY=your-secret
 export AWS_REGION=us-east-1
 
-ci run pipeline.yml --driver='docker://?cache=s3://bucket'
+pocketci run pipeline.yml --driver='docker://?cache=s3://bucket'
 ```
 
 Or use IAM roles, instance profiles, or other AWS SDK credential sources.

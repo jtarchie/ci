@@ -6,7 +6,7 @@ import (
 
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
-	"github.com/jtarchie/ci/orchestra"
+	"github.com/jtarchie/pocketci/orchestra"
 )
 
 type Volume struct {

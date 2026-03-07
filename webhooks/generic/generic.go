@@ -10,7 +10,7 @@ import (
 	"encoding/hex"
 	"net/http"
 
-	"github.com/jtarchie/ci/webhooks"
+	"github.com/jtarchie/pocketci/webhooks"
 )
 
 func init() {

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"sync/atomic"
 
-	"github.com/jtarchie/ci/resources"
+	"github.com/jtarchie/pocketci/resources"
 )
 
 // Mock implements a simple mock resource for testing.

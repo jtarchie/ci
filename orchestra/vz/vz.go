@@ -17,8 +17,8 @@ import (
 	"time"
 
 	"github.com/Code-Hex/vz/v3"
-	"github.com/jtarchie/ci/orchestra"
-	"github.com/jtarchie/ci/orchestra/vz/agent"
+	"github.com/jtarchie/pocketci/orchestra"
+	"github.com/jtarchie/pocketci/orchestra/vz/agent"
 )
 
 // VZ implements orchestra.Driver using Apple's Virtualization.framework.
@@ -54,7 +54,7 @@ func (v *VZ) Name() string {
 // NewVZ creates a new Apple Virtualization framework driver.
 func NewVZ(namespace string, logger *slog.Logger, params map[string]string) (orchestra.Driver, error) {
 	homeDir, _ := os.UserHomeDir()
-	defaultCacheDir := filepath.Join(homeDir, ".cache", "ci", "vz")
+	defaultCacheDir := filepath.Join(homeDir, ".cache", "pocketci", "vz")
 
 	memoryStr := orchestra.GetParam(params, "memory", "VZ_MEMORY", "2048")
 	cpusStr := orchestra.GetParam(params, "cpus", "VZ_CPUS", "2")
@@ -642,7 +642,7 @@ func (v *VZ) buildAgent() error {
 
 	// Cross-compile for linux/arm64 (Apple Silicon VMs run arm64 Linux)
 	// Use the full module path for cross-compilation
-	cmd := execCommand("go", "build", "-o", agentPath, "github.com/jtarchie/ci/orchestra/vz/agent/cmd")
+	cmd := execCommand("go", "build", "-o", agentPath, "github.com/jtarchie/pocketci/orchestra/vz/agent/cmd")
 	cmd.Env = append(os.Environ(),
 		"GOOS=linux",
 		"GOARCH=arm64",

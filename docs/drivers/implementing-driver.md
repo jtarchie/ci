@@ -98,7 +98,7 @@ package yourdriver
 
 import (
     "log/slog"
-    "github.com/jtarchie/ci/orchestra"
+    "github.com/jtarchie/pocketci/orchestra"
 )
 
 func init() {
@@ -252,7 +252,7 @@ import (
     "context"
     "io"
     "log/slog"
-    "github.com/jtarchie/ci/orchestra"
+    "github.com/jtarchie/pocketci/orchestra"
 )
 
 type YourDriver struct {

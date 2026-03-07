@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jtarchie/ci/orchestra"
-	"github.com/jtarchie/ci/orchestra/docker"
+	"github.com/jtarchie/pocketci/orchestra"
+	"github.com/jtarchie/pocketci/orchestra/docker"
 	gonanoid "github.com/matoous/go-nanoid/v2"
 	. "github.com/onsi/gomega"
 )

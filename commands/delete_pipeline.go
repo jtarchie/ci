@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/jtarchie/ci/storage"
+	"github.com/jtarchie/pocketci/storage"
 )
 
 type DeletePipeline struct {

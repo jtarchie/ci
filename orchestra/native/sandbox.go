@@ -10,7 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/jtarchie/ci/orchestra"
+	"github.com/jtarchie/pocketci/orchestra"
 )
 
 // NativeSandbox runs each Exec call as a fresh OS process in a persistent

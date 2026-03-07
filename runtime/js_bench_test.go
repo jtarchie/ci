@@ -3,7 +3,7 @@ package runtime_test
 import (
 	"testing"
 
-	"github.com/jtarchie/ci/runtime"
+	"github.com/jtarchie/pocketci/runtime"
 )
 
 // Simple TypeScript pipeline for benchmarking transpilation

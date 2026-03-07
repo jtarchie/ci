@@ -10,7 +10,7 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/pkg/stdcopy"
-	"github.com/jtarchie/ci/orchestra"
+	"github.com/jtarchie/pocketci/orchestra"
 )
 
 // Sandbox is a long-lived Docker container kept alive with "tail -f /dev/null".

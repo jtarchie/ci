@@ -9,7 +9,7 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
-	"github.com/jtarchie/ci/orchestra/cache"
+	"github.com/jtarchie/pocketci/orchestra/cache"
 )
 
 // pullImage ensures an image is available locally, waiting for the pull to complete.

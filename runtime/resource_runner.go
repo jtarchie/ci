@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/jtarchie/ci/resources"
-	"github.com/jtarchie/ci/secrets"
+	"github.com/jtarchie/pocketci/resources"
+	"github.com/jtarchie/pocketci/secrets"
 )
 
 // ResourceRunner provides methods for executing native resources.

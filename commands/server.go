@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jtarchie/ci/secrets"
-	"github.com/jtarchie/ci/server"
-	"github.com/jtarchie/ci/storage"
-	_ "github.com/jtarchie/ci/storage/sqlite"
+	"github.com/jtarchie/pocketci/secrets"
+	"github.com/jtarchie/pocketci/server"
+	"github.com/jtarchie/pocketci/storage"
+	_ "github.com/jtarchie/pocketci/storage/sqlite"
 	"github.com/labstack/echo/v5"
 )
 

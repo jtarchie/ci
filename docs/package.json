@@ -1,9 +1,9 @@
 {
-  "name": "ci-docs",
+  "name": "pocketci-docs",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "VitePress docs for CI",
+  "description": "VitePress docs for PocketCI",
   "scripts": {
     "dev": "vitepress dev",
     "build": "vitepress build && npm run build:embed",

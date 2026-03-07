@@ -1,4 +1,4 @@
-# CI
+# PocketCI
 
 Design principles:
 

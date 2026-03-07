@@ -44,7 +44,7 @@ COPY --from=docs-builder /app/server/docs/site ./server/docs/site
 # Build the binary with cache mounts
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o ci .
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o pocketci .
 
 # Stage 2: Runtime
 FROM alpine:latest
@@ -63,7 +63,7 @@ RUN addgroup -g 1001 appgroup && \
 WORKDIR /app
 
 # Copy binary with correct ownership
-COPY --from=builder --chown=appuser:appgroup /app/ci .
+COPY --from=builder --chown=appuser:appgroup /app/pocketci .
 
 # Create data directory
 RUN mkdir -p /data
@@ -80,4 +80,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8080/ || exit 1
 
 # Run the server
-CMD ["./ci", "server", "--port", "8080", "--storage", "sqlite:///data/ci.db"]
+CMD ["./pocketci", "server", "--port", "8080", "--storage", "sqlite:///data/pocketci.db"]

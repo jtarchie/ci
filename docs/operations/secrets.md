@@ -22,13 +22,13 @@ storage.
 Secrets can be set at two scopes: **pipeline** (only visible to one pipeline) or
 **global** (visible to all pipelines, used as a fallback).
 
-### Pipeline-Scoped Secrets (`ci run --secret`)
+### Pipeline-Scoped Secrets (`pocketci run --secret`)
 
-Pass secrets on the `ci run` command line using `--secret KEY=VALUE` (or
+Pass secrets on the `pocketci run` command line using `--secret KEY=VALUE` (or
 `-e KEY=VALUE`). These are scoped to the pipeline being run.
 
 ```bash
-ci run pipeline.ts \
+pocketci run pipeline.ts \
   --secrets "local://secrets.db?key=my-passphrase" \
   --secret API_KEY=sk-1234567890 \
   --secret DB_PASSWORD=hunter2
@@ -38,19 +38,19 @@ ci run pipeline.ts \
 
 Global secrets are shared across all pipelines. There are two ways to set them:
 
-**Via the server command** (`ci server --secret`):
+**Via the server command** (`pocketci server --secret`):
 
 ```bash
-ci server \
+pocketci server \
   --secrets "local://secrets.db?key=my-passphrase" \
   --secret SHARED_TOKEN=tok-global-abc \
   --secret REGISTRY_PASSWORD=ghp-xyz
 ```
 
-**Via the runner** (`ci run --global-secret`):
+**Via the runner** (`pocketci run --global-secret`):
 
 ```bash
-ci run pipeline.ts \
+pocketci run pipeline.ts \
   --secrets "local://secrets.db?key=my-passphrase" \
   --global-secret SHARED_TOKEN=tok-global-abc \
   --secret PIPELINE_KEY=per-pipeline-only
@@ -72,13 +72,13 @@ every invocation.
 ```bash
 export CI_SECRETS="local://secrets.db?key=my-passphrase"
 
-ci run pipeline.ts --secret API_KEY=sk-1234567890
+pocketci run pipeline.ts --secret API_KEY=sk-1234567890
 ```
 
 ```bash
-export CI_SECRETS="local:///var/lib/ci/secrets.db?key=my-passphrase"
+export CI_SECRETS="local:///var/lib/pocketci/secrets.db?key=my-passphrase"
 
-ci server --secret SHARED_TOKEN=tok-global-abc
+pocketci server --secret SHARED_TOKEN=tok-global-abc
 ```
 
 ## Backend Configuration
@@ -107,7 +107,7 @@ local://<sqlite-path>?key=<passphrase>
 --secrets "local://secrets.db?key=my-passphrase"
 
 # Absolute path
---secrets "local:///var/lib/ci/secrets.db?key=my-passphrase"
+--secrets "local:///var/lib/pocketci/secrets.db?key=my-passphrase"
 
 # In-memory (useful for testing, secrets don't persist)
 --secrets "local://:memory:?key=test-key"
@@ -225,10 +225,10 @@ export { pipeline };
 
 Secrets are scoped to limit access:
 
-- **Pipeline scope** (`pipeline/<id>`): Set via `ci run --secret`. Each pipeline
-  only sees its own pipeline-scoped secrets.
-- **Global scope** (`global`): Set via `ci server --secret` or
-  `ci run --global-secret`. Shared across all pipelines.
+- **Pipeline scope** (`pipeline/<id>`): Set via `pocketci run --secret`. Each
+  pipeline only sees its own pipeline-scoped secrets.
+- **Global scope** (`global`): Set via `pocketci server --secret` or
+  `pocketci run --global-secret`. Shared across all pipelines.
 
 The system checks pipeline scope first, then falls back to global. A
 pipeline-scoped secret with the same key overrides its global counterpart.
@@ -246,12 +246,12 @@ of another, the longer value is redacted first to avoid partial matches.
 
 ```bash
 # Set global secrets on the server
-ci server \
+pocketci server \
   --secrets "local://my-secrets.db?key=change-me-in-production" \
   --secret REGISTRY_TOKEN=ghp-abc123
 
 # Set pipeline-scoped secrets and run
-ci run examples/both/secrets-basic.ts \
+pocketci run examples/both/secrets-basic.ts \
   --driver docker \
   --secrets "local://my-secrets.db?key=change-me-in-production" \
   --secret API_KEY=sk-live-abc123 \

@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jtarchie/ci/orchestra"
-	"github.com/jtarchie/ci/secrets"
-	"github.com/jtarchie/ci/storage"
+	"github.com/jtarchie/pocketci/orchestra"
+	"github.com/jtarchie/pocketci/secrets"
+	"github.com/jtarchie/pocketci/storage"
 )
 
 type PipelineRunner struct {

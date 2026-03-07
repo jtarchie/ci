@@ -21,7 +21,7 @@ import (
 	genaiopenai "github.com/achetronic/adk-utils-go/genai/openai"
 	"github.com/achetronic/adk-utils-go/plugin/contextguard"
 
-	"github.com/jtarchie/ci/secrets"
+	"github.com/jtarchie/pocketci/secrets"
 )
 
 // AgentLLMConfig controls LLM generation parameters.

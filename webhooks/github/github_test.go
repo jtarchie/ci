@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jtarchie/ci/webhooks"
-	_ "github.com/jtarchie/ci/webhooks/github"
+	"github.com/jtarchie/pocketci/webhooks"
+	_ "github.com/jtarchie/pocketci/webhooks/github"
 )
 
 func sign(body []byte, secret string) string {

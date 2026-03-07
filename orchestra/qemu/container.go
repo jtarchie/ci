@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jtarchie/ci/orchestra"
+	"github.com/jtarchie/pocketci/orchestra"
 )
 
 // Container represents a command executed inside the QEMU guest via QGA.

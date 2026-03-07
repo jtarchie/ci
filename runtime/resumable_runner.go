@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jtarchie/ci/orchestra"
-	"github.com/jtarchie/ci/secrets"
-	storagelib "github.com/jtarchie/ci/storage"
+	"github.com/jtarchie/pocketci/orchestra"
+	"github.com/jtarchie/pocketci/secrets"
+	storagelib "github.com/jtarchie/pocketci/storage"
 )
 
 // ResumableRunner wraps PipelineRunner with state persistence and resume capability.

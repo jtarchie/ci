@@ -1,12 +1,12 @@
 {
-  "name": "ci-server-static",
+  "name": "pocketci-server-static",
   "version": "1.0.0",
   "private": true,
-  "description": "Static assets for CI server",
+  "description": "Static assets for PocketCI server",
   "scripts": {
     "build": "npm run build:css && npm run build:js",
     "build:css": "tailwindcss --cwd ../ -i static/src/index.css -o static/dist/bundle.css --minify --optimize",
-    "build:js": "esbuild src/index.js --bundle --minify --outfile=dist/bundle.js --format=iife --global-name=CI --target=es2017"
+    "build:js": "esbuild src/index.js --bundle --minify --outfile=dist/bundle.js --format=iife --global-name=PocketCI --target=es2017"
   },
   "dependencies": {
     "asciinema-player": "3.15.1",

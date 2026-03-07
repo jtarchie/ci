@@ -13,10 +13,10 @@ import (
 	"github.com/dop251/goja_nodejs/console"
 	"github.com/dop251/goja_nodejs/require"
 	"github.com/evanw/esbuild/pkg/api"
-	"github.com/jtarchie/ci/orchestra"
-	"github.com/jtarchie/ci/secrets"
-	"github.com/jtarchie/ci/storage"
-	"github.com/jtarchie/ci/webhooks/filter"
+	"github.com/jtarchie/pocketci/orchestra"
+	"github.com/jtarchie/pocketci/secrets"
+	"github.com/jtarchie/pocketci/storage"
+	"github.com/jtarchie/pocketci/webhooks/filter"
 )
 
 // ExecuteOptions configures pipeline execution.

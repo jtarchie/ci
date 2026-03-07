@@ -6,7 +6,7 @@ import (
 
 	fly "github.com/superfly/fly-go"
 
-	"github.com/jtarchie/ci/orchestra"
+	"github.com/jtarchie/pocketci/orchestra"
 )
 
 type Volume struct {

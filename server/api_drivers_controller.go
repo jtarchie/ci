@@ -3,7 +3,7 @@ package server
 import (
 	"net/http"
 
-	"github.com/jtarchie/ci/orchestra"
+	"github.com/jtarchie/pocketci/orchestra"
 	"github.com/labstack/echo/v5"
 )
 

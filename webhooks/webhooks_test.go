@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jtarchie/ci/webhooks"
+	"github.com/jtarchie/pocketci/webhooks"
 )
 
 // noopProvider matches requests with an "X-Noop" header.

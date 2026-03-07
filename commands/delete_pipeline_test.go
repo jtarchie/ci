@@ -5,9 +5,9 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/jtarchie/ci/commands"
-	"github.com/jtarchie/ci/server"
-	"github.com/jtarchie/ci/storage"
+	"github.com/jtarchie/pocketci/commands"
+	"github.com/jtarchie/pocketci/server"
+	"github.com/jtarchie/pocketci/storage"
 	. "github.com/onsi/gomega"
 )
 

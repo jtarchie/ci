@@ -1,9 +1,9 @@
-# ci set-pipeline
+# pocketci set-pipeline
 
 Store a pipeline on a remote CI server.
 
 ```bash
-ci set-pipeline <pipeline-file> --server <url> [options]
+pocketci set-pipeline <pipeline-file> --server <url> [options]
 ```
 
 ## Options
@@ -20,15 +20,15 @@ ci set-pipeline <pipeline-file> --server <url> [options]
 ## Example
 
 ```bash
-ci set-pipeline my-pipeline.ts \
+pocketci set-pipeline my-pipeline.ts \
   --server http://localhost:8080 \
   --name my-pipeline \
   --driver docker?// \
   --webhook-secret my-secret-key
 ```
 
-Once stored, trigger with `ci run`:
+Once stored, trigger with `pocketci run`:
 
 ```bash
-ci run my-pipeline --server-url http://localhost:8080
+pocketci run my-pipeline --server-url http://localhost:8080
 ```

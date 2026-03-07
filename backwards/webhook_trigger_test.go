@@ -5,12 +5,12 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/jtarchie/ci/backwards"
-	"github.com/jtarchie/ci/orchestra"
-	_ "github.com/jtarchie/ci/orchestra/native"
-	"github.com/jtarchie/ci/runtime"
-	"github.com/jtarchie/ci/storage"
-	_ "github.com/jtarchie/ci/storage/sqlite"
+	"github.com/jtarchie/pocketci/backwards"
+	"github.com/jtarchie/pocketci/orchestra"
+	_ "github.com/jtarchie/pocketci/orchestra/native"
+	"github.com/jtarchie/pocketci/runtime"
+	"github.com/jtarchie/pocketci/storage"
+	_ "github.com/jtarchie/pocketci/storage/sqlite"
 	. "github.com/onsi/gomega"
 )
 

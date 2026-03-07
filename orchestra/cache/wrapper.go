@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/jtarchie/ci/orchestra"
+	"github.com/jtarchie/pocketci/orchestra"
 )
 
 // WrapWithCaching wraps a driver with caching if cache parameters are present.

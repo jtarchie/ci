@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/jtarchie/ci/runtime"
+	"github.com/jtarchie/pocketci/runtime"
 	. "github.com/onsi/gomega"
 )
 

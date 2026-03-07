@@ -1,6 +1,7 @@
 # Benchmarks
 
-This directory contains load testing and benchmarking scripts for the CI system.
+This directory contains load testing and benchmarking scripts for the PocketCI
+system.
 
 ## Go Benchmarks
 

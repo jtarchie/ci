@@ -3,7 +3,7 @@ package server
 import (
 	"strings"
 
-	"github.com/jtarchie/ci/storage"
+	"github.com/jtarchie/pocketci/storage"
 )
 
 // BaseController holds dependencies shared by all controllers.

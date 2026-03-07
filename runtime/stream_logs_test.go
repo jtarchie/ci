@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jtarchie/ci/orchestra/docker"
-	"github.com/jtarchie/ci/runtime"
-	storage "github.com/jtarchie/ci/storage/sqlite"
+	"github.com/jtarchie/pocketci/orchestra/docker"
+	"github.com/jtarchie/pocketci/runtime"
+	storage "github.com/jtarchie/pocketci/storage/sqlite"
 	. "github.com/onsi/gomega"
 )
 

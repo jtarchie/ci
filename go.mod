@@ -1,4 +1,4 @@
-module github.com/jtarchie/ci
+module github.com/jtarchie/pocketci
 
 go 1.25.5
 

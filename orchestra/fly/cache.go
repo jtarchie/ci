@@ -13,7 +13,7 @@ import (
 	fly "github.com/superfly/fly-go"
 	"golang.org/x/crypto/ssh"
 
-	"github.com/jtarchie/ci/orchestra/cache"
+	"github.com/jtarchie/pocketci/orchestra/cache"
 )
 
 const cacheHelperImage = "busybox:latest"

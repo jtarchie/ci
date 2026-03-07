@@ -163,7 +163,7 @@ import (
     "github.com/go-git/go-git/v5/plumbing/transport"
     "github.com/go-git/go-git/v5/plumbing/transport/http"
     "github.com/go-git/go-git/v5/plumbing/transport/ssh"
-    "github.com/jtarchie/ci/resources"
+    "github.com/jtarchie/pocketci/resources"
 )
 
 type Git struct{}
@@ -200,8 +200,8 @@ The challenge: when running in Docker or K8s, the container doesn't have the
 
 When running a native resource operation in a container environment:
 
-1. Mount the `ci` binary into the container
-2. Run `ci resource <type> <operation>` instead of `/opt/resource/<op>`
+1. Mount the `pocketci` binary into the container
+2. Run `pocketci resource <type> <operation>` instead of `/opt/resource/<op>`
 3. The binary handles the resource operation natively
 
 ```go
@@ -211,17 +211,17 @@ container.Create(ctx, ContainerConfig{
         {
             Type:   "bind",
             Source: os.Executable(), // Path to ci binary
-            Target: "/opt/ci/bin/ci",
+            Target: "/opt/pocketci/bin/pocketci",
             ReadOnly: true,
         },
     },
-    Command: []string{"/opt/ci/bin/ci", "resource", "git", "in", "/workspace"},
+    Command: []string{"/opt/pocketci/bin/pocketci", "resource", "git", "in", "/workspace"},
 })
 ```
 
 ### Strategy 2: Sidecar Container (K8s)
 
-For Kubernetes, use a sidecar container with the `ci` binary:
+For Kubernetes, use a sidecar container with the `pocketci` binary:
 
 ```yaml
 apiVersion: v1
@@ -231,7 +231,7 @@ spec:
     - name: main
       # Main task container
     - name: ci-resource
-      image: ghcr.io/jtarchie/ci:latest
+      image: ghcr.io/jtarchie/pocketci:latest
       command: ["sleep", "infinity"]
       volumeMounts:
         - name: workspace
@@ -245,11 +245,11 @@ Copy the binary to a shared volume:
 ```yaml
 initContainers:
   - name: ci-installer
-    image: ghcr.io/jtarchie/ci:latest
-    command: ["cp", "/usr/local/bin/ci", "/ci-bin/"]
+    image: ghcr.io/jtarchie/pocketci:latest
+    command: ["cp", "/usr/local/bin/pocketci", "/pocketci-bin/"]
     volumeMounts:
       - name: ci-bin
-        mountPath: /ci-bin
+        mountPath: /pocketci-bin
 ```
 
 ### Strategy 4: Fallback to Container Resources
@@ -274,13 +274,13 @@ Add a new `resource` subcommand for executing resource operations:
 
 ```bash
 # For check
-echo '{"source": {"uri": "..."}}' | ci resource git check
+echo '{"source": {"uri": "..."}}' | pocketci resource git check
 
 # For in (get)
-echo '{"source": {...}, "version": {...}}' | ci resource git in /path/to/dest
+echo '{"source": {...}, "version": {...}}' | pocketci resource git in /path/to/dest
 
 # For out (put)
-echo '{"source": {...}, "params": {...}}' | ci resource git out /path/to/src
+echo '{"source": {...}, "params": {...}}' | pocketci resource git out /path/to/src
 ```
 
 ## Runtime Integration
@@ -360,13 +360,13 @@ resources:
 Or globally via CLI:
 
 ```bash
-ci runner --prefer-native-resources pipeline.ts
+pocketci runner --prefer-native-resources pipeline.ts
 ```
 
 ## Future Direction: Native-First Execution (No Containers for Resources)
 
 The cleanest architecture is to **always execute native resources directly in
-the `ci` process** - no containers at all for resource operations. This
+the `pocketci` process** - no containers at all for resource operations. This
 eliminates all sidecar/binary-mounting complexity.
 
 ### Why Resources Don't Need Containers
@@ -424,18 +424,19 @@ Pipeline Request
 
 | Driver   | Volume Path                        | How Resources Access It                                 |
 | -------- | ---------------------------------- | ------------------------------------------------------- |
-| `native` | `/tmp/ci-volumes/abc123`           | Direct filesystem access                                |
+| `native` | `/tmp/pocketci-volumes/abc123`     | Direct filesystem access                                |
 | `docker` | Host path mounted as Docker volume | Direct filesystem access (same host)                    |
 | `k8s`    | PVC mount path on controller node  | Direct access if controller has PVC mounted (see below) |
 
 ### Kubernetes Consideration
 
-For K8s, if the `ci` controller runs **outside** the cluster, you'd need the
-binary-mounting approach from the strategies above. But if `ci` runs **inside**
-the cluster (as a pod), it can mount the same PVCs and write directly:
+For K8s, if the `pocketci` controller runs **outside** the cluster, you'd need
+the binary-mounting approach from the strategies above. But if `ci` runs
+**inside** the cluster (as a pod), it can mount the same PVCs and write
+directly:
 
 ```yaml
-# ci controller running in-cluster
+# pocketci controller running in-cluster
 apiVersion: v1
 kind: Pod
 metadata:
@@ -443,7 +444,7 @@ metadata:
 spec:
   containers:
     - name: ci
-      image: ghcr.io/jtarchie/ci:latest
+      image: ghcr.io/jtarchie/pocketci:latest
       volumeMounts:
         - name: workspace-pvc
           mountPath: /workspace

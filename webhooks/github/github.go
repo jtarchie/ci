@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/jtarchie/ci/webhooks"
+	"github.com/jtarchie/pocketci/webhooks"
 )
 
 func init() {

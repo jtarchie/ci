@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/evanw/esbuild/pkg/api"
-	"github.com/jtarchie/ci/backwards"
+	"github.com/jtarchie/pocketci/backwards"
 )
 
 type Transpile struct {

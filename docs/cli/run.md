@@ -1,9 +1,9 @@
-# ci run
+# pocketci run
 
 Execute a stored pipeline by name on a remote CI server.
 
 ```bash
-ci run <name> [args...] --server-url <url> [options]
+pocketci run <name> [args...] --server-url <url> [options]
 ```
 
 ## Options
@@ -17,7 +17,7 @@ All positional arguments after `<name>` are passed to the pipeline as
 ## Example
 
 ```bash
-ci run my-pipeline arg1 arg2 --server-url http://localhost:8080
+pocketci run my-pipeline arg1 arg2 --server-url http://localhost:8080
 ```
 
 Inside the pipeline, `pipelineContext.args === ["arg1", "arg2"]`.

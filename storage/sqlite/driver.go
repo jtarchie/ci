@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/georgysavva/scany/v2/sqlscan"
-	"github.com/jtarchie/ci/runtime"
-	"github.com/jtarchie/ci/storage"
 	"github.com/jtarchie/lqs"
+	"github.com/jtarchie/pocketci/runtime"
+	"github.com/jtarchie/pocketci/storage"
 	"github.com/samber/lo"
 	_ "modernc.org/sqlite"
 )

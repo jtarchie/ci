@@ -8,7 +8,7 @@
   "license": "MIT",
   "description": "",
   "devDependencies": {
-    "@jtarchie/ci": "file:../packages/ci",
+    "@jtarchie/pocketci": "file:../packages/pocketci",
     "typescript": "5.9.3"
   }
 }

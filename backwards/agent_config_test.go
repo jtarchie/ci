@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/goccy/go-yaml"
-	"github.com/jtarchie/ci/backwards"
+	"github.com/jtarchie/pocketci/backwards"
 	. "github.com/onsi/gomega"
 )
 

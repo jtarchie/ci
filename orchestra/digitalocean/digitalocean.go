@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/digitalocean/godo"
-	"github.com/jtarchie/ci/orchestra"
-	"github.com/jtarchie/ci/orchestra/docker"
+	"github.com/jtarchie/pocketci/orchestra"
+	"github.com/jtarchie/pocketci/orchestra/docker"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -139,13 +139,13 @@ func (d *DigitalOcean) Name() string {
 }
 
 // workerTag returns the tag used to identify all worker machines in the pool for this namespace.
-func (d *DigitalOcean) workerTag() string { return "ci-worker-" + d.namespace }
+func (d *DigitalOcean) workerTag() string { return "pocketci-worker-" + d.namespace }
 
 // busyTag returns the tag applied to machines currently claimed by a pipeline run.
-func (d *DigitalOcean) busyTag() string { return "ci-busy-" + d.namespace }
+func (d *DigitalOcean) busyTag() string { return "pocketci-busy-" + d.namespace }
 
 // idleTag returns the tag applied to parked machines available for reuse.
-func (d *DigitalOcean) idleTag() string { return "ci-idle-" + d.namespace }
+func (d *DigitalOcean) idleTag() string { return "pocketci-idle-" + d.namespace }
 
 // waitForWorkerSlot blocks until a worker slot is available (total pool < maxWorkers).
 // If reuseWorker is enabled and the pool is full, it attempts to claim an idle machine.
@@ -346,11 +346,11 @@ func (d *DigitalOcean) ensureDroplet(ctx context.Context, containerLimits orches
 	region := orchestra.GetParam(d.params, "region", "DIGITALOCEAN_REGION", DefaultRegion)
 	size := d.determineDropletSize(containerLimits)
 
-	dropletName := fmt.Sprintf("ci-%s", d.namespace)
+	dropletName := fmt.Sprintf("pocketci-%s", d.namespace)
 
-	// Build tags list: always include ci, namespace, and worker pool tags
+	// Build tags list: always include pocketci, namespace, and worker pool tags
 	tags := []string{
-		"ci",
+		"pocketci",
 		fmt.Sprintf("namespace-%s", d.namespace),
 		d.workerTag(),
 		d.busyTag(),
@@ -484,7 +484,7 @@ func (d *DigitalOcean) determineDropletSize(limits orchestra.ContainerLimits) st
 
 // ensureSSHKey creates or retrieves an SSH key for droplet access.
 func (d *DigitalOcean) ensureSSHKey(ctx context.Context) (int, string, error) {
-	keyName := fmt.Sprintf("ci-%s", d.namespace)
+	keyName := fmt.Sprintf("pocketci-%s", d.namespace)
 
 	// Check if SSH key already exists in DO
 	keys, _, err := d.client.Keys.List(ctx, &godo.ListOptions{})
@@ -497,7 +497,7 @@ func (d *DigitalOcean) ensureSSHKey(ctx context.Context) (int, string, error) {
 			d.logger.Debug("digitalocean.ssh_key.exists", "name", keyName, "id", key.ID)
 
 			// Try to find the local key file
-			sshKeyPath := filepath.Join(os.TempDir(), fmt.Sprintf("ci-do-%s", d.namespace))
+			sshKeyPath := filepath.Join(os.TempDir(), fmt.Sprintf("pocketci-do-%s", d.namespace))
 			if _, err := os.Stat(sshKeyPath); err == nil {
 				return key.ID, sshKeyPath, nil
 			}
@@ -519,7 +519,7 @@ func (d *DigitalOcean) ensureSSHKey(ctx context.Context) (int, string, error) {
 	}
 
 	// Save private key to temp file
-	sshKeyPath := filepath.Join(os.TempDir(), fmt.Sprintf("ci-do-%s", d.namespace))
+	sshKeyPath := filepath.Join(os.TempDir(), fmt.Sprintf("pocketci-do-%s", d.namespace))
 	privateKeyPEM := pem.EncodeToMemory(&pem.Block{
 		Type:  "RSA PRIVATE KEY",
 		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
@@ -801,12 +801,12 @@ func (d *DigitalOcean) Close() error {
 }
 
 // CleanupOrphanedResources deletes droplets and SSH keys matching the specified tag.
-// If tag is empty, it defaults to "ci" which matches all CI-created resources.
-// For more targeted cleanup, use a specific tag like "ci-test" or a namespace tag.
+// If tag is empty, it defaults to "pocketci" which matches all PocketCI-created resources.
+// For more targeted cleanup, use a specific tag like "pocketci-test" or a namespace tag.
 // This is useful for cleaning up resources from failed or interrupted runs.
 func CleanupOrphanedResources(ctx context.Context, token string, logger *slog.Logger, tag string) error {
 	if tag == "" {
-		tag = "ci"
+		tag = "pocketci"
 	}
 
 	client := godo.NewFromToken(token)
@@ -829,10 +829,10 @@ func CleanupOrphanedResources(ctx context.Context, token string, logger *slog.Lo
 	}
 
 	// List all SSH keys and delete those matching the tag pattern
-	// SSH keys are named "ci-<namespace>" so we look for keys starting with the tag
+	// SSH keys are named "pocketci-<namespace>" so we look for keys starting with the tag
 	keyPrefix := tag + "-"
-	if tag == "ci" {
-		keyPrefix = "ci-"
+	if tag == "pocketci" {
+		keyPrefix = "pocketci-"
 	}
 
 	keys, _, err := client.Keys.List(ctx, &godo.ListOptions{PerPage: 200})

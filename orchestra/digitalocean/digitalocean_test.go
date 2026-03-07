@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jtarchie/ci/orchestra"
-	"github.com/jtarchie/ci/orchestra/digitalocean"
+	"github.com/jtarchie/pocketci/orchestra"
+	"github.com/jtarchie/pocketci/orchestra/digitalocean"
 	gonanoid "github.com/matoous/go-nanoid/v2"
 	. "github.com/onsi/gomega"
 )

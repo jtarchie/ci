@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jtarchie/ci/orchestra"
+	"github.com/jtarchie/pocketci/orchestra"
 )
 
 // SandboxInput describes the sandbox container to create.

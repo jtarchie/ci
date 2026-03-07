@@ -1,8 +1,8 @@
 import { defineConfig } from "vitepress";
 
 export default defineConfig({
-  title: "CI",
-  description: "Local-first CI runtime documentation",
+  title: "PocketCI",
+  description: "Local-first PocketCI runtime documentation",
   base: "/docs/",
   cleanUrls: false,
   themeConfig: {
@@ -39,7 +39,7 @@ export default defineConfig({
       ],
     },
     socialLinks: [
-      { icon: "github", link: "https://github.com/jtarchie/ci" },
+      { icon: "github", link: "https://github.com/jtarchie/pocketci" },
     ],
   },
 });

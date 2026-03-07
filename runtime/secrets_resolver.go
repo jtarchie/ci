@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jtarchie/ci/secrets"
+	"github.com/jtarchie/pocketci/secrets"
 )
 
 const secretPrefix = "secret:"

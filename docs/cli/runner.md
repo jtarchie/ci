@@ -1,9 +1,9 @@
-# ci runner
+# pocketci runner
 
 Execute a pipeline locally in a single iteration.
 
 ```bash
-ci runner <pipeline-file> [options]
+pocketci runner <pipeline-file> [options]
 ```
 
 ## Options
@@ -20,7 +20,7 @@ ci runner <pipeline-file> [options]
 ## Example
 
 ```bash
-ci runner examples/both/hello-world.ts --driver native --log-level debug
+pocketci runner examples/both/hello-world.ts --driver native --log-level debug
 ```
 
 See [Secrets](../operations/secrets.md) for details on secret handling.

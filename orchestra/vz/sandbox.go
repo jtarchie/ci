@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jtarchie/ci/orchestra"
+	"github.com/jtarchie/pocketci/orchestra"
 )
 
 // VZSandbox represents an Apple VZ VM sandbox that dispatches sequential exec

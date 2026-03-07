@@ -7,7 +7,7 @@ import (
 
 	"github.com/dop251/goja"
 
-	"github.com/jtarchie/ci/secrets"
+	"github.com/jtarchie/pocketci/secrets"
 )
 
 type Runtime struct {

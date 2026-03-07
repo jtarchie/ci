@@ -11,7 +11,7 @@ import (
 
 	"github.com/dop251/goja"
 	sprig "github.com/go-task/slim-sprig/v3"
-	"github.com/jtarchie/ci/secrets"
+	"github.com/jtarchie/pocketci/secrets"
 	"github.com/nikoksr/notify"
 	nhttp "github.com/nikoksr/notify/service/http"
 	"github.com/nikoksr/notify/service/msteams"

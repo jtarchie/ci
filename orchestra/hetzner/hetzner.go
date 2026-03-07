@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
-	"github.com/jtarchie/ci/orchestra"
-	"github.com/jtarchie/ci/orchestra/docker"
+	"github.com/jtarchie/pocketci/orchestra"
+	"github.com/jtarchie/pocketci/orchestra/docker"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -141,7 +141,7 @@ func (h *Hetzner) Name() string {
 }
 
 // workerLabelSelector returns the Hetzner label selector for all pool machines in this namespace.
-func (h *Hetzner) workerLabelSelector() string { return "ci-worker=" + h.namespace }
+func (h *Hetzner) workerLabelSelector() string { return "pocketci-worker=" + h.namespace }
 
 // waitForWorkerSlot blocks until a worker slot is available (total pool < maxWorkers).
 // If reuseWorker is enabled and the pool is full, it attempts to claim an idle machine.
@@ -210,7 +210,7 @@ func (h *Hetzner) claimIdleServer(ctx context.Context) (bool, error) {
 		for k, v := range server.Labels {
 			newLabels[k] = v
 		}
-		newLabels["ci-worker-status"] = "busy"
+		newLabels["pocketci-worker-status"] = "busy"
 
 		_, _, err := h.client.Server.Update(ctx, server, hcloud.ServerUpdateOpts{
 			Labels: newLabels,
@@ -227,7 +227,7 @@ func (h *Hetzner) claimIdleServer(ctx context.Context) (bool, error) {
 			continue
 		}
 
-		if freshServer.Labels["ci-worker-status"] != "busy" {
+		if freshServer.Labels["pocketci-worker-status"] != "busy" {
 			h.logger.Debug("hetzner.worker.claim.lost_race", "server_id", server.ID)
 			continue
 		}
@@ -279,7 +279,7 @@ func (h *Hetzner) parkServer(ctx context.Context) error {
 	for k, v := range h.server.Labels {
 		newLabels[k] = v
 	}
-	newLabels["ci-worker-status"] = "idle"
+	newLabels["pocketci-worker-status"] = "idle"
 
 	_, _, err := h.client.Server.Update(ctx, h.server, hcloud.ServerUpdateOpts{
 		Labels: newLabels,
@@ -324,7 +324,7 @@ func (h *Hetzner) ensureServer(ctx context.Context, containerLimits orchestra.Co
 	location := orchestra.GetParam(h.params, "location", "HETZNER_LOCATION", DefaultLocation)
 	serverType := h.determineServerType(containerLimits)
 
-	serverName := fmt.Sprintf("ci-%s", h.namespace)
+	serverName := fmt.Sprintf("pocketci-%s", h.namespace)
 
 	// Look up the image
 	imageResult, _, err := h.client.Image.GetByNameAndArchitecture(ctx, image, hcloud.ArchitectureX86)
@@ -356,12 +356,12 @@ func (h *Hetzner) ensureServer(ctx context.Context, containerLimits orchestra.Co
 		return fmt.Errorf("location %s not found", location)
 	}
 
-	// Build labels map: always include ci, namespace, and worker pool labels
+	// Build labels map: always include pocketci, namespace, and worker pool labels
 	labels := map[string]string{
-		"ci":               "true",
-		"namespace":        h.namespace,
-		"ci-worker":        h.namespace,
-		"ci-worker-status": "busy",
+		"pocketci":               "true",
+		"namespace":              h.namespace,
+		"pocketci-worker":        h.namespace,
+		"pocketci-worker-status": "busy",
 	}
 
 	// Add custom labels from DSN parameter (format: key1=value1,key2=value2)
@@ -489,7 +489,7 @@ func (h *Hetzner) determineServerType(limits orchestra.ContainerLimits) string {
 
 // ensureSSHKey creates or retrieves an SSH key for server access.
 func (h *Hetzner) ensureSSHKey(ctx context.Context) (*hcloud.SSHKey, string, error) {
-	keyName := fmt.Sprintf("ci-%s", h.namespace)
+	keyName := fmt.Sprintf("pocketci-%s", h.namespace)
 
 	// Check if SSH key already exists in Hetzner
 	existingKey, _, err := h.client.SSHKey.GetByName(ctx, keyName)
@@ -501,7 +501,7 @@ func (h *Hetzner) ensureSSHKey(ctx context.Context) (*hcloud.SSHKey, string, err
 		h.logger.Debug("hetzner.ssh_key.exists", "name", keyName, "id", existingKey.ID)
 
 		// Try to find the local key file
-		sshKeyPath := filepath.Join(os.TempDir(), fmt.Sprintf("ci-hetzner-%s", h.namespace))
+		sshKeyPath := filepath.Join(os.TempDir(), fmt.Sprintf("pocketci-hetzner-%s", h.namespace))
 		if _, err := os.Stat(sshKeyPath); err == nil {
 			return existingKey, sshKeyPath, nil
 		}
@@ -520,7 +520,7 @@ func (h *Hetzner) ensureSSHKey(ctx context.Context) (*hcloud.SSHKey, string, err
 	}
 
 	// Save private key to temp file
-	sshKeyPath := filepath.Join(os.TempDir(), fmt.Sprintf("ci-hetzner-%s", h.namespace))
+	sshKeyPath := filepath.Join(os.TempDir(), fmt.Sprintf("pocketci-hetzner-%s", h.namespace))
 	privateKeyPEM := pem.EncodeToMemory(&pem.Block{
 		Type:  "RSA PRIVATE KEY",
 		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
@@ -543,7 +543,7 @@ func (h *Hetzner) ensureSSHKey(ctx context.Context) (*hcloud.SSHKey, string, err
 		Name:      keyName,
 		PublicKey: publicKeyStr,
 		Labels: map[string]string{
-			"ci": "true",
+			"pocketci": "true",
 		},
 	}
 
@@ -806,12 +806,12 @@ func (h *Hetzner) Close() error {
 }
 
 // CleanupOrphanedResources deletes servers and SSH keys matching the specified label selector.
-// If labelSelector is empty, it defaults to "ci=true" which matches all CI-created resources.
+// If labelSelector is empty, it defaults to "pocketci=true" which matches all PocketCI-created resources.
 // For more targeted cleanup, use a specific selector like "environment=test" or "namespace=myns".
 // This is useful for cleaning up resources from failed or interrupted runs.
 func CleanupOrphanedResources(ctx context.Context, token string, logger *slog.Logger, labelSelector string) error {
 	if labelSelector == "" {
-		labelSelector = "ci=true"
+		labelSelector = "pocketci=true"
 	}
 
 	client := hcloud.NewClient(hcloud.WithToken(token))
@@ -838,8 +838,8 @@ func CleanupOrphanedResources(ctx context.Context, token string, logger *slog.Lo
 	}
 
 	// List all SSH keys and delete those matching the pattern
-	// SSH keys are named "ci-<namespace>" so we derive prefix from the label selector
-	keyPrefix := "ci-"
+	// SSH keys are named "pocketci-<namespace>" so we derive prefix from the label selector
+	keyPrefix := "pocketci-"
 
 	// If selector includes namespace, use it for more targeted cleanup
 	if strings.Contains(labelSelector, "namespace=") {
@@ -847,7 +847,7 @@ func CleanupOrphanedResources(ctx context.Context, token string, logger *slog.Lo
 			part = strings.TrimSpace(part)
 			if after, ok := strings.CutPrefix(part, "namespace="); ok {
 				ns := after
-				keyPrefix = "ci-" + ns
+				keyPrefix = "pocketci-" + ns
 
 				break
 			}

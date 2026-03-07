@@ -1,11 +1,11 @@
-# CI Project — Coding Agent Instructions
+# PocketCI Project — Coding Agent Instructions
 
 > Trust these instructions. Only search the codebase if information here is
 > incomplete or found to be in error.
 
 ## Project Summary
 
-Local-first CI/CD runtime written in Go (module `github.com/jtarchie/ci`).
+Local-first CI/CD runtime written in Go (module `github.com/jtarchie/pocketci`).
 Executes JS/TS pipelines via Goja VM with Concourse YAML backward compatibility.
 Pluggable container orchestration drivers (docker, native, k8s, fly,
 digitalocean, hetzner, qemu, vz), SQLite storage, and an Echo HTTP server with
@@ -85,7 +85,7 @@ Always run after test failures that may leave Docker resources behind.
 2. **After editing `server/static/src/`**: always run `task build:static` to
    regenerate `server/static/dist/bundle.js` (also embedded).
 3. **After editing `docs/**/\*.md`or`docs/.vitepress/`**: always run
-`task build:docs`to regenerate`server/docs/site/` (embedded).
+   `task build:docs`to regenerate`server/docs/site/` (embedded).
 4. **After editing `storage/sqlite/schema.sql`**: no regeneration needed
    (directly embedded), but run tests to validate schema changes.
 5. **After editing HTML templates in `server/templates/`**: no regeneration
@@ -107,7 +107,7 @@ Always run after test failures that may leave Docker resources behind.
 main.go                  CLI entry point (kong). Blank imports register all plugins.
 main_darwin.go           macOS-only: registers orchestra/vz driver.
 Taskfile.yml             Build/test/lint task definitions (go-task).
-go.mod                   Go 1.25+, module github.com/jtarchie/ci
+go.mod                   Go 1.25+, module github.com/jtarchie/pocketci
 Brewfile                 macOS tool dependencies.
 commands/                CLI subcommands: runner, server, run, transpile, set-pipeline, delete-pipeline, resource.
 runtime/                 Goja VM execution engine.
@@ -143,7 +143,7 @@ examples/                Pipeline examples. both/ = docker+native, docker/ = doc
   examples_test.go       Integration tests: runs each example against drivers.
 e2e/                     Playwright browser tests (Chromium, port 8080).
 testhelpers/             Test utilities (minio.go — starts local MinIO for S3 cache tests).
-packages/ci/             TypeScript type definitions for the pipeline API.
+packages/pocketci/       TypeScript type definitions for the pipeline API.
 ```
 
 ## Plugin Registration Pattern
@@ -153,7 +153,7 @@ All plugins self-register via `init()` and are activated by blank imports in
 
 ```go
 func init() { orchestra.Add("docker", NewDocker) }   // in orchestra/docker/docker.go
-_ "github.com/jtarchie/ci/orchestra/docker"           // in main.go
+_ "github.com/jtarchie/pocketci/orchestra/docker"           // in main.go
 ```
 
 When adding a new driver/storage/secret/resource/webhook plugin: implement the
@@ -166,8 +166,8 @@ interface, add `init()` with registration call, add blank import to `main.go`.
   `assert.Expect(...).NotTo(HaveOccurred())`.
 - **In-memory DB**: use `sqlite://:memory:` for tests (never file-backed unless
   testing persistence).
-- **Driver imports in tests**: add `_ "github.com/jtarchie/ci/orchestra/docker"`
-  (and/or `/native`).
+- **Driver imports in tests**: add
+  `_ "github.com/jtarchie/pocketci/orchestra/docker"` (and/or `/native`).
 - **JSON tags**: all structs exposed to Goja JS VM must have `json:"fieldName"`
   tags.
 - **Logging**: use `slog` (structured). Never `log` or `fmt.Println` for

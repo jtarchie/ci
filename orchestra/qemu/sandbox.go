@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jtarchie/ci/orchestra"
+	"github.com/jtarchie/pocketci/orchestra"
 )
 
 // QEMUSandbox represents a QEMU VM sandbox that dispatches sequential exec

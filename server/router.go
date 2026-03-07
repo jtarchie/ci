@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/jtarchie/ci/secrets"
-	"github.com/jtarchie/ci/storage"
+	"github.com/jtarchie/pocketci/secrets"
+	"github.com/jtarchie/pocketci/storage"
 	"github.com/labstack/echo/v5"
 	"github.com/labstack/echo/v5/middleware"
 )

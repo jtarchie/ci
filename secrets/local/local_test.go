@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/jtarchie/ci/secrets"
-	_ "github.com/jtarchie/ci/secrets/local"
+	"github.com/jtarchie/pocketci/secrets"
+	_ "github.com/jtarchie/pocketci/secrets/local"
 	. "github.com/onsi/gomega"
 )
 

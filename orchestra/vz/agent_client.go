@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jtarchie/ci/orchestra/vz/agent"
+	"github.com/jtarchie/pocketci/orchestra/vz/agent"
 )
 
 // AgentClient communicates with the vsock guest agent running inside the VM.

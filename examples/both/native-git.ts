@@ -1,4 +1,4 @@
-/// <reference path="../../packages/ci/src/global.d.ts" />
+/// <reference path="../../packages/pocketci/src/global.d.ts" />
 
 // Example pipeline demonstrating native git resource usage
 // This bypasses container-based resources for improved performance

@@ -8,9 +8,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/jtarchie/ci/server"
-	"github.com/jtarchie/ci/storage"
-	_ "github.com/jtarchie/ci/storage/sqlite"
+	"github.com/jtarchie/pocketci/server"
+	"github.com/jtarchie/pocketci/storage"
+	_ "github.com/jtarchie/pocketci/storage/sqlite"
 	. "github.com/onsi/gomega"
 )
 

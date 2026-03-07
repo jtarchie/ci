@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/jtarchie/ci/runtime"
+	"github.com/jtarchie/pocketci/runtime"
 	. "github.com/onsi/gomega"
 )
 

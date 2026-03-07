@@ -14,7 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
-	"github.com/jtarchie/ci/orchestra/cache"
+	"github.com/jtarchie/pocketci/orchestra/cache"
 )
 
 func init() {

@@ -1,6 +1,6 @@
-# CI Documentation
+# PocketCI Documentation
 
-CI is a local-first pipeline runtime that executes JavaScript/TypeScript
+PocketCI is a local-first pipeline runtime that executes JavaScript/TypeScript
 pipelines and supports Concourse-style YAML compatibility.
 
 ## Getting Started

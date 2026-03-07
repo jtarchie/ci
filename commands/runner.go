@@ -15,12 +15,12 @@ import (
 	"time"
 
 	"github.com/evanw/esbuild/pkg/api"
-	"github.com/jtarchie/ci/backwards"
-	"github.com/jtarchie/ci/orchestra"
-	"github.com/jtarchie/ci/orchestra/cache"
-	"github.com/jtarchie/ci/runtime"
-	"github.com/jtarchie/ci/secrets"
-	"github.com/jtarchie/ci/storage"
+	"github.com/jtarchie/pocketci/backwards"
+	"github.com/jtarchie/pocketci/orchestra"
+	"github.com/jtarchie/pocketci/orchestra/cache"
+	"github.com/jtarchie/pocketci/runtime"
+	"github.com/jtarchie/pocketci/secrets"
+	"github.com/jtarchie/pocketci/storage"
 )
 
 type Runner struct {

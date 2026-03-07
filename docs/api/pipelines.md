@@ -67,4 +67,4 @@ Response is an SSE stream with events:
 - `{"event":"exit","code":0,"run_id":"..."}` — pipeline finished
 - `{"event":"error","message":"..."}` — fatal error
 
-See [ci run](../cli/run.md) for client-side usage.
+See [pocketci run](../cli/run.md) for client-side usage.

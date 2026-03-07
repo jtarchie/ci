@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/digitalocean/go-qemu/qmp"
-	"github.com/jtarchie/ci/orchestra"
+	"github.com/jtarchie/pocketci/orchestra"
 )
 
 // QEMU implements orchestra.Driver using a local QEMU virtual machine.
@@ -54,7 +54,7 @@ func (q *QEMU) Name() string {
 // NewQEMU creates a new QEMU driver.
 func NewQEMU(namespace string, logger *slog.Logger, params map[string]string) (orchestra.Driver, error) {
 	homeDir, _ := os.UserHomeDir()
-	defaultCacheDir := filepath.Join(homeDir, ".cache", "ci", "qemu")
+	defaultCacheDir := filepath.Join(homeDir, ".cache", "pocketci", "qemu")
 
 	defaultAccel := "tcg"
 	switch runtime.GOOS {

@@ -73,8 +73,8 @@ function initSyntaxHighlighting() {
   });
 }
 
-// Export CI namespace for htmx hx-on attributes
-window.CI = { showToast, initSyntaxHighlighting };
+// Export PocketCI namespace for htmx hx-on attributes
+window.PocketCI = { showToast, initSyntaxHighlighting };
 
 // Add global HTMx error handling
 document.body.addEventListener("htmx:responseError", function (event) {

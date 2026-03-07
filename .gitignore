@@ -189,5 +189,5 @@ dist
 .envrc
 *.db
 *.db-*
-ci*
+pocketci*
 server/docs/site/

@@ -9,7 +9,7 @@ background.
 ### 1. Create a pipeline with a webhook secret
 
 ```bash
-ci set-pipeline my-pipeline.ts \
+pocketci set-pipeline my-pipeline.ts \
   --server http://localhost:8080 \
   --webhook-secret "my-secret-key"
 ```
@@ -20,9 +20,9 @@ requests without signature validation.
 ### 2. Configure the server
 
 ```bash
-ci server \
+pocketci server \
   --port 8080 \
-  --storage sqlite://ci.db \
+  --storage sqlite://pocketci.db \
   --webhook-timeout 5s   # How long to wait for http.respond() (default: 5s)
 ```
 

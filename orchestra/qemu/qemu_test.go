@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jtarchie/ci/orchestra"
-	"github.com/jtarchie/ci/orchestra/qemu"
+	"github.com/jtarchie/pocketci/orchestra"
+	"github.com/jtarchie/pocketci/orchestra/qemu"
 	gonanoid "github.com/matoous/go-nanoid/v2"
 	. "github.com/onsi/gomega"
 )

@@ -12,7 +12,7 @@ import (
 	"github.com/superfly/fly-go/flaps"
 	"github.com/superfly/fly-go/tokens"
 
-	"github.com/jtarchie/ci/orchestra"
+	"github.com/jtarchie/pocketci/orchestra"
 )
 
 type Fly struct {
@@ -69,7 +69,7 @@ func NewFly(namespace string, logger *slog.Logger, params map[string]string) (or
 
 	apiClient := fly.NewClientFromOptions(fly.ClientOptions{
 		Tokens: toks,
-		Name:   "ci",
+		Name:   "pocketci",
 	})
 
 	client, err := flaps.NewWithOptions(context.Background(), flaps.NewClientOpts{
@@ -95,7 +95,7 @@ func NewFly(namespace string, logger *slog.Logger, params map[string]string) (or
 
 	// If no app name provided, create an ephemeral one
 	if appName == "" {
-		appName = sanitizeAppName(fmt.Sprintf("ci-%s", namespace))
+		appName = sanitizeAppName(fmt.Sprintf("pocketci-%s", namespace))
 
 		logger.Info("fly.app.create", "app", appName, "org", org)
 

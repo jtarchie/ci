@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/jtarchie/ci/orchestra"
-	"github.com/jtarchie/ci/storage"
+	"github.com/jtarchie/pocketci/orchestra"
+	"github.com/jtarchie/pocketci/storage"
 	"github.com/labstack/echo/v5"
 )
 

@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/jtarchie/ci/resources"
+	"github.com/jtarchie/pocketci/resources"
 )
 
 // Resource command for executing native resource operations.

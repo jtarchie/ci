@@ -9,10 +9,10 @@ import (
 	"os"
 	"testing"
 
-	_ "github.com/jtarchie/ci/orchestra/native"
-	"github.com/jtarchie/ci/server"
-	"github.com/jtarchie/ci/storage"
-	_ "github.com/jtarchie/ci/storage/sqlite"
+	_ "github.com/jtarchie/pocketci/orchestra/native"
+	"github.com/jtarchie/pocketci/server"
+	"github.com/jtarchie/pocketci/storage"
+	_ "github.com/jtarchie/pocketci/storage/sqlite"
 	. "github.com/onsi/gomega"
 )
 

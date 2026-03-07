@@ -17,14 +17,14 @@ capabilities are available. By default, all features are enabled.
 ### CLI Flag
 
 ```bash
-ci server --allowed-features "webhooks,secrets"
+pocketci server --allowed-features "webhooks,secrets"
 ```
 
 ### Environment Variable
 
 ```bash
 export CI_ALLOWED_FEATURES="webhooks,secrets"
-ci server
+pocketci server
 ```
 
 ### Wildcard (default)
@@ -32,7 +32,7 @@ ci server
 Use `*` to enable all features (this is the default):
 
 ```bash
-ci server --allowed-features "*"
+pocketci server --allowed-features "*"
 ```
 
 ## Behavior

@@ -3,7 +3,7 @@ package storage_test
 import (
 	"testing"
 
-	"github.com/jtarchie/ci/storage"
+	"github.com/jtarchie/pocketci/storage"
 	. "github.com/onsi/gomega"
 )
 

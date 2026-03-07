@@ -1,7 +1,7 @@
 # Examples
 
-These are examples that show the progress of the `ci` system. All examples work
-because all examples are tests.
+These are examples that show the progress of the `pocketci` system. All examples
+work because all examples are tests.
 
 - In JS/TS examples, the are `assert` statements.
 - In the YAML examples, a new property ()`assert`) has been added for `task` to
@@ -12,7 +12,7 @@ to ensure the assertions are run with any code changes.
 
 ## TS type definition
 
-A separate package (`@jtarchie/ci`) is being maintained [here](../packages/ci).
-The purpose to ensure that type safety for runtime can be maintained. Please
-keep in mind that CI will not check types, that is left for your favorite editor
-to ensure for you.
+A separate package (`@jtarchie/pocketci`) is being maintained
+[here](../packages/pocketci). The purpose to ensure that type safety for runtime
+can be maintained. Please keep in mind that PocketCI will not check types, that
+is left for your favorite editor to ensure for you.

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/jtarchie/ci/orchestra"
-	"github.com/jtarchie/ci/orchestra/cache"
+	"github.com/jtarchie/pocketci/orchestra"
+	"github.com/jtarchie/pocketci/orchestra/cache"
 )
 
 // CopyToVolume implements cache.VolumeDataAccessor by delegating to the inner

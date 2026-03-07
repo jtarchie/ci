@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/jtarchie/ci/storage"
+	"github.com/jtarchie/pocketci/storage"
 	"github.com/labstack/echo/v5"
 )
 

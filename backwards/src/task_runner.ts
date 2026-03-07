@@ -1,4 +1,4 @@
-/// <reference path="../../packages/ci/src/global.d.ts" />
+/// <reference path="../../packages/pocketci/src/global.d.ts" />
 
 export class TaskRunner {
   private knownMounts: KnownMounts = {};

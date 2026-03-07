@@ -11,9 +11,9 @@ import (
 	"strings"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/jtarchie/ci/backwards"
-	"github.com/jtarchie/ci/runtime"
-	"github.com/jtarchie/ci/storage"
+	"github.com/jtarchie/pocketci/backwards"
+	"github.com/jtarchie/pocketci/runtime"
+	"github.com/jtarchie/pocketci/storage"
 )
 
 type SetPipeline struct {

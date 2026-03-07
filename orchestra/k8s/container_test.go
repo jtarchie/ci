@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jtarchie/ci/orchestra"
-	"github.com/jtarchie/ci/orchestra/k8s"
+	"github.com/jtarchie/pocketci/orchestra"
+	"github.com/jtarchie/pocketci/orchestra/k8s"
 	gonanoid "github.com/matoous/go-nanoid/v2"
 	. "github.com/onsi/gomega"
 )

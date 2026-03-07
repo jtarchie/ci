@@ -9,9 +9,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/jtarchie/ci/orchestra"
-	"github.com/jtarchie/ci/secrets"
-	"github.com/jtarchie/ci/storage"
+	"github.com/jtarchie/pocketci/orchestra"
+	"github.com/jtarchie/pocketci/secrets"
+	"github.com/jtarchie/pocketci/storage"
 	"github.com/klauspost/compress/zstd"
 	"github.com/labstack/echo/v5"
 )

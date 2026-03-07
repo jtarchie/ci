@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/jtarchie/ci/orchestra"
+	"github.com/jtarchie/pocketci/orchestra"
 )
 
 type Native struct {

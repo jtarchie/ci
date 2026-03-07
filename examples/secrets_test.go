@@ -4,11 +4,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/jtarchie/ci/commands"
-	_ "github.com/jtarchie/ci/orchestra/docker"
-	_ "github.com/jtarchie/ci/orchestra/native"
-	_ "github.com/jtarchie/ci/secrets/local"
-	_ "github.com/jtarchie/ci/storage/sqlite"
+	"github.com/jtarchie/pocketci/commands"
+	_ "github.com/jtarchie/pocketci/orchestra/docker"
+	_ "github.com/jtarchie/pocketci/orchestra/native"
+	_ "github.com/jtarchie/pocketci/secrets/local"
+	_ "github.com/jtarchie/pocketci/storage/sqlite"
 	. "github.com/onsi/gomega"
 )
 

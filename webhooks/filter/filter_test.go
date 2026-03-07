@@ -3,7 +3,7 @@ package filter_test
 import (
 	"testing"
 
-	"github.com/jtarchie/ci/webhooks/filter"
+	"github.com/jtarchie/pocketci/webhooks/filter"
 	. "github.com/onsi/gomega"
 )
 

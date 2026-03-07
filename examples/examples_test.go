@@ -5,11 +5,11 @@ import (
 	"testing"
 
 	"github.com/bmatcuk/doublestar/v4"
-	"github.com/jtarchie/ci/commands"
-	_ "github.com/jtarchie/ci/orchestra/docker"
-	"github.com/jtarchie/ci/orchestra/k8s"
-	_ "github.com/jtarchie/ci/orchestra/native"
-	_ "github.com/jtarchie/ci/storage/sqlite"
+	"github.com/jtarchie/pocketci/commands"
+	_ "github.com/jtarchie/pocketci/orchestra/docker"
+	"github.com/jtarchie/pocketci/orchestra/k8s"
+	_ "github.com/jtarchie/pocketci/orchestra/native"
+	_ "github.com/jtarchie/pocketci/storage/sqlite"
 	. "github.com/onsi/gomega"
 )
 
