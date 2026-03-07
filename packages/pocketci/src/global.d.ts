@@ -218,6 +218,7 @@ declare global {
    * ```
    */
   namespace storage {
+    function set(key: string, value: unknown): Promise<void>;
     function get(key: string): unknown;
 
     // Resource version operations
@@ -281,7 +282,7 @@ declare global {
   // Context window management configuration.
   interface AgentContextGuardConfig {
     strategy: "threshold" | "sliding_window";
-    max_turns?: number;  // sliding_window: compact after N turns
+    max_turns?: number; // sliding_window: compact after N turns
     max_tokens?: number; // threshold: manual context window override
   }
 
@@ -762,4 +763,4 @@ declare global {
   }
 }
 
-export { };
+export {};
