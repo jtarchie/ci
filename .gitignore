@@ -191,3 +191,4 @@ dist
 *.db-*
 /pocketci*
 server/docs/site/
+site/docs/

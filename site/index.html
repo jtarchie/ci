@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PocketCI — CI/CD forged for the agentic era</title>
+    <meta
+      name="description"
+      content="PocketCI is a local-first, programmable CI/CD runtime built for AI agents and humans alike. Pre-release and moving fast." />
+    <meta property="og:title" content="PocketCI" />
+    <meta
+      property="og:description"
+      content="CI/CD forged for the agentic era. Local-first, programmable, pre-release." />
+    <meta property="og:url" content="https://pocketci.dev" />
+    <meta property="og:type" content="website" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet" />
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      :root {
+        --iron:      #0a0705;
+        --iron-mid:  #120e0a;
+        --iron-light:#1e1610;
+        --copper:    #b87333;
+        --copper-dim:#7a4e22;
+        --brass:     #c9a84c;
+        --parchment: #f0e6d3;
+        --smoke:     #9a8a7a;
+        --border:    #2a1e14;
+        --red-led:   #FF3B30;
+        --green-led: #34C759;
+      }
+
+      html { scroll-behavior: smooth; }
+
+      body {
+        background-color: var(--iron);
+        color: var(--parchment);
+        font-family: 'Inter', sans-serif;
+        font-weight: 300;
+        line-height: 1.7;
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+
+      /* ─── texture overlay ─────────────────────────────────────────────── */
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background-image:
+          radial-gradient(ellipse at 20% 10%, rgba(184,115,51,0.06) 0%, transparent 60%),
+          radial-gradient(ellipse at 80% 80%, rgba(201,168,76,0.04) 0%, transparent 50%);
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      /* ─── nav ─────────────────────────────────────────────────────────── */
+      nav {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: rgba(10,7,5,0.92);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--border);
+        padding: 0 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 60px;
+      }
+
+      .nav-logo {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        text-decoration: none;
+      }
+
+      .nav-logo-mark {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .nav-logo-mark svg { height: 22px; }
+
+      .nav-logo-text {
+        font-family: 'Cinzel', serif;
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: var(--brass);
+        letter-spacing: 0.04em;
+      }
+
+      .nav-links {
+        display: flex;
+        gap: 2rem;
+        align-items: center;
+        list-style: none;
+      }
+
+      .nav-links a {
+        color: var(--smoke);
+        text-decoration: none;
+        font-size: 0.875rem;
+        letter-spacing: 0.03em;
+        transition: color 0.2s;
+      }
+
+      .nav-links a:hover { color: var(--parchment); }
+
+      .nav-links .btn-nav {
+        border: 1px solid var(--copper-dim);
+        border-radius: 3px;
+        padding: 0.35rem 0.9rem;
+        color: var(--copper);
+        font-size: 0.8rem;
+        transition: border-color 0.2s, color 0.2s, background 0.2s;
+      }
+
+      .nav-links .btn-nav:hover {
+        border-color: var(--copper);
+        background: rgba(184,115,51,0.08);
+        color: var(--parchment);
+      }
+
+      /* ─── layout ──────────────────────────────────────────────────────── */
+      section, footer { position: relative; z-index: 1; }
+
+      .container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 0 2rem;
+      }
+
+      /* ─── hero ────────────────────────────────────────────────────────── */
+      .hero {
+        min-height: calc(100vh - 60px);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 5rem 2rem 4rem;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .hero-gears {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.035;
+      }
+
+      .hero-gears svg {
+        position: absolute;
+        fill: var(--copper);
+      }
+
+      .gear-large {
+        width: 520px; height: 520px;
+        right: -120px; top: -80px;
+        animation: spin 90s linear infinite;
+      }
+
+      .gear-medium {
+        width: 280px; height: 280px;
+        left: -60px; bottom: 40px;
+        animation: spin 60s linear infinite reverse;
+      }
+
+      .gear-small {
+        width: 160px; height: 160px;
+        right: 340px; bottom: -30px;
+        animation: spin 40s linear infinite;
+      }
+
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      .hero-inner {
+        max-width: 720px;
+        margin: 0 auto;
+        text-align: center;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: var(--iron-light);
+        border: 1px solid var(--copper-dim);
+        border-radius: 2px;
+        padding: 0.3rem 0.85rem;
+        font-size: 0.72rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--copper);
+        margin-bottom: 2rem;
+        font-family: 'JetBrains Mono', monospace;
+      }
+
+      .badge::before {
+        content: '';
+        width: 6px; height: 6px;
+        border-radius: 50%;
+        background: var(--copper);
+        box-shadow: 0 0 6px var(--copper);
+        animation: pulse 2s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
+      }
+
+      h1 {
+        font-family: 'Cinzel', serif;
+        font-size: clamp(2rem, 5vw, 3.5rem);
+        font-weight: 700;
+        line-height: 1.15;
+        color: var(--parchment);
+        letter-spacing: 0.01em;
+        margin-bottom: 1.25rem;
+      }
+
+      h1 em {
+        font-style: normal;
+        color: var(--brass);
+      }
+
+      .hero-sub {
+        font-size: 1.1rem;
+        color: var(--smoke);
+        max-width: 560px;
+        margin: 0 auto 2.5rem;
+        line-height: 1.8;
+      }
+
+      .cta-group {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.75rem;
+        border-radius: 3px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        letter-spacing: 0.03em;
+        text-decoration: none;
+        transition: all 0.2s;
+        cursor: pointer;
+      }
+
+      .btn-primary {
+        background: var(--copper);
+        color: var(--iron);
+        border: 1px solid var(--copper);
+      }
+
+      .btn-primary:hover {
+        background: var(--brass);
+        border-color: var(--brass);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 20px rgba(184,115,51,0.3);
+      }
+
+      .btn-secondary {
+        background: transparent;
+        color: var(--parchment);
+        border: 1px solid var(--border);
+      }
+
+      .btn-secondary:hover {
+        border-color: var(--copper-dim);
+        color: var(--parchment);
+        transform: translateY(-1px);
+      }
+
+      /* ─── divider ─────────────────────────────────────────────────────── */
+      .rivet-divider {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 0 2rem;
+      }
+
+      .rivet-divider::before,
+      .rivet-divider::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(to right, transparent, var(--border));
+      }
+
+      .rivet-divider::after {
+        background: linear-gradient(to left, transparent, var(--border));
+      }
+
+      .rivet-center {
+        display: flex;
+        gap: 0.6rem;
+        align-items: center;
+      }
+
+      .rivet {
+        width: 8px; height: 8px;
+        border-radius: 50%;
+        background: var(--iron-light);
+        border: 1px solid var(--copper-dim);
+      }
+
+      /* ─── features ────────────────────────────────────────────────────── */
+      .features {
+        padding: 5rem 2rem;
+      }
+
+      .features-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1.5rem;
+        max-width: 900px;
+        margin: 0 auto;
+      }
+
+      .feature-card {
+        background: var(--iron-mid);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 2rem 1.75rem;
+        position: relative;
+        transition: border-color 0.3s, transform 0.2s;
+      }
+
+      .feature-card:hover {
+        border-color: var(--copper-dim);
+        transform: translateY(-2px);
+      }
+
+      /* corner rivets */
+      .feature-card::before,
+      .feature-card::after {
+        content: '';
+        position: absolute;
+        width: 6px; height: 6px;
+        border-radius: 50%;
+        background: var(--iron-light);
+        border: 1px solid var(--border);
+      }
+
+      .feature-card::before { top: 10px; left: 10px; }
+      .feature-card::after  { top: 10px; right: 10px; }
+
+      .feature-icon {
+        width: 40px; height: 40px;
+        color: var(--copper);
+        margin-bottom: 1.25rem;
+      }
+
+      .feature-card h3 {
+        font-family: 'Cinzel', serif;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--brass);
+        letter-spacing: 0.05em;
+        margin-bottom: 0.75rem;
+        text-transform: uppercase;
+      }
+
+      .feature-card p {
+        font-size: 0.875rem;
+        color: var(--smoke);
+        line-height: 1.75;
+      }
+
+      /* ─── code specimen ───────────────────────────────────────────────── */
+      .specimen {
+        padding: 0 2rem 5rem;
+      }
+
+      .specimen-frame {
+        max-width: 900px;
+        margin: 0 auto;
+        background: var(--iron-mid);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+
+      .specimen-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.75rem 1.25rem;
+        border-bottom: 1px solid var(--border);
+        background: var(--iron-light);
+      }
+
+      .specimen-dots {
+        display: flex;
+        gap: 6px;
+      }
+
+      .specimen-dot {
+        width: 10px; height: 10px;
+        border-radius: 50%;
+      }
+
+      .specimen-label {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.7rem;
+        color: var(--smoke);
+        letter-spacing: 0.08em;
+      }
+
+      .specimen-body {
+        padding: 1.75rem 2rem;
+        overflow-x: auto;
+      }
+
+      pre {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.825rem;
+        line-height: 1.8;
+        color: var(--parchment);
+        white-space: pre;
+      }
+
+      .tok-comment { color: #5a4e42; }
+      .tok-keyword { color: var(--copper); }
+      .tok-fn      { color: var(--brass); }
+      .tok-string  { color: #8fa882; }
+      .tok-dim     { color: #6a5a4e; }
+
+      /* ─── workshop notice ─────────────────────────────────────────────── */
+      .workshop {
+        padding: 0 2rem 5rem;
+      }
+
+      .workshop-inner {
+        max-width: 900px;
+        margin: 0 auto;
+        background: var(--iron-mid);
+        border: 1px solid var(--copper-dim);
+        border-radius: 4px;
+        padding: 2.5rem 3rem;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 2rem;
+        align-items: start;
+      }
+
+      .workshop-gauge {
+        width: 64px;
+        flex-shrink: 0;
+      }
+
+      .workshop-body h2 {
+        font-family: 'Cinzel', serif;
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--brass);
+        letter-spacing: 0.04em;
+        margin-bottom: 0.75rem;
+      }
+
+      .workshop-body p {
+        font-size: 0.9rem;
+        color: var(--smoke);
+        line-height: 1.8;
+      }
+
+      .workshop-body p + p { margin-top: 0.75rem; }
+
+      .workshop-body a {
+        color: var(--copper);
+        text-decoration: none;
+        border-bottom: 1px solid var(--copper-dim);
+        transition: border-color 0.2s, color 0.2s;
+      }
+
+      .workshop-body a:hover {
+        color: var(--brass);
+        border-color: var(--brass);
+      }
+
+      /* ─── footer ──────────────────────────────────────────────────────── */
+      footer {
+        border-top: 1px solid var(--border);
+        padding: 2.5rem 2rem;
+      }
+
+      .footer-inner {
+        max-width: 900px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1.5rem;
+        flex-wrap: wrap;
+      }
+
+      .footer-logo svg { height: 28px; }
+
+      .footer-links {
+        display: flex;
+        gap: 1.5rem;
+        list-style: none;
+      }
+
+      .footer-links a {
+        font-size: 0.8rem;
+        color: var(--smoke);
+        text-decoration: none;
+        transition: color 0.2s;
+      }
+
+      .footer-links a:hover { color: var(--parchment); }
+
+      .footer-copy {
+        font-size: 0.75rem;
+        color: #4a3e34;
+      }
+
+      /* ─── responsive ──────────────────────────────────────────────────── */
+      @media (max-width: 600px) {
+        .workshop-inner {
+          grid-template-columns: 1fr;
+          padding: 2rem 1.5rem;
+        }
+
+        .workshop-gauge { display: none; }
+
+        .footer-inner { justify-content: center; text-align: center; }
+      }
+    </style>
+  </head>
+  <body>
+
+    <!-- nav -->
+    <nav>
+      <a class="nav-logo" href="/">
+        <div class="nav-logo-mark">
+          <!-- dual LED logo -->
+          <svg viewBox="0 0 60 24" xmlns="http://www.w3.org/2000/svg" aria-label="PocketCI" role="img">
+            <circle cx="12" cy="12" r="9" fill="#FF3B30" stroke="#CC2D26" stroke-width="1.5">
+              <animate attributeName="opacity" from="0.85" to="1" dur="2s" repeatCount="indefinite"/>
+            </circle>
+            <circle cx="9" cy="9" r="3" fill="white" opacity="0.25"/>
+            <circle cx="48" cy="12" r="9" fill="#34C759" stroke="#28A745" stroke-width="1.5">
+              <animate attributeName="opacity" from="0.85" to="1" dur="1.5s" repeatCount="indefinite"/>
+            </circle>
+            <circle cx="45" cy="9" r="3" fill="white" opacity="0.25"/>
+          </svg>
+        </div>
+        <span class="nav-logo-text">PocketCI</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="/docs/">Docs</a></li>
+        <li><a href="https://github.com/jtarchie/pocketci" class="btn-nav" target="_blank" rel="noopener">GitHub</a></li>
+      </ul>
+    </nav>
+
+    <!-- hero -->
+    <section class="hero">
+      <div class="hero-gears" aria-hidden="true">
+        <svg class="gear-large" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <path d="M43.5,0 L56.5,0 L59,12.5 C62.5,13.5 65.8,15 68.8,17 L80.5,11.5 L89.5,20.5 L84,32.2 C86,35.2 87.5,38.5 88.5,42 L101,44.5 L101,57.5 L88.5,60 C87.5,63.5 86,66.8 84,69.8 L89.5,81.5 L80.5,90.5 L68.8,85 C65.8,87 62.5,88.5 59,89.5 L56.5,102 L43.5,102 L41,89.5 C37.5,88.5 34.2,87 31.2,85 L19.5,90.5 L10.5,81.5 L16,69.8 C14,66.8 12.5,63.5 11.5,60 L-1,57.5 L-1,44.5 L11.5,42 C12.5,38.5 14,35.2 16,32.2 L10.5,20.5 L19.5,11.5 L31.2,17 C34.2,15 37.5,13.5 41,12.5 Z M50,30 A20,20 0 1,0 50,70 A20,20 0 1,0 50,30 Z"/>
+        </svg>
+        <svg class="gear-medium" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <path d="M43.5,0 L56.5,0 L59,12.5 C62.5,13.5 65.8,15 68.8,17 L80.5,11.5 L89.5,20.5 L84,32.2 C86,35.2 87.5,38.5 88.5,42 L101,44.5 L101,57.5 L88.5,60 C87.5,63.5 86,66.8 84,69.8 L89.5,81.5 L80.5,90.5 L68.8,85 C65.8,87 62.5,88.5 59,89.5 L56.5,102 L43.5,102 L41,89.5 C37.5,88.5 34.2,87 31.2,85 L19.5,90.5 L10.5,81.5 L16,69.8 C14,66.8 12.5,63.5 11.5,60 L-1,57.5 L-1,44.5 L11.5,42 C12.5,38.5 14,35.2 16,32.2 L10.5,20.5 L19.5,11.5 L31.2,17 C34.2,15 37.5,13.5 41,12.5 Z M50,30 A20,20 0 1,0 50,70 A20,20 0 1,0 50,30 Z"/>
+        </svg>
+        <svg class="gear-small" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <path d="M43.5,0 L56.5,0 L59,12.5 C62.5,13.5 65.8,15 68.8,17 L80.5,11.5 L89.5,20.5 L84,32.2 C86,35.2 87.5,38.5 88.5,42 L101,44.5 L101,57.5 L88.5,60 C87.5,63.5 86,66.8 84,69.8 L89.5,81.5 L80.5,90.5 L68.8,85 C65.8,87 62.5,88.5 59,89.5 L56.5,102 L43.5,102 L41,89.5 C37.5,88.5 34.2,87 31.2,85 L19.5,90.5 L10.5,81.5 L16,69.8 C14,66.8 12.5,63.5 11.5,60 L-1,57.5 L-1,44.5 L11.5,42 C12.5,38.5 14,35.2 16,32.2 L10.5,20.5 L19.5,11.5 L31.2,17 C34.2,15 37.5,13.5 41,12.5 Z M50,30 A20,20 0 1,0 50,70 A20,20 0 1,0 50,30 Z"/>
+        </svg>
+      </div>
+      <div class="hero-inner">
+        <div class="badge">Pre-release &nbsp;·&nbsp; v0.x</div>
+        <h1>CI/CD forged for the<br><em>agentic era</em></h1>
+        <p class="hero-sub">
+          PocketCI is a local-first pipeline runtime where pipelines are
+          TypeScript programs, not YAML configs. Built to run on your machine
+          and scale to fleets of AI agents.
+        </p>
+        <div class="cta-group">
+          <a href="https://github.com/jtarchie/pocketci" class="btn btn-primary" target="_blank" rel="noopener">
+            View on GitHub
+          </a>
+          <a href="/docs/" class="btn btn-secondary">
+            Read the Docs
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <div class="rivet-divider">
+      <div class="rivet-center">
+        <div class="rivet"></div>
+        <div class="rivet"></div>
+        <div class="rivet"></div>
+      </div>
+    </div>
+
+    <!-- features -->
+    <section class="features">
+      <div class="features-grid">
+
+        <div class="feature-card">
+          <!-- gear icon -->
+          <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+          </svg>
+          <h3>Local-first</h3>
+          <p>Runs entirely on your machine with Docker or the native driver. No cloud account, no SaaS dependency, no data leaving your infrastructure.</p>
+        </div>
+
+        <div class="feature-card">
+          <!-- circuit/agent icon -->
+          <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25zm.75-12h9v9h-9v-9z"/>
+          </svg>
+          <h3>Agent-ready</h3>
+          <p>Designed from the start for AI agents. Pipelines expose an MCP server, webhooks fire into agentic loops, and the runtime API is scripted, not clicked.</p>
+        </div>
+
+        <div class="feature-card">
+          <!-- code icon -->
+          <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5"/>
+          </svg>
+          <h3>Programmable</h3>
+          <p>Pipelines are TypeScript programs. Loops, conditionals, parallel steps, shared volumes — use the language, not a new DSL. YAML compatibility for Concourse migrations.</p>
+        </div>
+
+      </div>
+    </section>
+
+    <div class="rivet-divider">
+      <div class="rivet-center">
+        <div class="rivet"></div>
+        <div class="rivet"></div>
+        <div class="rivet"></div>
+      </div>
+    </div>
+
+    <!-- code specimen -->
+    <section class="specimen">
+      <div style="max-width:900px; margin: 0 auto 1.5rem; padding-top: 4rem;">
+        <div style="text-align:center; margin-bottom: 2.5rem;">
+          <p style="font-family:'Cinzel',serif; font-size:0.75rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--smoke);">A pipeline, unabridged</p>
+        </div>
+      </div>
+      <div class="specimen-frame">
+        <div class="specimen-header">
+          <div class="specimen-dots">
+            <div class="specimen-dot" style="background:#FF3B30;"></div>
+            <div class="specimen-dot" style="background:#FFCC00;"></div>
+            <div class="specimen-dot" style="background:#34C759;"></div>
+          </div>
+          <span class="specimen-label">pipeline.ts</span>
+          <span></span>
+        </div>
+        <div class="specimen-body">
+<pre><span class="tok-comment">// A pipeline is an exported async function.</span>
+<span class="tok-comment">// PocketCI executes it, wires up containers, and collects results.</span>
+
+<span class="tok-keyword">const</span> <span class="tok-fn">pipeline</span> = <span class="tok-keyword">async</span> () => {
+  <span class="tok-dim">// 1. run tests inside a container</span>
+  <span class="tok-keyword">const</span> test = <span class="tok-keyword">await</span> runtime.<span class="tok-fn">run</span>({
+    name:    <span class="tok-string">"run-tests"</span>,
+    image:   <span class="tok-string">"golang:1.25"</span>,
+    command: { path: <span class="tok-string">"go"</span>, args: [<span class="tok-string">"test"</span>, <span class="tok-string">"./..."</span>] },
+    volumes: [{ name: <span class="tok-string">"src"</span>, path: <span class="tok-string">"/workspace"</span> }],
+  });
+
+  <span class="tok-dim">// 2. hand off to an agent if tests passed</span>
+  <span class="tok-keyword">if</span> (test.exitCode === <span class="tok-string">0</span>) {
+    <span class="tok-keyword">await</span> runtime.<span class="tok-fn">agent</span>({
+      name:   <span class="tok-string">"notify-agent"</span>,
+      script: <span class="tok-string">"./agents/post-build.ts"</span>,
+    });
+  }
+};
+
+<span class="tok-keyword">export</span> { pipeline };</pre>
+        </div>
+      </div>
+    </section>
+
+    <div class="rivet-divider" style="padding-top: 0;">
+      <div class="rivet-center">
+        <div class="rivet"></div>
+        <div class="rivet"></div>
+        <div class="rivet"></div>
+      </div>
+    </div>
+
+    <!-- workshop notice -->
+    <section class="workshop" style="padding-top: 4rem;">
+      <div class="workshop-inner">
+        <!-- pressure gauge SVG -->
+        <div class="workshop-gauge" aria-hidden="true">
+          <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" fill="none">
+            <circle cx="32" cy="32" r="28" stroke="#2a1e14" stroke-width="3" fill="#120e0a"/>
+            <circle cx="32" cy="32" r="24" stroke="#3a2a1c" stroke-width="1" fill="none"/>
+            <!-- tick marks -->
+            <g stroke="#5a4e42" stroke-width="1.5">
+              <line x1="32" y1="10" x2="32" y2="15"/>
+              <line x1="10" y1="32" x2="15" y2="32"/>
+              <line x1="54" y1="32" x2="49" y2="32"/>
+              <line x1="32" y1="54" x2="32" y2="49"/>
+              <line x1="16" y1="16" x2="19.5" y2="19.5"/>
+              <line x1="48" y1="16" x2="44.5" y2="19.5"/>
+              <line x1="16" y1="48" x2="19.5" y2="44.5"/>
+              <line x1="48" y1="48" x2="44.5" y2="44.5"/>
+            </g>
+            <!-- needle pointing to ~70% -->
+            <line x1="32" y1="32" x2="44" y2="14" stroke="#b87333" stroke-width="2" stroke-linecap="round"/>
+            <!-- centre cap -->
+            <circle cx="32" cy="32" r="3" fill="#b87333"/>
+            <!-- label -->
+            <text x="32" y="46" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="5" fill="#5a4e42">PRESSURE</text>
+          </svg>
+        </div>
+        <div class="workshop-body">
+          <h2>The boiler is lit. The gauges are being calibrated.</h2>
+          <p>
+            PocketCI is pre-v1.0 and actively developed. The core pipeline runtime
+            is solid and used in production workflows, but APIs may shift and some
+            drivers are still experimental. Expect rough edges and fast iteration.
+          </p>
+          <p>
+            If you're building with AI agents, automating infrastructure, or just
+            tired of YAML sprawl, this is a good time to kick the tyres.
+            Star the <a href="https://github.com/jtarchie/pocketci" target="_blank" rel="noopener">repo</a>
+            to follow along, or open an issue if something breaks.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- footer -->
+    <footer>
+      <div class="footer-inner">
+        <div class="footer-logo">
+          <svg viewBox="0 0 60 24" xmlns="http://www.w3.org/2000/svg" aria-label="PocketCI" role="img">
+            <circle cx="12" cy="12" r="9" fill="#FF3B30" stroke="#CC2D26" stroke-width="1.5"/>
+            <circle cx="9" cy="9" r="3" fill="white" opacity="0.2"/>
+            <circle cx="48" cy="12" r="9" fill="#34C759" stroke="#28A745" stroke-width="1.5"/>
+            <circle cx="45" cy="9" r="3" fill="white" opacity="0.2"/>
+          </svg>
+        </div>
+        <ul class="footer-links">
+          <li><a href="/docs/">Documentation</a></li>
+          <li><a href="https://github.com/jtarchie/pocketci" target="_blank" rel="noopener">GitHub</a></li>
+          <li><a href="https://ci.pocketci.dev" target="_blank" rel="noopener">Live&nbsp;Demo</a></li>
+        </ul>
+        <span class="footer-copy">&copy; 2026 PocketCI</span>
+      </div>
+    </footer>
+
+  </body>
+</html>
