@@ -1,9 +1,6 @@
 package server
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +9,7 @@ import (
 
 	"github.com/jtarchie/ci/runtime"
 	"github.com/jtarchie/ci/storage"
+	"github.com/jtarchie/ci/webhooks"
 	"github.com/labstack/echo/v5"
 )
 
@@ -52,23 +50,17 @@ func (c *APIWebhooksController) Trigger(ctx *echo.Context) error {
 		})
 	}
 
-	if pipeline.WebhookSecret != "" {
-		signature := ctx.Request().Header.Get("X-Webhook-Signature")
-		if signature == "" {
-			signature = ctx.QueryParam("signature")
-		}
-
-		if signature == "" {
+	event, err := webhooks.Detect(ctx.Request(), body, pipeline.WebhookSecret)
+	if err != nil {
+		if errors.Is(err, webhooks.ErrUnauthorized) {
 			return ctx.JSON(http.StatusUnauthorized, map[string]string{
-				"error": "missing webhook signature",
+				"error": "webhook signature validation failed",
 			})
 		}
 
-		if !validateWebhookSignature(body, pipeline.WebhookSecret, signature) {
-			return ctx.JSON(http.StatusUnauthorized, map[string]string{
-				"error": "invalid webhook signature",
-			})
-		}
+		return ctx.JSON(http.StatusBadRequest, map[string]string{
+			"error": fmt.Sprintf("no webhook provider matched the request: %v", err),
+		})
 	}
 
 	if !c.execService.CanExecute() {
@@ -79,26 +71,14 @@ func (c *APIWebhooksController) Trigger(ctx *echo.Context) error {
 		})
 	}
 
-	headers := make(map[string]string)
-	for key, values := range ctx.Request().Header {
-		if len(values) > 0 {
-			headers[key] = values[0]
-		}
-	}
-
-	query := make(map[string]string)
-	for key, values := range ctx.QueryParams() {
-		if len(values) > 0 {
-			query[key] = values[0]
-		}
-	}
-
 	webhookData := &runtime.WebhookData{
-		Method:  ctx.Request().Method,
-		URL:     ctx.Request().URL.String(),
-		Headers: headers,
-		Body:    string(body),
-		Query:   query,
+		Provider:  event.Provider,
+		EventType: event.EventType,
+		Method:    event.Method,
+		URL:       event.URL,
+		Headers:   event.Headers,
+		Body:      event.Body,
+		Query:     event.Query,
 	}
 
 	responseChan := make(chan *runtime.HTTPResponse, 1)
@@ -130,16 +110,6 @@ func (c *APIWebhooksController) Trigger(ctx *echo.Context) error {
 			"message":     "pipeline execution started",
 		})
 	}
-}
-
-// validateWebhookSignature validates an HMAC-SHA256 signature of the request body.
-func validateWebhookSignature(body []byte, secret, signature string) bool {
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write(body)
-	expectedMAC := mac.Sum(nil)
-	expectedSignature := hex.EncodeToString(expectedMAC)
-
-	return hmac.Equal([]byte(signature), []byte(expectedSignature))
 }
 
 // RegisterRoutes registers all webhook routes on the main router (no auth group).

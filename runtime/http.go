@@ -8,11 +8,13 @@ import (
 
 // WebhookData represents the incoming HTTP request data from a webhook trigger.
 type WebhookData struct {
-	Method  string            `json:"method"`
-	URL     string            `json:"url"`
-	Headers map[string]string `json:"headers"`
-	Body    string            `json:"body"`
-	Query   map[string]string `json:"query"`
+	Provider  string            `json:"provider"`
+	EventType string            `json:"eventType"`
+	Method    string            `json:"method"`
+	URL       string            `json:"url"`
+	Headers   map[string]string `json:"headers"`
+	Body      string            `json:"body"`
+	Query     map[string]string `json:"query"`
 }
 
 // HTTPResponse represents the HTTP response a pipeline can send back to the webhook caller.

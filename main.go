@@ -16,6 +16,9 @@ import (
 	_ "github.com/jtarchie/ci/resources/mock"
 	_ "github.com/jtarchie/ci/secrets/local"
 	_ "github.com/jtarchie/ci/storage/sqlite"
+	_ "github.com/jtarchie/ci/webhooks/generic"
+	_ "github.com/jtarchie/ci/webhooks/github"
+	_ "github.com/jtarchie/ci/webhooks/slack"
 	"github.com/lmittmann/tint"
 )
 

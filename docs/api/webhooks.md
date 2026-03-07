@@ -10,20 +10,18 @@ execution in the background.
 
 ## Signature Validation (Optional)
 
-If the pipeline has a `webhook_secret` configured, requests must include an
-HMAC-SHA256 signature of the request body.
+The server automatically detects the webhook provider from the request headers
+and applies provider-specific signature verification.
 
-**Via header**:
+| Provider  | Detection header    | Signature header                                            |
+| --------- | ------------------- | ----------------------------------------------------------- |
+| `github`  | `X-GitHub-Event`    | `X-Hub-Signature-256: sha256=<hex>`                         |
+| `slack`   | `X-Slack-Signature` | `X-Slack-Signature: v0=<hex>` + `X-Slack-Request-Timestamp` |
+| `generic` | _(fallback)_        | `X-Webhook-Signature: <hex>` or `?signature=<hex>`          |
 
-```
-X-Webhook-Signature: <hex-encoded HMAC-SHA256>
-```
-
-**Via query parameter**:
-
-```
-/api/webhooks/:pipeline-id?signature=<hex-encoded HMAC-SHA256>
-```
+If the pipeline has a `webhook_secret` configured, requests must pass the
+provider's signature check. Requests that fail validation receive
+`401 Unauthorized`.
 
 ## Example
 
@@ -42,10 +40,11 @@ Inside the pipeline, access the incoming request and respond:
 const pipeline = async () => {
   const req = http.request();
   if (req) {
-    // Pipeline was triggered via webhook
+    // req.provider    — "github" | "slack" | "generic"
+    // req.eventType   — e.g. "push", "pull_request", "event_callback"
     http.respond({
       status: 200,
-      body: JSON.stringify({ acknowledged: true }),
+      body: JSON.stringify({ acknowledged: true, provider: req.provider }),
       headers: { "Content-Type": "application/json" }
     });
   }

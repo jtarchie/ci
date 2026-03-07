@@ -17,6 +17,7 @@ import (
 	"github.com/jtarchie/ci/server"
 	"github.com/jtarchie/ci/storage"
 	_ "github.com/jtarchie/ci/storage/sqlite"
+	_ "github.com/jtarchie/ci/webhooks/generic"
 	. "github.com/onsi/gomega"
 )
 
@@ -215,7 +216,7 @@ func TestWebhookAPI(t *testing.T) {
 				var resp map[string]string
 				err = json.Unmarshal(rec.Body.Bytes(), &resp)
 				assert.Expect(err).NotTo(HaveOccurred())
-				assert.Expect(resp["error"]).To(Equal("missing webhook signature"))
+				assert.Expect(resp["error"]).To(Equal("webhook signature validation failed"))
 			})
 
 			t.Run("webhook returns 401 on invalid signature", func(t *testing.T) {
@@ -252,7 +253,7 @@ func TestWebhookAPI(t *testing.T) {
 				var resp map[string]string
 				err = json.Unmarshal(rec.Body.Bytes(), &resp)
 				assert.Expect(err).NotTo(HaveOccurred())
-				assert.Expect(resp["error"]).To(Equal("invalid webhook signature"))
+				assert.Expect(resp["error"]).To(Equal("webhook signature validation failed"))
 			})
 
 			t.Run("webhook accepts all requests when no secret configured", func(t *testing.T) {

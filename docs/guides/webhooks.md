@@ -76,6 +76,53 @@ crypto
   .digest("hex");
 ```
 
+## Webhook Providers
+
+The server automatically detects the incoming webhook provider and verifies its
+signature. Pipelines receive the detected `provider` and `eventType` on the
+`http.request()` object.
+
+### GitHub
+
+Detected when the request includes an `X-GitHub-Event` header.
+
+- **`provider`**: `"github"`
+- **`eventType`**: value of `X-GitHub-Event` (e.g. `"push"`, `"pull_request"`)
+- **Signature header**: `X-Hub-Signature-256: sha256=<hex>` (HMAC-SHA256)
+- If a webhook secret is configured and the header is missing or invalid, the
+  request is rejected with `401 Unauthorized`.
+
+```bash
+curl -X POST http://localhost:8080/api/webhooks/<pipeline-id> \
+  -H "X-GitHub-Event: push" \
+  -H "X-Hub-Signature-256: sha256=<hex>" \
+  -d '{"ref":"refs/heads/main"}'
+```
+
+### Slack
+
+Detected when the request includes an `X-Slack-Signature` header.
+
+- **`provider`**: `"slack"`
+- **`eventType`**: top-level `type` field from the JSON body (e.g.
+  `"event_callback"`, `"url_verification"`)
+- **Signature**: `X-Slack-Signature: v0=<hex>` verified against
+  `v0:<X-Slack-Request-Timestamp>:<body>` using HMAC-SHA256
+- Both `X-Slack-Signature` and `X-Slack-Request-Timestamp` must be present when
+  a secret is configured.
+
+### Generic (fallback)
+
+Used for all other requests that don't match a specific provider.
+
+- **`provider`**: `"generic"`
+- **`eventType`**: `""` (empty)
+- **Signature header**: `X-Webhook-Signature: <hex-encoded HMAC-SHA256>`
+- **Signature query param**: `?signature=<hex-encoded HMAC-SHA256>`
+
+This is the same behaviour as the original webhook implementation and is
+compatible with any tool that can send a plain HMAC-SHA256 signature.
+
 ## JavaScript/TypeScript API
 
 Pipelines access webhook data through the global `http` object.
@@ -87,6 +134,8 @@ triggered via webhook.
 
 ```typescript
 interface HttpRequest {
+  provider: string; // Detected provider: "github", "slack", or "generic"
+  eventType: string; // Provider-specific event type (e.g. "push", "event_callback")
   method: string; // "GET", "POST", etc.
   url: string; // Request URL path with query string
   headers: Record<string, string>; // Request headers
@@ -161,21 +210,47 @@ const pipeline = async () => {
   const req = http.request();
   if (!req) return;
 
-  const event = req.headers["X-Github-Event"];
+  // req.provider === "github", req.eventType === "push" | "pull_request" | ...
   http.respond({
     status: 200,
-    body: JSON.stringify({ accepted: true, event }),
+    body: JSON.stringify({ accepted: true, event: req.eventType }),
     headers: { "Content-Type": "application/json" },
   });
 
   const payload = JSON.parse(req.body);
-  if (event === "push") {
+  if (req.eventType === "push") {
     await runtime.run({
       name: "build",
       image: "golang:1.22",
       command: { path: "go", args: ["build", "./..."] },
     });
   }
+};
+export { pipeline };
+```
+
+#### Slack webhook
+
+```typescript
+const pipeline = async () => {
+  const req = http.request();
+  if (!req) return;
+
+  // Handle Slack's url_verification challenge
+  if (req.eventType === "url_verification") {
+    const { challenge } = JSON.parse(req.body);
+    http.respond({
+      status: 200,
+      body: JSON.stringify({ challenge }),
+      headers: { "Content-Type": "application/json" },
+    });
+    return;
+  }
+
+  http.respond({ status: 200, body: "ok" });
+
+  const payload = JSON.parse(req.body);
+  console.log("Slack event:", payload.event?.type);
 };
 export { pipeline };
 ```
