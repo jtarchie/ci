@@ -903,6 +903,7 @@ export class JobRunner {
         stdout: result.text,
         toolCalls: result.toolCalls,
         usage: result.usage,
+        audit_log: result.auditLog,
       });
     } catch (error) {
       storage.set(storageKey, {

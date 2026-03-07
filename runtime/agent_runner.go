@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"google.golang.org/adk/agent"
@@ -79,6 +80,7 @@ type AgentResult struct {
 	Status    string           `json:"status"` // "success" or "failure"
 	ToolCalls []ToolCallRecord `json:"toolCalls"`
 	Usage     AgentUsage       `json:"usage"`
+	AuditLog  []AuditEvent     `json:"auditLog"`
 }
 
 // ToolCallRecord captures a single tool invocation and its result.
@@ -96,6 +98,34 @@ type AgentUsage struct {
 	TotalTokens      int32 `json:"totalTokens"`
 	LLMRequests      int   `json:"llmRequests"`
 	ToolCallCount    int   `json:"toolCallCount"`
+}
+
+// AuditUsage holds per-event token counts reported by the LLM.
+type AuditUsage struct {
+	PromptTokens     int32 `json:"promptTokens"`
+	CompletionTokens int32 `json:"completionTokens"`
+	TotalTokens      int32 `json:"totalTokens"`
+}
+
+// AuditEvent is a single entry in the agent audit log.
+// Type values:
+//   - "pre_context"   — synthetic tool call injected before the first turn
+//   - "user_message"  — the initial user prompt
+//   - "tool_call"     — a function call made by the model
+//   - "tool_response" — the result returned to the model
+//   - "model_text"    — an intermediate model text chunk
+//   - "model_final"   — the final model response
+type AuditEvent struct {
+	Timestamp    string         `json:"timestamp,omitempty"`
+	InvocationID string         `json:"invocationId,omitempty"`
+	Author       string         `json:"author,omitempty"`
+	Type         string         `json:"type"`
+	Text         string         `json:"text,omitempty"`
+	ToolName     string         `json:"toolName,omitempty"`
+	ToolCallID   string         `json:"toolCallId,omitempty"`
+	ToolArgs     map[string]any `json:"toolArgs,omitempty"`
+	ToolResult   map[string]any `json:"toolResult,omitempty"`
+	Usage        *AuditUsage    `json:"usage,omitempty"`
 }
 
 // runCommandInput is the tool schema for run_command.
@@ -812,6 +842,10 @@ func RunAgent(
 		}
 	}
 
+	// Initialise audit log and base timestamp for pre-context entries.
+	var auditEvents []AuditEvent
+	now := time.Now().UTC()
+
 	// Pre-inject a synthetic list_tasks result so the agent knows the run
 	// state from turn 0 without spending a tool-call turn on orientation.
 	if config.storage != nil && config.runID != "" {
@@ -822,12 +856,23 @@ func RunAgent(
 				taskMaps[i] = taskSummaryToMap(t)
 			}
 
+			listTasksResult := map[string]any{"tasks": taskMaps}
+
 			_ = injectSyntheticToolCall(
 				ctx, sessionService, sessResp.Session,
 				config.Name, "list_tasks",
 				map[string]any{},
-				map[string]any{"tasks": taskMaps},
+				listTasksResult,
 			)
+
+			auditEvents = append(auditEvents, AuditEvent{
+				Timestamp:  now.Format(time.RFC3339),
+				Author:     config.Name,
+				Type:       "pre_context",
+				ToolName:   "list_tasks",
+				ToolArgs:   map[string]any{},
+				ToolResult: listTasksResult,
+			})
 		}
 	}
 
@@ -891,14 +936,33 @@ func RunAgent(
 				result["stderr"] = stderr
 			}
 
+			getTaskArgs := map[string]any{"name": ct.Name}
+
 			_ = injectSyntheticToolCall(
 				ctx, sessionService, sessResp.Session,
 				config.Name, "get_task_result",
-				map[string]any{"name": ct.Name},
+				getTaskArgs,
 				result,
 			)
+
+			auditEvents = append(auditEvents, AuditEvent{
+				Timestamp:  now.Format(time.RFC3339),
+				Author:     config.Name,
+				Type:       "pre_context",
+				ToolName:   "get_task_result",
+				ToolArgs:   getTaskArgs,
+				ToolResult: result,
+			})
 		}
 	}
+
+	// Record the initial user message in the audit log.
+	auditEvents = append(auditEvents, AuditEvent{
+		Timestamp: now.Format(time.RFC3339),
+		Author:    "user",
+		Type:      "user_message",
+		Text:      config.Prompt,
+	})
 
 	// Run the agent, collecting the final text response, tool call history, and usage.
 	// The user's task prompt is the first user message; the Instruction field
@@ -925,16 +989,31 @@ func RunAgent(
 		}
 
 		// Accumulate token usage from every LLM response.
+		var eventUsage *AuditUsage
 		if event.UsageMetadata != nil {
 			usage.PromptTokens += event.UsageMetadata.PromptTokenCount
 			usage.CompletionTokens += event.UsageMetadata.CandidatesTokenCount
 			usage.TotalTokens += event.UsageMetadata.TotalTokenCount
 			usage.LLMRequests++
+			eventUsage = &AuditUsage{
+				PromptTokens:     event.UsageMetadata.PromptTokenCount,
+				CompletionTokens: event.UsageMetadata.CandidatesTokenCount,
+				TotalTokens:      event.UsageMetadata.TotalTokenCount,
+			}
 		}
 
 		if event.Content == nil {
 			continue
 		}
+
+		// Compute timestamp and finality for audit events.
+		ts := now.Format(time.RFC3339)
+		if !event.Timestamp.IsZero() {
+			ts = event.Timestamp.UTC().Format(time.RFC3339)
+		}
+
+		isFinal := event.IsFinalResponse()
+		usageAttached := false
 
 		for _, part := range event.Content.Parts {
 			// Track function calls (tool invocations by the model).
@@ -952,6 +1031,16 @@ func RunAgent(
 
 				toolCalls = append(toolCalls, *record)
 				usage.ToolCallCount++
+
+				auditEvents = append(auditEvents, AuditEvent{
+					Timestamp:    ts,
+					InvocationID: event.InvocationID,
+					Author:       event.Author,
+					Type:         "tool_call",
+					ToolName:     fc.Name,
+					ToolCallID:   fc.ID,
+					ToolArgs:     fc.Args,
+				})
 			}
 
 			// Track function responses (tool results).
@@ -969,6 +1058,16 @@ func RunAgent(
 
 					delete(pendingCalls, fr.ID)
 				}
+
+				auditEvents = append(auditEvents, AuditEvent{
+					Timestamp:    ts,
+					InvocationID: event.InvocationID,
+					Author:       event.Author,
+					Type:         "tool_response",
+					ToolName:     fr.Name,
+					ToolCallID:   fr.ID,
+					ToolResult:   fr.Response,
+				})
 			}
 
 			if part.Text == "" {
@@ -980,6 +1079,26 @@ func RunAgent(
 			if config.OnOutput != nil {
 				config.OnOutput("stdout", part.Text)
 			}
+
+			eventType := "model_text"
+			if isFinal {
+				eventType = "model_final"
+			}
+
+			ae := AuditEvent{
+				Timestamp:    ts,
+				InvocationID: event.InvocationID,
+				Author:       event.Author,
+				Type:         eventType,
+				Text:         part.Text,
+			}
+
+			if !usageAttached {
+				ae.Usage = eventUsage
+				usageAttached = true
+			}
+
+			auditEvents = append(auditEvents, ae)
 		}
 	}
 
@@ -1012,5 +1131,6 @@ func RunAgent(
 		Status:    status,
 		ToolCalls: toolCalls,
 		Usage:     usage,
+		AuditLog:  auditEvents,
 	}, nil
 }

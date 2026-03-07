@@ -263,6 +263,29 @@ declare global {
     status: "success" | "failure";
     toolCalls: ToolCallRecord[];
     usage: AgentUsage;
+    auditLog: AuditEvent[];
+  }
+
+  // Token counts for a single LLM event.
+  interface AuditUsage {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  }
+
+  // A single entry in the agent audit log.
+  // type values: "pre_context" | "user_message" | "tool_call" | "tool_response" | "model_text" | "model_final"
+  interface AuditEvent {
+    timestamp?: string;
+    invocationId?: string;
+    author?: string;
+    type: string;
+    text?: string;
+    toolName?: string;
+    toolCallId?: string;
+    toolArgs?: { [key: string]: unknown };
+    toolResult?: { [key: string]: unknown };
+    usage?: AuditUsage;
   }
 
   // Language model generation parameters for agent steps.
@@ -781,4 +804,4 @@ declare global {
   }
 }
 
-export { };
+export {};

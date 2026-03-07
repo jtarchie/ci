@@ -852,7 +852,8 @@ var JobRunner = class {
         elapsed: elapsedSince(),
         stdout: result.text,
         toolCalls: result.toolCalls,
-        usage: result.usage
+        usage: result.usage,
+        audit_log: result.auditLog
       });
     } catch (error) {
       storage.set(storageKey, {
