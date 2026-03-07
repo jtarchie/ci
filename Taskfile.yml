@@ -24,7 +24,10 @@ tasks:
       - shellcheck bin/*.sh
       - shfmt -w bin/
       - gofmt -w .
-      - golangci-lint run ./... --fix
+      - |
+          if [ "${CI}" != "true" ]; then
+            golangci-lint run ./... --fix
+          fi
   default:
     cmds:
       - task: build
@@ -94,8 +97,8 @@ tasks:
       - go mod tidy
       - echo "Bumping npm dependencies in e2e..."
       - cd e2e && npx npm-check-updates -u && npm install
-      - echo "Bumping npm dependencies in packages/ci..."
-      - cd packages/ci && npx npm-check-updates -u && npm install
+      - echo "Bumping npm dependencies in packages/pocketci..."
+      - cd packages/pocketci && npx npm-check-updates -u && npm install
       - echo "Bumping npm dependencies in examples..."
       - cd examples && npx npm-check-updates -u && npm install
       - echo "Bumping npm dependencies in server/static..."
