@@ -1,6 +1,22 @@
 # syntax=docker/dockerfile:1
 # Multi-stage Dockerfile for Fly.io deployment
 
+# Stage 0: Build VitePress docs
+FROM node:alpine AS docs-builder
+
+RUN apk add --no-cache rsync
+
+WORKDIR /app/docs
+
+# Copy docs source
+COPY docs/package.json docs/package-lock.json ./
+RUN npm ci
+
+COPY docs/ ./
+
+# Builds .vitepress/dist/ then rsyncs to ../server/docs/site/
+RUN mkdir -p /app/server/docs/site && npm run build
+
 # Stage 1: Build
 FROM golang:alpine AS builder
 
@@ -21,6 +37,9 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 # Copy the rest of the source code
 COPY . .
+
+# Copy pre-built VitePress docs (not in git, built in docs-builder stage)
+COPY --from=docs-builder /app/server/docs/site ./server/docs/site
 
 # Build the binary with cache mounts
 RUN --mount=type=cache,target=/go/pkg/mod \

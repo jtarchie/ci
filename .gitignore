@@ -190,3 +190,4 @@ dist
 *.db
 *.db-*
 ci*
+server/docs/site/
