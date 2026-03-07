@@ -165,6 +165,12 @@ var JobRunner = class {
     const storageKey = this.getBaseStorageKey();
     let failure = void 0;
     const dependsOn = this.extractDependencies();
+    if (this.jobConfig.webhook_trigger) {
+      if (!webhookTrigger(this.jobConfig.webhook_trigger)) {
+        storage.set(storageKey, { status: "skipped", dependsOn });
+        return;
+      }
+    }
     storage.set(storageKey, { status: "pending", dependsOn });
     try {
       for (let i = 0; i < this.jobConfig.plan.length; i++) {

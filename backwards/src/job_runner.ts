@@ -41,6 +41,15 @@ export class JobRunner {
     let failure: unknown = undefined;
     const dependsOn = this.extractDependencies();
 
+    // Skip this job if webhook_trigger expression evaluates to false.
+    // Manual (non-webhook) triggers always pass through (webhookTrigger returns true).
+    if (this.jobConfig.webhook_trigger) {
+      if (!webhookTrigger(this.jobConfig.webhook_trigger)) {
+        storage.set(storageKey, { status: "skipped", dependsOn });
+        return;
+      }
+    }
+
     storage.set(storageKey, { status: "pending", dependsOn });
 
     try {

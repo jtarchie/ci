@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -15,6 +16,7 @@ import (
 	"github.com/jtarchie/ci/orchestra"
 	"github.com/jtarchie/ci/secrets"
 	"github.com/jtarchie/ci/storage"
+	"github.com/jtarchie/ci/webhooks/filter"
 )
 
 // ExecuteOptions configures pipeline execution.
@@ -243,6 +245,40 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 	err = jsVM.Set("http", httpRuntime)
 	if err != nil {
 		return fmt.Errorf("could not set http: %w", err)
+	}
+
+	// webhookTrigger evaluates an expr-lang expression against the current webhook data.
+	// Returns true when no webhook is active (manual trigger) so jobs always run.
+	err = jsVM.Set("webhookTrigger", func(expression string) bool {
+		if opts.WebhookData == nil {
+			return true
+		}
+
+		env := filter.WebhookEnv{
+			Provider:  opts.WebhookData.Provider,
+			EventType: opts.WebhookData.EventType,
+			Method:    opts.WebhookData.Method,
+			Headers:   opts.WebhookData.Headers,
+			Query:     opts.WebhookData.Query,
+			Body:      opts.WebhookData.Body,
+		}
+
+		var payload map[string]any
+		if jsonErr := json.Unmarshal([]byte(opts.WebhookData.Body), &payload); jsonErr == nil {
+			env.Payload = payload
+		}
+
+		result, evalErr := filter.Evaluate(expression, env)
+		if evalErr != nil {
+			slog.Error("webhookTrigger evaluation failed", "error", evalErr, "expression", expression)
+
+			return false
+		}
+
+		return result
+	})
+	if err != nil {
+		return fmt.Errorf("could not set webhookTrigger: %w", err)
 	}
 
 	// Expose pipeline context to JavaScript (runID, pipelineID, etc.)

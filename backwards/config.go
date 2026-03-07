@@ -198,15 +198,16 @@ type Job struct {
 		Days   int `yaml:"days,omitempty"`
 	} `yaml:"build_log_retention,omitempty"`
 
-	Name      string        `validate:"required,min=3"      yaml:"name,omitempty"`
-	Plan      Steps         `validate:"required,min=1,dive" yaml:"plan,omitempty"`
-	Public    bool          `yaml:"public,omitempty"`
-	Ensure    *Step         `yaml:"ensure,omitempty"`
-	OnAbort   *Step         `yaml:"on_abort,omitempty"`
-	OnError   *Step         `yaml:"on_error,omitempty"`
-	OnSuccess *Step         `yaml:"on_success,omitempty"`
-	OnFailure *Step         `yaml:"on_failure,omitempty"`
-	Timeout   time.Duration `yaml:"timeout,omitempty"`
+	Name           string        `validate:"required,min=3"      yaml:"name,omitempty"`
+	Plan           Steps         `validate:"required,min=1,dive" yaml:"plan,omitempty"`
+	Public         bool          `yaml:"public,omitempty"`
+	Ensure         *Step         `yaml:"ensure,omitempty"`
+	OnAbort        *Step         `yaml:"on_abort,omitempty"`
+	OnError        *Step         `yaml:"on_error,omitempty"`
+	OnSuccess      *Step         `yaml:"on_success,omitempty"`
+	OnFailure      *Step         `yaml:"on_failure,omitempty"`
+	Timeout        time.Duration `yaml:"timeout,omitempty"`
+	WebhookTrigger string        `yaml:"webhook_trigger,omitempty"`
 }
 
 type Jobs []Job

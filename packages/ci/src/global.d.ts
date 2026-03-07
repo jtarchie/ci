@@ -531,7 +531,28 @@ declare global {
     assert?: {
       execution?: string[];
     };
+    /**
+     * An expr-lang boolean expression evaluated against webhook metadata.
+     * When set, the job only runs if the expression returns true.
+     * Ignored for manual (non-webhook) triggers.
+     *
+     * Available variables: provider, eventType, method, headers, query, body, payload
+     *
+     * @example
+     * webhook_trigger: 'provider == "github" && eventType == "push"'
+     */
+    webhook_trigger?: string;
   }
+
+  /**
+   * Evaluates an expr-lang boolean expression against the current webhook
+   * metadata. Returns true when the pipeline was not triggered by a webhook
+   * (manual run), ensuring jobs always run in that case.
+   *
+   * @param expression - An expr-lang boolean expression. Available variables:
+   *   provider, eventType, method, headers, query, body, payload
+   */
+  function webhookTrigger(expression: string): boolean;
 
   type Resource = ResourceBase;
   type ResourceType = ResourceBase;

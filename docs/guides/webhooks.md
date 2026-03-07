@@ -280,6 +280,132 @@ const pipeline = async () => {
 export { pipeline };
 ```
 
+## Conditional Execution
+
+You can gate a pipeline or individual jobs so they only run when the incoming
+webhook matches specific criteria, using the
+[expr-lang](https://expr-lang.github.io/expr/) expression language.
+
+### Available variables
+
+| Variable    | Type                     | Description                                           |
+| ----------- | ------------------------ | ----------------------------------------------------- |
+| `provider`  | `string`                 | Detected provider: `"github"`, `"slack"`, `"generic"` |
+| `eventType` | `string`                 | Provider-specific event type (e.g. `"push"`)          |
+| `method`    | `string`                 | HTTP method (`"GET"`, `"POST"`, …)                    |
+| `headers`   | `map[string]string`      | Request headers (keys are lowercase)                  |
+| `query`     | `map[string]string`      | Parsed query parameters                               |
+| `body`      | `string`                 | Raw request body                                      |
+| `payload`   | `map[string]any` / `nil` | JSON-decoded body; `nil` when body is not valid JSON  |
+
+### `webhookTrigger(expression)` — JS/TS pipelines
+
+Call `webhookTrigger()` anywhere in your pipeline. It returns `true` when:
+
+- the pipeline was **not** triggered by a webhook (manual runs always pass), or
+- the expression evaluates to `true` against the current webhook data.
+
+Returns `false` (and logs an error) if the expression itself is invalid.
+
+```typescript
+const pipeline = async () => {
+  const req = http.request();
+  if (req) {
+    http.respond({ status: 200, body: "acknowledged" });
+  }
+
+  // Only deploy on GitHub push events to main
+  if (
+    !webhookTrigger(
+      'provider == "github" && eventType == "push" && payload.ref == "refs/heads/main"',
+    )
+  ) {
+    return;
+  }
+
+  await runtime.run({
+    name: "deploy",
+    image: "alpine",
+    command: { path: "sh", args: ["-c", "echo deploying"] },
+  });
+};
+export { pipeline };
+```
+
+You can also use `payload` to drill into nested JSON fields:
+
+```typescript
+// Only act on Slack messages mentioning the bot
+if (!webhookTrigger('payload.event.type == "app_mention"')) return;
+```
+
+### `webhook_trigger` — YAML (Concourse-compatible) pipelines
+
+Add a `webhook_trigger` field to any job. The field is an
+[expr-lang](https://expr-lang.github.io/expr/) boolean expression evaluated
+against the same variables listed above.
+
+- When the expression returns `false`, the job is **skipped** (status
+  `"skipped"`) and downstream jobs that depend on it still proceed.
+- When the pipeline is triggered manually (no webhook), the expression is **not
+  evaluated** — the job always runs.
+
+```yaml
+jobs:
+  # Runs only when a GitHub push event arrives
+  - name: build-on-push
+    webhook_trigger: 'provider == "github" && eventType == "push"'
+    plan:
+      - task: build
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: { repository: golang, tag: "1.22" }
+          run:
+            path: go
+            args: [build, ./...]
+
+  # Runs only on pull-request events
+  - name: test-on-pr
+    webhook_trigger: 'provider == "github" && eventType == "pull_request"'
+    plan:
+      - task: test
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: { repository: golang, tag: "1.22" }
+          run:
+            path: go
+            args: [test, ./...]
+
+  # Always runs (no webhook_trigger)
+  - name: notify
+    plan:
+      - task: send-notification
+        ...
+```
+
+Filter on nested JSON payload fields using `payload`:
+
+```yaml
+jobs:
+  # Only trigger for pushes to main
+  - name: deploy
+    webhook_trigger: 'payload.ref == "refs/heads/main"'
+    plan:
+      - task: deploy
+        ...
+
+  # Slack: only react to bot mentions
+  - name: respond-to-mention
+    webhook_trigger: 'provider == "slack" && payload.event.type == "app_mention"'
+    plan:
+      - task: reply
+        ...
+```
+
 ## Response Behavior
 
 | Scenario                                       | HTTP Response                               |

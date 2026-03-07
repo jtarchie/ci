@@ -55,5 +55,39 @@ const pipeline = async () => {
 export { pipeline };
 ```
 
-See [Webhooks](../guides/webhooks.md) for detailed examples (GitHub, custom
-signatures, etc.).
+### Conditional execution — `webhookTrigger(expression)`
+
+Gate execution on webhook metadata using an
+[expr-lang](https://expr-lang.github.io/expr/) boolean expression. Returns
+`true` for manual (non-webhook) runs so jobs are never silently skipped.
+
+```typescript
+// Only run when a GitHub push event targets main
+if (
+  !webhookTrigger(
+    'provider == "github" && eventType == "push" && payload.ref == "refs/heads/main"',
+  )
+) {
+  return;
+}
+```
+
+Available variables: `provider`, `eventType`, `method`, `headers`, `query`,
+`body`, `payload` (JSON-decoded body, or `nil`).
+
+**YAML pipelines** use the `webhook_trigger` field on a job:
+
+```yaml
+jobs:
+  - name: deploy
+    webhook_trigger: 'provider == "github" && eventType == "push"'
+    plan:
+      - task: deploy
+        ...
+```
+
+When the expression returns `false` the job is recorded as `"skipped"`. Manual
+triggers bypass the filter entirely.
+
+See [Webhooks guide](../guides/webhooks.md) for detailed examples (GitHub,
+Slack, conditional execution, custom signatures, etc.).
