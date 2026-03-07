@@ -885,6 +885,7 @@ export class JobRunner {
         thinking: step.thinking,
         safety: step.safety,
         context_guard: step.context_guard,
+        context: step.context,
         onOutput: (_stream: "stdout" | "stderr", data: string) => {
           accumulatedOutput += data;
           storage.set(storageKey, {

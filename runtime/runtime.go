@@ -8,6 +8,7 @@ import (
 	"github.com/dop251/goja"
 
 	"github.com/jtarchie/pocketci/secrets"
+	"github.com/jtarchie/pocketci/storage"
 )
 
 type Runtime struct {
@@ -22,6 +23,8 @@ type Runtime struct {
 	secretsManager secrets.Manager
 	pipelineID     string
 	ctx            context.Context //nolint: containedctx
+	storage        storage.Driver
+	triggeredBy    string
 }
 
 func NewRuntime(
@@ -342,6 +345,12 @@ func (r *Runtime) Agent(call goja.FunctionCall) goja.Value {
 		if ctx == nil {
 			ctx = context.Background()
 		}
+
+		// Populate runtime context into config before calling RunAgent.
+		config.storage = r.storage
+		config.namespace = r.namespace
+		config.runID = r.runID
+		config.triggeredBy = r.triggeredBy
 
 		result, err := RunAgent(ctx, r.runner, r.secretsManager, r.pipelineID, config)
 

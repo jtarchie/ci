@@ -136,6 +136,20 @@ type AgentContextGuardConfig struct {
 	MaxTokens int    `yaml:"max_tokens,omitempty"` // threshold: manual context window override
 }
 
+// AgentContextTask specifies a prior pipeline task whose output is pre-fetched
+// into the agent's session as a synthetic tool result before the first turn.
+type AgentContextTask struct {
+	Name  string `yaml:"name"           json:"name"`
+	Field string `yaml:"field,omitempty" json:"field,omitempty"` // stdout | stderr | both (default)
+}
+
+// AgentContext configures which prior task outputs to inject into the agent's
+// session history before the first turn, reducing orientation tool calls.
+type AgentContext struct {
+	Tasks    []AgentContextTask `yaml:"tasks,omitempty"    json:"tasks,omitempty"`
+	MaxBytes int                `yaml:"max_bytes,omitempty" json:"max_bytes,omitempty"`
+}
+
 type Step struct {
 	Assert *struct {
 		Code   *int   `yaml:"code,omitempty"`
@@ -158,6 +172,7 @@ type Step struct {
 	AgentThinking     *AgentThinkingConfig     `yaml:"thinking,omitempty"`
 	AgentSafety       AgentSafetyConfig        `yaml:"safety,omitempty"`
 	AgentContextGuard *AgentContextGuardConfig `yaml:"context_guard,omitempty"`
+	AgentContext      *AgentContext            `yaml:"context,omitempty"`
 
 	Get       string    `yaml:"get,omitempty"`
 	GetConfig GetConfig `yaml:",inline,omitempty"`

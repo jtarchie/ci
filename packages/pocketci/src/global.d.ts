@@ -286,6 +286,22 @@ declare global {
     max_tokens?: number; // threshold: manual context window override
   }
 
+  // Specifies a prior task whose output is pre-fetched into the agent's session
+  // as a synthetic tool result before the first turn, saving orientation calls.
+  interface AgentContextTask {
+    /** Partial or full task name; closest match is used. */
+    name: string;
+    /** Which output field to inject: "stdout" | "stderr" | "both" (default). */
+    field?: "stdout" | "stderr" | "both";
+  }
+
+  // Configures pre-fetched task outputs to inject before the agent's first turn.
+  interface AgentContext {
+    tasks?: AgentContextTask[];
+    /** Maximum bytes per stdout/stderr field. Defaults to 4096. */
+    max_bytes?: number;
+  }
+
   // Input to runtime.agent().
   interface AgentRunConfig {
     name: string;
@@ -299,6 +315,7 @@ declare global {
     thinking?: AgentThinkingConfig;
     safety?: { [key: string]: string };
     context_guard?: AgentContextGuardConfig;
+    context?: AgentContext;
   }
 
   /**
@@ -703,6 +720,7 @@ declare global {
     thinking?: AgentThinkingConfig;
     safety?: { [key: string]: string };
     context_guard?: AgentContextGuardConfig;
+    context?: AgentContext;
     attempts?: number;
     across?: AcrossVar[];
     fail_fast?: boolean;
@@ -763,4 +781,4 @@ declare global {
   }
 }
 
-export {};
+export { };

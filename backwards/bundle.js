@@ -836,6 +836,7 @@ var JobRunner = class {
         thinking: step.thinking,
         safety: step.safety,
         context_guard: step.context_guard,
+        context: step.context,
         onOutput: (_stream, data) => {
           accumulatedOutput += data;
           storage.set(storageKey, {

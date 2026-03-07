@@ -190,6 +190,7 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 	runtime.secretsManager = opts.SecretsManager
 	runtime.pipelineID = opts.PipelineID
 	runtime.ctx = ctx
+	runtime.storage = storage
 
 	err = jsVM.Set("runtime", runtime)
 	if err != nil {
@@ -286,6 +287,7 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 	if opts.WebhookData != nil {
 		triggeredBy = "webhook"
 	}
+	runtime.triggeredBy = triggeredBy
 
 	args := opts.Args
 	if args == nil {
