@@ -1,11 +1,11 @@
-package runtime
+package support
 
 import (
 	"sort"
 	"strings"
 )
 
-const redactedPlaceholder = "***REDACTED***"
+const RedactedPlaceholder = "***REDACTED***"
 
 // RedactSecrets replaces all occurrences of secret values in text with ***REDACTED***.
 // Uses longest-match-first ordering to avoid partial replacements.
@@ -37,7 +37,7 @@ func RedactSecrets(text string, secretValues []string) string {
 	})
 
 	for _, secret := range values {
-		text = strings.ReplaceAll(text, secret, redactedPlaceholder)
+		text = strings.ReplaceAll(text, secret, RedactedPlaceholder)
 	}
 
 	return text

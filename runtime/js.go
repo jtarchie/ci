@@ -14,6 +14,7 @@ import (
 	"github.com/dop251/goja_nodejs/require"
 	"github.com/evanw/esbuild/pkg/api"
 	"github.com/jtarchie/pocketci/orchestra"
+	"github.com/jtarchie/pocketci/runtime/jsapi"
 	"github.com/jtarchie/pocketci/secrets"
 	"github.com/jtarchie/pocketci/storage"
 	"github.com/jtarchie/pocketci/webhooks/filter"
@@ -170,9 +171,9 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 
 	registry := require.NewRegistry()
 	registry.Enable(jsVM)
-	registry.RegisterNativeModule("console", console.RequireWithPrinter(&printer{
-		logger: j.logger.WithGroup("console.log"),
-	}))
+	registry.RegisterNativeModule("console", console.RequireWithPrinter(jsapi.NewPrinter(
+		j.logger.WithGroup("console.log"),
+	)))
 
 	_ = jsVM.Set("console", require.Require(jsVM, "console"))
 
@@ -199,7 +200,7 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 
 	// Set up notification runtime (disabled when feature is gated)
 	notifier := NewNotifier(j.logger)
-	notifier.disabled = opts.DisableNotifications
+	notifier.Disabled = opts.DisableNotifications
 	if opts.SecretsManager != nil {
 		notifier.SetSecretsManager(opts.SecretsManager, opts.PipelineID)
 	}
@@ -233,7 +234,7 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 
 	// Set up fetch runtime for outbound HTTP requests
 	fetchRuntime := NewFetchRuntime(ctx, jsVM, runtime.promises, runtime.tasks, opts.FetchTimeout, opts.FetchMaxResponseBytes)
-	fetchRuntime.disabled = opts.DisableFetch
+	fetchRuntime.Disabled = opts.DisableFetch
 
 	err = jsVM.Set("fetch", fetchRuntime.Fetch)
 	if err != nil {

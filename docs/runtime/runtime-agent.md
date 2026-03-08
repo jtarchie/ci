@@ -23,14 +23,14 @@ const result = await runtime.agent(options);
 
 ### Optional
 
-| Field              | Type   | Description                                                         |
-| ------------------ | ------ | ------------------------------------------------------------------- |
-| `mounts`           | object | Volume mounts: `{ "name": volumeHandle }`                           |
-| `outputVolumePath` | string | Path inside the container to write `result.json`                    |
-| `llm`              | object | LLM generation overrides (see [LLM Config](#llm))                   |
-| `thinking`         | object | Extended thinking config (see [Thinking](#thinking))                |
-| `safety`           | object | Safety filter overrides (see [Safety](#safety))                     |
-| `context_guard`    | object | Context window management (see [Context Guard](#context-guard))     |
+| Field              | Type   | Description                                                          |
+| ------------------ | ------ | -------------------------------------------------------------------- |
+| `mounts`           | object | Volume mounts: `{ "name": volumeHandle }`                            |
+| `outputVolumePath` | string | Path inside the container to write `result.json`                     |
+| `llm`              | object | LLM generation overrides (see [LLM Config](#llm))                    |
+| `thinking`         | object | Extended thinking config (see [Thinking](#thinking))                 |
+| `safety`           | object | Safety filter overrides (see [Safety](#safety))                      |
+| `context_guard`    | object | Context window management (see [Context Guard](#context-guard))      |
 | `context`          | object | Pre-inject prior task outputs into session (see [Context](#context)) |
 
 ## Providers
@@ -169,11 +169,11 @@ conversation history is sent to the model on every turn.
 Every agent run has three tools available automatically — no configuration
 required.
 
-| Tool              | Description                                                                  |
-| ----------------- | ---------------------------------------------------------------------------- |
-| `run_command`     | Execute a shell command inside the sandbox container                         |
-| `list_tasks`      | List all tasks in the current pipeline run with their status and timing      |
-| `get_task_result` | Fetch the stdout, stderr, and exit code for a specific task by name          |
+| Tool              | Description                                                             |
+| ----------------- | ----------------------------------------------------------------------- |
+| `run_command`     | Execute a shell command inside the sandbox container                    |
+| `list_tasks`      | List all tasks in the current pipeline run with their status and timing |
+| `get_task_result` | Fetch the stdout, stderr, and exit code for a specific task by name     |
 
 `list_tasks` is **always pre-fetched** and injected into the session before the
 agent's first turn, so the agent knows the run state immediately without
@@ -219,8 +219,8 @@ The agent sees the output as if it had already called the tool, and the
 
 ```typescript
 {
-  text: string;      // final agent response text
-  status: string;    // "success"
+  text: string; // final agent response text
+  status: string; // "success"
   toolCalls: Array<{
     name: string;
     args?: Record<string, unknown>;
@@ -233,7 +233,7 @@ The agent sees the output as if it had already called the tool, and the
     totalTokens: number;
     llmRequests: number;
     toolCallCount: number;
-  };
+  }
   auditLog: Array<AuditEvent>; // full ordered conversation log (see below)
 }
 ```
@@ -244,17 +244,22 @@ alongside `stdout`, `toolCalls`, and `usage` for offline inspection.
 
 ```typescript
 interface AuditEvent {
-  type: "pre_context" | "user_message" | "tool_call" | "tool_response"
-      | "model_text" | "model_final";
-  timestamp?: string;              // ISO 8601 UTC
-  invocationId?: string;           // groups events within one LLM turn
-  author?: string;                 // agent name or "user"
-  text?: string;                   // model text or user prompt
-  toolName?: string;               // for tool_call / tool_response / pre_context
-  toolCallId?: string;             // pairs a tool_call with its tool_response
+  type:
+    | "pre_context"
+    | "user_message"
+    | "tool_call"
+    | "tool_response"
+    | "model_text"
+    | "model_final";
+  timestamp?: string; // ISO 8601 UTC
+  invocationId?: string; // groups events within one LLM turn
+  author?: string; // agent name or "user"
+  text?: string; // model text or user prompt
+  toolName?: string; // for tool_call / tool_response / pre_context
+  toolCallId?: string; // pairs a tool_call with its tool_response
   toolArgs?: Record<string, unknown>;
   toolResult?: Record<string, unknown>;
-  usage?: {                        // per-event token counts (model events only)
+  usage?: { // per-event token counts (model events only)
     promptTokens: number;
     completionTokens: number;
     totalTokens: number;
@@ -262,14 +267,14 @@ interface AuditEvent {
 }
 ```
 
-| `type`           | When emitted                                                       |
-| ---------------- | ------------------------------------------------------------------ |
-| `pre_context`    | Synthetic tool result injected before the first turn (list_tasks or context.tasks entry) |
-| `user_message`   | The initial prompt sent by the pipeline                            |
-| `tool_call`      | The model requests a tool invocation                               |
-| `tool_response`  | The tool result is returned to the model                           |
-| `model_text`     | An intermediate text chunk from the model                          |
-| `model_final`    | The concluding model response (last turn)                          |
+| `type`          | When emitted                                                                             |
+| --------------- | ---------------------------------------------------------------------------------------- |
+| `pre_context`   | Synthetic tool result injected before the first turn (list_tasks or context.tasks entry) |
+| `user_message`  | The initial prompt sent by the pipeline                                                  |
+| `tool_call`     | The model requests a tool invocation                                                     |
+| `tool_response` | The tool result is returned to the model                                                 |
+| `model_text`    | An intermediate text chunk from the model                                                |
+| `model_final`   | The concluding model response (last turn)                                                |
 
 ## Examples
 

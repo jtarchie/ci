@@ -1,4 +1,4 @@
-package runtime
+package jsapi
 
 import (
 	"log/slog"

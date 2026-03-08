@@ -1,4 +1,4 @@
-package runtime
+package runner
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jtarchie/pocketci/orchestra"
+	"github.com/jtarchie/pocketci/runtime/support"
 	"github.com/jtarchie/pocketci/secrets"
 	storagelib "github.com/jtarchie/pocketci/storage"
 )
@@ -46,7 +47,7 @@ func NewResumableRunner(
 ) (*ResumableRunner, error) {
 	runID := opts.RunID
 	if runID == "" {
-		runID = UniqueID()
+		runID = support.UniqueID()
 	}
 
 	runner := NewPipelineRunner(ctx, client, store, logger, namespace, runID)
@@ -193,7 +194,7 @@ func (r *ResumableRunner) runStep(stepID string, input RunInput) (*RunResult, er
 	}
 
 	// Create task ID for container tracking (deterministic for consistency across resumes)
-	taskID := DeterministicTaskID(r.runner.namespace, r.state.RunID, stepID, input.Name)
+	taskID := support.DeterministicTaskID(r.runner.namespace, r.state.RunID, stepID, input.Name)
 
 	// Create and persist step state as running
 	step := &StepState{

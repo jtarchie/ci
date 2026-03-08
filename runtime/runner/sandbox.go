@@ -1,4 +1,4 @@
-package runtime
+package runner
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jtarchie/pocketci/orchestra"
+	"github.com/jtarchie/pocketci/runtime/support"
 )
 
 // SandboxInput describes the sandbox container to create.
@@ -152,8 +153,8 @@ func (h *SandboxHandle) Exec(input ExecInput) (*RunResult, error) {
 	stderrStr := stderrBuf.String()
 
 	if len(h.runner.secretValues) > 0 {
-		stdoutStr = RedactSecrets(stdoutStr, h.runner.secretValues)
-		stderrStr = RedactSecrets(stderrStr, h.runner.secretValues)
+		stdoutStr = support.RedactSecrets(stdoutStr, h.runner.secretValues)
+		stderrStr = support.RedactSecrets(stderrStr, h.runner.secretValues)
 	}
 
 	return &RunResult{
@@ -182,7 +183,7 @@ func (c *PipelineRunner) StartSandbox(input SandboxInput) (*SandboxHandle, error
 	c.callIndex++
 	c.mu.Unlock()
 
-	taskID := DeterministicTaskID(c.namespace, c.runID, stepID, input.Name)
+	taskID := support.DeterministicTaskID(c.namespace, c.runID, stepID, input.Name)
 
 	var mounts orchestra.Mounts
 	for path, volume := range input.Mounts {

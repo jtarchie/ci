@@ -1,4 +1,4 @@
-package runtime
+package runner
 
 // Runner is the interface for running pipeline steps.
 // Both PipelineRunner and ResumableRunner implement this interface.

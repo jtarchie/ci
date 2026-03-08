@@ -1,4 +1,4 @@
-package runtime
+package jsapi
 
 import (
 	"bytes"
@@ -11,6 +11,7 @@ import (
 
 	"github.com/dop251/goja"
 	sprig "github.com/go-task/slim-sprig/v3"
+	"github.com/jtarchie/pocketci/runtime/support"
 	"github.com/jtarchie/pocketci/secrets"
 	"github.com/nikoksr/notify"
 	nhttp "github.com/nikoksr/notify/service/http"
@@ -62,7 +63,7 @@ type Notifier struct {
 	context        NotifyContext
 	logger         *slog.Logger
 	mu             sync.RWMutex
-	disabled       bool
+	Disabled       bool
 	secretsManager secrets.Manager
 	pipelineID     string
 }
@@ -108,7 +109,7 @@ func (n *Notifier) resolveConfigSecrets(ctx context.Context, config NotifyConfig
 	}
 
 	for _, f := range scalarFields {
-		resolved, _, err := resolveSecretString(ctx, mgr, pipelineID, *f.field)
+		resolved, _, err := support.ResolveSecretString(ctx, mgr, pipelineID, *f.field)
 		if err != nil {
 			return config, fmt.Errorf("notification field %q: %w", f.name, err)
 		}
@@ -120,7 +121,7 @@ func (n *Notifier) resolveConfigSecrets(ctx context.Context, config NotifyConfig
 	if len(config.Headers) > 0 {
 		resolvedHeaders := make(map[string]string, len(config.Headers))
 		for k, v := range config.Headers {
-			resolved, _, err := resolveSecretString(ctx, mgr, pipelineID, v)
+			resolved, _, err := support.ResolveSecretString(ctx, mgr, pipelineID, v)
 			if err != nil {
 				return config, fmt.Errorf("notification header %q: %w", k, err)
 			}
@@ -190,7 +191,7 @@ func (n *Notifier) RenderTemplate(templateStr string) (string, error) {
 
 // Send sends a notification using the named configuration.
 func (n *Notifier) Send(ctx context.Context, name string, message string) error {
-	if n.disabled {
+	if n.Disabled {
 		return fmt.Errorf("notifications feature is not enabled")
 	}
 

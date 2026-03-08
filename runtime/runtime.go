@@ -347,10 +347,10 @@ func (r *Runtime) Agent(call goja.FunctionCall) goja.Value {
 		}
 
 		// Populate runtime context into config before calling RunAgent.
-		config.storage = r.storage
-		config.namespace = r.namespace
-		config.runID = r.runID
-		config.triggeredBy = r.triggeredBy
+		config.Storage = r.storage
+		config.Namespace = r.namespace
+		config.RunID = r.runID
+		config.TriggeredBy = r.triggeredBy
 
 		result, err := RunAgent(ctx, r.runner, r.secretsManager, r.pipelineID, config)
 

@@ -1,4 +1,4 @@
-package runtime
+package jsapi
 
 import (
 	"context"
@@ -50,7 +50,7 @@ type FetchRuntime struct {
 	jsVM             *goja.Runtime
 	promises         *sync.WaitGroup
 	tasks            chan func() error
-	disabled         bool
+	Disabled         bool
 	timeout          time.Duration
 	maxResponseBytes int64
 }
@@ -87,7 +87,7 @@ func NewFetchRuntime(
 func (f *FetchRuntime) Fetch(call goja.FunctionCall) goja.Value {
 	promise, resolve, reject := f.jsVM.NewPromise()
 
-	if f.disabled {
+	if f.Disabled {
 		_ = reject(f.jsVM.NewGoError(fmt.Errorf("fetch feature is not enabled")))
 
 		return f.jsVM.ToValue(promise)

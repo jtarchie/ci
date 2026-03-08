@@ -1,4 +1,4 @@
-package runtime
+package agent
 
 import (
 	"context"
@@ -26,6 +26,7 @@ import (
 	genaiopenai "github.com/achetronic/adk-utils-go/genai/openai"
 	"github.com/achetronic/adk-utils-go/plugin/contextguard"
 
+	pipelinerunner "github.com/jtarchie/pocketci/runtime/runner"
 	"github.com/jtarchie/pocketci/secrets"
 	"github.com/jtarchie/pocketci/storage"
 )
@@ -53,25 +54,25 @@ type AgentContextGuardConfig struct {
 
 // AgentConfig is the configuration passed from JavaScript to runtime.agent().
 type AgentConfig struct {
-	Name             string                   `json:"name"`
-	Prompt           string                   `json:"prompt"`
-	Model            string                   `json:"model"`
-	Image            string                   `json:"image"`
-	Mounts           map[string]VolumeResult  `json:"mounts"`
-	OutputVolumePath string                   `json:"outputVolumePath"`
-	LLM              *AgentLLMConfig          `json:"llm,omitempty"`
-	Thinking         *AgentThinkingConfig     `json:"thinking,omitempty"`
-	Safety           map[string]string        `json:"safety,omitempty"`
-	ContextGuard     *AgentContextGuardConfig `json:"context_guard,omitempty"`
-	Context          *AgentContext            `json:"context,omitempty"`
+	Name             string                                 `json:"name"`
+	Prompt           string                                 `json:"prompt"`
+	Model            string                                 `json:"model"`
+	Image            string                                 `json:"image"`
+	Mounts           map[string]pipelinerunner.VolumeResult `json:"mounts"`
+	OutputVolumePath string                                 `json:"outputVolumePath"`
+	LLM              *AgentLLMConfig                        `json:"llm,omitempty"`
+	Thinking         *AgentThinkingConfig                   `json:"thinking,omitempty"`
+	Safety           map[string]string                      `json:"safety,omitempty"`
+	ContextGuard     *AgentContextGuardConfig               `json:"context_guard,omitempty"`
+	Context          *AgentContext                          `json:"context,omitempty"`
 	// OnOutput is called with streaming chunks. Not serialised from JS.
-	OnOutput OutputCallback `json:"-"`
+	OnOutput pipelinerunner.OutputCallback `json:"-"`
 	// Internal fields populated by Runtime.Agent() — not exposed to JS.
-	storage     storage.Driver
-	namespace   string
-	runID       string
-	pipelineID  string
-	triggeredBy string
+	Storage     storage.Driver
+	Namespace   string
+	RunID       string
+	PipelineID  string
+	TriggeredBy string
 }
 
 // AgentResult is returned to JavaScript after the agent completes.
@@ -554,7 +555,7 @@ func taskSummaryToMap(t taskSummary) map[string]any {
 // It writes a result.json to outputVolumePath when the agent finishes.
 func RunAgent(
 	ctx context.Context,
-	sandboxRunner Runner,
+	sandboxRunner pipelinerunner.Runner,
 	sm secrets.Manager,
 	pipelineID string,
 	config AgentConfig,
@@ -569,7 +570,7 @@ func RunAgent(
 	}
 
 	// Start the sandbox container.
-	sandbox, err := sandboxRunner.StartSandbox(SandboxInput{
+	sandbox, err := sandboxRunner.StartSandbox(pipelinerunner.SandboxInput{
 		Image:  config.Image,
 		Name:   config.Name,
 		Mounts: config.Mounts,
@@ -606,7 +607,7 @@ func RunAgent(
 			Description: "Run a shell command in the sandbox container. Returns stdout, stderr, and exit code.",
 		},
 		func(_ adktool.Context, input runCommandInput) (runCommandOutput, error) {
-			var execInput ExecInput
+			var execInput pipelinerunner.ExecInput
 			execInput.Command.Path = input.Command
 			execInput.Command.Args = input.Args
 			execInput.WorkDir = agentWorkDir
@@ -647,16 +648,16 @@ func RunAgent(
 		fmt.Fprintf(&instrBuilder, "Container image: %s\n", config.Image)
 	}
 
-	if config.runID != "" {
-		fmt.Fprintf(&instrBuilder, "Pipeline run ID: %s\n", config.runID)
+	if config.RunID != "" {
+		fmt.Fprintf(&instrBuilder, "Pipeline run ID: %s\n", config.RunID)
 	}
 
-	if config.pipelineID != "" {
-		fmt.Fprintf(&instrBuilder, "Pipeline ID: %s\n", config.pipelineID)
+	if config.PipelineID != "" {
+		fmt.Fprintf(&instrBuilder, "Pipeline ID: %s\n", config.PipelineID)
 	}
 
-	if config.triggeredBy != "" {
-		fmt.Fprintf(&instrBuilder, "Triggered by: %s\n", config.triggeredBy)
+	if config.TriggeredBy != "" {
+		fmt.Fprintf(&instrBuilder, "Triggered by: %s\n", config.TriggeredBy)
 	}
 
 	if len(config.Mounts) > 0 {
@@ -685,11 +686,11 @@ func RunAgent(
 			Description: "List all tasks executed in the current pipeline run with their name, status, start time, and elapsed duration.",
 		},
 		func(_ adktool.Context, _ struct{}) (listTasksOutput, error) {
-			if config.storage == nil || config.runID == "" {
+			if config.Storage == nil || config.RunID == "" {
 				return listTasksOutput{}, nil
 			}
 
-			tasks, err := loadTaskSummaries(ctx, config.storage, config.runID)
+			tasks, err := loadTaskSummaries(ctx, config.Storage, config.RunID)
 			if err != nil {
 				return listTasksOutput{}, err
 			}
@@ -708,11 +709,11 @@ func RunAgent(
 			Description: "Retrieve the stdout, stderr, and exit code for a task in the current run. Use a partial or full task name; the closest match is returned.",
 		},
 		func(_ adktool.Context, input getTaskResultInput) (getTaskResultOutput, error) {
-			if config.storage == nil || config.runID == "" {
+			if config.Storage == nil || config.RunID == "" {
 				return getTaskResultOutput{}, fmt.Errorf("task storage not available")
 			}
 
-			summaries, err := loadTaskSummaries(ctx, config.storage, config.runID)
+			summaries, err := loadTaskSummaries(ctx, config.Storage, config.RunID)
 			if err != nil {
 				return getTaskResultOutput{}, err
 			}
@@ -724,9 +725,9 @@ func RunAgent(
 
 			// Fetch full payload for the matched task.
 			stepID := fmt.Sprintf("%d-%s", matched.Index, matched.Name)
-			key := "/pipeline/" + config.runID + "/tasks/" + stepID
+			key := "/pipeline/" + config.RunID + "/tasks/" + stepID
 
-			payload, err := config.storage.Get(ctx, key)
+			payload, err := config.Storage.Get(ctx, key)
 			if err != nil {
 				return getTaskResultOutput{}, fmt.Errorf("get task %q: %w", matched.Name, err)
 			}
@@ -848,8 +849,8 @@ func RunAgent(
 
 	// Pre-inject a synthetic list_tasks result so the agent knows the run
 	// state from turn 0 without spending a tool-call turn on orientation.
-	if config.storage != nil && config.runID != "" {
-		summaries, err := loadTaskSummaries(ctx, config.storage, config.runID)
+	if config.Storage != nil && config.RunID != "" {
+		summaries, err := loadTaskSummaries(ctx, config.Storage, config.RunID)
 		if err == nil && len(summaries) > 0 {
 			taskMaps := make([]any, len(summaries))
 			for i, t := range summaries {
@@ -877,13 +878,13 @@ func RunAgent(
 	}
 
 	// Pre-inject explicitly declared context tasks as get_task_result results.
-	if config.Context != nil && config.storage != nil && config.runID != "" {
+	if config.Context != nil && config.Storage != nil && config.RunID != "" {
 		maxBytes := config.Context.MaxBytes
 		if maxBytes <= 0 {
 			maxBytes = 4096
 		}
 
-		summaries, _ := loadTaskSummaries(ctx, config.storage, config.runID)
+		summaries, _ := loadTaskSummaries(ctx, config.Storage, config.RunID)
 
 		for _, ct := range config.Context.Tasks {
 			matched, ok := fuzzyFindTask(summaries, ct.Name)
@@ -892,7 +893,7 @@ func RunAgent(
 			}
 
 			stepID := fmt.Sprintf("%d-%s", matched.Index, matched.Name)
-			payload, err := config.storage.Get(ctx, "/pipeline/"+config.runID+"/tasks/"+stepID)
+			payload, err := config.Storage.Get(ctx, "/pipeline/"+config.RunID+"/tasks/"+stepID)
 			if err != nil {
 				continue
 			}
@@ -1118,7 +1119,7 @@ func RunAgent(
 		writeCmd := fmt.Sprintf("mkdir -p %s && cat > %s/result.json",
 			config.OutputVolumePath, config.OutputVolumePath)
 
-		var execInput ExecInput
+		var execInput pipelinerunner.ExecInput
 		execInput.Command.Path = "sh"
 		execInput.Command.Args = []string{"-c", writeCmd}
 		execInput.Stdin = string(data)

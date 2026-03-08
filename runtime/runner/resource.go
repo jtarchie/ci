@@ -1,4 +1,4 @@
-package runtime
+package runner
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/jtarchie/pocketci/resources"
+	"github.com/jtarchie/pocketci/runtime/support"
 	"github.com/jtarchie/pocketci/secrets"
 )
 
@@ -50,7 +51,7 @@ func (r *ResourceRunner) Check(input ResourceCheckInput) (*ResourceCheckResult, 
 	logger := r.logger.With("type", input.Type, "operation", "resource.check")
 	logger.Debug("resource.check")
 
-	if err := resolveSecretsInMap(r.ctx, r.secretsManager, r.pipelineID, input.Source, nil); err != nil {
+	if err := support.ResolveSecretsInMap(r.ctx, r.secretsManager, r.pipelineID, input.Source, nil); err != nil {
 		return nil, fmt.Errorf("could not resolve secrets in source: %w", err)
 	}
 
@@ -102,11 +103,11 @@ func (r *ResourceRunner) Fetch(input ResourceFetchInput) (*ResourceFetchResult, 
 	logger := r.logger.With("type", input.Type, "operation", "resource.fetch", "destDir", input.DestDir)
 	logger.Debug("resource.fetch")
 
-	if err := resolveSecretsInMap(r.ctx, r.secretsManager, r.pipelineID, input.Source, nil); err != nil {
+	if err := support.ResolveSecretsInMap(r.ctx, r.secretsManager, r.pipelineID, input.Source, nil); err != nil {
 		return nil, fmt.Errorf("could not resolve secrets in source: %w", err)
 	}
 
-	if err := resolveSecretsInMap(r.ctx, r.secretsManager, r.pipelineID, input.Params, nil); err != nil {
+	if err := support.ResolveSecretsInMap(r.ctx, r.secretsManager, r.pipelineID, input.Params, nil); err != nil {
 		return nil, fmt.Errorf("could not resolve secrets in params: %w", err)
 	}
 
@@ -164,11 +165,11 @@ func (r *ResourceRunner) Push(input ResourcePushInput) (*ResourcePushResult, err
 	logger := r.logger.With("type", input.Type, "operation", "resource.push", "srcDir", input.SrcDir)
 	logger.Debug("resource.push")
 
-	if err := resolveSecretsInMap(r.ctx, r.secretsManager, r.pipelineID, input.Source, nil); err != nil {
+	if err := support.ResolveSecretsInMap(r.ctx, r.secretsManager, r.pipelineID, input.Source, nil); err != nil {
 		return nil, fmt.Errorf("could not resolve secrets in source: %w", err)
 	}
 
-	if err := resolveSecretsInMap(r.ctx, r.secretsManager, r.pipelineID, input.Params, nil); err != nil {
+	if err := support.ResolveSecretsInMap(r.ctx, r.secretsManager, r.pipelineID, input.Params, nil); err != nil {
 		return nil, fmt.Errorf("could not resolve secrets in params: %w", err)
 	}
 

@@ -1,4 +1,4 @@
-package runtime
+package runner
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jtarchie/pocketci/orchestra"
+	"github.com/jtarchie/pocketci/runtime/support"
 	"github.com/jtarchie/pocketci/secrets"
 	"github.com/jtarchie/pocketci/storage"
 )
@@ -233,7 +234,7 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 	stepID := fmt.Sprintf("%d-%s", c.callIndex, input.Name)
 	c.callIndex++
 	c.mu.Unlock()
-	taskID := DeterministicTaskID(c.namespace, c.runID, stepID, input.Name)
+	taskID := support.DeterministicTaskID(c.namespace, c.runID, stepID, input.Name)
 
 	logger = c.logger.With("task.id", taskID, "task.name", input.Name, "task.privileged", input.Privileged)
 
@@ -455,8 +456,8 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 	stderrStr := stderr.String()
 
 	if len(c.secretValues) > 0 {
-		stdoutStr = RedactSecrets(stdoutStr, c.secretValues)
-		stderrStr = RedactSecrets(stderrStr, c.secretValues)
+		stdoutStr = support.RedactSecrets(stdoutStr, c.secretValues)
+		stderrStr = support.RedactSecrets(stderrStr, c.secretValues)
 	}
 
 	status := "success"
