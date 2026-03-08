@@ -181,6 +181,10 @@ func (c *SetPipeline) Run(logger *slog.Logger) error {
 		fmt.Printf("  Secrets: %d key(s) set\n", len(secretsMap))
 	}
 
+	if c.WebhookSecret != "" {
+		fmt.Printf("  Webhook URL: %s/api/webhooks/%s\n", displayURL, pipeline.ID)
+	}
+
 	return nil
 }
 

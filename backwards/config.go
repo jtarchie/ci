@@ -203,6 +203,18 @@ type Step struct {
 
 type Steps []Step
 
+// WebhookTriggerConfig holds the filter expression and optional parameter
+// extraction map for webhook-based job triggers.
+type WebhookTriggerConfig struct {
+	Filter string            `yaml:"filter,omitempty" json:"filter,omitempty"`
+	Params map[string]string `yaml:"params,omitempty" json:"params,omitempty"`
+}
+
+// Triggers holds the set of trigger configurations for a job.
+type Triggers struct {
+	Webhook *WebhookTriggerConfig `yaml:"webhook,omitempty" json:"webhook,omitempty"`
+}
+
 type Job struct {
 	Assert *struct {
 		Execution []string `yaml:"execution,omitempty"`
@@ -222,6 +234,7 @@ type Job struct {
 	OnSuccess      *Step         `yaml:"on_success,omitempty"`
 	OnFailure      *Step         `yaml:"on_failure,omitempty"`
 	Timeout        time.Duration `yaml:"timeout,omitempty"`
+	Triggers       *Triggers     `yaml:"triggers,omitempty"       json:"triggers,omitempty"`
 	WebhookTrigger string        `yaml:"webhook_trigger,omitempty"`
 }
 

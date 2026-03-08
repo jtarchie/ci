@@ -1,0 +1,161 @@
+---
+# Multi-agent GitHub PR review pipeline.
+#
+# Triggered by a GitHub pull_request webhook. Three specialist agents review
+# the code sequentially; a final aggregator agent synthesises their feedback
+# and a task step posts the result as a PR comment via the `gh` CLI.
+#
+# Required secrets:
+#   GITHUB_TOKEN — Personal access token with repo + pull_request:write scope.
+#              Set via: pocketci run --secret GITHUB_TOKEN=<token>
+#
+# Required setup:
+#   Register a webhook in your GitHub repo pointing to:
+#     http://<pocketci-host>/api/webhooks/<webhook-id>
+#   with Content-Type: application/json and a shared secret configured in pocketci.
+jobs:
+  - name: review-pr
+    triggers:
+      webhook:
+        filter: >-
+          provider == "github" &&
+          eventType == "pull_request" &&
+          payload.action in ["opened", "synchronize"]
+        params:
+          PR_NUMBER: "string(payload.number)"
+          PR_REPO: "payload.pull_request.head.repo.clone_url"
+          PR_HEAD_REF: "payload.pull_request.head.ref"
+          GH_REPO: "payload.repository.full_name"
+    plan:
+      # ── 1. Clone the PR branch ────────────────────────────────────────────
+      - task: clone-pr
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: { repository: alpine/git }
+          outputs:
+            - name: repo
+          run:
+            path: sh
+            args:
+              - -c
+              - |
+                  git clone "$PR_REPO" repo
+                  cd repo && git checkout "$PR_HEAD_REF"
+
+      # ── 2a. Code-quality review ───────────────────────────────────────────
+      - agent: code-quality-reviewer
+        prompt: |
+          Review the code in the repo directory.
+          Focus on: readability, naming, structure, and DRY violations.
+          Be concise — bullet points only, no preamble.
+        model: openrouter/anthropic/claude-sonnet-4
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: { repository: alpine/git }
+          inputs:
+            - name: repo
+          outputs:
+            - name: code-quality-output
+
+      # ── 2b. Security review ───────────────────────────────────────────────
+      - agent: security-reviewer
+        prompt: |
+          Audit the code in the repo directory for security issues.
+          Focus on: injection, authentication, data exposure, OWASP Top 10.
+          Be concise — bullet points only, no preamble.
+        model: openrouter/anthropic/claude-sonnet-4
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: { repository: alpine/git }
+          inputs:
+            - name: repo
+          outputs:
+            - name: security-output
+
+      # ── 2c. Maintainability review ────────────────────────────────────────
+      - agent: maintainability-reviewer
+        prompt: |
+          Evaluate the code in the repo directory for maintainability.
+          Focus on: test coverage, cyclomatic complexity, documentation.
+          Be concise — bullet points only, no preamble.
+        model: openrouter/anthropic/claude-sonnet-4
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: { repository: alpine/git }
+          inputs:
+            - name: repo
+          outputs:
+            - name: maintainability-output
+
+      # ── 3. Aggregate and synthesize ───────────────────────────────────────
+      #
+      # The three prior agent outputs are available two ways:
+      #   a) context.tasks — each review text is pre-injected into this
+      #      agent's chat history as a synthetic get_task_result response,
+      #      so no tool call is needed to read them.
+      #   b) input volume mounts — result.json files are also mounted at
+      #      code-quality-output/result.json, security-output/result.json,
+      #      maintainability-output/result.json and can be cat'd via
+      #      run_command if the agent needs to re-read raw content.
+      - agent: final-reviewer
+        prompt: |
+          You have received three code reviews: code quality, security, and
+          maintainability. Synthesise them into a single, concise GitHub PR
+          comment written in Markdown. Format:
+
+          ## Code Review
+
+          ### Issues
+          (only actionable items grouped by severity: critical / minor)
+
+          ### Summary
+          (one sentence overall verdict)
+
+          Omit any section that has nothing to report.
+        model: openrouter/anthropic/claude-sonnet-4
+        context:
+          tasks:
+            - name: code-quality-reviewer
+              field: stdout
+            - name: security-reviewer
+              field: stdout
+            - name: maintainability-reviewer
+              field: stdout
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: { repository: alpine }
+          inputs:
+            - name: code-quality-output
+            - name: security-output
+            - name: maintainability-output
+          outputs:
+            - name: final-review
+
+      # ── 4. Post the comment ───────────────────────────────────────────────
+      - task: post-comment
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: { repository: maniator/gh }
+          inputs:
+            - name: final-review
+          run:
+            path: sh
+            args:
+              - -c
+              - |
+                  REVIEW=$(cat final-review/result.json | jq -r .text)
+                  gh pr comment "$PR_NUMBER" --repo "$GH_REPO" --body "$REVIEW"
+          env:
+            GH_TOKEN: secret:GITHUB_TOKEN

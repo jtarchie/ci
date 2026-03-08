@@ -233,15 +233,21 @@ var JobRunner = class {
   taskNames = [];
   taskRunner;
   buildID;
+  jobParams = {};
   async run() {
     const storageKey = this.getBaseStorageKey();
     let failure = void 0;
     const dependsOn = this.extractDependencies();
-    if (this.jobConfig.webhook_trigger) {
-      if (!webhookTrigger(this.jobConfig.webhook_trigger)) {
+    const webhookFilter = this.jobConfig.triggers?.webhook?.filter ?? this.jobConfig.webhook_trigger;
+    if (webhookFilter) {
+      if (!webhookTrigger(webhookFilter)) {
         storage.set(storageKey, { status: "skipped", dependsOn });
         return;
       }
+    }
+    const rawParams = this.jobConfig.triggers?.webhook?.params;
+    if (rawParams) {
+      this.jobParams = webhookParams(rawParams);
     }
     storage.set(storageKey, { status: "pending", dependsOn });
     try {
@@ -343,6 +349,7 @@ var JobRunner = class {
     }
   }
   async processStepInternal(step, pathContext) {
+    step = this.injectJobParams(step);
     if (step.across && step.across.length > 0) {
       await this.processAcrossStep(step, pathContext);
       return;
@@ -507,6 +514,22 @@ var JobRunner = class {
     }
     delete clonedStep.across;
     delete clonedStep.fail_fast;
+    return clonedStep;
+  }
+  // injectJobParams merges job-level webhook params into a task step's env.
+  // Step-level env takes precedence over job params.
+  injectJobParams(step) {
+    if (Object.keys(this.jobParams).length === 0) return step;
+    const clonedStep = { ...step };
+    if ("task" in clonedStep && clonedStep.config) {
+      clonedStep.config = {
+        ...clonedStep.config,
+        env: {
+          ...this.jobParams,
+          ...clonedStep.config.env
+        }
+      };
+    }
     return clonedStep;
   }
   async processTryStep(step, pathContext) {

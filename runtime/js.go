@@ -283,6 +283,47 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 		return fmt.Errorf("could not set webhookTrigger: %w", err)
 	}
 
+	// webhookParams evaluates a map of expr-lang string expressions against the current
+	// webhook data, returning a map of resolved string values. Returns an empty map when
+	// no webhook is active so callers can always treat the result as a plain string map.
+	err = jsVM.Set("webhookParams", func(paramsExprs map[string]string) map[string]string {
+		result := make(map[string]string, len(paramsExprs))
+
+		if opts.WebhookData == nil {
+			return result
+		}
+
+		env := filter.WebhookEnv{
+			Provider:  opts.WebhookData.Provider,
+			EventType: opts.WebhookData.EventType,
+			Method:    opts.WebhookData.Method,
+			Headers:   opts.WebhookData.Headers,
+			Query:     opts.WebhookData.Query,
+			Body:      opts.WebhookData.Body,
+		}
+
+		var payload map[string]any
+		if jsonErr := json.Unmarshal([]byte(opts.WebhookData.Body), &payload); jsonErr == nil {
+			env.Payload = payload
+		}
+
+		for key, expression := range paramsExprs {
+			val, evalErr := filter.EvaluateString(expression, env)
+			if evalErr != nil {
+				slog.Error("webhookParams evaluation failed", "key", key, "error", evalErr, "expression", expression)
+
+				continue
+			}
+
+			result[key] = val
+		}
+
+		return result
+	})
+	if err != nil {
+		return fmt.Errorf("could not set webhookParams: %w", err)
+	}
+
 	// Expose pipeline context to JavaScript (runID, pipelineID, etc.)
 	triggeredBy := "manual"
 	if opts.WebhookData != nil {

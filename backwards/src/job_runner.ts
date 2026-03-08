@@ -31,6 +31,7 @@ export class JobRunner {
   private taskNames: string[] = [];
   private taskRunner: TaskRunner;
   private buildID: string;
+  private jobParams: Record<string, string> = {};
 
   constructor(
     private jobConfig: JobConfig,
@@ -46,13 +47,24 @@ export class JobRunner {
     let failure: unknown = undefined;
     const dependsOn = this.extractDependencies();
 
-    // Skip this job if webhook_trigger expression evaluates to false.
+    // Resolve the webhook filter expression from either triggers.webhook.filter
+    // (new) or the legacy webhook_trigger field.
+    const webhookFilter = this.jobConfig.triggers?.webhook?.filter ??
+      this.jobConfig.webhook_trigger;
+
+    // Skip this job if the filter expression evaluates to false.
     // Manual (non-webhook) triggers always pass through (webhookTrigger returns true).
-    if (this.jobConfig.webhook_trigger) {
-      if (!webhookTrigger(this.jobConfig.webhook_trigger)) {
+    if (webhookFilter) {
+      if (!webhookTrigger(webhookFilter)) {
         storage.set(storageKey, { status: "skipped", dependsOn });
         return;
       }
+    }
+
+    // Evaluate triggers.webhook.params and store for injection into task steps.
+    const rawParams = this.jobConfig.triggers?.webhook?.params;
+    if (rawParams) {
+      this.jobParams = webhookParams(rawParams);
     }
 
     storage.set(storageKey, { status: "pending", dependsOn });
@@ -175,6 +187,9 @@ export class JobRunner {
     step: Step,
     pathContext: string,
   ): Promise<void> {
+    // Inject job-level webhook params into task step env.
+    step = this.injectJobParams(step);
+
     // Handle across wrapper - run step multiple times with different variable combinations
     if (step.across && step.across.length > 0) {
       await this.processAcrossStep(step, pathContext);
@@ -383,6 +398,26 @@ export class JobRunner {
     // Remove across fields from cloned step to avoid infinite recursion
     delete (clonedStep as Record<string, unknown>).across;
     delete (clonedStep as Record<string, unknown>).fail_fast;
+
+    return clonedStep;
+  }
+
+  // injectJobParams merges job-level webhook params into a task step's env.
+  // Step-level env takes precedence over job params.
+  private injectJobParams(step: Step): Step {
+    if (Object.keys(this.jobParams).length === 0) return step;
+
+    const clonedStep = { ...step };
+
+    if ("task" in clonedStep && clonedStep.config) {
+      clonedStep.config = {
+        ...clonedStep.config,
+        env: {
+          ...this.jobParams,
+          ...clonedStep.config.env,
+        },
+      };
+    }
 
     return clonedStep;
   }
