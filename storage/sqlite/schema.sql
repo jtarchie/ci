@@ -28,19 +28,6 @@ CREATE TABLE IF NOT EXISTS pipeline_runs (
   FOREIGN KEY (pipeline_id) REFERENCES pipelines(id) ON DELETE CASCADE
 ) STRICT;
 
-CREATE TABLE IF NOT EXISTS resource_versions (
-  id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-  resource_name TEXT NOT NULL,
-  version BLOB NOT NULL,
-  job_name TEXT,
-  fetched_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(resource_name, version)
-) STRICT;
-
-CREATE INDEX IF NOT EXISTS idx_resource_versions_name ON resource_versions(resource_name);
-
-CREATE INDEX IF NOT EXISTS idx_resource_versions_fetched ON resource_versions(resource_name, fetched_at DESC);
-
 -- FTS5 virtual table for pipeline full-text search (name + content).
 CREATE VIRTUAL TABLE IF NOT EXISTS pipelines_fts USING fts5(
   id,
