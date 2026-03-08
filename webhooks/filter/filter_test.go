@@ -118,3 +118,70 @@ func TestEvaluate(t *testing.T) {
 		assert.Expect(ok).To(BeTrue())
 	})
 }
+
+func TestEvaluateString(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns string field directly", func(t *testing.T) {
+		t.Parallel()
+		assert := NewGomegaWithT(t)
+		val, err := filter.EvaluateString("provider", baseEnv())
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(val).To(Equal("github"))
+	})
+
+	t.Run("returns eventType field", func(t *testing.T) {
+		t.Parallel()
+		assert := NewGomegaWithT(t)
+		val, err := filter.EvaluateString("eventType", baseEnv())
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(val).To(Equal("push"))
+	})
+
+	t.Run("extracts nested payload string field", func(t *testing.T) {
+		t.Parallel()
+		assert := NewGomegaWithT(t)
+		env := baseEnv()
+		env.Payload = map[string]any{"number": "42", "action": "opened"}
+		val, err := filter.EvaluateString(`payload["action"]`, env)
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(val).To(Equal("opened"))
+	})
+
+	t.Run("converts non-string result via Sprintf", func(t *testing.T) {
+		t.Parallel()
+		assert := NewGomegaWithT(t)
+		env := baseEnv()
+		env.Payload = map[string]any{"number": 99}
+		val, err := filter.EvaluateString(`string(payload["number"])`, env)
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(val).To(Equal("99"))
+	})
+
+	t.Run("concatenation expression", func(t *testing.T) {
+		t.Parallel()
+		assert := NewGomegaWithT(t)
+		val, err := filter.EvaluateString(`provider + "/" + eventType`, baseEnv())
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(val).To(Equal("github/push"))
+	})
+
+	t.Run("error on compile failure", func(t *testing.T) {
+		t.Parallel()
+		assert := NewGomegaWithT(t)
+		_, err := filter.EvaluateString("this is not valid expr !!!", baseEnv())
+		assert.Expect(err).To(HaveOccurred())
+		assert.Expect(err.Error()).To(ContainSubstring("webhook_params compile error"))
+	})
+
+	t.Run("nil payload returns empty result without error", func(t *testing.T) {
+		t.Parallel()
+		assert := NewGomegaWithT(t)
+		// expr-lang map access on nil returns nil (zero value), which formats as "<nil>".
+		env := baseEnv()
+		env.Payload = nil
+		val, err := filter.EvaluateString(`string(payload == nil)`, env)
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(val).To(Equal("true"))
+	})
+}

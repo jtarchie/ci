@@ -36,3 +36,23 @@ func Evaluate(expression string, env WebhookEnv) (bool, error) {
 
 	return result.(bool), nil //nolint:forcetypeassert
 }
+
+// EvaluateString compiles and runs a string-valued expression against env.
+// Non-string results are converted via fmt.Sprintf. Used for triggers.webhook.params.
+func EvaluateString(expression string, env WebhookEnv) (string, error) {
+	program, err := expr.Compile(expression, expr.Env(env))
+	if err != nil {
+		return "", fmt.Errorf("webhook_params compile error: %w", err)
+	}
+
+	result, err := expr.Run(program, env)
+	if err != nil {
+		return "", fmt.Errorf("webhook_params eval error: %w", err)
+	}
+
+	if s, ok := result.(string); ok {
+		return s, nil
+	}
+
+	return fmt.Sprintf("%v", result), nil
+}

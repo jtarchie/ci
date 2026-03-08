@@ -158,6 +158,10 @@ declare global {
     headers: Record<string, string>;
     body: string;
     query: Record<string, string>;
+    /** The detected webhook provider, e.g. "github", "slack". */
+    provider: string;
+    /** The provider-specific event type, e.g. "pull_request", "push". */
+    eventType: string;
   }
 
   interface HttpResponse {
@@ -770,9 +774,35 @@ declare global {
       execution?: string[];
     };
     /**
+     * Structured trigger configuration. Namespaces trigger types under a
+     * single field. Currently supports `webhook` triggers.
+     *
+     * @example
+     * triggers:
+     *   webhook:
+     *     filter: 'provider == "github" && eventType == "pull_request"'
+     *     params:
+     *       PR_NUMBER: 'string(payload.number)'
+     *       PR_REPO: 'payload.pull_request.head.repo.clone_url'
+     */
+    triggers?: {
+      webhook?: {
+        /** Boolean expr-lang expression. Same variables as `webhook_trigger`. */
+        filter?: string;
+        /**
+         * Map of env var name → string expr-lang expression evaluated against
+         * webhook metadata. Results are injected as env vars into all task
+         * steps of the job.
+         */
+        params?: Record<string, string>;
+      };
+    };
+    /**
      * An expr-lang boolean expression evaluated against webhook metadata.
      * When set, the job only runs if the expression returns true.
      * Ignored for manual (non-webhook) triggers.
+     *
+     * Deprecated: prefer `triggers.webhook.filter` for new pipelines.
      *
      * Available variables: provider, eventType, method, headers, query, body, payload
      *
@@ -791,6 +821,21 @@ declare global {
    *   provider, eventType, method, headers, query, body, payload
    */
   function webhookTrigger(expression: string): boolean;
+
+  /**
+   * Evaluates a map of expr-lang string expressions against the current webhook
+   * metadata and returns a map of resolved string values. Returns an empty map
+   * when the pipeline was not triggered by a webhook.
+   *
+   * Used internally by `triggers.webhook.params` to extract env vars from the
+   * webhook payload.
+   *
+   * @param params - Map of env var name → expr-lang expression string.
+   * @returns Map of env var name → resolved string value.
+   */
+  function webhookParams(
+    params: Record<string, string>,
+  ): Record<string, string>;
 
   type Resource = ResourceBase;
   type ResourceType = ResourceBase;
