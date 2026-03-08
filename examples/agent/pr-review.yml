@@ -25,9 +25,10 @@ jobs:
           PR_NUMBER: "string(payload.number)"
           PR_REPO: "payload.pull_request.head.repo.clone_url"
           PR_HEAD_REF: "payload.pull_request.head.ref"
+          PR_BASE_REF: "payload.pull_request.base.ref"
           GH_REPO: "payload.repository.full_name"
     plan:
-      # ── 1. Clone the PR branch ────────────────────────────────────────────
+      # ── 1. Clone the PR branch and generate the diff ─────────────────────
       - task: clone-pr
         config:
           platform: linux
@@ -35,63 +36,66 @@ jobs:
             type: registry-image
             source: { repository: alpine/git }
           outputs:
-            - name: repo
+            - name: diff
           run:
             path: sh
             args:
               - -c
               - |
                   git clone "$PR_REPO" repo
-                  cd repo && git checkout "$PR_HEAD_REF"
+                  cd repo
+                  git checkout "$PR_HEAD_REF"
+                  git fetch origin "$PR_BASE_REF"
+                  git diff "origin/$PR_BASE_REF"...HEAD > ../diff/pr.diff
 
       # ── 2a. Code-quality review ───────────────────────────────────────────
       - agent: code-quality-reviewer
         prompt: |
-          Review the code in the repo directory.
-          Focus on: readability, naming, structure, and DRY violations.
+          Review the pull request changes in diff/pr.diff.
+          Focus only on the changed lines: readability, naming, structure, and DRY violations.
           Be concise — bullet points only, no preamble.
-        model: openrouter/anthropic/claude-sonnet-4
+        model: openrouter/openai/gpt-5.1-codex-mini
         config:
           platform: linux
           image_resource:
             type: registry-image
             source: { repository: alpine/git }
           inputs:
-            - name: repo
+            - name: diff
           outputs:
             - name: code-quality-output
 
       # ── 2b. Security review ───────────────────────────────────────────────
       - agent: security-reviewer
         prompt: |
-          Audit the code in the repo directory for security issues.
-          Focus on: injection, authentication, data exposure, OWASP Top 10.
+          Audit the pull request changes in diff/pr.diff for security issues.
+          Focus only on the changed lines: injection, authentication, data exposure, OWASP Top 10.
           Be concise — bullet points only, no preamble.
-        model: openrouter/anthropic/claude-sonnet-4
+        model: openrouter/openai/gpt-5.1-codex-mini
         config:
           platform: linux
           image_resource:
             type: registry-image
             source: { repository: alpine/git }
           inputs:
-            - name: repo
+            - name: diff
           outputs:
             - name: security-output
 
       # ── 2c. Maintainability review ────────────────────────────────────────
       - agent: maintainability-reviewer
         prompt: |
-          Evaluate the code in the repo directory for maintainability.
-          Focus on: test coverage, cyclomatic complexity, documentation.
+          Evaluate the pull request changes in diff/pr.diff for maintainability.
+          Focus only on the changed lines: test coverage, cyclomatic complexity, documentation.
           Be concise — bullet points only, no preamble.
-        model: openrouter/anthropic/claude-sonnet-4
+        model: openrouter/openai/gpt-5.1-codex-mini
         config:
           platform: linux
           image_resource:
             type: registry-image
             source: { repository: alpine/git }
           inputs:
-            - name: repo
+            - name: diff
           outputs:
             - name: maintainability-output
 
@@ -120,7 +124,7 @@ jobs:
           (one sentence overall verdict)
 
           Omit any section that has nothing to report.
-        model: openrouter/anthropic/claude-sonnet-4
+        model: openrouter/openai/gpt-5.1-codex-mini
         context:
           tasks:
             - name: code-quality-reviewer

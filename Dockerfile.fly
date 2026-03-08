@@ -68,7 +68,8 @@ RUN mkdir -p /data
 
 # Set runtime environment variables
 ENV TZ=UTC \
-    GOMAXPROCS=0
+    GOMAXPROCS=0 \
+    CI_LOG_LEVEL=debug
 
 # Expose port
 EXPOSE 8080

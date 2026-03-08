@@ -1,0 +1,219 @@
+{
+  "action": "reopened",
+  "number": 16,
+  "pull_request": {
+    "url": "https://api.github.com/repos/jtarchie/pocketci/pulls/16",
+    "id": 3370172613,
+    "node_id": "PR_kwDONDt76M7I4MDF",
+    "html_url": "https://github.com/jtarchie/pocketci/pull/16",
+    "diff_url": "https://github.com/jtarchie/pocketci/pull/16.diff",
+    "patch_url": "https://github.com/jtarchie/pocketci/pull/16.patch",
+    "issue_url": "https://api.github.com/repos/jtarchie/pocketci/issues/16",
+    "number": 16,
+    "state": "open",
+    "locked": false,
+    "title": "review a PR",
+    "user": {
+      "login": "jtarchie",
+      "id": 75184,
+      "node_id": "MDQ6VXNlcjc1MTg0",
+      "avatar_url": "https://avatars.githubusercontent.com/u/75184?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/jtarchie",
+      "html_url": "https://github.com/jtarchie",
+      "followers_url": "https://api.github.com/users/jtarchie/followers",
+      "following_url": "https://api.github.com/users/jtarchie/following{/other_user}",
+      "gists_url": "https://api.github.com/users/jtarchie/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/jtarchie/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/jtarchie/subscriptions",
+      "organizations_url": "https://api.github.com/users/jtarchie/orgs",
+      "repos_url": "https://api.github.com/users/jtarchie/repos",
+      "events_url": "https://api.github.com/users/jtarchie/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/jtarchie/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "body": null,
+    "created_at": "2026-03-08T17:04:03Z",
+    "updated_at": "2026-03-08T17:19:39Z",
+    "closed_at": null,
+    "merged_at": null,
+    "merge_commit_sha": null,
+    "assignees": [],
+    "requested_reviewers": [],
+    "requested_teams": [],
+    "labels": [],
+    "milestone": null,
+    "draft": false,
+    "commits_url": "https://api.github.com/repos/jtarchie/pocketci/pulls/16/commits",
+    "review_comments_url": "https://api.github.com/repos/jtarchie/pocketci/pulls/16/comments",
+    "review_comment_url": "https://api.github.com/repos/jtarchie/pocketci/pulls/comments{/number}",
+    "comments_url": "https://api.github.com/repos/jtarchie/pocketci/issues/16/comments",
+    "statuses_url": "https://api.github.com/repos/jtarchie/pocketci/statuses/bfcb5cb2ccc00a6bf6c5804861c1561790222e86",
+    "head": {
+      "label": "jtarchie:pr/review-bot",
+      "ref": "pr/review-bot",
+      "sha": "bfcb5cb2ccc00a6bf6c5804861c1561790222e86",
+      "user": {
+        "login": "jtarchie",
+        "id": 75184,
+        "node_id": "MDQ6VXNlcjc1MTg0",
+        "avatar_url": "https://avatars.githubusercontent.com/u/75184?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/jtarchie",
+        "html_url": "https://github.com/jtarchie",
+        "followers_url": "https://api.github.com/users/jtarchie/followers",
+        "following_url": "https://api.github.com/users/jtarchie/following{/other_user}",
+        "gists_url": "https://api.github.com/users/jtarchie/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/jtarchie/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/jtarchie/subscriptions",
+        "organizations_url": "https://api.github.com/users/jtarchie/orgs",
+        "repos_url": "https://api.github.com/users/jtarchie/repos",
+        "events_url": "https://api.github.com/users/jtarchie/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/jtarchie/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "repo": {
+        "id": 876313576,
+        "node_id": "R_kgDONDt76A",
+        "name": "pocketci",
+        "full_name": "jtarchie/pocketci",
+        "private": false,
+        "owner": {
+          "login": "jtarchie",
+          "id": 75184,
+          "node_id": "MDQ6VXNlcjc1MTg0",
+          "avatar_url": "https://avatars.githubusercontent.com/u/75184?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/jtarchie",
+          "html_url": "https://github.com/jtarchie",
+          "followers_url": "https://api.github.com/users/jtarchie/followers",
+          "following_url": "https://api.github.com/users/jtarchie/following{/other_user}",
+          "gists_url": "https://api.github.com/users/jtarchie/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/jtarchie/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/jtarchie/subscriptions",
+          "organizations_url": "https://api.github.com/users/jtarchie/orgs",
+          "repos_url": "https://api.github.com/users/jtarchie/repos",
+          "events_url": "https://api.github.com/users/jtarchie/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/jtarchie/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        },
+        "html_url": "https://github.com/jtarchie/pocketci",
+        "description": "local-first CI/CD system",
+        "fork": false,
+        "url": "https://api.github.com/repos/jtarchie/pocketci"
+      }
+    },
+    "base": {
+      "label": "jtarchie:main",
+      "ref": "main",
+      "sha": "98fb24879c15306e379b1b1060cf73d60c7527d6",
+      "user": {
+        "login": "jtarchie",
+        "id": 75184,
+        "node_id": "MDQ6VXNlcjc1MTg0",
+        "avatar_url": "https://avatars.githubusercontent.com/u/75184?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/jtarchie",
+        "html_url": "https://github.com/jtarchie"
+      },
+      "repo": {
+        "id": 876313576,
+        "node_id": "R_kgDONDt76A",
+        "name": "pocketci",
+        "full_name": "jtarchie/pocketci",
+        "private": false,
+        "owner": {
+          "login": "jtarchie",
+          "id": 75184,
+          "node_id": "MDQ6VXNlcjc1MTg0",
+          "avatar_url": "https://avatars.githubusercontent.com/u/75184?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/jtarchie",
+          "html_url": "https://github.com/jtarchie"
+        },
+        "html_url": "https://github.com/jtarchie/pocketci",
+        "description": "local-first CI/CD system",
+        "fork": false,
+        "url": "https://api.github.com/repos/jtarchie/pocketci"
+      }
+    },
+    "_links": {
+      "self": {
+        "href": "https://api.github.com/repos/jtarchie/pocketci/pulls/16"
+      },
+      "html": { "href": "https://github.com/jtarchie/pocketci/pull/16" },
+      "issue": {
+        "href": "https://api.github.com/repos/jtarchie/pocketci/issues/16"
+      },
+      "comments": {
+        "href": "https://api.github.com/repos/jtarchie/pocketci/issues/16/comments"
+      },
+      "review_comments": {
+        "href": "https://api.github.com/repos/jtarchie/pocketci/pulls/16/comments"
+      },
+      "review_comment": {
+        "href": "https://api.github.com/repos/jtarchie/pocketci/pulls/comments{/number}"
+      },
+      "commits": {
+        "href": "https://api.github.com/repos/jtarchie/pocketci/pulls/16/commits"
+      },
+      "statuses": {
+        "href": "https://api.github.com/repos/jtarchie/pocketci/statuses/bfcb5cb2ccc00a6bf6c5804861c1561790222e86"
+      }
+    },
+    "author_association": "OWNER",
+    "auto_merge": null,
+    "assignee": null,
+    "active_lock_reason": null,
+    "merged": false,
+    "mergeable": null,
+    "rebaseable": null,
+    "mergeable_state": "unknown",
+    "merged_by": null,
+    "comments": 0,
+    "review_comments": 0,
+    "maintainer_can_modify": false,
+    "commits": 1,
+    "additions": 666,
+    "deletions": 5,
+    "changed_files": 11
+  },
+  "repository": {
+    "id": 876313576,
+    "node_id": "R_kgDONDt76A",
+    "name": "pocketci",
+    "full_name": "jtarchie/pocketci",
+    "private": false,
+    "owner": {
+      "login": "jtarchie",
+      "id": 75184,
+      "node_id": "MDQ6VXNlcjc1MTg0",
+      "avatar_url": "https://avatars.githubusercontent.com/u/75184?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/jtarchie",
+      "html_url": "https://github.com/jtarchie"
+    },
+    "html_url": "https://github.com/jtarchie/pocketci",
+    "description": "local-first CI/CD system",
+    "fork": false,
+    "url": "https://api.github.com/repos/jtarchie/pocketci"
+  },
+  "sender": {
+    "login": "jtarchie",
+    "id": 75184,
+    "node_id": "MDQ6VXNlcjc1MTg0",
+    "avatar_url": "https://avatars.githubusercontent.com/u/75184?v=4",
+    "gravatar_id": "",
+    "url": "https://api.github.com/users/jtarchie",
+    "html_url": "https://github.com/jtarchie",
+    "type": "User",
+    "user_view_type": "public",
+    "site_admin": false
+  }
+}

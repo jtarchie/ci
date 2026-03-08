@@ -168,7 +168,7 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	api := router.Group("/api")
 	api.Use(newBasicAuthMiddleware(opts.BasicAuthUsername, opts.BasicAuthPassword))
 
-	registerRoutes(router, api, web, store, execService, allowedDrivers, allowedFeatures, opts.SecretsManager, webhookTimeout)
+	registerRoutes(router, api, web, store, execService, allowedDrivers, allowedFeatures, opts.SecretsManager, webhookTimeout, logger)
 
 	// MCP endpoint (authenticated)
 	mcpHandler := newMCPHandler(store)
@@ -189,6 +189,7 @@ func registerRoutes(
 	allowedFeatures []Feature,
 	secretsMgr secrets.Manager,
 	webhookTimeout time.Duration,
+	logger *slog.Logger,
 ) {
 	base := BaseController{store: store, execService: execService}
 
@@ -199,7 +200,7 @@ func registerRoutes(
 	(&APIFeaturesController{allowedFeatures: allowedFeatures}).RegisterRoutes(api)
 
 	// Webhooks registered on the main router (no auth group, before API group)
-	(&APIWebhooksController{BaseController: base, allowedFeatures: allowedFeatures, webhookTimeout: webhookTimeout}).RegisterRoutes(router)
+	(&APIWebhooksController{BaseController: base, allowedFeatures: allowedFeatures, webhookTimeout: webhookTimeout, logger: logger.WithGroup("webhook")}).RegisterRoutes(router)
 
 	// Web controllers (HTML responses)
 	(&WebPipelinesController{BaseController: base}).RegisterRoutes(web)
