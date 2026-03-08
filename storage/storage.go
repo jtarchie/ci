@@ -65,46 +65,33 @@ type PaginationResult[T any] struct {
 	HasNext    bool `json:"has_next"`
 }
 
-// ResourceVersion represents a stored resource version.
-type ResourceVersion struct {
-	ID           int64             `json:"id"`
-	ResourceName string            `json:"resource_name"`
-	Version      map[string]string `json:"version"`
-	FetchedAt    time.Time         `json:"fetched_at"`
-	JobName      string            `json:"job_name,omitempty"` // For passed constraints
-}
-
 type Driver interface {
 	Close() error
 	Set(ctx context.Context, prefix string, payload any) error
 	Get(ctx context.Context, prefix string) (Payload, error)
 	GetAll(ctx context.Context, prefix string, fields []string) (Results, error)
+	// UpdateStatusForPrefix sets the status field of all task records under prefix
+	// whose current status matches one of matchStatuses to newStatus.
+	// It uses the same jsonb_patch upsert semantics as Set, so only the status
+	// field is overwritten and all other payload fields are preserved.
+	UpdateStatusForPrefix(ctx context.Context, prefix string, matchStatuses []string, newStatus string) error
 
 	// Pipeline CRUD operations
 	SavePipeline(ctx context.Context, name, content, driverDSN, webhookSecret, contentType string) (*Pipeline, error)
 	GetPipeline(ctx context.Context, id string) (*Pipeline, error)
 	GetPipelineByName(ctx context.Context, name string) (*Pipeline, error)
-	ListPipelines(ctx context.Context, page, perPage int) (*PaginationResult[Pipeline], error)
 	DeletePipeline(ctx context.Context, id string) error
 
 	// Pipeline run operations
 	SaveRun(ctx context.Context, pipelineID string) (*PipelineRun, error)
 	GetRun(ctx context.Context, runID string) (*PipelineRun, error)
-	GetLatestRunByPipeline(ctx context.Context, pipelineID string) (*PipelineRun, error)
-	ListRunsByPipeline(ctx context.Context, pipelineID string, page, perPage int) (*PaginationResult[PipelineRun], error)
 	SearchRunsByPipeline(ctx context.Context, pipelineID, query string, page, perPage int) (*PaginationResult[PipelineRun], error)
 	UpdateRunStatus(ctx context.Context, runID string, status RunStatus, errorMessage string) error
-
-	// Resource version operations
-	SaveResourceVersion(ctx context.Context, resourceName string, version map[string]string, jobName string) (*ResourceVersion, error)
-	GetLatestResourceVersion(ctx context.Context, resourceName string) (*ResourceVersion, error)
-	ListResourceVersions(ctx context.Context, resourceName string, limit int) ([]ResourceVersion, error)
-	GetVersionsAfter(ctx context.Context, resourceName string, afterVersion map[string]string) ([]ResourceVersion, error)
 
 	// Full-text search operations
 	//
 	// SearchPipelines returns pipelines whose name or content match query using
-	// FTS5. An empty query returns all pipelines (same as ListPipelines).
+	// FTS5. An empty query returns all pipelines.
 	SearchPipelines(ctx context.Context, query string, page, perPage int) (*PaginationResult[Pipeline], error)
 
 	// Search returns records whose indexed text matches query, scoped to paths

@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -19,6 +20,9 @@ import (
 	"github.com/jtarchie/pocketci/storage"
 )
 
+// ErrRunNotInFlight is returned when a stop is requested for a run that is not currently executing.
+var ErrRunNotInFlight = errors.New("run is not currently in flight")
+
 // ExecutionService manages pipeline execution with concurrency limits.
 type ExecutionService struct {
 	store                 storage.Driver
@@ -32,6 +36,8 @@ type ExecutionService struct {
 	AllowedFeatures       []Feature
 	FetchTimeout          time.Duration
 	FetchMaxResponseBytes int64
+	stopRegistry          map[string]context.CancelFunc
+	stopMu                sync.Mutex
 }
 
 // NewExecutionService creates a new execution service.
@@ -53,6 +59,7 @@ func NewExecutionService(store storage.Driver, logger *slog.Logger, maxInFlight 
 		logger:        logger.WithGroup("executor.run"),
 		maxInFlight:   maxInFlight,
 		DefaultDriver: defaultDriver,
+		stopRegistry:  make(map[string]context.CancelFunc),
 	}
 }
 
@@ -60,6 +67,22 @@ func NewExecutionService(store storage.Driver, logger *slog.Logger, maxInFlight 
 // This is useful for graceful shutdown or testing.
 func (s *ExecutionService) Wait() {
 	s.wg.Wait()
+}
+
+// StopRun cancels an in-flight pipeline execution by its run ID.
+// Returns ErrRunNotInFlight if the run is not currently executing.
+func (s *ExecutionService) StopRun(runID string) error {
+	s.stopMu.Lock()
+	cancel, ok := s.stopRegistry[runID]
+	s.stopMu.Unlock()
+
+	if !ok {
+		return ErrRunNotInFlight
+	}
+
+	cancel()
+
+	return nil
 }
 
 // CanExecute returns true if a new pipeline can be started.
@@ -140,7 +163,22 @@ func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *stor
 	defer s.inFlight.Add(-1)
 	defer s.wg.Done()
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	s.stopMu.Lock()
+	s.stopRegistry[run.ID] = cancel
+	s.stopMu.Unlock()
+	defer func() {
+		s.stopMu.Lock()
+		delete(s.stopRegistry, run.ID)
+		s.stopMu.Unlock()
+	}()
+
+	// dbCtx is a separate context for storage operations that must succeed
+	// even when the pipeline context has been cancelled (e.g. user-initiated stop).
+	dbCtx := context.Background()
+
 	logger := s.logger.With(
 		"event", "pipeline.execute",
 		"run_id", run.ID,
@@ -149,7 +187,7 @@ func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *stor
 	)
 
 	// Update status to running
-	err := s.store.UpdateRunStatus(ctx, run.ID, storage.RunStatusRunning, "")
+	err := s.store.UpdateRunStatus(dbCtx, run.ID, storage.RunStatusRunning, "")
 	if err != nil {
 		logger.Error("run.update.failed.to_running", "error", err)
 		return
@@ -192,7 +230,7 @@ func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *stor
 	if err != nil {
 		logger.Error("pipeline.transpile.failed", "error", err)
 
-		updateErr := s.store.UpdateRunStatus(ctx, run.ID, storage.RunStatusFailed, err.Error())
+		updateErr := s.store.UpdateRunStatus(dbCtx, run.ID, storage.RunStatusFailed, err.Error())
 		if updateErr != nil {
 			logger.Error("run.update.failed.to_failed", "error", updateErr)
 		}
@@ -204,7 +242,30 @@ func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *stor
 	if err != nil {
 		logger.Error("pipeline.execute.failed", "error", err)
 
-		updateErr := s.store.UpdateRunStatus(ctx, run.ID, storage.RunStatusFailed, err.Error())
+		errMsg := err.Error()
+		if ctx.Err() != nil {
+			errMsg = "Run stopped by user"
+			if abortErr := s.store.UpdateStatusForPrefix(dbCtx, "/pipeline/"+run.ID+"/", []string{"pending", "running"}, "aborted"); abortErr != nil {
+				logger.Error("run.abort.tasks.failed", "error", abortErr)
+			}
+		}
+
+		updateErr := s.store.UpdateRunStatus(dbCtx, run.ID, storage.RunStatusFailed, errMsg)
+		if updateErr != nil {
+			logger.Error("run.update.failed.to_failed", "error", updateErr)
+		}
+
+		return
+	}
+
+	// If the context was cancelled (e.g. user stopped the run) but ExecutePipeline returned
+	// no error (because the abort was handled gracefully inside the runner), still mark as failed.
+	if ctx.Err() != nil {
+		if abortErr := s.store.UpdateStatusForPrefix(dbCtx, "/pipeline/"+run.ID+"/", []string{"pending", "running"}, "aborted"); abortErr != nil {
+			logger.Error("run.abort.tasks.failed", "error", abortErr)
+		}
+
+		updateErr := s.store.UpdateRunStatus(dbCtx, run.ID, storage.RunStatusFailed, "Run stopped by user")
 		if updateErr != nil {
 			logger.Error("run.update.failed.to_failed", "error", updateErr)
 		}
@@ -213,9 +274,9 @@ func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *stor
 	}
 
 	// Check if any jobs failed by querying job statuses
-	finalStatus := s.determineRunStatus(ctx, run.ID, logger)
+	finalStatus := s.determineRunStatus(dbCtx, run.ID, logger)
 
-	err = s.store.UpdateRunStatus(ctx, run.ID, finalStatus, "")
+	err = s.store.UpdateRunStatus(dbCtx, run.ID, finalStatus, "")
 	if err != nil {
 		logger.Error("run.update.failed.to_final", "error", err)
 		return

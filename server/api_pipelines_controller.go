@@ -70,7 +70,7 @@ func (c *APIPipelinesController) Index(ctx *echo.Context) error {
 		_, _ = fmt.Sscanf(pp, "%d", &perPage)
 	}
 
-	result, err := c.store.ListPipelines(ctx.Request().Context(), page, perPage)
+	result, err := c.store.SearchPipelines(ctx.Request().Context(), "", page, perPage)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, map[string]string{
 			"error": fmt.Sprintf("failed to list pipelines: %v", err),
@@ -289,7 +289,7 @@ func (c *APIPipelinesController) Trigger(ctx *echo.Context) error {
 	}
 
 	if isHtmxRequest(ctx) {
-		result, err := c.store.ListRunsByPipeline(ctx.Request().Context(), id, 1, 20)
+		result, err := c.store.SearchRunsByPipeline(ctx.Request().Context(), id, "", 1, 20)
 		if err != nil {
 			return fmt.Errorf("could not list runs: %w", err)
 		}

@@ -6,6 +6,11 @@ import {
   TaskFailure,
   TaskRunner,
 } from "./task_runner.ts";
+import {
+  getLatestResourceVersion,
+  listResourceVersions,
+  saveResourceVersion,
+} from "./resource_store.ts";
 
 function zeroPad(num: number, places: number): string {
   return String(num).padStart(places, "0");
@@ -611,12 +616,8 @@ export class JobRunner {
     // Get last known version for 'every' mode check using dedicated resource version API
     let lastKnownVersion: ResourceVersion | undefined;
     if (versionMode === "every") {
-      try {
-        const stored = storage.getLatestResourceVersion(scopedResourceName);
-        lastKnownVersion = stored?.version;
-      } catch (_e) {
-        // No previous version stored, that's fine
-      }
+      const stored = getLatestResourceVersion(scopedResourceName);
+      lastKnownVersion = stored?.version;
     }
 
     // Determine which version to fetch
@@ -680,7 +681,7 @@ export class JobRunner {
       if (versionMode === "every") {
         // For 'every' mode, get ALL stored versions to filter against
         // This ensures we don't re-process versions we've already seen
-        const storedVersions = storage.listResourceVersions(
+        const storedVersions = listResourceVersions(
           scopedResourceName,
           0, // 0 = no limit, get all versions
         );
@@ -787,7 +788,7 @@ export class JobRunner {
     // Store version using dedicated resource version API for:
     // 1. Global tracking (for 'every' mode across runs)
     // 2. Job input tracking (for 'passed' constraints)
-    storage.saveResourceVersion(
+    saveResourceVersion(
       scopedResourceName,
       versionToFetch as { [key: string]: string },
       this.jobConfig.name,

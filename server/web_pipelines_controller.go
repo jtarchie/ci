@@ -26,9 +26,8 @@ func buildPipelineRows(ctx context.Context, store storage.Driver, pipelines []st
 	rows := make([]PipelineRow, 0, len(pipelines))
 	for _, p := range pipelines {
 		row := PipelineRow{Pipeline: p, DriverName: driverNameFromDSN(p.DriverDSN, defaultDriver)}
-		run, err := store.GetLatestRunByPipeline(ctx, p.ID)
-		if err == nil {
-			row.LatestRun = run
+		if res, err := store.SearchRunsByPipeline(ctx, p.ID, "", 1, 1); err == nil && len(res.Items) > 0 {
+			row.LatestRun = &res.Items[0]
 		}
 		rows = append(rows, row)
 	}
@@ -164,7 +163,7 @@ func (c *WebPipelinesController) Show(ctx *echo.Context) error {
 	if q != "" {
 		result, runsErr = c.store.SearchRunsByPipeline(ctx.Request().Context(), id, q, page, perPage)
 	} else {
-		result, runsErr = c.store.ListRunsByPipeline(ctx.Request().Context(), id, page, perPage)
+		result, runsErr = c.store.SearchRunsByPipeline(ctx.Request().Context(), id, "", page, perPage)
 	}
 	if runsErr != nil {
 		return fmt.Errorf("could not list runs: %w", runsErr)
@@ -205,7 +204,7 @@ func (c *WebPipelinesController) RunsSection(ctx *echo.Context) error {
 		_, _ = fmt.Sscanf(pp, "%d", &perPage)
 	}
 
-	result, err := c.store.ListRunsByPipeline(ctx.Request().Context(), id, page, perPage)
+	result, err := c.store.SearchRunsByPipeline(ctx.Request().Context(), id, "", page, perPage)
 	if err != nil {
 		return fmt.Errorf("could not list runs: %w", err)
 	}

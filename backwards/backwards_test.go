@@ -438,7 +438,7 @@ func TestVersionEveryWithMock(t *testing.T) {
 		pipelineFile := "versions/mock-every.yml"
 
 		// Helper to query stored versions with a fresh connection
-		queryVersions := func() []storage.ResourceVersion {
+		queryVersions := func() []storage.Payload {
 			pipelinePath, err := filepath.Abs(pipelineFile)
 			assert.Expect(err).NotTo(HaveOccurred())
 			runtimeID := youtubeIDStyle(pipelinePath)
@@ -451,9 +451,22 @@ func TestVersionEveryWithMock(t *testing.T) {
 			defer func() { _ = store.Close() }()
 
 			scopedResourceName := fmt.Sprintf("%s/%s", runtimeID, "counter")
-			versions, err := store.ListResourceVersions(context.Background(), scopedResourceName, 100)
-			assert.Expect(err).NotTo(HaveOccurred())
+			metaKey := fmt.Sprintf("/rv/%s/meta", scopedResourceName)
 
+			meta, err := store.Get(context.Background(), metaKey)
+			if err != nil {
+				return nil
+			}
+
+			count := int(meta["count"].(float64))
+			versions := make([]storage.Payload, 0, count)
+			for i := range count {
+				key := fmt.Sprintf("/rv/%s/versions/%010d", scopedResourceName, i)
+				v, err := store.Get(context.Background(), key)
+				if err == nil {
+					versions = append(versions, v)
+				}
+			}
 			return versions
 		}
 
@@ -469,7 +482,7 @@ func TestVersionEveryWithMock(t *testing.T) {
 		// Verify a version was saved after run 1
 		versions1 := queryVersions()
 		assert.Expect(versions1).To(HaveLen(1))
-		firstVersion := versions1[0].Version
+		firstVersion := versions1[0]["version"].(map[string]interface{})
 
 		// Run 2: Should fetch a NEW version (mock increments counter each Check)
 		runner2 := commands.Runner{
@@ -485,7 +498,7 @@ func TestVersionEveryWithMock(t *testing.T) {
 		assert.Expect(versions2).To(HaveLen(2))
 
 		// Verify the versions are different (versions are ordered by ID ascending, so newest is last)
-		secondVersion := versions2[len(versions2)-1].Version // Most recent is last
+		secondVersion := versions2[len(versions2)-1]["version"].(map[string]interface{}) // Most recent is last
 		assert.Expect(secondVersion).NotTo(Equal(firstVersion))
 
 		// Run 3: Get another version

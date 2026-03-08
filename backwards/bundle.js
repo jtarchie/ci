@@ -141,15 +141,87 @@ var TaskErrored = class extends CustomError {
 var TaskAbort = class extends CustomError {
 };
 
-// src/job_runner.ts
+// src/resource_store.ts
 function zeroPad(num, places) {
+  return String(num).padStart(places, "0");
+}
+function hashString(str) {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) {
+    h = Math.imul(h, 31) ^ str.charCodeAt(i);
+  }
+  return (h >>> 0).toString(16);
+}
+function metaKey(name) {
+  return `/rv/${name}/meta`;
+}
+function versionKey(name, index) {
+  return `/rv/${name}/versions/${zeroPad(index, 10)}`;
+}
+function dedupKey(name, versionJSON) {
+  return `/rv/${name}/v/${hashString(versionJSON)}`;
+}
+function safeGet(key) {
+  try {
+    return storage.get(key);
+  } catch (_e) {
+    return null;
+  }
+}
+function saveResourceVersion(name, version, jobName) {
+  const versionJSON = JSON.stringify(version);
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const dk = dedupKey(name, versionJSON);
+  const dedupEntry = safeGet(dk);
+  if (dedupEntry !== null && dedupEntry !== void 0) {
+    if (dedupEntry.version_json === versionJSON) {
+      const vk = versionKey(name, dedupEntry.index);
+      const existing = safeGet(vk);
+      if (existing) {
+        storage.set(vk, { ...existing, job_name: jobName, fetched_at: now });
+      }
+      return;
+    }
+  }
+  const metaData = safeGet(metaKey(name));
+  const count = metaData?.count ?? 0;
+  storage.set(versionKey(name, count), {
+    version,
+    job_name: jobName,
+    fetched_at: now
+  });
+  storage.set(dk, { index: count, version_json: versionJSON });
+  storage.set(metaKey(name), { count: count + 1 });
+}
+function getLatestResourceVersion(name) {
+  const metaData = safeGet(metaKey(name));
+  const count = metaData?.count ?? 0;
+  if (count <= 0) {
+    return null;
+  }
+  return safeGet(versionKey(name, count - 1));
+}
+function listResourceVersions(name, limit) {
+  const metaData = safeGet(metaKey(name));
+  const count = metaData?.count ?? 0;
+  const actualCount = limit > 0 ? Math.min(limit, count) : count;
+  const versions = [];
+  for (let i = 0; i < actualCount; i++) {
+    const v = safeGet(versionKey(name, i));
+    if (v) versions.push(v);
+  }
+  return versions;
+}
+
+// src/job_runner.ts
+function zeroPad2(num, places) {
   return String(num).padStart(places, "0");
 }
 function zeroPadWithLength(num, length) {
   const decimalPlaces = String(length).split(".")[1]?.length || 0;
-  return zeroPad(num, decimalPlaces);
+  return zeroPad2(num, decimalPlaces);
 }
-var buildID = typeof pipelineContext !== "undefined" && pipelineContext.runID ? pipelineContext.runID : zeroPad(Date.now(), 20);
+var buildID = typeof pipelineContext !== "undefined" && pipelineContext.runID ? pipelineContext.runID : zeroPad2(Date.now(), 20);
 var JobRunner = class {
   constructor(jobConfig, resources, resourceTypes) {
     this.jobConfig = jobConfig;
@@ -621,11 +693,8 @@ var JobRunner = class {
     const scopedResourceName = this.getScopedResourceName(resource?.name);
     let lastKnownVersion;
     if (versionMode === "every") {
-      try {
-        const stored = storage.getLatestResourceVersion(scopedResourceName);
-        lastKnownVersion = stored?.version;
-      } catch (_e) {
-      }
+      const stored = getLatestResourceVersion(scopedResourceName);
+      lastKnownVersion = stored?.version;
     }
     let versionToFetch;
     if (versionMode === "pinned") {
@@ -677,7 +746,7 @@ var JobRunner = class {
         throw new Error(`No versions found for resource ${resource?.name}`);
       }
       if (versionMode === "every") {
-        const storedVersions = storage.listResourceVersions(
+        const storedVersions = listResourceVersions(
           scopedResourceName,
           0
           // 0 = no limit, get all versions
@@ -762,7 +831,7 @@ var JobRunner = class {
         `${pathContext}/get`
       );
     }
-    storage.saveResourceVersion(
+    saveResourceVersion(
       scopedResourceName,
       versionToFetch,
       this.jobConfig.name

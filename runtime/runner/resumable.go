@@ -275,6 +275,9 @@ func (r *ResumableRunner) runStep(stepID string, input RunInput) (*RunResult, er
 			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 				step.Status = StepStatusAborted
 				_ = r.saveState()
+				if cleanupErr := container.Cleanup(context.Background()); cleanupErr != nil {
+					r.logger.Error("container.cleanup.abort", "err", cleanupErr)
+				}
 				return &RunResult{Status: RunAbort}, nil
 			}
 			step.Status = StepStatusFailed
@@ -297,6 +300,9 @@ func (r *ResumableRunner) runStep(stepID string, input RunInput) (*RunResult, er
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 			step.Status = StepStatusAborted
 			_ = r.saveState()
+			if cleanupErr := container.Cleanup(context.Background()); cleanupErr != nil {
+				r.logger.Error("container.cleanup.abort", "err", cleanupErr)
+			}
 			return &RunResult{Status: RunAbort}, nil
 		}
 

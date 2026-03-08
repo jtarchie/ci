@@ -98,7 +98,7 @@ func TestPipelineStorage(t *testing.T) {
 				_, err = client.SavePipeline(context.Background(), "pipeline-2", "content2", "native://", "", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				result, err := client.ListPipelines(context.Background(), 1, 100)
+				result, err := client.SearchPipelines(context.Background(), "", 1, 100)
 				assert.Expect(err).NotTo(HaveOccurred())
 				assert.Expect(result.Items).To(HaveLen(2))
 			})
@@ -115,7 +115,7 @@ func TestPipelineStorage(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				result, err := client.ListPipelines(context.Background(), 1, 100)
+				result, err := client.SearchPipelines(context.Background(), "", 1, 100)
 				assert.Expect(err).NotTo(HaveOccurred())
 				assert.Expect(result.Items).To(BeEmpty())
 			})
@@ -267,7 +267,7 @@ func TestPipelineStorage(t *testing.T) {
 				assert.Expect(second.Content).To(Equal("content-v2"))
 
 				// Only one pipeline should exist in the database.
-				result, err := client.ListPipelines(ctx, 1, 100)
+				result, err := client.SearchPipelines(ctx, "", 1, 100)
 				assert.Expect(err).NotTo(HaveOccurred())
 				assert.Expect(result.Items).To(HaveLen(1))
 				assert.Expect(result.Items[0].Name).To(Equal("my-pipeline"))

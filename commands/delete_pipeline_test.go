@@ -35,7 +35,7 @@ func TestDeletePipeline(t *testing.T) {
 				err = cmd.Run(slog.Default())
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				result, err := client.ListPipelines(context.Background(), 1, 100)
+				result, err := client.SearchPipelines(context.Background(), "", 1, 100)
 				assert.Expect(err).NotTo(HaveOccurred())
 				assert.Expect(result.Items).To(BeEmpty())
 			})
@@ -57,7 +57,7 @@ func TestDeletePipeline(t *testing.T) {
 				err = cmd.Run(slog.Default())
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				result, err := client.ListPipelines(context.Background(), 1, 100)
+				result, err := client.SearchPipelines(context.Background(), "", 1, 100)
 				assert.Expect(err).NotTo(HaveOccurred())
 				assert.Expect(result.Items).To(BeEmpty())
 			})
@@ -97,7 +97,7 @@ func TestDeletePipeline(t *testing.T) {
 				err = cmd.Run(slog.Default())
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				result, err := client.ListPipelines(context.Background(), 1, 100)
+				result, err := client.SearchPipelines(context.Background(), "", 1, 100)
 				assert.Expect(err).NotTo(HaveOccurred())
 				assert.Expect(result.Items).To(HaveLen(1))
 				assert.Expect(result.Items[0].Name).To(Equal("keep-me"))
