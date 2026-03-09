@@ -980,7 +980,9 @@ export class JobRunner {
             }
           } else if (event.type === "tool_response") {
             const callID = event.toolCallId;
-            const existingIndex = callID ? pendingToolCallIndex.get(callID) : undefined;
+            const existingIndex = callID
+              ? pendingToolCallIndex.get(callID)
+              : undefined;
 
             if (existingIndex !== undefined) {
               toolCalls[existingIndex].result = event.toolResult;

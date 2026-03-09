@@ -138,7 +138,7 @@ type AgentContextGuardConfig struct {
 
 // AgentLimitsConfig configures hard limits that stop agent execution.
 type AgentLimitsConfig struct {
-	MaxTurns       int   `yaml:"max_turns,omitempty"`       // stop after N LLM responses (default: 50)
+	MaxTurns       int   `yaml:"max_turns,omitempty"`        // stop after N LLM responses (default: 50)
 	MaxTotalTokens int32 `yaml:"max_total_tokens,omitempty"` // stop when cumulative tokens reach this
 }
 
@@ -178,7 +178,7 @@ type Step struct {
 	AgentThinking     *AgentThinkingConfig     `yaml:"thinking,omitempty"`
 	AgentSafety       AgentSafetyConfig        `yaml:"safety,omitempty"`
 	AgentContextGuard *AgentContextGuardConfig `yaml:"context_guard,omitempty"`
-	AgentLimits       *AgentLimitsConfig        `yaml:"limits,omitempty"`
+	AgentLimits       *AgentLimitsConfig       `yaml:"limits,omitempty"`
 	AgentContext      *AgentContext            `yaml:"context,omitempty"`
 
 	Get       string    `yaml:"get,omitempty"`

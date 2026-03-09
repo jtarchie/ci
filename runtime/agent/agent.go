@@ -54,7 +54,7 @@ type AgentContextGuardConfig struct {
 
 // AgentLimitsConfig configures hard limits that stop agent execution.
 type AgentLimitsConfig struct {
-	MaxTurns      int   `json:"max_turns,omitempty"`
+	MaxTurns       int   `json:"max_turns,omitempty"`
 	MaxTotalTokens int32 `json:"max_total_tokens,omitempty"`
 }
 
@@ -70,7 +70,7 @@ type AgentConfig struct {
 	Thinking         *AgentThinkingConfig                   `json:"thinking,omitempty"`
 	Safety           map[string]string                      `json:"safety,omitempty"`
 	ContextGuard     *AgentContextGuardConfig               `json:"context_guard,omitempty"`
-	Limits           *AgentLimitsConfig                      `json:"limits,omitempty"`
+	Limits           *AgentLimitsConfig                     `json:"limits,omitempty"`
 	Context          *AgentContext                          `json:"context,omitempty"`
 	// OnOutput is called with streaming chunks. Not serialised from JS.
 	OnOutput pipelinerunner.OutputCallback `json:"-"`

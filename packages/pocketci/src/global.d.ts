@@ -243,7 +243,7 @@ declare global {
   // Result returned by runtime.agent().
   interface AgentResult {
     text: string;
-    status: "success" | "failure";
+    status: "success" | "failure" | "limit_exceeded";
     toolCalls: ToolCallRecord[];
     usage: AgentUsage;
     auditLog: AuditEvent[];
@@ -487,7 +487,13 @@ declare global {
     pipelineName: string;
     jobName: string;
     buildID: string;
-    status: "pending" | "running" | "success" | "failure" | "error";
+    status:
+      | "pending"
+      | "running"
+      | "success"
+      | "failure"
+      | "error"
+      | "limit_exceeded";
     startTime: string;
     endTime: string;
     duration: string;
