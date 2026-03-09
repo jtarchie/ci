@@ -686,24 +686,11 @@ func RunAgent(
 	defer func() { _ = sandbox.Close() }()
 
 	// Build the run_command tool.
-	// Determine a common workdir from the mounts so the agent can reference
-	// files by relative path (e.g. "my-repo/main.go").
-	agentWorkDir := ""
-	if len(config.Mounts) > 0 {
-		// Use the parent of the first mount path as workdir.
-		// For Fly shared volumes: /workspace/my-repo → workdir /workspace
-		// For Docker: /tmp/container/my-repo → workdir /tmp/container
-		for _, vol := range config.Mounts {
-			if vol.Path != "" {
-				idx := strings.LastIndex(vol.Path, "/")
-				if idx > 0 {
-					agentWorkDir = vol.Path[:idx]
-				}
-
-				break
-			}
-		}
-	}
+	// The sandbox container's default working directory is pre-configured by
+	// the driver (e.g. /tmp/{containerName}/ for Docker).  Volumes are mounted
+	// as children of that directory using the mount name as the final path
+	// component, so the agent can reference files via relative paths like
+	// "my-repo/main.go" or "diff/pr.diff".
 
 	runCmd, err := functiontool.New[runCommandInput, runCommandOutput](
 		functiontool.Config{
@@ -714,7 +701,8 @@ func RunAgent(
 			var execInput pipelinerunner.ExecInput
 			execInput.Command.Path = input.Command
 			execInput.Command.Args = input.Args
-			execInput.WorkDir = agentWorkDir
+			// WorkDir left empty — the sandbox uses its default working directory
+			// which is the parent of all mounted volumes.
 			execInput.OnOutput = config.OnOutput
 
 			result, execErr := sandbox.Exec(execInput)
@@ -765,15 +753,11 @@ func RunAgent(
 	}
 
 	if len(config.Mounts) > 0 {
-		instrBuilder.WriteString("\nAvailable volumes:\n")
+		instrBuilder.WriteString("\nAvailable volumes (accessible as relative paths from the working directory):\n")
 
-		for name, vol := range config.Mounts {
-			fmt.Fprintf(&instrBuilder, "  - %s (at %s)\n", name, vol.Path)
+		for name := range config.Mounts {
+			fmt.Fprintf(&instrBuilder, "  - %s/\n", name)
 		}
-	}
-
-	if agentWorkDir != "" {
-		fmt.Fprintf(&instrBuilder, "\nWorking directory: %s\n", agentWorkDir)
 	}
 
 	instrBuilder.WriteString("\nTools available:\n")
