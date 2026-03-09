@@ -339,7 +339,9 @@ test.describe("Run Views", () => {
     await tasksLink.click();
 
     // Should show "Run <runID>" in breadcrumb
-    await expect(page.getByText(/Run\s/)).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /^Run\s/ }),
+    ).toBeVisible();
   });
 
   test("run tasks view has link to graph view", async ({ page, request }) => {
