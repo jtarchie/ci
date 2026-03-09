@@ -15,8 +15,9 @@ import (
 // FlySandbox keeps a Fly machine alive with "tail -f /dev/null" and dispatches
 // exec calls via the Fly Machines exec API (POST /machines/{id}/exec).
 type FlySandbox struct {
-	machineID string
-	driver    *Fly
+	machineID      string
+	driver         *Fly
+	defaultWorkDir string // applied when Exec is called without an explicit workDir
 }
 
 var _ orchestra.Sandbox = (*FlySandbox)(nil)
@@ -36,8 +37,22 @@ func (s *FlySandbox) Exec(
 	stdin io.Reader,
 	stdout, stderr io.Writer,
 ) (orchestra.ContainerStatus, error) {
-	// Build the command string, optionally wrapping with sh -c for env/workDir.
-	execCmd := strings.Join(cmd, " ")
+	// Apply default workDir if none was specified.
+	if workDir == "" {
+		workDir = s.defaultWorkDir
+	}
+
+	// Filter empty strings (e.g. empty Command.Path) and properly quote
+	// each argument so compound commands like
+	// ["/bin/sh", "-c", "find / -name foo"] are preserved correctly.
+	var filtered []string
+	for _, c := range cmd {
+		if c != "" {
+			filtered = append(filtered, c)
+		}
+	}
+
+	execCmd := shelljoin(filtered)
 
 	if workDir != "" || len(env) > 0 {
 		var parts []string
@@ -47,11 +62,11 @@ func (s *FlySandbox) Exec(
 		}
 
 		if workDir != "" {
-			parts = append(parts, "cd "+workDir)
+			parts = append(parts, "cd "+shellescape(workDir))
 		}
 
 		parts = append(parts, "exec "+execCmd)
-		execCmd = "/bin/sh -c '" + strings.Join(parts, " && ") + "'"
+		execCmd = "/bin/sh -c " + shellescape(strings.Join(parts, " && "))
 	}
 
 	var stdinStr string
@@ -198,9 +213,15 @@ func (f *Fly) StartSandbox(ctx context.Context, task orchestra.Task) (orchestra.
 		return nil, fmt.Errorf("sandbox: machine did not start: %w", err)
 	}
 
+	defaultWorkDir := ""
+	if len(mountDirs) > 0 {
+		defaultWorkDir = "/workspace"
+	}
+
 	sandbox := &FlySandbox{
-		machineID: machine.ID,
-		driver:    f,
+		machineID:      machine.ID,
+		driver:         f,
+		defaultWorkDir: defaultWorkDir,
 	}
 
 	// Create mount subdirectories inside the shared workspace volume.
