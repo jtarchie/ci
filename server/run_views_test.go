@@ -93,6 +93,75 @@ func TestRunViews(t *testing.T) {
 				assert.Expect(rec.Body.String()).To(ContainSubstring("test-job"))
 			})
 
+			t.Run("GET /runs/:id/tasks shows run error alert when error_message is set", func(t *testing.T) {
+				t.Parallel()
+				assert := NewGomegaWithT(t)
+
+				buildFile, err := os.CreateTemp(t.TempDir(), "")
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = buildFile.Close() }()
+
+				client, err := init(buildFile.Name(), "namespace", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = client.Close() }()
+
+				pipeline, err := client.SavePipeline(context.Background(), "error-pipeline", "export const pipeline = async () => {};", "docker://", "")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				run, err := client.SaveRun(context.Background(), pipeline.ID)
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				err = client.UpdateRunStatus(context.Background(), run.ID, storage.RunStatusFailed, "failed to create volume: unauthorized")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				req := httptest.NewRequest(http.MethodGet, "/runs/"+run.ID+"/tasks", nil)
+				rec := httptest.NewRecorder()
+				router.ServeHTTP(rec, req)
+
+				assert.Expect(rec.Code).To(Equal(http.StatusOK))
+				assert.Expect(rec.Body.String()).To(ContainSubstring("Run failed"))
+				assert.Expect(rec.Body.String()).To(ContainSubstring("failed to create volume: unauthorized"))
+			})
+
+			t.Run("GET /runs/:id/graph shows run error alert when error_message is set", func(t *testing.T) {
+				t.Parallel()
+				assert := NewGomegaWithT(t)
+
+				buildFile, err := os.CreateTemp(t.TempDir(), "")
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = buildFile.Close() }()
+
+				client, err := init(buildFile.Name(), "namespace", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = client.Close() }()
+
+				pipeline, err := client.SavePipeline(context.Background(), "graph-error-pipeline", "export const pipeline = async () => {};", "docker://", "")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				run, err := client.SaveRun(context.Background(), pipeline.ID)
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				err = client.Set(context.Background(), "/pipeline/"+run.ID+"/jobs/test-job", map[string]any{"status": "failure", "dependsOn": []string{}})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				err = client.UpdateRunStatus(context.Background(), run.ID, storage.RunStatusFailed, "failed to create volume: unauthorized")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				req := httptest.NewRequest(http.MethodGet, "/runs/"+run.ID+"/graph", nil)
+				rec := httptest.NewRecorder()
+				router.ServeHTTP(rec, req)
+
+				assert.Expect(rec.Code).To(Equal(http.StatusOK))
+				assert.Expect(rec.Body.String()).To(ContainSubstring("Run failed"))
+				assert.Expect(rec.Body.String()).To(ContainSubstring("failed to create volume: unauthorized"))
+			})
+
 			t.Run("GET /runs/:id/tasks returns empty tree for non-existent run", func(t *testing.T) {
 				t.Parallel()
 				assert := NewGomegaWithT(t)

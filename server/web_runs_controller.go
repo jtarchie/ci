@@ -81,6 +81,7 @@ func (c *WebRunsController) Graph(ctx *echo.Context) error {
 		"Path":     lookupPath,
 		"RunID":    runID,
 		"IsActive": isActive,
+		"Run":      run,
 		"Pipeline": pipeline,
 		"Title":    title,
 	})
