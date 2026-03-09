@@ -7,7 +7,7 @@ import (
 	"github.com/jtarchie/pocketci/commands"
 	_ "github.com/jtarchie/pocketci/orchestra/docker"
 	_ "github.com/jtarchie/pocketci/orchestra/native"
-	_ "github.com/jtarchie/pocketci/secrets/local"
+	_ "github.com/jtarchie/pocketci/secrets/sqlite"
 	_ "github.com/jtarchie/pocketci/storage/sqlite"
 	. "github.com/onsi/gomega"
 )
@@ -30,7 +30,7 @@ func TestSecretsBasic(t *testing.T) {
 				Pipeline: examplePath,
 				Driver:   driver,
 				Storage:  "sqlite://:memory:",
-				Secrets:  "local://:memory:?key=test-passphrase",
+				Secrets:  "sqlite://:memory:?key=test-passphrase",
 				Secret:   []string{"API_KEY=super-secret-value-12345"},
 			}
 			err = runner.Run(nil)
@@ -51,7 +51,7 @@ func TestSecretsMissingFails(t *testing.T) {
 		Pipeline: examplePath,
 		Driver:   "native",
 		Storage:  "sqlite://:memory:",
-		Secrets:  "local://:memory:?key=test-passphrase",
+		Secrets:  "sqlite://:memory:?key=test-passphrase",
 	}
 	err = runner.Run(nil)
 	assert.Expect(err).To(HaveOccurred())
@@ -70,7 +70,7 @@ func TestSecretsInvalidFlag(t *testing.T) {
 		Pipeline: examplePath,
 		Driver:   "native",
 		Storage:  "sqlite://:memory:",
-		Secrets:  "local://:memory:?key=test-passphrase",
+		Secrets:  "sqlite://:memory:?key=test-passphrase",
 		Secret:   []string{"INVALID_NO_EQUALS"},
 	}
 	err = runner.Run(nil)
@@ -100,7 +100,7 @@ func TestSecretsGlobal(t *testing.T) {
 				Pipeline:     examplePath,
 				Driver:       driver,
 				Storage:      "sqlite://:memory:",
-				Secrets:      "local://:memory:?key=test-passphrase",
+				Secrets:      "sqlite://:memory:?key=test-passphrase",
 				GlobalSecret: []string{"API_KEY=global-secret-value-99999"},
 			}
 			err = runner.Run(nil)
@@ -123,7 +123,7 @@ func TestSecretsGlobalOverriddenByPipeline(t *testing.T) {
 		Pipeline:     examplePath,
 		Driver:       "native",
 		Storage:      "sqlite://:memory:",
-		Secrets:      "local://:memory:?key=test-passphrase",
+		Secrets:      "sqlite://:memory:?key=test-passphrase",
 		Secret:       []string{"API_KEY=pipeline-secret"},
 		GlobalSecret: []string{"API_KEY=global-secret"},
 	}

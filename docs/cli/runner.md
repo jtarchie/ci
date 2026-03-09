@@ -13,7 +13,7 @@ pocketci runner <pipeline-file> [options]
 - `--storage` — persistence backend (default: `sqlite://test.db`)
 - `--secret` — set pipeline-scoped secret (repeatable; format: `KEY=VALUE`)
 - `--global-secret` — set global secret (repeatable)
-- `--secrets` — secrets backend DSN (e.g., `local://secrets.db?key=passphrase`)
+- `--secrets` — secrets backend DSN (e.g., `sqlite://secrets.db?key=passphrase`)
 - `--log-level` — log level (`debug`, `info`, `warn`, `error`)
 - `--log-format` — log format (`json` or text)
 

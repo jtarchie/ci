@@ -14,7 +14,7 @@ import (
 	_ "github.com/jtarchie/pocketci/orchestra/native"
 	_ "github.com/jtarchie/pocketci/orchestra/qemu"
 	_ "github.com/jtarchie/pocketci/resources/mock"
-	_ "github.com/jtarchie/pocketci/secrets/local"
+	_ "github.com/jtarchie/pocketci/secrets/sqlite"
 	_ "github.com/jtarchie/pocketci/storage/sqlite"
 	_ "github.com/jtarchie/pocketci/webhooks/generic"
 	_ "github.com/jtarchie/pocketci/webhooks/github"

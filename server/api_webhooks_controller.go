@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jtarchie/pocketci/runtime"
+	"github.com/jtarchie/pocketci/secrets"
 	"github.com/jtarchie/pocketci/storage"
 	"github.com/jtarchie/pocketci/webhooks"
 	"github.com/labstack/echo/v5"
@@ -20,6 +21,7 @@ type APIWebhooksController struct {
 	allowedFeatures []Feature
 	webhookTimeout  time.Duration
 	logger          *slog.Logger
+	secretsMgr      secrets.Manager
 }
 
 // Trigger handles ANY /api/webhooks/:id - Trigger pipeline execution via webhook.
@@ -49,7 +51,20 @@ func (c *APIWebhooksController) Trigger(ctx *echo.Context) error {
 		})
 	}
 
-	logger = logger.With("pipeline_name", pipeline.Name, "has_webhook_secret", pipeline.WebhookSecret != "")
+	webhookSecret := ""
+	if c.secretsMgr != nil {
+		resolvedSecret, getErr := c.secretsMgr.Get(ctx.Request().Context(), secrets.PipelineScope(pipeline.ID), "webhook_secret")
+		if getErr == nil {
+			webhookSecret = resolvedSecret
+		} else if !errors.Is(getErr, secrets.ErrNotFound) {
+			logger.Error("webhook.secret_error", "error", getErr)
+			return ctx.JSON(http.StatusInternalServerError, map[string]string{
+				"error": fmt.Sprintf("failed to get webhook secret: %v", getErr),
+			})
+		}
+	}
+
+	logger = logger.With("pipeline_name", pipeline.Name, "has_webhook_secret", webhookSecret != "")
 
 	body, err := io.ReadAll(ctx.Request().Body)
 	if err != nil {
@@ -68,7 +83,7 @@ func (c *APIWebhooksController) Trigger(ctx *echo.Context) error {
 		}
 	}
 
-	event, err := webhooks.Detect(ctx.Request(), body, pipeline.WebhookSecret)
+	event, err := webhooks.Detect(ctx.Request(), body, webhookSecret)
 	if err != nil {
 		if errors.Is(err, webhooks.ErrUnauthorized) {
 			logger.Error("webhook.unauthorized",

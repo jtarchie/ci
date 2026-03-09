@@ -1,8 +1,9 @@
-package local
+package sqlite
 
 import (
 	"context"
 	"database/sql"
+	_ "embed"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -13,28 +14,31 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// Local is a secrets backend that stores encrypted secrets in SQLite.
-type Local struct {
+//go:embed schema.sql
+var schema string
+
+// SQLite is a secrets backend that stores encrypted secrets in SQLite.
+type SQLite struct {
 	db        *sql.DB
 	encryptor *secrets.Encryptor
 	logger    *slog.Logger
 }
 
 func init() {
-	secrets.Register("local", New)
+	secrets.Register("sqlite", New)
 }
 
-// New creates a new Local secrets manager.
-// The DSN format is: "local://<sqlite-path>?key=<encryption-passphrase>"
-// For in-memory: "local://:memory:?key=<encryption-passphrase>"
+// New creates a new SQLite secrets manager.
+// The DSN format is: "sqlite://<sqlite-path>?key=<encryption-passphrase>"
+// For in-memory: "sqlite://:memory:?key=<encryption-passphrase>"
 func New(dsn string, logger *slog.Logger) (secrets.Manager, error) {
 	if logger == nil {
 		logger = slog.Default()
 	}
 
-	logger = logger.WithGroup("secrets.local")
+	logger = logger.WithGroup("secrets.sqlite")
 
-	// Parse DSN: expected format "local://<path>?key=<passphrase>"
+	// Parse DSN: expected format "sqlite://<path>?key=<passphrase>"
 	// or just the passphrase with a separate DB path
 	dbPath, passphrase, err := parseDSN(dsn)
 	if err != nil {
@@ -54,16 +58,7 @@ func New(dsn string, logger *slog.Logger) (secrets.Manager, error) {
 	}
 
 	//nolint: noctx
-	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS secrets (
-			scope TEXT NOT NULL,
-			key TEXT NOT NULL,
-			encrypted_value BLOB NOT NULL,
-			version TEXT NOT NULL DEFAULT 'v1',
-			updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-			PRIMARY KEY (scope, key)
-		) STRICT;
-	`)
+	_, err = db.Exec(schema)
 	if err != nil {
 		return nil, fmt.Errorf("could not create secrets table: %w", err)
 	}
@@ -71,19 +66,19 @@ func New(dsn string, logger *slog.Logger) (secrets.Manager, error) {
 	db.SetMaxIdleConns(1)
 	db.SetMaxOpenConns(1)
 
-	logger.Info("secrets.local.initialized", "db", dbPath)
+	logger.Info("secrets.sqlite.initialized", "db", dbPath)
 
-	return &Local{
+	return &SQLite{
 		db:        db,
 		encryptor: encryptor,
 		logger:    logger,
 	}, nil
 }
 
-func (l *Local) Get(ctx context.Context, scope string, key string) (string, error) {
+func (s *SQLite) Get(ctx context.Context, scope string, key string) (string, error) {
 	var encryptedValue []byte
 
-	err := sqlscan.Get(ctx, l.db, &encryptedValue, `
+	err := sqlscan.Get(ctx, s.db, &encryptedValue, `
 		SELECT encrypted_value FROM secrets WHERE scope = ? AND key = ?
 	`, scope, key)
 	if err != nil {
@@ -94,7 +89,7 @@ func (l *Local) Get(ctx context.Context, scope string, key string) (string, erro
 		return "", fmt.Errorf("could not query secret: %w", err)
 	}
 
-	plaintext, err := l.encryptor.Decrypt(encryptedValue)
+	plaintext, err := s.encryptor.Decrypt(encryptedValue)
 	if err != nil {
 		return "", fmt.Errorf("could not decrypt secret %q in scope %q: %w", key, scope, err)
 	}
@@ -102,8 +97,8 @@ func (l *Local) Get(ctx context.Context, scope string, key string) (string, erro
 	return string(plaintext), nil
 }
 
-func (l *Local) Set(ctx context.Context, scope string, key string, value string) error {
-	encrypted, err := l.encryptor.Encrypt([]byte(value))
+func (s *SQLite) Set(ctx context.Context, scope string, key string, value string) error {
+	encrypted, err := s.encryptor.Encrypt([]byte(value))
 	if err != nil {
 		return fmt.Errorf("could not encrypt secret: %w", err)
 	}
@@ -111,7 +106,7 @@ func (l *Local) Set(ctx context.Context, scope string, key string, value string)
 	// Determine next version
 	var currentVersion string
 
-	err = sqlscan.Get(ctx, l.db, &currentVersion, `
+	err = sqlscan.Get(ctx, s.db, &currentVersion, `
 		SELECT version FROM secrets WHERE scope = ? AND key = ?
 	`, scope, key)
 	if err != nil && !sqlscan.NotFound(err) {
@@ -123,7 +118,7 @@ func (l *Local) Set(ctx context.Context, scope string, key string, value string)
 		nextVersion = incrementVersion(currentVersion)
 	}
 
-	_, err = l.db.ExecContext(ctx, `
+	_, err = s.db.ExecContext(ctx, `
 		INSERT INTO secrets (scope, key, encrypted_value, version, updated_at)
 		VALUES (?, ?, ?, ?, ?)
 		ON CONFLICT(scope, key) DO UPDATE SET
@@ -135,13 +130,13 @@ func (l *Local) Set(ctx context.Context, scope string, key string, value string)
 		return fmt.Errorf("could not store secret: %w", err)
 	}
 
-	l.logger.Info("secret.set", "scope", scope, "key", key, "version", nextVersion)
+	s.logger.Info("secret.set", "scope", scope, "key", key, "version", nextVersion)
 
 	return nil
 }
 
-func (l *Local) Delete(ctx context.Context, scope string, key string) error {
-	result, err := l.db.ExecContext(ctx, `
+func (s *SQLite) Delete(ctx context.Context, scope string, key string) error {
+	result, err := s.db.ExecContext(ctx, `
 		DELETE FROM secrets WHERE scope = ? AND key = ?
 	`, scope, key)
 	if err != nil {
@@ -157,15 +152,15 @@ func (l *Local) Delete(ctx context.Context, scope string, key string) error {
 		return secrets.ErrNotFound
 	}
 
-	l.logger.Info("secret.deleted", "scope", scope, "key", key)
+	s.logger.Info("secret.deleted", "scope", scope, "key", key)
 
 	return nil
 }
 
-func (l *Local) ListByScope(ctx context.Context, scope string) ([]string, error) {
+func (s *SQLite) ListByScope(ctx context.Context, scope string) ([]string, error) {
 	var keys []string
 
-	err := sqlscan.Select(ctx, l.db, &keys, `
+	err := sqlscan.Select(ctx, s.db, &keys, `
 		SELECT key FROM secrets WHERE scope = ? ORDER BY key
 	`, scope)
 	if err != nil {
@@ -175,29 +170,29 @@ func (l *Local) ListByScope(ctx context.Context, scope string) ([]string, error)
 	return keys, nil
 }
 
-func (l *Local) DeleteByScope(ctx context.Context, scope string) error {
-	_, err := l.db.ExecContext(ctx, `
+func (s *SQLite) DeleteByScope(ctx context.Context, scope string) error {
+	_, err := s.db.ExecContext(ctx, `
 		DELETE FROM secrets WHERE scope = ?
 	`, scope)
 	if err != nil {
 		return fmt.Errorf("could not delete secrets by scope: %w", err)
 	}
 
-	l.logger.Info("secrets.deleted_by_scope", "scope", scope)
+	s.logger.Info("secrets.deleted_by_scope", "scope", scope)
 
 	return nil
 }
 
-func (l *Local) Close() error {
-	return l.db.Close()
+func (s *SQLite) Close() error {
+	return s.db.Close()
 }
 
 // parseDSN parses a secrets DSN string.
-// Format: "local://<db-path>?key=<passphrase>"
+// Format: "sqlite://<db-path>?key=<passphrase>"
 // Simplified: "<db-path>?key=<passphrase>"
 func parseDSN(dsn string) (dbPath string, passphrase string, err error) {
-	// Strip "local://" prefix if present
-	dsn = strings.TrimPrefix(dsn, "local://")
+	// Strip "sqlite://" prefix if present
+	dsn = strings.TrimPrefix(dsn, "sqlite://")
 
 	// Split on "?key="
 	parts := strings.SplitN(dsn, "?key=", 2)
@@ -213,7 +208,7 @@ func parseDSN(dsn string) (dbPath string, passphrase string, err error) {
 	return dbPath, parts[1], nil
 }
 
-// incrementVersion increments fa version string like "v1" -> "v2".
+// incrementVersion increments a version string like "v1" -> "v2".
 func incrementVersion(version string) string {
 	var num int
 

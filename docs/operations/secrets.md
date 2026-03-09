@@ -29,7 +29,7 @@ Pass secrets on the `pocketci run` command line using `--secret KEY=VALUE` (or
 
 ```bash
 pocketci run pipeline.ts \
-  --secrets "local://secrets.db?key=my-passphrase" \
+  --secrets "sqlite://secrets.db?key=my-passphrase" \
   --secret API_KEY=sk-1234567890 \
   --secret DB_PASSWORD=hunter2
 ```
@@ -42,7 +42,7 @@ Global secrets are shared across all pipelines. There are two ways to set them:
 
 ```bash
 pocketci server \
-  --secrets "local://secrets.db?key=my-passphrase" \
+  --secrets "sqlite://secrets.db?key=my-passphrase" \
   --secret SHARED_TOKEN=tok-global-abc \
   --secret REGISTRY_PASSWORD=ghp-xyz
 ```
@@ -51,7 +51,7 @@ pocketci server \
 
 ```bash
 pocketci run pipeline.ts \
-  --secrets "local://secrets.db?key=my-passphrase" \
+  --secrets "sqlite://secrets.db?key=my-passphrase" \
   --global-secret SHARED_TOKEN=tok-global-abc \
   --secret PIPELINE_KEY=per-pipeline-only
 ```
@@ -70,29 +70,29 @@ every invocation.
 | `CI_SECRETS`         | `--secrets` | Secrets backend DSN (includes scheme) |
 
 ```bash
-export CI_SECRETS="local://secrets.db?key=my-passphrase"
+export CI_SECRETS="sqlite://secrets.db?key=my-passphrase"
 
 pocketci run pipeline.ts --secret API_KEY=sk-1234567890
 ```
 
 ```bash
-export CI_SECRETS="local:///var/lib/pocketci/secrets.db?key=my-passphrase"
+export CI_SECRETS="sqlite:///var/lib/pocketci/secrets.db?key=my-passphrase"
 
 pocketci server --secret SHARED_TOKEN=tok-global-abc
 ```
 
 ## Backend Configuration
 
-### Local (SQLite)
+### SQLite
 
-The `local` backend stores secrets in a SQLite database, encrypted with
+The `sqlite` backend stores secrets in a SQLite database, encrypted with
 AES-256-GCM. The encryption key is derived from the passphrase in the DSN using
 SHA-256.
 
 **DSN Format**:
 
 ```
-local://<sqlite-path>?key=<passphrase>
+sqlite://<sqlite-path>?key=<passphrase>
 ```
 
 | Component       | Description                           | Example                   |
@@ -104,13 +104,13 @@ local://<sqlite-path>?key=<passphrase>
 
 ```bash
 # File-based storage
---secrets "local://secrets.db?key=my-passphrase"
+--secrets "sqlite://secrets.db?key=my-passphrase"
 
 # Absolute path
---secrets "local:///var/lib/pocketci/secrets.db?key=my-passphrase"
+--secrets "sqlite:///var/lib/pocketci/secrets.db?key=my-passphrase"
 
 # In-memory (useful for testing, secrets don't persist)
---secrets "local://:memory:?key=test-key"
+--secrets "sqlite://:memory:?key=test-key"
 ```
 
 ## Using Secrets in Pipelines
@@ -247,13 +247,13 @@ of another, the longer value is redacted first to avoid partial matches.
 ```bash
 # Set global secrets on the server
 pocketci server \
-  --secrets "local://my-secrets.db?key=change-me-in-production" \
+  --secrets "sqlite://my-secrets.db?key=change-me-in-production" \
   --secret REGISTRY_TOKEN=ghp-abc123
 
 # Set pipeline-scoped secrets and run
 pocketci run examples/both/secrets-basic.ts \
   --driver docker \
-  --secrets "local://my-secrets.db?key=change-me-in-production" \
+  --secrets "sqlite://my-secrets.db?key=change-me-in-production" \
   --secret API_KEY=sk-live-abc123 \
   --global-secret WEBHOOK_TOKEN=whsec-xyz789
 ```

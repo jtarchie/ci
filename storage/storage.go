@@ -24,14 +24,13 @@ const (
 
 // Pipeline represents a stored pipeline definition.
 type Pipeline struct {
-	ID            string      `json:"id"`
-	Name          string      `json:"name"`
-	Content       string      `json:"content"`
-	ContentType   ContentType `json:"content_type"`
-	DriverDSN     string      `json:"driver_dsn"`
-	WebhookSecret string      `json:"webhook_secret,omitempty"`
-	CreatedAt     time.Time   `json:"created_at"`
-	UpdatedAt     time.Time   `json:"updated_at"`
+	ID          string      `json:"id"`
+	Name        string      `json:"name"`
+	Content     string      `json:"content"`
+	ContentType ContentType `json:"content_type"`
+	DriverDSN   string      `json:"driver_dsn"`
+	CreatedAt   time.Time   `json:"created_at"`
+	UpdatedAt   time.Time   `json:"updated_at"`
 }
 
 // RunStatus represents the status of a pipeline run.
@@ -77,7 +76,7 @@ type Driver interface {
 	UpdateStatusForPrefix(ctx context.Context, prefix string, matchStatuses []string, newStatus string) error
 
 	// Pipeline CRUD operations
-	SavePipeline(ctx context.Context, name, content, driverDSN, webhookSecret, contentType string) (*Pipeline, error)
+	SavePipeline(ctx context.Context, name, content, driverDSN, contentType string) (*Pipeline, error)
 	GetPipeline(ctx context.Context, id string) (*Pipeline, error)
 	GetPipelineByName(ctx context.Context, name string) (*Pipeline, error)
 	DeletePipeline(ctx context.Context, id string) error

@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jtarchie/pocketci/secrets"
+	_ "github.com/jtarchie/pocketci/secrets/sqlite"
 	"github.com/jtarchie/pocketci/server"
 	"github.com/jtarchie/pocketci/storage"
 	_ "github.com/jtarchie/pocketci/storage/sqlite"
@@ -50,7 +52,6 @@ func TestWebhookAPI(t *testing.T) {
 					"webhook-pipeline",
 					"export const pipeline = async () => { console.log('running'); };",
 					"native://",
-					"",
 					"",
 				)
 				assert.Expect(err).NotTo(HaveOccurred())
@@ -116,14 +117,20 @@ func TestWebhookAPI(t *testing.T) {
 					"secure-pipeline",
 					"export const pipeline = async () => {};",
 					"native://",
-					"my-secret-key",
 					"",
 				)
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				secretsMgr, err := secrets.GetFromDSN("sqlite://:memory:?key=test-key", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = secretsMgr.Close() }()
+				err = secretsMgr.Set(context.Background(), secrets.PipelineScope(pipeline.ID), "webhook_secret", "my-secret-key")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{
 					MaxInFlight:    5,
 					WebhookTimeout: 100 * time.Millisecond,
+					SecretsManager: secretsMgr,
 				})
 				assert.Expect(err).NotTo(HaveOccurred())
 
@@ -158,14 +165,20 @@ func TestWebhookAPI(t *testing.T) {
 					"secure-pipeline-qp",
 					"export const pipeline = async () => {};",
 					"native://",
-					"query-secret",
 					"",
 				)
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				secretsMgr, err := secrets.GetFromDSN("sqlite://:memory:?key=test-key", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = secretsMgr.Close() }()
+				err = secretsMgr.Set(context.Background(), secrets.PipelineScope(pipeline.ID), "webhook_secret", "query-secret")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{
 					MaxInFlight:    5,
 					WebhookTimeout: 100 * time.Millisecond,
+					SecretsManager: secretsMgr,
 				})
 				assert.Expect(err).NotTo(HaveOccurred())
 
@@ -199,12 +212,17 @@ func TestWebhookAPI(t *testing.T) {
 					"secure-pipeline-nosig",
 					"export const pipeline = async () => {};",
 					"native://",
-					"my-secret",
 					"",
 				)
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
+				secretsMgr, err := secrets.GetFromDSN("sqlite://:memory:?key=test-key", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = secretsMgr.Close() }()
+				err = secretsMgr.Set(context.Background(), secrets.PipelineScope(pipeline.ID), "webhook_secret", "my-secret")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{SecretsManager: secretsMgr})
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				req := httptest.NewRequest(http.MethodPost, "/api/webhooks/"+pipeline.ID, strings.NewReader(`{}`))
@@ -235,12 +253,17 @@ func TestWebhookAPI(t *testing.T) {
 					"secure-pipeline-badsig",
 					"export const pipeline = async () => {};",
 					"native://",
-					"correct-secret",
 					"",
 				)
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
+				secretsMgr, err := secrets.GetFromDSN("sqlite://:memory:?key=test-key", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = secretsMgr.Close() }()
+				err = secretsMgr.Set(context.Background(), secrets.PipelineScope(pipeline.ID), "webhook_secret", "correct-secret")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{SecretsManager: secretsMgr})
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				req := httptest.NewRequest(http.MethodPost, "/api/webhooks/"+pipeline.ID, strings.NewReader(`{}`))
@@ -271,7 +294,6 @@ func TestWebhookAPI(t *testing.T) {
 					"open-pipeline",
 					"export const pipeline = async () => {};",
 					"native://",
-					"", // No secret
 					"",
 				)
 				assert.Expect(err).NotTo(HaveOccurred())
@@ -309,7 +331,6 @@ func TestWebhookAPI(t *testing.T) {
 					"any-method-pipeline",
 					"export const pipeline = async () => {};",
 					"native://",
-					"",
 					"",
 				)
 				assert.Expect(err).NotTo(HaveOccurred())
@@ -368,7 +389,6 @@ func TestWebhookAPI(t *testing.T) {
 					"respond-pipeline",
 					content,
 					"native://",
-					"",
 					"",
 				)
 				assert.Expect(err).NotTo(HaveOccurred())

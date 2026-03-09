@@ -30,7 +30,7 @@ type Runner struct {
 	Timeout            time.Duration `env:"CI_TIMEOUT"                                              help:"timeout for the pipeline, will cause abort if exceeded"`
 	Resume             bool          `help:"Resume from last checkpoint if pipeline was interrupted"`
 	RunID              string        `help:"Unique run ID for resume support (auto-generated if not provided)"`
-	Secrets            string        `default:"" env:"CI_SECRETS" help:"Secrets backend DSN (e.g., 'local://secrets.db?key=my-passphrase')'" `
+	Secrets            string        `default:"" env:"CI_SECRETS" help:"Secrets backend DSN (e.g., 'sqlite://secrets.db?key=my-passphrase)')" `
 	Secret             []string      `help:"Set a pipeline-scoped secret as KEY=VALUE (can be repeated)" short:"e"`
 	GlobalSecret       []string      `help:"Set a global secret as KEY=VALUE (can be repeated)"`
 	FetchTimeout       time.Duration `default:"30s"                                              env:"CI_FETCH_TIMEOUT"            help:"Timeout for fetch() requests in pipelines"`

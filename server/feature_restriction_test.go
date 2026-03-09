@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	_ "github.com/jtarchie/pocketci/orchestra/native"
+	"github.com/jtarchie/pocketci/secrets"
+	_ "github.com/jtarchie/pocketci/secrets/sqlite"
 	"github.com/jtarchie/pocketci/server"
 	"github.com/jtarchie/pocketci/storage"
 	_ "github.com/jtarchie/pocketci/storage/sqlite"
@@ -70,9 +72,14 @@ func TestFeatureRestriction(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
+				secretsMgr, err := secrets.GetFromDSN("sqlite://:memory:?key=test-key", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = secretsMgr.Close() }()
+
 				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{
 					AllowedDrivers:  "native",
 					AllowedFeatures: "webhooks,secrets",
+					SecretsManager:  secretsMgr,
 				})
 				assert.Expect(err).NotTo(HaveOccurred())
 
@@ -132,10 +139,15 @@ func TestFeatureRestriction(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
+				secretsMgr, err := secrets.GetFromDSN("sqlite://:memory:?key=test-key", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = secretsMgr.Close() }()
+
 				// Create router with wildcard (default)
 				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{
 					AllowedDrivers:  "native",
 					AllowedFeatures: "*",
+					SecretsManager:  secretsMgr,
 				})
 				assert.Expect(err).NotTo(HaveOccurred())
 
@@ -188,10 +200,15 @@ func TestFeatureRestriction(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
+				secretsMgr, err := secrets.GetFromDSN("sqlite://:memory:?key=test-key", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = secretsMgr.Close() }()
+
 				// Empty string should default to all features
 				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{
 					AllowedDrivers:  "native",
 					AllowedFeatures: "",
+					SecretsManager:  secretsMgr,
 				})
 				assert.Expect(err).NotTo(HaveOccurred())
 

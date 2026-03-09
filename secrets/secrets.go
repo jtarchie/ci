@@ -65,7 +65,7 @@ func New(name string, dsn string, logger *slog.Logger) (Manager, error) {
 }
 
 // GetFromDSN extracts the backend name from the DSN scheme and creates a Manager.
-// The DSN format is "<backend>://<path>?<params>", e.g. "local://secrets.db?key=passphrase".
+// The DSN format is "<backend>://<path>?<params>", e.g. "sqlite://secrets.db?key=passphrase".
 func GetFromDSN(dsn string, logger *slog.Logger) (Manager, error) {
 	uri, err := url.Parse(dsn)
 	if err != nil {

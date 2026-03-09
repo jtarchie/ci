@@ -24,7 +24,7 @@ func TestDeletePipeline(t *testing.T) {
 
 				client, ts := newTestServer(t, server.RouterOptions{})
 
-				_, err := client.SavePipeline(context.Background(), "my-pipeline", "content", "docker://", "", "")
+				_, err := client.SavePipeline(context.Background(), "my-pipeline", "content", "docker://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				cmd := commands.DeletePipeline{
@@ -46,7 +46,7 @@ func TestDeletePipeline(t *testing.T) {
 
 				client, ts := newTestServer(t, server.RouterOptions{})
 
-				saved, err := client.SavePipeline(context.Background(), "my-pipeline", "content", "docker://", "", "")
+				saved, err := client.SavePipeline(context.Background(), "my-pipeline", "content", "docker://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				cmd := commands.DeletePipeline{
@@ -84,9 +84,9 @@ func TestDeletePipeline(t *testing.T) {
 
 				client, ts := newTestServer(t, server.RouterOptions{})
 
-				_, err := client.SavePipeline(context.Background(), "to-delete", "content", "docker://", "", "")
+				_, err := client.SavePipeline(context.Background(), "to-delete", "content", "docker://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
-				_, err = client.SavePipeline(context.Background(), "keep-me", "content", "docker://", "", "")
+				_, err = client.SavePipeline(context.Background(), "keep-me", "content", "docker://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				cmd := commands.DeletePipeline{

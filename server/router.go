@@ -200,7 +200,7 @@ func registerRoutes(
 	(&APIFeaturesController{allowedFeatures: allowedFeatures}).RegisterRoutes(api)
 
 	// Webhooks registered on the main router (no auth group, before API group)
-	(&APIWebhooksController{BaseController: base, allowedFeatures: allowedFeatures, webhookTimeout: webhookTimeout, logger: logger.WithGroup("webhook")}).RegisterRoutes(router)
+	(&APIWebhooksController{BaseController: base, allowedFeatures: allowedFeatures, webhookTimeout: webhookTimeout, logger: logger.WithGroup("webhook"), secretsMgr: secretsMgr}).RegisterRoutes(router)
 
 	// Web controllers (HTML responses)
 	(&WebPipelinesController{BaseController: base}).RegisterRoutes(web)

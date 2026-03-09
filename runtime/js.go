@@ -433,8 +433,8 @@ func (w *storageContextWrapper) GetAll(prefix string, fields []string) (storage.
 
 // SavePipeline wraps the storage SavePipeline method, injecting context automatically.
 // Pipelines saved from within a running pipeline are always JS/TS content.
-func (w *storageContextWrapper) SavePipeline(name, content, driverDSN, webhookSecret string) (*storage.Pipeline, error) {
-	return w.driver.SavePipeline(w.ctx, name, content, driverDSN, webhookSecret, "js")
+func (w *storageContextWrapper) SavePipeline(name, content, driverDSN, _ string) (*storage.Pipeline, error) {
+	return w.driver.SavePipeline(w.ctx, name, content, driverDSN, "js")
 }
 
 // GetPipeline wraps the storage GetPipeline method, injecting context automatically.

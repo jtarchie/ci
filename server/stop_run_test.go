@@ -64,7 +64,7 @@ func TestStopRun(t *testing.T) {
 				defer func() { _ = client.Close() }()
 
 				pipeline, err := client.SavePipeline(context.Background(), "stop-test-pipeline",
-					"export const pipeline = async () => {};", "native://", "", "")
+					"export const pipeline = async () => {};", "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
@@ -111,7 +111,7 @@ export const pipeline = async () => {
 	});
 };`
 				pipeline, err := client.SavePipeline(context.Background(), "stop-inflight-pipeline",
-					pipelineContent, "native://", "", "")
+					pipelineContent, "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
@@ -183,7 +183,7 @@ export const pipeline = async () => {
 				// Simulate a run that was left in "running" state (e.g. after a server crash)
 				// by saving a run then manually forcing its status to running without a live goroutine.
 				pipeline, err := client.SavePipeline(context.Background(), "orphan-pipeline",
-					"export const pipeline = async () => {};", "native://", "", "")
+					"export const pipeline = async () => {};", "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				run, err := client.SaveRun(context.Background(), pipeline.ID)

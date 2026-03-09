@@ -21,7 +21,7 @@ type PipelineRequest struct {
 	Content       string            `json:"content"`
 	ContentType   string            `json:"content_type"`
 	DriverDSN     string            `json:"driver_dsn"`
-	WebhookSecret string            `json:"webhook_secret"`
+	WebhookSecret *string           `json:"webhook_secret,omitempty"`
 	Secrets       map[string]string `json:"secrets,omitempty"`
 }
 
@@ -157,9 +157,15 @@ func (c *APIPipelinesController) Upsert(ctx *echo.Context) error {
 		})
 	}
 
-	if req.WebhookSecret != "" && !IsFeatureEnabled(FeatureWebhooks, c.allowedFeatures) {
+	if req.WebhookSecret != nil && *req.WebhookSecret != "" && !IsFeatureEnabled(FeatureWebhooks, c.allowedFeatures) {
 		return ctx.JSON(http.StatusBadRequest, map[string]string{
 			"error": "webhooks feature is not enabled",
+		})
+	}
+
+	if req.WebhookSecret != nil && *req.WebhookSecret != "" && c.secretsMgr == nil {
+		return ctx.JSON(http.StatusBadRequest, map[string]string{
+			"error": "secrets backend is not configured on the server",
 		})
 	}
 
@@ -178,11 +184,28 @@ func (c *APIPipelinesController) Upsert(ctx *echo.Context) error {
 		}
 	}
 
-	pipeline, err := c.store.SavePipeline(ctx.Request().Context(), name, req.Content, req.DriverDSN, req.WebhookSecret, req.ContentType)
+	pipeline, err := c.store.SavePipeline(ctx.Request().Context(), name, req.Content, req.DriverDSN, req.ContentType)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, map[string]string{
 			"error": fmt.Sprintf("failed to save pipeline: %v", err),
 		})
+	}
+
+	if req.WebhookSecret != nil && c.secretsMgr != nil {
+		scope := secrets.PipelineScope(pipeline.ID)
+		if *req.WebhookSecret == "" {
+			if err := c.secretsMgr.Delete(ctx.Request().Context(), scope, "webhook_secret"); err != nil && !errors.Is(err, secrets.ErrNotFound) {
+				return ctx.JSON(http.StatusInternalServerError, map[string]string{
+					"error": fmt.Sprintf("failed to delete webhook secret: %v", err),
+				})
+			}
+		} else {
+			if err := c.secretsMgr.Set(ctx.Request().Context(), scope, "webhook_secret", *req.WebhookSecret); err != nil {
+				return ctx.JSON(http.StatusInternalServerError, map[string]string{
+					"error": fmt.Sprintf("failed to store webhook secret: %v", err),
+				})
+			}
+		}
 	}
 
 	// Store per-pipeline secrets if provided

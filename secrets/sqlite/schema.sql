@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS secrets (
+  scope TEXT NOT NULL,
+  key TEXT NOT NULL,
+  encrypted_value BLOB NOT NULL,
+  version TEXT NOT NULL DEFAULT 'v1',
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (scope, key)
+) STRICT;

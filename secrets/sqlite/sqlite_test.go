@@ -1,11 +1,11 @@
-package local_test
+package sqlite_test
 
 import (
 	"context"
 	"testing"
 
 	"github.com/jtarchie/pocketci/secrets"
-	_ "github.com/jtarchie/pocketci/secrets/local"
+	_ "github.com/jtarchie/pocketci/secrets/sqlite"
 	. "github.com/onsi/gomega"
 )
 
@@ -14,7 +14,7 @@ func newTestManager(t *testing.T) secrets.Manager {
 
 	assert := NewGomegaWithT(t)
 
-	manager, err := secrets.New("local", "local://:memory:?key=test-encryption-key-for-testing", nil)
+	manager, err := secrets.New("sqlite", "sqlite://:memory:?key=test-encryption-key-for-testing", nil)
 	assert.Expect(err).NotTo(HaveOccurred())
 
 	t.Cleanup(func() { _ = manager.Close() })
@@ -22,7 +22,7 @@ func newTestManager(t *testing.T) secrets.Manager {
 	return manager
 }
 
-func TestLocalBackend(t *testing.T) {
+func TestSQLiteBackend(t *testing.T) {
 	t.Parallel()
 
 	t.Run("set and get", func(t *testing.T) {
@@ -194,7 +194,7 @@ func TestLocalBackend(t *testing.T) {
 
 		assert := NewGomegaWithT(t)
 
-		_, err := secrets.New("local", "no-key-param", nil)
+		_, err := secrets.New("sqlite", "no-key-param", nil)
 		assert.Expect(err).To(HaveOccurred())
 		assert.Expect(err.Error()).To(ContainSubstring("key="))
 	})

@@ -33,14 +33,13 @@ type Sqlite struct {
 // pipelineScan is an intermediate struct for scanning pipeline rows.
 // SQLite stores timestamps as RFC3339 strings, so we scan into strings first.
 type pipelineScan struct {
-	ID            string `db:"id"`
-	Name          string `db:"name"`
-	Content       string `db:"content"`
-	ContentType   string `db:"content_type"`
-	DriverDSN     string `db:"driver_dsn"`
-	WebhookSecret string `db:"webhook_secret"`
-	CreatedAt     string `db:"created_at"`
-	UpdatedAt     string `db:"updated_at"`
+	ID          string `db:"id"`
+	Name        string `db:"name"`
+	Content     string `db:"content"`
+	ContentType string `db:"content_type"`
+	DriverDSN   string `db:"driver_dsn"`
+	CreatedAt   string `db:"created_at"`
+	UpdatedAt   string `db:"updated_at"`
 }
 
 func (p pipelineScan) toStorage() storage.Pipeline {
@@ -48,14 +47,13 @@ func (p pipelineScan) toStorage() storage.Pipeline {
 	updatedAt, _ := time.Parse(time.RFC3339, p.UpdatedAt)
 
 	return storage.Pipeline{
-		ID:            p.ID,
-		Name:          p.Name,
-		Content:       p.Content,
-		ContentType:   p.ContentType,
-		DriverDSN:     p.DriverDSN,
-		WebhookSecret: p.WebhookSecret,
-		CreatedAt:     createdAt,
-		UpdatedAt:     updatedAt,
+		ID:          p.ID,
+		Name:        p.Name,
+		Content:     p.Content,
+		ContentType: p.ContentType,
+		DriverDSN:   p.DriverDSN,
+		CreatedAt:   createdAt,
+		UpdatedAt:   updatedAt,
 	}
 }
 
@@ -308,7 +306,7 @@ func (s *Sqlite) Close() error {
 // SavePipeline creates or updates a pipeline in the database.
 // Pipeline names are unique; saving with an existing name updates the record
 // while preserving the original ID so existing pipeline_runs references remain valid.
-func (s *Sqlite) SavePipeline(ctx context.Context, name, content, driverDSN, webhookSecret, contentType string) (*storage.Pipeline, error) {
+func (s *Sqlite) SavePipeline(ctx context.Context, name, content, driverDSN, contentType string) (*storage.Pipeline, error) {
 	newID := runtime.PipelineID(name, content)
 	now := time.Now().UTC()
 
@@ -317,15 +315,14 @@ func (s *Sqlite) SavePipeline(ctx context.Context, name, content, driverDSN, web
 	_ = sqlscan.Get(ctx, s.writer, &existingID, `SELECT id FROM pipelines WHERE name = ?`, name)
 
 	_, err := s.writer.ExecContext(ctx, `
-		INSERT INTO pipelines (id, name, content, content_type, driver_dsn, webhook_secret, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO pipelines (id, name, content, content_type, driver_dsn, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(name) DO UPDATE SET
 			content=excluded.content,
 			content_type=excluded.content_type,
 			driver_dsn=excluded.driver_dsn,
-			webhook_secret=excluded.webhook_secret,
 			updated_at=excluded.updated_at
-	`, newID, name, content, contentType, driverDSN, webhookSecret, now.Format(time.RFC3339), now.Format(time.RFC3339))
+	`, newID, name, content, contentType, driverDSN, now.Format(time.RFC3339), now.Format(time.RFC3339))
 	if err != nil {
 		return nil, fmt.Errorf("failed to save pipeline: %w", err)
 	}
@@ -355,14 +352,13 @@ func (s *Sqlite) SavePipeline(ctx context.Context, name, content, driverDSN, web
 	}
 
 	return &storage.Pipeline{
-		ID:            storedID,
-		Name:          name,
-		Content:       content,
-		ContentType:   contentType,
-		DriverDSN:     driverDSN,
-		WebhookSecret: webhookSecret,
-		CreatedAt:     now,
-		UpdatedAt:     now,
+		ID:          storedID,
+		Name:        name,
+		Content:     content,
+		ContentType: contentType,
+		DriverDSN:   driverDSN,
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}, nil
 }
 
@@ -371,7 +367,7 @@ func (s *Sqlite) GetPipeline(ctx context.Context, id string) (*storage.Pipeline,
 	var row pipelineScan
 
 	err := sqlscan.Get(ctx, s.writer, &row, `
-		SELECT id, name, content, content_type, driver_dsn, webhook_secret, created_at, updated_at
+		SELECT id, name, content, content_type, driver_dsn, created_at, updated_at
 		FROM pipelines WHERE id = ?
 	`, id)
 	if err != nil {
@@ -392,7 +388,7 @@ func (s *Sqlite) GetPipelineByName(ctx context.Context, name string) (*storage.P
 	var row pipelineScan
 
 	err := sqlscan.Get(ctx, s.writer, &row, `
-		SELECT id, name, content, content_type, driver_dsn, webhook_secret, created_at, updated_at
+		SELECT id, name, content, content_type, driver_dsn, created_at, updated_at
 		FROM pipelines WHERE name = ?
 		ORDER BY updated_at DESC LIMIT 1
 	`, name)
@@ -649,7 +645,7 @@ func (s *Sqlite) SearchPipelines(ctx context.Context, query string, page, perPag
 
 		var rows []pipelineScan
 		err = sqlscan.Select(ctx, s.writer, &rows, `
-			SELECT id, name, content, content_type, driver_dsn, webhook_secret, created_at, updated_at
+			SELECT id, name, content, content_type, driver_dsn, created_at, updated_at
 			FROM pipelines ORDER BY created_at DESC
 			LIMIT ? OFFSET ?
 		`, perPage, offset)
@@ -689,7 +685,7 @@ func (s *Sqlite) SearchPipelines(ctx context.Context, query string, page, perPag
 	var rows []pipelineScan
 
 	err = sqlscan.Select(ctx, s.writer, &rows, `
-		SELECT p.id, p.name, p.content, p.content_type, p.driver_dsn, p.webhook_secret, p.created_at, p.updated_at
+		SELECT p.id, p.name, p.content, p.content_type, p.driver_dsn, p.created_at, p.updated_at
 		FROM pipelines p
 		WHERE p.id IN (SELECT id FROM pipelines_fts WHERE pipelines_fts MATCH ?)
 		ORDER BY p.created_at DESC

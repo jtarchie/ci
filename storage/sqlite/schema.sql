@@ -12,7 +12,6 @@ CREATE TABLE IF NOT EXISTS pipelines (
   content TEXT NOT NULL,
   content_type TEXT NOT NULL DEFAULT '',
   driver_dsn TEXT NOT NULL,
-  webhook_secret TEXT NOT NULL DEFAULT '',
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 ) STRICT;

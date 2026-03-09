@@ -30,7 +30,7 @@ func TestPipelineRunStorage(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				pipeline, err := client.SavePipeline(context.Background(), "test-pipeline", "console.log('hello');", "docker://", "", "")
+				pipeline, err := client.SavePipeline(context.Background(), "test-pipeline", "console.log('hello');", "docker://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				run, err := client.SaveRun(context.Background(), pipeline.ID)
@@ -57,7 +57,7 @@ func TestPipelineRunStorage(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				pipeline, err := client.SavePipeline(context.Background(), "my-pipeline", "export { pipeline };", "native://", "", "")
+				pipeline, err := client.SavePipeline(context.Background(), "my-pipeline", "export { pipeline };", "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				saved, err := client.SaveRun(context.Background(), pipeline.ID)
@@ -98,7 +98,7 @@ func TestPipelineRunStorage(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				pipeline, err := client.SavePipeline(context.Background(), "pipeline", "content", "docker://", "", "")
+				pipeline, err := client.SavePipeline(context.Background(), "pipeline", "content", "docker://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				run, err := client.SaveRun(context.Background(), pipeline.ID)
@@ -126,7 +126,7 @@ func TestPipelineRunStorage(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				pipeline, err := client.SavePipeline(context.Background(), "pipeline", "content", "docker://", "", "")
+				pipeline, err := client.SavePipeline(context.Background(), "pipeline", "content", "docker://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				run, err := client.SaveRun(context.Background(), pipeline.ID)
@@ -157,7 +157,7 @@ func TestPipelineRunStorage(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				pipeline, err := client.SavePipeline(context.Background(), "pipeline", "content", "docker://", "", "")
+				pipeline, err := client.SavePipeline(context.Background(), "pipeline", "content", "docker://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				run, err := client.SaveRun(context.Background(), pipeline.ID)
@@ -207,7 +207,7 @@ func TestPipelineRunStorage(t *testing.T) {
 					assert.Expect(err).NotTo(HaveOccurred())
 					defer func() { _ = client.Close() }()
 
-					pipeline, err := client.SavePipeline(context.Background(), "search-test", "content", "native://", "", "")
+					pipeline, err := client.SavePipeline(context.Background(), "search-test", "content", "native://", "")
 					assert.Expect(err).NotTo(HaveOccurred())
 
 					_, err = client.SaveRun(context.Background(), pipeline.ID)
@@ -232,7 +232,7 @@ func TestPipelineRunStorage(t *testing.T) {
 					assert.Expect(err).NotTo(HaveOccurred())
 					defer func() { _ = client.Close() }()
 
-					pipeline, err := client.SavePipeline(context.Background(), "status-pipeline", "content", "native://", "", "")
+					pipeline, err := client.SavePipeline(context.Background(), "status-pipeline", "content", "native://", "")
 					assert.Expect(err).NotTo(HaveOccurred())
 
 					run1, err := client.SaveRun(context.Background(), pipeline.ID)
@@ -263,7 +263,7 @@ func TestPipelineRunStorage(t *testing.T) {
 					assert.Expect(err).NotTo(HaveOccurred())
 					defer func() { _ = client.Close() }()
 
-					pipeline, err := client.SavePipeline(context.Background(), "err-pipeline", "content", "native://", "", "")
+					pipeline, err := client.SavePipeline(context.Background(), "err-pipeline", "content", "native://", "")
 					assert.Expect(err).NotTo(HaveOccurred())
 
 					run1, err := client.SaveRun(context.Background(), pipeline.ID)
@@ -294,7 +294,7 @@ func TestPipelineRunStorage(t *testing.T) {
 					assert.Expect(err).NotTo(HaveOccurred())
 					defer func() { _ = client.Close() }()
 
-					pipeline, err := client.SavePipeline(context.Background(), "nomatch-pipeline", "content", "native://", "", "")
+					pipeline, err := client.SavePipeline(context.Background(), "nomatch-pipeline", "content", "native://", "")
 					assert.Expect(err).NotTo(HaveOccurred())
 
 					_, err = client.SaveRun(context.Background(), pipeline.ID)
@@ -317,9 +317,9 @@ func TestPipelineRunStorage(t *testing.T) {
 					assert.Expect(err).NotTo(HaveOccurred())
 					defer func() { _ = client.Close() }()
 
-					pipA, err := client.SavePipeline(context.Background(), "pipeline-a", "content", "native://", "", "")
+					pipA, err := client.SavePipeline(context.Background(), "pipeline-a", "content", "native://", "")
 					assert.Expect(err).NotTo(HaveOccurred())
-					pipB, err := client.SavePipeline(context.Background(), "pipeline-b", "other", "native://", "", "")
+					pipB, err := client.SavePipeline(context.Background(), "pipeline-b", "other", "native://", "")
 					assert.Expect(err).NotTo(HaveOccurred())
 
 					runA, err := client.SaveRun(context.Background(), pipA.ID)
