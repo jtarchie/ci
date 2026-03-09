@@ -10,6 +10,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/jtarchie/pocketci/secrets"
+	_ "github.com/jtarchie/pocketci/secrets/sqlite"
 	"github.com/jtarchie/pocketci/server"
 	"github.com/jtarchie/pocketci/storage"
 	_ "github.com/jtarchie/pocketci/storage/sqlite"
@@ -227,6 +229,105 @@ func TestPipelineAPI(t *testing.T) {
 				router.ServeHTTP(rec, req)
 
 				assert.Expect(rec.Code).To(Equal(http.StatusNotFound))
+			})
+
+			t.Run("PUT /api/pipelines/:name update with webhook_secret and secrets succeeds", func(t *testing.T) {
+				t.Parallel()
+				assert := NewGomegaWithT(t)
+
+				buildFile, err := os.CreateTemp(t.TempDir(), "")
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = buildFile.Close() }()
+
+				client, err := init(buildFile.Name(), "namespace", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = client.Close() }()
+
+				secretsMgr, err := secrets.GetFromDSN("sqlite://:memory:?key=test-key", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = secretsMgr.Close() }()
+
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{
+					AllowedFeatures: "webhooks,secrets",
+					SecretsManager:  secretsMgr,
+				})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				pipeline, err := client.SavePipeline(context.Background(), "with-webhook", "content-v1", "native://", "")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				err = secretsMgr.Set(context.Background(), secrets.PipelineScope(pipeline.ID), "webhook_secret", "existing-webhook-secret")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				body := map[string]any{
+					"content":        "content-v2",
+					"driver_dsn":     "native://",
+					"webhook_secret": "new-webhook-secret",
+					"secrets": map[string]string{
+						"GITHUB_TOKEN": "token-value",
+					},
+				}
+				jsonBody, _ := json.Marshal(body)
+
+				req := httptest.NewRequest(http.MethodPut, "/api/pipelines/with-webhook", bytes.NewReader(jsonBody))
+				req.Header.Set("Content-Type", "application/json")
+				rec := httptest.NewRecorder()
+				router.ServeHTTP(rec, req)
+
+				assert.Expect(rec.Code).To(Equal(http.StatusOK))
+
+				updated, err := client.GetPipelineByName(context.Background(), "with-webhook")
+				assert.Expect(err).NotTo(HaveOccurred())
+				assert.Expect(updated.Content).To(Equal("content-v2"))
+			})
+
+			t.Run("PUT /api/pipelines/:name missing existing secret key does not persist content update", func(t *testing.T) {
+				t.Parallel()
+				assert := NewGomegaWithT(t)
+
+				buildFile, err := os.CreateTemp(t.TempDir(), "")
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = buildFile.Close() }()
+
+				client, err := init(buildFile.Name(), "namespace", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = client.Close() }()
+
+				secretsMgr, err := secrets.GetFromDSN("sqlite://:memory:?key=test-key", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = secretsMgr.Close() }()
+
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{
+					AllowedFeatures: "secrets",
+					SecretsManager:  secretsMgr,
+				})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				pipeline, err := client.SavePipeline(context.Background(), "atomic-update", "content-v1", "native://", "")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				err = secretsMgr.Set(context.Background(), secrets.PipelineScope(pipeline.ID), "REQUIRED_KEY", "initial")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				body := map[string]any{
+					"content":    "content-v2",
+					"driver_dsn": "native://",
+					"secrets": map[string]string{
+						"OTHER_KEY": "other",
+					},
+				}
+				jsonBody, _ := json.Marshal(body)
+
+				req := httptest.NewRequest(http.MethodPut, "/api/pipelines/atomic-update", bytes.NewReader(jsonBody))
+				req.Header.Set("Content-Type", "application/json")
+				rec := httptest.NewRecorder()
+				router.ServeHTTP(rec, req)
+
+				assert.Expect(rec.Code).To(Equal(http.StatusBadRequest))
+
+				reloaded, err := client.GetPipelineByName(context.Background(), "atomic-update")
+				assert.Expect(err).NotTo(HaveOccurred())
+				assert.Expect(reloaded.Content).To(Equal("content-v1"))
 			})
 		})
 	})

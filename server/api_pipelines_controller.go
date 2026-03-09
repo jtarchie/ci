@@ -184,6 +184,40 @@ func (c *APIPipelinesController) Upsert(ctx *echo.Context) error {
 		}
 	}
 
+	if len(req.Secrets) > 0 && c.secretsMgr != nil {
+		existingPipeline, getErr := c.store.GetPipelineByName(ctx.Request().Context(), name)
+		if getErr != nil && !errors.Is(getErr, storage.ErrNotFound) {
+			return ctx.JSON(http.StatusInternalServerError, map[string]string{
+				"error": fmt.Sprintf("failed to get existing pipeline by name: %v", getErr),
+			})
+		}
+
+		if getErr == nil {
+			scope := secrets.PipelineScope(existingPipeline.ID)
+
+			existingKeys, listErr := c.secretsMgr.ListByScope(ctx.Request().Context(), scope)
+			if listErr != nil {
+				return ctx.JSON(http.StatusInternalServerError, map[string]string{
+					"error": fmt.Sprintf("failed to list existing secrets: %v", listErr),
+				})
+			}
+
+			for _, existingKey := range existingKeys {
+				// webhook_secret is managed by req.WebhookSecret and should not be coupled
+				// to generic pipeline secrets in req.Secrets.
+				if existingKey == "webhook_secret" {
+					continue
+				}
+
+				if _, ok := req.Secrets[existingKey]; !ok {
+					return ctx.JSON(http.StatusBadRequest, map[string]string{
+						"error": fmt.Sprintf("missing existing secret key %q: all existing secrets must be included on update", existingKey),
+					})
+				}
+			}
+		}
+	}
+
 	pipeline, err := c.store.SavePipeline(ctx.Request().Context(), name, req.Content, req.DriverDSN, req.ContentType)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, map[string]string{
@@ -211,22 +245,6 @@ func (c *APIPipelinesController) Upsert(ctx *echo.Context) error {
 	// Store per-pipeline secrets if provided
 	if len(req.Secrets) > 0 && c.secretsMgr != nil {
 		scope := secrets.PipelineScope(pipeline.ID)
-
-		// Enforce "fail if missing" policy: all existing keys must be present
-		existingKeys, err := c.secretsMgr.ListByScope(ctx.Request().Context(), scope)
-		if err != nil {
-			return ctx.JSON(http.StatusInternalServerError, map[string]string{
-				"error": fmt.Sprintf("failed to list existing secrets: %v", err),
-			})
-		}
-
-		for _, existingKey := range existingKeys {
-			if _, ok := req.Secrets[existingKey]; !ok {
-				return ctx.JSON(http.StatusBadRequest, map[string]string{
-					"error": fmt.Sprintf("missing existing secret key %q: all existing secrets must be included on update", existingKey),
-				})
-			}
-		}
 
 		// Write all secrets
 		// Sort keys for deterministic ordering
