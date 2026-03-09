@@ -959,6 +959,7 @@ export class JobRunner {
         thinking: step.thinking,
         safety: step.safety,
         context_guard: step.context_guard,
+        limits: step.limits,
         context: step.context,
         onUsage: (usage: AgentUsage) => {
           latestUsage = usage;
@@ -1010,8 +1011,12 @@ export class JobRunner {
 
       flushPendingPersist();
 
+      const resultStatus = result.status === "limit_exceeded"
+        ? "limit_exceeded"
+        : "success";
+
       storage.set(storageKey, {
-        status: "success",
+        status: resultStatus,
         started_at: startedAt,
         elapsed: elapsedSince(),
         stdout: result.text,

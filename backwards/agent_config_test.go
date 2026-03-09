@@ -51,6 +51,11 @@ func TestAgentStepConfig(t *testing.T) {
 		assert.Expect(step.AgentContextGuard).NotTo(BeNil())
 		assert.Expect(step.AgentContextGuard.Strategy).To(Equal("threshold"))
 		assert.Expect(step.AgentContextGuard.MaxTokens).To(Equal(100000))
+
+		// Limits config
+		assert.Expect(step.AgentLimits).NotTo(BeNil())
+		assert.Expect(step.AgentLimits.MaxTurns).To(Equal(20))
+		assert.Expect(step.AgentLimits.MaxTotalTokens).To(Equal(int32(500000)))
 	})
 
 	t.Run("NewPipeline transpiles agent step with LLM config to JS", func(t *testing.T) {
@@ -68,6 +73,7 @@ func TestAgentStepConfig(t *testing.T) {
 		assert.Expect(js).To(ContainSubstring(`"thinking"`))
 		assert.Expect(js).To(ContainSubstring(`"context_guard"`))
 		assert.Expect(js).To(ContainSubstring(`"safety"`))
+		assert.Expect(js).To(ContainSubstring(`"limits"`))
 	})
 
 	t.Run("agent step without LLM config is still valid", func(t *testing.T) {

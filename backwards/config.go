@@ -136,6 +136,12 @@ type AgentContextGuardConfig struct {
 	MaxTokens int    `yaml:"max_tokens,omitempty"` // threshold: manual context window override
 }
 
+// AgentLimitsConfig configures hard limits that stop agent execution.
+type AgentLimitsConfig struct {
+	MaxTurns       int   `yaml:"max_turns,omitempty"`       // stop after N LLM responses (default: 50)
+	MaxTotalTokens int32 `yaml:"max_total_tokens,omitempty"` // stop when cumulative tokens reach this
+}
+
 // AgentContextTask specifies a prior pipeline task whose output is pre-fetched
 // into the agent's session as a synthetic tool result before the first turn.
 type AgentContextTask struct {
@@ -172,6 +178,7 @@ type Step struct {
 	AgentThinking     *AgentThinkingConfig     `yaml:"thinking,omitempty"`
 	AgentSafety       AgentSafetyConfig        `yaml:"safety,omitempty"`
 	AgentContextGuard *AgentContextGuardConfig `yaml:"context_guard,omitempty"`
+	AgentLimits       *AgentLimitsConfig        `yaml:"limits,omitempty"`
 	AgentContext      *AgentContext            `yaml:"context,omitempty"`
 
 	Get       string    `yaml:"get,omitempty"`

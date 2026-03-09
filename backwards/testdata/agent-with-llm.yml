@@ -17,6 +17,9 @@ jobs:
         context_guard:
           strategy: threshold
           max_tokens: 100000
+        limits:
+          max_turns: 20
+          max_total_tokens: 500000
         config:
           platform: linux
           image_resource:

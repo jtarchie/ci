@@ -292,6 +292,14 @@ declare global {
     max_tokens?: number; // threshold: manual context window override
   }
 
+  // Hard limits that stop agent execution.
+  interface AgentLimitsConfig {
+    /** Stop after N LLM responses. Default: 50. */
+    max_turns?: number;
+    /** Stop when cumulative tokens reach this total. 0 = unlimited. */
+    max_total_tokens?: number;
+  }
+
   // Specifies a prior task whose output is pre-fetched into the agent's session
   // as a synthetic tool result before the first turn, saving orientation calls.
   interface AgentContextTask {
@@ -323,6 +331,7 @@ declare global {
     thinking?: AgentThinkingConfig;
     safety?: { [key: string]: string };
     context_guard?: AgentContextGuardConfig;
+    limits?: AgentLimitsConfig;
     context?: AgentContext;
   }
 
@@ -728,6 +737,7 @@ declare global {
     thinking?: AgentThinkingConfig;
     safety?: { [key: string]: string };
     context_guard?: AgentContextGuardConfig;
+    limits?: AgentLimitsConfig;
     context?: AgentContext;
     attempts?: number;
     across?: AcrossVar[];
