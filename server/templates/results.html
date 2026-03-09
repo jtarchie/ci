@@ -86,20 +86,6 @@
           class="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-center transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 sm:w-auto">
           Graph View
         </a>
-        <a href="/api/runs/{{ .RunID }}/status"
-          target="_blank" rel="noopener noreferrer"
-          class="w-full px-6 py-3 bg-gray-700 hover:bg-gray-800 text-white rounded-lg font-medium text-center transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 sm:w-auto"
-          aria-label="Open run JSON"
-          title="Open run status JSON in a new tab">
-          Run JSON
-        </a>
-        <a href="/api/runs/{{ .RunID }}/tasks"
-          target="_blank" rel="noopener noreferrer"
-          class="w-full px-6 py-3 bg-gray-700 hover:bg-gray-800 text-white rounded-lg font-medium text-center transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 sm:w-auto"
-          aria-label="Open tasks JSON"
-          title="Open run tasks JSON in a new tab">
-          Tasks JSON
-        </a>
         {{ if .IsActive }}
         <button
           hx-post="/api/runs/{{ .RunID }}/stop"
@@ -149,8 +135,24 @@
                 class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-600 rounded text-xs">c</kbd>
             </button>
             {{ if .RunID }}
-            {{ if and .Run .Run.PipelineID }}
             <hr class="my-1 border-gray-200 dark:border-gray-700">
+            <a href="/api/runs/{{ .RunID }}/status"
+              target="_blank" rel="noopener noreferrer"
+              class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:bg-gray-100 dark:focus:bg-gray-700"
+              role="menuitem"
+              aria-label="Open run JSON"
+              title="Open run status JSON in a new tab">
+              Run JSON
+            </a>
+            <a href="/api/runs/{{ .RunID }}/tasks"
+              target="_blank" rel="noopener noreferrer"
+              class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:bg-gray-100 dark:focus:bg-gray-700"
+              role="menuitem"
+              aria-label="Open tasks JSON"
+              title="Open run tasks JSON in a new tab">
+              Tasks JSON
+            </a>
+            {{ if and .Run .Run.PipelineID }}
             <a href="/pipelines/{{ .Run.PipelineID }}/source/"
               class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:bg-gray-100 dark:focus:bg-gray-700"
               role="menuitem">

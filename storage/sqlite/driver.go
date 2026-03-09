@@ -228,7 +228,7 @@ func (s *Sqlite) GetAll(ctx context.Context, prefix string, fields []string) (st
 	if len(fields) == 1 && fields[0] == "*" {
 		query = `
 			SELECT
-				id, path, payload
+				id, path, json(payload) as payload
 			FROM
 				tasks
 			WHERE path GLOB :path
