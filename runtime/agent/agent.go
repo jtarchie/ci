@@ -52,6 +52,12 @@ type AgentContextGuardConfig struct {
 	MaxTokens int    `json:"max_tokens,omitempty"`
 }
 
+// AgentLimitsConfig configures hard limits that stop agent execution.
+type AgentLimitsConfig struct {
+	MaxTurns      int   `json:"max_turns,omitempty"`
+	MaxTotalTokens int32 `json:"max_total_tokens,omitempty"`
+}
+
 // AgentConfig is the configuration passed from JavaScript to runtime.agent().
 type AgentConfig struct {
 	Name             string                                 `json:"name"`
@@ -64,6 +70,7 @@ type AgentConfig struct {
 	Thinking         *AgentThinkingConfig                   `json:"thinking,omitempty"`
 	Safety           map[string]string                      `json:"safety,omitempty"`
 	ContextGuard     *AgentContextGuardConfig               `json:"context_guard,omitempty"`
+	Limits           *AgentLimitsConfig                      `json:"limits,omitempty"`
 	Context          *AgentContext                          `json:"context,omitempty"`
 	// OnOutput is called with streaming chunks. Not serialised from JS.
 	OnOutput pipelinerunner.OutputCallback `json:"-"`
@@ -82,7 +89,7 @@ type AgentConfig struct {
 // AgentResult is returned to JavaScript after the agent completes.
 type AgentResult struct {
 	Text      string           `json:"text"`
-	Status    string           `json:"status"` // "success" or "failure"
+	Status    string           `json:"status"` // "success", "failure", or "limit_exceeded"
 	ToolCalls []ToolCallRecord `json:"toolCalls"`
 	Usage     AgentUsage       `json:"usage"`
 	AuditLog  []AuditEvent     `json:"auditLog"`
@@ -203,6 +210,8 @@ var defaultBaseURLs = map[string]string{
 const (
 	defaultContextGuardMaxTurns  = 30
 	defaultContextGuardMaxTokens = 128000
+	defaultLimitsMaxTurns        = 50
+	limitWarningTurnsBefore      = 2
 )
 
 // splitModel splits "provider/model-name" into ("provider", "model-name").
@@ -621,6 +630,22 @@ func emitUsageSnapshot(onUsage func(AgentUsage), usage AgentUsage) {
 	if onUsage != nil {
 		onUsage(usage)
 	}
+}
+
+// effectiveLimits returns the hard turn and token limits that apply. If no
+// limits are configured, a sensible default max_turns is used to prevent
+// runaway agents.
+func effectiveLimits(cfg *AgentLimitsConfig) (maxTurns int, maxTotalTokens int32) {
+	if cfg == nil {
+		return defaultLimitsMaxTurns, 0
+	}
+
+	maxTurns = cfg.MaxTurns
+	if maxTurns <= 0 {
+		maxTurns = defaultLimitsMaxTurns
+	}
+
+	return maxTurns, cfg.MaxTotalTokens
 }
 
 func appendAuditEvent(auditEvents *[]AuditEvent, event AuditEvent, onAuditEvent func(AuditEvent)) {
@@ -1042,13 +1067,24 @@ func RunAgent(
 	var toolCalls []ToolCallRecord
 	var usage AgentUsage
 
+	// Hard limits: resolve effective turn/token caps.
+	maxTurns, maxTotalTokens := effectiveLimits(config.Limits)
+
+	// Wrap context so we can cancel on hard limit.
+	runCtx, cancelRun := context.WithCancel(ctx)
+	defer cancelRun()
+
+	var turnCount int
+	limitExceeded := false
+	warningInjected := false
+
 	// pendingCalls tracks in-flight function calls by ID so we can pair them
 	// with the matching FunctionResponse later.
 	pendingCalls := make(map[string]*ToolCallRecord)
 
 	var runErr error
 
-	for event, err := range runnr.Run(ctx, "pipeline", sessResp.Session.ID(), userMsg, agent.RunConfig{}) {
+	for event, err := range runnr.Run(runCtx, "pipeline", sessResp.Session.ID(), userMsg, agent.RunConfig{}) {
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
 				runErr = err
@@ -1064,11 +1100,60 @@ func RunAgent(
 			usage.CompletionTokens += event.UsageMetadata.CandidatesTokenCount
 			usage.TotalTokens += event.UsageMetadata.TotalTokenCount
 			usage.LLMRequests++
+			turnCount++
 			emitUsageSnapshot(config.OnUsage, usage)
 			eventUsage = &AuditUsage{
 				PromptTokens:     event.UsageMetadata.PromptTokenCount,
 				CompletionTokens: event.UsageMetadata.CandidatesTokenCount,
 				TotalTokens:      event.UsageMetadata.TotalTokenCount,
+			}
+
+			// Check hard token limit.
+			if maxTotalTokens > 0 && usage.TotalTokens >= maxTotalTokens {
+				appendAuditEvent(&auditEvents, AuditEvent{
+					Timestamp: time.Now().UTC().Format(time.RFC3339),
+					Author:    "system",
+					Type:      "limit_warning",
+					Text:      fmt.Sprintf("Total token budget exhausted (%d/%d tokens used). Stopping agent.", usage.TotalTokens, maxTotalTokens),
+				}, config.OnAuditEvent)
+
+				limitExceeded = true
+				cancelRun()
+
+				break
+			}
+
+			// Inject a warning when approaching the turn limit.
+			if !warningInjected && turnCount == maxTurns-limitWarningTurnsBefore {
+				warningMsg := fmt.Sprintf(
+					"You are approaching your turn limit (%d/%d turns used). "+
+						"Please wrap up your current task and provide a final response within the next %d turn(s).",
+					turnCount, maxTurns, limitWarningTurnsBefore,
+				)
+
+				appendAuditEvent(&auditEvents, AuditEvent{
+					Timestamp: time.Now().UTC().Format(time.RFC3339),
+					Author:    "system",
+					Type:      "limit_warning",
+					Text:      warningMsg,
+				}, config.OnAuditEvent)
+
+				warningInjected = true
+			}
+
+			// Check hard turn limit.
+			if turnCount >= maxTurns {
+				appendAuditEvent(&auditEvents, AuditEvent{
+					Timestamp: time.Now().UTC().Format(time.RFC3339),
+					Author:    "system",
+					Type:      "limit_warning",
+					Text:      fmt.Sprintf("Turn limit reached (%d/%d). Stopping agent.", turnCount, maxTurns),
+				}, config.OnAuditEvent)
+
+				limitExceeded = true
+				cancelRun()
+
+				break
 			}
 		}
 
@@ -1179,6 +1264,10 @@ func RunAgent(
 
 	finalText := textBuilder.String()
 	status := "success"
+
+	if limitExceeded {
+		status = "limit_exceeded"
+	}
 
 	// Write result.json to the output path inside the sandbox if configured.
 	if config.OutputVolumePath != "" {

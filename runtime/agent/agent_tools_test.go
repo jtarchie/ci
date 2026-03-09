@@ -275,3 +275,51 @@ func TestNormalizeContextGuardConfig(t *testing.T) {
 		assert.Expect(err.Error()).To(ContainSubstring("invalid context_guard strategy"))
 	})
 }
+
+func TestEffectiveLimits(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil config uses default max turns with no token limit", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		turns, tokens := effectiveLimits(nil)
+		assert.Expect(turns).To(Equal(defaultLimitsMaxTurns))
+		assert.Expect(tokens).To(Equal(int32(0)))
+	})
+
+	t.Run("explicit max turns is used", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		turns, tokens := effectiveLimits(&AgentLimitsConfig{MaxTurns: 10})
+		assert.Expect(turns).To(Equal(10))
+		assert.Expect(tokens).To(Equal(int32(0)))
+	})
+
+	t.Run("zero max turns falls back to default", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		turns, _ := effectiveLimits(&AgentLimitsConfig{MaxTurns: 0})
+		assert.Expect(turns).To(Equal(defaultLimitsMaxTurns))
+	})
+
+	t.Run("explicit max total tokens is used", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		turns, tokens := effectiveLimits(&AgentLimitsConfig{MaxTurns: 5, MaxTotalTokens: 100000})
+		assert.Expect(turns).To(Equal(5))
+		assert.Expect(tokens).To(Equal(int32(100000)))
+	})
+
+	t.Run("empty config uses defaults", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		turns, tokens := effectiveLimits(&AgentLimitsConfig{})
+		assert.Expect(turns).To(Equal(defaultLimitsMaxTurns))
+		assert.Expect(tokens).To(Equal(int32(0)))
+	})
+}
