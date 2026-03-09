@@ -12,38 +12,45 @@ Get paginated execution history.
 curl http://localhost:8080/api/runs
 ```
 
-## Get Run
+## Get Run Status
 
-`GET /api/runs/:id`
+`GET /api/runs/:run_id/status`
 
 Retrieve a specific run's metadata and status.
 
 ```bash
-curl http://localhost:8080/api/runs/run-id-123
+curl http://localhost:8080/api/runs/run-id-123/status
 ```
 
 Response includes:
 
-- `status` — `running`, `success`, `failure`, `error`, etc.
-- `code` — exit code (0 = success)
-- `created_at`, `updated_at` — timestamps
+- `id` — run ID
+- `pipeline_id` — owning pipeline
+- `status` — `queued`, `running`, `success`, `failed`
+- `started_at`, `completed_at`, `created_at` — timestamps
+- `error_message` — optional failure reason
 
 ## Get Run Tasks
 
-`GET /api/runs/:id/tasks`
+`GET /api/runs/:run_id/tasks`
 
-List all tasks (containers) executed in a run.
+List all tasks persisted for a run, including agent task metadata when present.
 
 ```bash
 curl http://localhost:8080/api/runs/run-id-123/tasks
 ```
 
-Each task includes:
+Optional query parameter:
 
-- `name` — task name
-- `status` — execution status
-- `code` — exit code
-- `stdout`, `stderr` — logs (redacted if secrets were used)
-- `started_at`, `ended_at` — timing
+- `path` — return a single task payload by full path (for example
+  `/pipeline/run-id-123/tasks/0-review`)
+
+Each item includes:
+
+- `path` — task storage path
+- `payload.status`, `payload.elapsed`, `payload.started_at`
+- `payload.stdout`, `payload.stderr`, `payload.code`
+- `payload.dependsOn`, `payload.type`
+- `payload.usage`, `payload.toolCalls`, `payload.audit_log` for agent runs
 
 See [MCP](./mcp.md) for advanced task search and filtering.

@@ -58,6 +58,39 @@ func TestDrivers(t *testing.T) {
 				}))
 			})
 
+			t.Run("Wildcard returns all fields", func(t *testing.T) {
+				t.Parallel()
+
+				assert := NewGomegaWithT(t)
+
+				buildFile, err := os.CreateTemp(t.TempDir(), "")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				defer func() { _ = buildFile.Close() }()
+
+				client, err := init(buildFile.Name(), "namespace", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				defer func() { _ = client.Close() }()
+
+				err = client.Set(context.Background(), "/bar", map[string]any{
+					"field":   "123",
+					"another": "456",
+					"third":   "789",
+				})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				results, err := client.GetAll(context.Background(), "/bar", []string{"*"})
+				assert.Expect(err).NotTo(HaveOccurred())
+				assert.Expect(results).To(HaveLen(1))
+				assert.Expect(results[0].Path).To(Equal("/namespace/bar"))
+				assert.Expect(results[0].Payload).To(Equal(storage.Payload{
+					"field":   "123",
+					"another": "456",
+					"third":   "789",
+				}))
+			})
+
 		})
 	})
 }

@@ -140,6 +140,123 @@ func TestExecutionAPI(t *testing.T) {
 				assert.Expect(rec.Code).To(Equal(http.StatusNotFound))
 			})
 
+			t.Run("GET /api/runs/:run_id/tasks returns run tasks payload", func(t *testing.T) {
+				t.Parallel()
+				assert := NewGomegaWithT(t)
+
+				buildFile, err := os.CreateTemp(t.TempDir(), "")
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = buildFile.Close() }()
+
+				client, err := init(buildFile.Name(), "namespace", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = client.Close() }()
+
+				pipeline, err := client.SavePipeline(context.Background(), "agent-pipeline", "content", "docker://", "")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				run, err := client.SaveRun(context.Background(), pipeline.ID)
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				err = client.Set(context.Background(), "/pipeline/"+run.ID+"/tasks/0-review", map[string]any{
+					"status": "success",
+					"stdout": "done",
+					"usage": map[string]any{
+						"totalTokens": 1200,
+					},
+					"toolCalls": []any{map[string]any{"name": "search"}},
+					"audit_log": []any{map[string]any{"event": "tool_call"}},
+				})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				req := httptest.NewRequest(http.MethodGet, "/api/runs/"+run.ID+"/tasks", nil)
+				rec := httptest.NewRecorder()
+				router.ServeHTTP(rec, req)
+
+				assert.Expect(rec.Code).To(Equal(http.StatusOK))
+
+				var resp []map[string]any
+				err = json.Unmarshal(rec.Body.Bytes(), &resp)
+				assert.Expect(err).NotTo(HaveOccurred())
+				assert.Expect(resp).NotTo(BeEmpty())
+				assert.Expect(resp[0]["path"]).To(Equal("/pipeline/" + run.ID + "/tasks/0-review"))
+
+				payload, ok := resp[0]["payload"].(map[string]any)
+				assert.Expect(ok).To(BeTrue())
+				assert.Expect(payload["status"]).To(Equal("success"))
+				assert.Expect(payload["usage"]).NotTo(BeNil())
+				assert.Expect(payload["toolCalls"]).NotTo(BeNil())
+				assert.Expect(payload["audit_log"]).NotTo(BeNil())
+			})
+
+			t.Run("GET /api/runs/:run_id/tasks supports task path filter", func(t *testing.T) {
+				t.Parallel()
+				assert := NewGomegaWithT(t)
+
+				buildFile, err := os.CreateTemp(t.TempDir(), "")
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = buildFile.Close() }()
+
+				client, err := init(buildFile.Name(), "namespace", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = client.Close() }()
+
+				pipeline, err := client.SavePipeline(context.Background(), "filtered-pipeline", "content", "docker://", "")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				run, err := client.SaveRun(context.Background(), pipeline.ID)
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				err = client.Set(context.Background(), "/pipeline/"+run.ID+"/tasks/0-a", map[string]any{"status": "success"})
+				assert.Expect(err).NotTo(HaveOccurred())
+				err = client.Set(context.Background(), "/pipeline/"+run.ID+"/tasks/1-b", map[string]any{"status": "failure"})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				req := httptest.NewRequest(http.MethodGet, "/api/runs/"+run.ID+"/tasks?path=/pipeline/"+run.ID+"/tasks/1-b", nil)
+				rec := httptest.NewRecorder()
+				router.ServeHTTP(rec, req)
+
+				assert.Expect(rec.Code).To(Equal(http.StatusOK))
+
+				var resp []map[string]any
+				err = json.Unmarshal(rec.Body.Bytes(), &resp)
+				assert.Expect(err).NotTo(HaveOccurred())
+				assert.Expect(resp).To(HaveLen(1))
+				assert.Expect(resp[0]["path"]).To(Equal("/pipeline/" + run.ID + "/tasks/1-b"))
+
+				payload, ok := resp[0]["payload"].(map[string]any)
+				assert.Expect(ok).To(BeTrue())
+				assert.Expect(payload["status"]).To(Equal("failure"))
+			})
+
+			t.Run("GET /api/runs/:run_id/tasks returns 404 for non-existent run", func(t *testing.T) {
+				t.Parallel()
+				assert := NewGomegaWithT(t)
+
+				buildFile, err := os.CreateTemp(t.TempDir(), "")
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = buildFile.Close() }()
+
+				client, err := init(buildFile.Name(), "namespace", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = client.Close() }()
+
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				req := httptest.NewRequest(http.MethodGet, "/api/runs/non-existent/tasks", nil)
+				rec := httptest.NewRecorder()
+				router.ServeHTTP(rec, req)
+
+				assert.Expect(rec.Code).To(Equal(http.StatusNotFound))
+			})
+
 			t.Run("POST /api/pipelines/:id/trigger returns 429 when max-in-flight reached", func(t *testing.T) {
 				t.Parallel()
 				assert := NewGomegaWithT(t)

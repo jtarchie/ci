@@ -86,6 +86,20 @@
           class="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-center transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 sm:w-auto">
           Graph View
         </a>
+        <a href="/api/runs/{{ .RunID }}/status"
+          target="_blank" rel="noopener noreferrer"
+          class="w-full px-6 py-3 bg-gray-700 hover:bg-gray-800 text-white rounded-lg font-medium text-center transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 sm:w-auto"
+          aria-label="Open run JSON"
+          title="Open run status JSON in a new tab">
+          Run JSON
+        </a>
+        <a href="/api/runs/{{ .RunID }}/tasks"
+          target="_blank" rel="noopener noreferrer"
+          class="w-full px-6 py-3 bg-gray-700 hover:bg-gray-800 text-white rounded-lg font-medium text-center transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 sm:w-auto"
+          aria-label="Open tasks JSON"
+          title="Open run tasks JSON in a new tab">
+          Tasks JSON
+        </a>
         {{ if .IsActive }}
         <button
           hx-post="/api/runs/{{ .RunID }}/stop"
@@ -307,7 +321,8 @@
   hx-swap="morph:innerHTML"
   {{ end }}
   data-run-active="{{ if .IsActive }}true{{ else }}false{{ end }}">
-  {{ template "renderPath" dict "Path" .Tree "Depth" 0 "Order" 1 }}
+  {{ template "renderPath" dict "Path" .Tree "Depth" 0 "Order" 1 "RunID"
+  .RunID }}
 </div>
 {{ end }}
 
@@ -422,6 +437,7 @@ border-indigo-300 dark:border-indigo-600
 {{- define "renderTask" -}}
 {{- $path := .Path -}}
 {{- $order := .Order -}}
+{{- $runID := .RunID -}}
 <details class="task-item 
     {{ template "getStatusColor" $path }} border rounded-md p-3 transition-all
   dark:text-gray-200"
@@ -441,6 +457,15 @@ border-indigo-300 dark:border-indigo-600
       </div>
     </div>
     <div class="flex items-center gap-2 pr-1">
+      {{ if $runID }}
+      <a
+        href="/api/runs/{{ $runID }}/tasks?path={{ $path.FullPath | urlquery }}"
+        target="_blank" rel="noopener noreferrer"
+        class="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-1 dark:focus:ring-offset-gray-800"
+        title="Open task JSON in a new tab">
+        JSON
+      </a>
+      {{ end }}
       {{ if $path.Value.usage }}
       <span class="text-xs text-purple-400 dark:text-purple-500 font-mono"
         title="{{ printf "%.0f" $path.Value.usage.llmRequests }} LLM requests,
@@ -501,7 +526,8 @@ border-indigo-300 dark:border-indigo-600
     {{/* Render children */}}
     {{ range $index, $child := $path.Children }}
     {{ template "renderPath" dict "Path" $child "Depth" (add $depth 1) "Order"
-    (add $index 1) }}
+    (add $index 1) "RunID"
+    $.RunID }}
     {{ end }}
   </div>
 </div>
@@ -514,13 +540,14 @@ border-indigo-300 dark:border-indigo-600
 {{ $order := .Order }}
 
 {{ if and $path.IsGroup (ne $path.Name "") }}
-{{ template "renderGroup" dict "Path" $path "Depth" $depth }}
+{{ template "renderGroup" dict "Path" $path "Depth" $depth "RunID" .RunID }}
 {{ else if ne $path.Name "" }}
-{{ template "renderTask" dict "Path" $path "Order" $order }}
+{{ template "renderTask" dict "Path" $path "Order" $order "RunID" .RunID }}
 {{ else }}
 {{ range $index, $child := $path.Children }}
 {{ template "renderPath" dict "Path" $child "Depth" $depth "Order" (add $index
-1) }}
+1)
+"RunID" $.RunID }}
 {{ end }}
 {{ end }}
 {{ end }}

@@ -246,6 +246,8 @@ func TestRunViews(t *testing.T) {
 				assert.Expect(rec.Code).To(Equal(http.StatusOK))
 				// The template should have a link to /runs/:id/tasks
 				assert.Expect(rec.Body.String()).To(ContainSubstring("/runs/" + run.ID + "/tasks"))
+				assert.Expect(rec.Body.String()).To(ContainSubstring("/api/runs/" + run.ID + "/status"))
+				assert.Expect(rec.Body.String()).To(ContainSubstring("/api/runs/" + run.ID + "/tasks"))
 			})
 
 			t.Run("GET /runs/:id/tasks shows execution number for single task", func(t *testing.T) {
@@ -282,6 +284,10 @@ func TestRunViews(t *testing.T) {
 				assert.Expect(rec.Body.String()).NotTo(ContainSubstring("no value"))
 				// The number "1" must appear inside the badge span
 				assert.Expect(rec.Body.String()).To(MatchRegexp(`w-6 h-6[^>]*>\s*1\s*<`))
+				assert.Expect(rec.Body.String()).To(ContainSubstring("/api/runs/" + run.ID + "/status"))
+				assert.Expect(rec.Body.String()).To(ContainSubstring("/api/runs/" + run.ID + "/tasks"))
+				assert.Expect(rec.Body.String()).To(ContainSubstring("/api/runs/" + run.ID + "/tasks?path="))
+				assert.Expect(rec.Body.String()).To(ContainSubstring("tasks/0-k6"))
 			})
 
 			t.Run("GET /runs/:id/tasks shows correct execution numbers for multiple tasks", func(t *testing.T) {

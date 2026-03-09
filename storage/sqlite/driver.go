@@ -223,14 +223,27 @@ func (s *Sqlite) GetAll(ctx context.Context, prefix string, fields []string) (st
 
 	var results storage.Results
 
-	jsonSelects := strings.Join(
-		lo.Map(fields, func(field string, _ int) string {
-			return fmt.Sprintf("'%s', json_extract(payload, '$.%s')", field, field)
-		}),
-		",",
-	)
+	// Support wildcard "*" to return all fields
+	var query string
+	if len(fields) == 1 && fields[0] == "*" {
+		query = `
+			SELECT
+				id, path, payload
+			FROM
+				tasks
+			WHERE path GLOB :path
+			ORDER BY
+				id ASC
+		`
+	} else {
+		jsonSelects := strings.Join(
+			lo.Map(fields, func(field string, _ int) string {
+				return fmt.Sprintf("'%s', json_extract(payload, '$.%s')", field, field)
+			}),
+			",",
+		)
 
-	query := fmt.Sprintf(`
+		query = fmt.Sprintf(`
 			SELECT
 				id, path, json_object(%s) as payload
 			FROM
@@ -239,6 +252,7 @@ func (s *Sqlite) GetAll(ctx context.Context, prefix string, fields []string) (st
 			ORDER BY
 				id ASC
 		`, jsonSelects)
+	}
 
 	err := sqlscan.Select(
 		ctx,

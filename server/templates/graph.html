@@ -73,6 +73,20 @@
           class="w-full sm:w-auto px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400">
           List View
         </a>
+        <a href="/api/runs/{{ .RunID }}/status"
+          target="_blank" rel="noopener noreferrer"
+          class="w-full sm:w-auto px-4 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
+          aria-label="Open run JSON"
+          title="Open run status JSON in a new tab">
+          Run JSON
+        </a>
+        <a href="/api/runs/{{ .RunID }}/tasks"
+          target="_blank" rel="noopener noreferrer"
+          class="w-full sm:w-auto px-4 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
+          aria-label="Open tasks JSON"
+          title="Open run tasks JSON in a new tab">
+          Tasks JSON
+        </a>
         {{ if .IsActive }}
         <button
           hx-post="/api/runs/{{ .RunID }}/stop"
