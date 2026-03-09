@@ -901,7 +901,6 @@ export class JobRunner {
     const auditLog: AuditEvent[] = [];
     const toolCalls: ToolCallRecord[] = [];
     const pendingToolCallIndex = new Map<string, number>();
-    let auditEventIndex = 0;
     const startedAt = new Date().toISOString();
     const elapsedSince = () => {
       const ms = Date.now() - new Date(startedAt).getTime();
@@ -916,7 +915,13 @@ export class JobRunner {
 
     storage.set(storageKey, { status: "pending", started_at: startedAt });
 
-    const persistRunningState = () => {
+    let persistPending = false;
+    let lastPersistMs = 0;
+    const persistThrottleMs = 500;
+
+    const doPersist = () => {
+      persistPending = false;
+      lastPersistMs = Date.now();
       storage.set(storageKey, {
         status: "running",
         started_at: startedAt,
@@ -925,6 +930,21 @@ export class JobRunner {
         audit_log: auditLog,
         toolCalls,
       });
+    };
+
+    const persistRunningState = () => {
+      const elapsed = Date.now() - lastPersistMs;
+      if (elapsed < persistThrottleMs) {
+        persistPending = true;
+        return;
+      }
+      doPersist();
+    };
+
+    const flushPendingPersist = () => {
+      if (persistPending) {
+        doPersist();
+      }
     };
 
     try {
@@ -974,11 +994,10 @@ export class JobRunner {
             }
           }
 
-          storage.set(`${auditBaseKey}/${auditEventIndex}`, {
+          storage.set(`${auditBaseKey}/${auditLog.length - 1}`, {
             ...event,
-            index: auditEventIndex,
+            index: auditLog.length - 1,
           });
-          auditEventIndex += 1;
 
           persistRunningState();
         },
@@ -988,6 +1007,8 @@ export class JobRunner {
           persistRunningState();
         },
       });
+
+      flushPendingPersist();
 
       storage.set(storageKey, {
         status: "success",

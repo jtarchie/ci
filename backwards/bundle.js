@@ -909,7 +909,6 @@ var JobRunner = class {
     const auditLog = [];
     const toolCalls = [];
     const pendingToolCallIndex = /* @__PURE__ */ new Map();
-    let auditEventIndex = 0;
     const startedAt = (/* @__PURE__ */ new Date()).toISOString();
     const elapsedSince = () => {
       const ms = Date.now() - new Date(startedAt).getTime();
@@ -922,7 +921,12 @@ var JobRunner = class {
       return `${s}s`;
     };
     storage.set(storageKey, { status: "pending", started_at: startedAt });
-    const persistRunningState = () => {
+    let persistPending = false;
+    let lastPersistMs = 0;
+    const persistThrottleMs = 500;
+    const doPersist = () => {
+      persistPending = false;
+      lastPersistMs = Date.now();
       storage.set(storageKey, {
         status: "running",
         started_at: startedAt,
@@ -931,6 +935,19 @@ var JobRunner = class {
         audit_log: auditLog,
         toolCalls
       });
+    };
+    const persistRunningState = () => {
+      const elapsed = Date.now() - lastPersistMs;
+      if (elapsed < persistThrottleMs) {
+        persistPending = true;
+        return;
+      }
+      doPersist();
+    };
+    const flushPendingPersist = () => {
+      if (persistPending) {
+        doPersist();
+      }
     };
     try {
       const result = await runtime.agent({
@@ -975,11 +992,10 @@ var JobRunner = class {
               });
             }
           }
-          storage.set(`${auditBaseKey}/${auditEventIndex}`, {
+          storage.set(`${auditBaseKey}/${auditLog.length - 1}`, {
             ...event,
-            index: auditEventIndex
+            index: auditLog.length - 1
           });
-          auditEventIndex += 1;
           persistRunningState();
         },
         onOutput: (_stream, data) => {
@@ -987,6 +1003,7 @@ var JobRunner = class {
           persistRunningState();
         }
       });
+      flushPendingPersist();
       storage.set(storageKey, {
         status: "success",
         started_at: startedAt,
