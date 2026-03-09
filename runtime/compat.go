@@ -75,7 +75,6 @@ type (
 	AgentContextTask        = agent.AgentContextTask
 	AuditEvent              = agent.AuditEvent
 	AuditUsage              = agent.AuditUsage
-	ToolCallRecord          = agent.ToolCallRecord
 )
 
 // === Function/constructor aliases ===

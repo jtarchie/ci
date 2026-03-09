@@ -88,19 +88,10 @@ type AgentConfig struct {
 
 // AgentResult is returned to JavaScript after the agent completes.
 type AgentResult struct {
-	Text      string           `json:"text"`
-	Status    string           `json:"status"` // "success", "failure", or "limit_exceeded"
-	ToolCalls []ToolCallRecord `json:"toolCalls"`
-	Usage     AgentUsage       `json:"usage"`
-	AuditLog  []AuditEvent     `json:"auditLog"`
-}
-
-// ToolCallRecord captures a single tool invocation and its result.
-type ToolCallRecord struct {
-	Name     string         `json:"name"`
-	Args     map[string]any `json:"args,omitempty"`
-	Result   map[string]any `json:"result,omitempty"`
-	ExitCode int            `json:"exitCode,omitempty"`
+	Text     string       `json:"text"`
+	Status   string       `json:"status"` // "success", "failure", or "limit_exceeded"
+	Usage    AgentUsage   `json:"usage"`
+	AuditLog []AuditEvent `json:"auditLog"`
 }
 
 // AgentUsage tracks cumulative token counts and request stats.
@@ -765,6 +756,10 @@ func RunAgent(
 	instrBuilder.WriteString("  - list_tasks: list all tasks in the current run with their statuses (pre-fetched at start)\n")
 	instrBuilder.WriteString("  - get_task_result: retrieve stdout, stderr, and exit code for a specific task by name\n")
 
+	// Tell the model about its turn budget so it can plan accordingly.
+	maxTurns, maxTotalTokens := effectiveLimits(config.Limits)
+	fmt.Fprintf(&instrBuilder, "\nYou have a budget of %d turns. Plan your work to finish well within this limit.\n", maxTurns)
+
 	instruction := instrBuilder.String()
 
 	// Build list_tasks tool — zero input, returns all tasks for the current run.
@@ -1042,17 +1037,13 @@ func RunAgent(
 		Text:      config.Prompt,
 	}, config.OnAuditEvent)
 
-	// Run the agent, collecting the final text response, tool call history, and usage.
+	// Run the agent, collecting the final text response and usage.
 	// The user's task prompt is the first user message; the Instruction field
 	// holds environment context so there is no duplication.
 	userMsg := genai.NewContentFromText(config.Prompt, genai.RoleUser)
 
 	var textBuilder strings.Builder
-	var toolCalls []ToolCallRecord
 	var usage AgentUsage
-
-	// Hard limits: resolve effective turn/token caps.
-	maxTurns, maxTotalTokens := effectiveLimits(config.Limits)
 
 	// Wrap context so we can cancel on hard limit.
 	runCtx, cancelRun := context.WithCancel(ctx)
@@ -1061,10 +1052,6 @@ func RunAgent(
 	var turnCount int
 	limitExceeded := false
 	warningInjected := false
-
-	// pendingCalls tracks in-flight function calls by ID so we can pair them
-	// with the matching FunctionResponse later.
-	pendingCalls := make(map[string]*ToolCallRecord)
 
 	var runErr error
 
@@ -1158,17 +1145,6 @@ func RunAgent(
 			// Track function calls (tool invocations by the model).
 			if part.FunctionCall != nil {
 				fc := part.FunctionCall
-				record := &ToolCallRecord{
-					Name: fc.Name,
-					Args: fc.Args,
-				}
-
-				// Store by ID so we can attach the response later.
-				if fc.ID != "" {
-					pendingCalls[fc.ID] = record
-				}
-
-				toolCalls = append(toolCalls, *record)
 				usage.ToolCallCount++
 
 				appendAuditEvent(&auditEvents, AuditEvent{
@@ -1186,18 +1162,6 @@ func RunAgent(
 			// Track function responses (tool results).
 			if part.FunctionResponse != nil {
 				fr := part.FunctionResponse
-				if pending, ok := pendingCalls[fr.ID]; ok {
-					pending.Result = fr.Response
-					// Update the toolCalls slice entry.
-					for i := len(toolCalls) - 1; i >= 0; i-- {
-						if toolCalls[i].Name == pending.Name && toolCalls[i].Result == nil {
-							toolCalls[i].Result = fr.Response
-							break
-						}
-					}
-
-					delete(pendingCalls, fr.ID)
-				}
 
 				appendAuditEvent(&auditEvents, AuditEvent{
 					Timestamp:    ts,
@@ -1271,10 +1235,9 @@ func RunAgent(
 	}
 
 	return &AgentResult{
-		Text:      finalText,
-		Status:    status,
-		ToolCalls: toolCalls,
-		Usage:     usage,
-		AuditLog:  auditEvents,
+		Text:     finalText,
+		Status:   status,
+		Usage:    usage,
+		AuditLog: auditEvents,
 	}, nil
 }

@@ -164,7 +164,6 @@ func TestExecutionAPI(t *testing.T) {
 					"usage": map[string]any{
 						"totalTokens": 1200,
 					},
-					"toolCalls": []any{map[string]any{"name": "search"}},
 					"audit_log": []any{map[string]any{"event": "tool_call"}},
 				})
 				assert.Expect(err).NotTo(HaveOccurred())
@@ -188,7 +187,6 @@ func TestExecutionAPI(t *testing.T) {
 				assert.Expect(ok).To(BeTrue())
 				assert.Expect(payload["status"]).To(Equal("success"))
 				assert.Expect(payload["usage"]).NotTo(BeNil())
-				assert.Expect(payload["toolCalls"]).NotTo(BeNil())
 				assert.Expect(payload["audit_log"]).NotTo(BeNil())
 			})
 

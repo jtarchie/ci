@@ -79,7 +79,7 @@ func buildMCPServer(store storage.Driver) *mcp.Server {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "get_run_task",
-		Description: "Get a single task payload for a run. Returns full stored payload fields (for example: stdout, stderr, usage, audit_log, toolCalls).",
+		Description: "Get a single task payload for a run. Returns full stored payload fields (for example: stdout, stderr, usage, audit_log).",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, input GetRunTaskInput) (*mcp.CallToolResult, any, error) {
 		if input.Path == "" {
 			return nil, nil, fmt.Errorf("path is required")

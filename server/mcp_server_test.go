@@ -184,7 +184,6 @@ func TestMCPGetRunTask(t *testing.T) {
 		"status":    "running",
 		"stdout":    "line 1\nline 2\n",
 		"audit_log": []any{map[string]any{"type": "tool_call", "toolName": "run_command"}},
-		"toolCalls": []any{map[string]any{"name": "run_command", "args": map[string]any{"args": []any{"ls"}}}},
 	})
 	assert.Expect(err).NotTo(HaveOccurred())
 
@@ -210,7 +209,6 @@ func TestMCPGetRunTask(t *testing.T) {
 		assert.Expect(got).To(HaveLen(1))
 		assert.Expect(got[0].Path).To(Equal(taskPath))
 		assert.Expect(got[0].Payload["audit_log"]).NotTo(BeNil())
-		assert.Expect(got[0].Payload["toolCalls"]).NotTo(BeNil())
 	})
 
 	t.Run("accepts path relative to run prefix", func(t *testing.T) {

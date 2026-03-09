@@ -907,8 +907,6 @@ var JobRunner = class {
     let accumulatedOutput = "";
     let latestUsage;
     const auditLog = [];
-    const toolCalls = [];
-    const pendingToolCallIndex = /* @__PURE__ */ new Map();
     const startedAt = (/* @__PURE__ */ new Date()).toISOString();
     const elapsedSince = () => {
       const ms = Date.now() - new Date(startedAt).getTime();
@@ -932,8 +930,7 @@ var JobRunner = class {
         started_at: startedAt,
         stdout: accumulatedOutput,
         usage: latestUsage,
-        audit_log: auditLog,
-        toolCalls
+        audit_log: auditLog
       });
     };
     const persistRunningState = () => {
@@ -969,30 +966,6 @@ var JobRunner = class {
         },
         onAuditEvent: (event) => {
           auditLog.push(event);
-          if (event.type === "tool_call") {
-            const nextIndex = toolCalls.length;
-            toolCalls.push({
-              name: event.toolName || "",
-              args: event.toolArgs
-            });
-            if (event.toolCallId) {
-              pendingToolCallIndex.set(event.toolCallId, nextIndex);
-            }
-          } else if (event.type === "tool_response") {
-            const callID = event.toolCallId;
-            const existingIndex = callID ? pendingToolCallIndex.get(callID) : void 0;
-            if (existingIndex !== void 0) {
-              toolCalls[existingIndex].result = event.toolResult;
-              if (callID) {
-                pendingToolCallIndex.delete(callID);
-              }
-            } else {
-              toolCalls.push({
-                name: event.toolName || "",
-                result: event.toolResult
-              });
-            }
-          }
           storage.set(`${auditBaseKey}/${auditLog.length - 1}`, {
             ...event,
             index: auditLog.length - 1
@@ -1011,7 +984,6 @@ var JobRunner = class {
         started_at: startedAt,
         elapsed: elapsedSince(),
         stdout: result.text,
-        toolCalls: result.toolCalls,
         usage: latestUsage ?? result.usage,
         audit_log: result.auditLog
       });
@@ -1022,8 +994,7 @@ var JobRunner = class {
         elapsed: elapsedSince(),
         stdout: accumulatedOutput,
         usage: latestUsage,
-        audit_log: auditLog,
-        toolCalls
+        audit_log: auditLog
       });
       throw new TaskFailure(`Agent ${step.agent} failed: ${error}`);
     }

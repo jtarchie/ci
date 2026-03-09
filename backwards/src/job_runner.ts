@@ -899,8 +899,6 @@ export class JobRunner {
     let accumulatedOutput = "";
     let latestUsage: AgentUsage | undefined;
     const auditLog: AuditEvent[] = [];
-    const toolCalls: ToolCallRecord[] = [];
-    const pendingToolCallIndex = new Map<string, number>();
     const startedAt = new Date().toISOString();
     const elapsedSince = () => {
       const ms = Date.now() - new Date(startedAt).getTime();
@@ -928,7 +926,6 @@ export class JobRunner {
         stdout: accumulatedOutput,
         usage: latestUsage,
         audit_log: auditLog,
-        toolCalls,
       });
     };
 
@@ -968,35 +965,6 @@ export class JobRunner {
         onAuditEvent: (event: AuditEvent) => {
           auditLog.push(event);
 
-          if (event.type === "tool_call") {
-            const nextIndex = toolCalls.length;
-            toolCalls.push({
-              name: event.toolName || "",
-              args: event.toolArgs,
-            });
-
-            if (event.toolCallId) {
-              pendingToolCallIndex.set(event.toolCallId, nextIndex);
-            }
-          } else if (event.type === "tool_response") {
-            const callID = event.toolCallId;
-            const existingIndex = callID
-              ? pendingToolCallIndex.get(callID)
-              : undefined;
-
-            if (existingIndex !== undefined) {
-              toolCalls[existingIndex].result = event.toolResult;
-              if (callID) {
-                pendingToolCallIndex.delete(callID);
-              }
-            } else {
-              toolCalls.push({
-                name: event.toolName || "",
-                result: event.toolResult,
-              });
-            }
-          }
-
           storage.set(`${auditBaseKey}/${auditLog.length - 1}`, {
             ...event,
             index: auditLog.length - 1,
@@ -1022,7 +990,6 @@ export class JobRunner {
         started_at: startedAt,
         elapsed: elapsedSince(),
         stdout: result.text,
-        toolCalls: result.toolCalls,
         usage: latestUsage ?? result.usage,
         audit_log: result.auditLog,
       });
@@ -1034,7 +1001,6 @@ export class JobRunner {
         stdout: accumulatedOutput,
         usage: latestUsage,
         audit_log: auditLog,
-        toolCalls,
       });
       throw new TaskFailure(`Agent ${step.agent} failed: ${error}`);
     }

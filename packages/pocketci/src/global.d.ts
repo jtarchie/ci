@@ -223,14 +223,6 @@ declare global {
     function get(key: string): unknown;
   }
 
-  // A single tool invocation and its result.
-  interface ToolCallRecord {
-    name: string;
-    args?: { [key: string]: unknown };
-    result?: { [key: string]: unknown };
-    exitCode?: number;
-  }
-
   // Cumulative token counts and request stats.
   interface AgentUsage {
     promptTokens: number;
@@ -244,7 +236,6 @@ declare global {
   interface AgentResult {
     text: string;
     status: "success" | "failure" | "limit_exceeded";
-    toolCalls: ToolCallRecord[];
     usage: AgentUsage;
     auditLog: AuditEvent[];
   }
