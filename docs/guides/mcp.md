@@ -110,6 +110,36 @@ time, and exit status.
 
 ---
 
+### `get_run_task`
+
+Fetch a single task record within a run and return the full stored payload. Use
+this when you need complete output for one task (for example very large
+`stdout`, `audit_log`, or `toolCalls`) instead of scanning all tasks.
+
+**Input**
+
+| Field    | Type   | Description                                                                                      |
+| -------- | ------ | ------------------------------------------------------------------------------------------------ |
+| `run_id` | string | The run ID containing the task                                                                   |
+| `path`   | string | Task path, either absolute (`/pipeline/<run_id>/...`) or relative to the run prefix (`jobs/...`) |
+
+`path` must resolve inside the run (`/pipeline/<run_id>/...`) or the tool will
+return an error.
+
+**Returns** A one-item array containing `{ path, payload }`, where `payload` is
+the complete task object as stored by the server.
+
+**Example prompts**
+
+> "Get the full payload for task
+> `/pipeline/_Y0_q5n3RMUktK5y2tYGO/jobs/review-pr/1/agent/code-quality-reviewer`
+> in run `_Y0_q5n3RMUktK5y2tYGO`."
+
+> "For run `_Y0_q5n3RMUktK5y2tYGO`, fetch
+> `jobs/review-pr/1/agent/code-quality-reviewer` with full output."
+
+---
+
 ### `search_tasks`
 
 Full-text search in two modes — either within one run's task output, or across
@@ -214,5 +244,7 @@ For a deployed instance (e.g. on Fly.io), point the URL at the public hostname:
 2. Ask the assistant: _"What failed in run `<run_id>`?"_
 3. The assistant calls `get_run` to confirm the status, then `list_run_tasks` to
    surface the failed step and its stderr.
-4. If the output is noisy, use `search_tasks` to zero in on the error.
-5. Fix the pipeline source and re-run.
+4. If one step needs deep inspection, call `get_run_task` to retrieve full
+   payload fields (including large `stdout`, `audit_log`, and `toolCalls`).
+5. If the output is noisy, use `search_tasks` to zero in on the error.
+6. Fix the pipeline source and re-run.

@@ -45,8 +45,19 @@ jobs:
                   git clone "$PR_REPO" repo
                   cd repo
                   git checkout "$PR_HEAD_REF"
-                  git fetch origin "$PR_BASE_REF"
-                  git diff "origin/$PR_BASE_REF"...HEAD > ../diff/pr.diff
+
+                  # Fetch base branch from the upstream repository, not the PR head fork.
+                  BASE_REPO="https://github.com/$GH_REPO.git"
+                  git remote add upstream "$BASE_REPO" || git remote set-url upstream "$BASE_REPO"
+                  git fetch upstream "$PR_BASE_REF"
+
+                  git diff "upstream/$PR_BASE_REF"...HEAD > ../diff/pr.diff
+
+                  DIFF_BYTES="$(wc -c < ../diff/pr.diff)"
+                  if [ "$DIFF_BYTES" -eq 0 ]; then
+                    echo "error: generated diff is empty for PR #$PR_NUMBER ($GH_REPO $PR_HEAD_REF -> $PR_BASE_REF)" >&2
+                    exit 1
+                  fi
 
       # ── 2a. Code-quality review ───────────────────────────────────────────
       - agent: code-quality-reviewer

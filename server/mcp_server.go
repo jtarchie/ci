@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/jtarchie/pocketci/storage"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -17,6 +18,7 @@ func buildMCPServer(store storage.Driver) *mcp.Server {
 	}, &mcp.ServerOptions{
 		Instructions: "Use these tools to inspect CI pipeline runs, tasks, and agents. " +
 			"Start with get_run to get the run status, then list_run_tasks to see all tasks and their outputs. " +
+			"Use get_run_task to fetch a single task with full payload fields (including long stdout/audit/tool call data). " +
 			"Use search_tasks with a run_id to search task stdout/stderr within a specific run, " +
 			"or with a pipeline_id to search across all runs for that pipeline (by ID, status, or error message).",
 	})
@@ -63,6 +65,49 @@ func buildMCPServer(store storage.Driver) *mcp.Server {
 		data, err := json.Marshal(results)
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not marshal tasks: %w", err)
+		}
+
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{&mcp.TextContent{Text: string(data)}},
+		}, nil, nil
+	})
+
+	// Tool: get_run_task
+	type GetRunTaskInput struct {
+		RunID string `json:"run_id" jsonschema:"The run ID containing the task"`
+		Path  string `json:"path"   jsonschema:"Task path, either absolute (/pipeline/<run>/...) or relative to the run prefix"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "get_run_task",
+		Description: "Get a single task payload for a run. Returns full stored payload fields (for example: stdout, stderr, usage, audit_log, toolCalls).",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, input GetRunTaskInput) (*mcp.CallToolResult, any, error) {
+		if input.Path == "" {
+			return nil, nil, fmt.Errorf("path is required")
+		}
+
+		prefix := fmt.Sprintf("/pipeline/%s/", input.RunID)
+		lookupPath := input.Path
+		if !strings.HasPrefix(lookupPath, "/") {
+			lookupPath = prefix + strings.TrimPrefix(lookupPath, "/")
+		}
+
+		if !strings.HasPrefix(lookupPath, prefix) {
+			return nil, nil, fmt.Errorf("task path must be scoped to the run")
+		}
+
+		payload, err := store.Get(ctx, lookupPath)
+		if err != nil {
+			return nil, nil, fmt.Errorf("could not get task: %w", err)
+		}
+
+		result := []storage.Result{{
+			Path:    lookupPath,
+			Payload: payload,
+		}}
+
+		data, err := json.Marshal(result)
+		if err != nil {
+			return nil, nil, fmt.Errorf("could not marshal task: %w", err)
 		}
 
 		return &mcp.CallToolResult{

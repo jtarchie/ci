@@ -906,6 +906,9 @@ var JobRunner = class {
     const outputVolumePath = outputs.length > 0 ? mounts[outputs[0].name]?.path ?? "" : "";
     let accumulatedOutput = "";
     let latestUsage;
+    const auditLog = [];
+    const toolCalls = [];
+    const pendingToolCallIndex = /* @__PURE__ */ new Map();
     let auditEventIndex = 0;
     const startedAt = (/* @__PURE__ */ new Date()).toISOString();
     const elapsedSince = () => {
@@ -919,6 +922,16 @@ var JobRunner = class {
       return `${s}s`;
     };
     storage.set(storageKey, { status: "pending", started_at: startedAt });
+    const persistRunningState = () => {
+      storage.set(storageKey, {
+        status: "running",
+        started_at: startedAt,
+        stdout: accumulatedOutput,
+        usage: latestUsage,
+        audit_log: auditLog,
+        toolCalls
+      });
+    };
     try {
       const result = await runtime.agent({
         name: step.agent,
@@ -934,31 +947,44 @@ var JobRunner = class {
         context: step.context,
         onUsage: (usage) => {
           latestUsage = usage;
-          storage.set(storageKey, {
-            status: "running",
-            started_at: startedAt,
-            stdout: accumulatedOutput,
-            usage
-          });
+          persistRunningState();
         },
         onAuditEvent: (event) => {
+          auditLog.push(event);
+          if (event.type === "tool_call") {
+            const nextIndex = toolCalls.length;
+            toolCalls.push({
+              name: event.toolName || "",
+              args: event.toolArgs
+            });
+            if (event.toolCallId) {
+              pendingToolCallIndex.set(event.toolCallId, nextIndex);
+            }
+          } else if (event.type === "tool_response") {
+            const callID = event.toolCallId;
+            const existingIndex = callID ? pendingToolCallIndex.get(callID) : void 0;
+            if (existingIndex !== void 0) {
+              toolCalls[existingIndex].result = event.toolResult;
+              if (callID) {
+                pendingToolCallIndex.delete(callID);
+              }
+            } else {
+              toolCalls.push({
+                name: event.toolName || "",
+                result: event.toolResult
+              });
+            }
+          }
           storage.set(`${auditBaseKey}/${auditEventIndex}`, {
             ...event,
             index: auditEventIndex
           });
           auditEventIndex += 1;
+          persistRunningState();
         },
         onOutput: (_stream, data) => {
           accumulatedOutput += data;
-          const runningPayload = {
-            status: "running",
-            started_at: startedAt,
-            stdout: accumulatedOutput
-          };
-          if (latestUsage) {
-            runningPayload.usage = latestUsage;
-          }
-          storage.set(storageKey, runningPayload);
+          persistRunningState();
         }
       });
       storage.set(storageKey, {
@@ -974,7 +1000,11 @@ var JobRunner = class {
       storage.set(storageKey, {
         status: "failure",
         started_at: startedAt,
-        elapsed: elapsedSince()
+        elapsed: elapsedSince(),
+        stdout: accumulatedOutput,
+        usage: latestUsage,
+        audit_log: auditLog,
+        toolCalls
       });
       throw new TaskFailure(`Agent ${step.agent} failed: ${error}`);
     }

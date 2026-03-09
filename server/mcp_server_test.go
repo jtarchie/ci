@@ -63,13 +63,13 @@ func TestMCPListTools(t *testing.T) {
 	result, err := session.ListTools(context.Background(), nil)
 	assert := NewWithT(t)
 	assert.Expect(err).NotTo(HaveOccurred())
-	assert.Expect(result.Tools).To(HaveLen(4))
+	assert.Expect(result.Tools).To(HaveLen(5))
 
 	names := make([]string, len(result.Tools))
 	for i, tool := range result.Tools {
 		names[i] = tool.Name
 	}
-	assert.Expect(names).To(ConsistOf("get_run", "list_run_tasks", "search_tasks", "search_pipelines"))
+	assert.Expect(names).To(ConsistOf("get_run", "list_run_tasks", "get_run_task", "search_tasks", "search_pipelines"))
 }
 
 func TestMCPGetRun(t *testing.T) {
@@ -164,6 +164,84 @@ func TestMCPListRunTasks(t *testing.T) {
 	var tasks storage.Results
 	assert.Expect(json.Unmarshal([]byte(text), &tasks)).NotTo(HaveOccurred())
 	assert.Expect(tasks).To(HaveLen(2))
+}
+
+func TestMCPGetRunTask(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := newTestStore(t)
+	assert := NewWithT(t)
+
+	pipeline, err := store.SavePipeline(ctx, "single-task-pipeline", "export const pipeline = async () => {};", "native://", "")
+	assert.Expect(err).NotTo(HaveOccurred())
+
+	run, err := store.SaveRun(ctx, pipeline.ID)
+	assert.Expect(err).NotTo(HaveOccurred())
+
+	taskPath := "/pipeline/" + run.ID + "/jobs/review-pr/1/agent/code-quality-reviewer"
+	err = store.Set(ctx, taskPath, map[string]any{
+		"status":    "running",
+		"stdout":    "line 1\nline 2\n",
+		"audit_log": []any{map[string]any{"type": "tool_call", "toolName": "run_command"}},
+		"toolCalls": []any{map[string]any{"name": "run_command", "args": map[string]any{"args": []any{"ls"}}}},
+	})
+	assert.Expect(err).NotTo(HaveOccurred())
+
+	session := setupMCPSession(t, store)
+
+	t.Run("returns full payload for absolute path", func(t *testing.T) {
+		t.Parallel()
+		assert := NewWithT(t)
+
+		result, err := session.CallTool(ctx, &mcp.CallToolParams{
+			Name: "get_run_task",
+			Arguments: map[string]any{
+				"run_id": run.ID,
+				"path":   taskPath,
+			},
+		})
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(result.IsError).To(BeFalse())
+
+		text := result.Content[0].(*mcp.TextContent).Text
+		var got []storage.Result
+		assert.Expect(json.Unmarshal([]byte(text), &got)).NotTo(HaveOccurred())
+		assert.Expect(got).To(HaveLen(1))
+		assert.Expect(got[0].Path).To(Equal(taskPath))
+		assert.Expect(got[0].Payload["audit_log"]).NotTo(BeNil())
+		assert.Expect(got[0].Payload["toolCalls"]).NotTo(BeNil())
+	})
+
+	t.Run("accepts path relative to run prefix", func(t *testing.T) {
+		t.Parallel()
+		assert := NewWithT(t)
+
+		result, err := session.CallTool(ctx, &mcp.CallToolParams{
+			Name: "get_run_task",
+			Arguments: map[string]any{
+				"run_id": run.ID,
+				"path":   "jobs/review-pr/1/agent/code-quality-reviewer",
+			},
+		})
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(result.IsError).To(BeFalse())
+	})
+
+	t.Run("rejects task path outside run scope", func(t *testing.T) {
+		t.Parallel()
+		assert := NewWithT(t)
+
+		result, err := session.CallTool(ctx, &mcp.CallToolParams{
+			Name: "get_run_task",
+			Arguments: map[string]any{
+				"run_id": run.ID,
+				"path":   "/pipeline/other-run/jobs/review-pr/1/agent/code-quality-reviewer",
+			},
+		})
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(result.IsError).To(BeTrue())
+	})
 }
 
 func TestMCPSearchTasks(t *testing.T) {
