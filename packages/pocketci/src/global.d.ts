@@ -764,7 +764,7 @@ declare global {
      *     filter: 'provider == "github" && eventType == "pull_request"'
      *     params:
      *       PR_NUMBER: 'string(payload.number)'
-     *       PR_REPO: 'payload.pull_request.head.repo.clone_url'
+     *       PR_REPO: "'https://github.com/' + payload.pull_request.head.repo.full_name + '.git'"
      */
     triggers?: {
       webhook?: {

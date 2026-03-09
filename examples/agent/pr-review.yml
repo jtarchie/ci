@@ -23,7 +23,7 @@ jobs:
           payload.action in ["opened", "synchronize"]
         params:
           PR_NUMBER: "string(payload.number)"
-          PR_REPO: "payload.pull_request.head.repo.clone_url"
+          PR_REPO: "'https://github.com/' + payload.pull_request.head.repo.full_name + '.git'"
           PR_HEAD_REF: "payload.pull_request.head.ref"
           PR_BASE_REF: "payload.pull_request.base.ref"
           GH_REPO: "payload.repository.full_name"

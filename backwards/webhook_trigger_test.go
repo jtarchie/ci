@@ -225,7 +225,7 @@ jobs:
         filter: 'provider == "github"'
         params:
           PR_NUMBER: 'string(payload.number)'
-          PR_REPO:   'payload.pull_request.head.repo.clone_url'
+          PR_REPO:   "'https://github.com/' + payload.pull_request.head.repo.full_name + '.git'"
     plan:
       - task: check-params
         config:
@@ -295,7 +295,7 @@ func TestTriggersWebhook(t *testing.T) {
 	t.Run("params: payload fields injected as env vars into task", func(t *testing.T) {
 		t.Parallel()
 		assert := NewGomegaWithT(t)
-		body := `{"number":42,"pull_request":{"head":{"repo":{"clone_url":"https://github.com/org/repo.git"}}}}`
+		body := `{"number":42,"pull_request":{"head":{"repo":{"full_name":"org/repo"}}}}`
 		err := runYAMLPipeline(t, triggersWebhookParamsPayloadYAML, &runtime.WebhookData{
 			Provider:  "github",
 			EventType: "pull_request",

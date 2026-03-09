@@ -152,7 +152,7 @@ func TestWebhookParamsGlobal(t *testing.T) {
 			async function pipeline() {
 				const params = webhookParams({
 					PR_NUMBER: 'string(payload.number)',
-					PR_REPO:   'payload.pull_request.head.repo.clone_url',
+					PR_REPO:   "'https://github.com/' + payload.pull_request.head.repo.full_name + '.git'",
 				});
 				assert.equal(params['PR_NUMBER'], '42');
 				assert.equal(params['PR_REPO'], 'https://github.com/org/repo.git');
@@ -164,7 +164,7 @@ func TestWebhookParamsGlobal(t *testing.T) {
 			Method:    "POST",
 			Headers:   map[string]string{},
 			Query:     map[string]string{},
-			Body:      `{"number":42,"pull_request":{"head":{"repo":{"clone_url":"https://github.com/org/repo.git"}}}}`,
+			Body:      `{"number":42,"pull_request":{"head":{"repo":{"full_name":"org/repo"}}}}`,
 		})
 		assert.Expect(err).NotTo(HaveOccurred())
 	})
