@@ -55,6 +55,12 @@ declare global {
    */
   type OutputCallback = (stream: "stdout" | "stderr", data: string) => void;
 
+  // Callback invoked when cumulative agent usage counters change.
+  type AgentUsageCallback = (usage: AgentUsage) => void;
+
+  // Callback invoked when a new agent audit event is emitted.
+  type AgentAuditEventCallback = (event: AuditEvent) => void;
+
   // ---------------------------------------------------------------------------
   // Runtime types
   // ---------------------------------------------------------------------------
@@ -311,6 +317,8 @@ declare global {
     mounts?: KnownMounts;
     outputVolumePath?: string;
     onOutput?: OutputCallback;
+    onUsage?: AgentUsageCallback;
+    onAuditEvent?: AgentAuditEventCallback;
     llm?: AgentLLMConfig;
     thinking?: AgentThinkingConfig;
     safety?: { [key: string]: string };

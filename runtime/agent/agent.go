@@ -67,6 +67,10 @@ type AgentConfig struct {
 	Context          *AgentContext                          `json:"context,omitempty"`
 	// OnOutput is called with streaming chunks. Not serialised from JS.
 	OnOutput pipelinerunner.OutputCallback `json:"-"`
+	// OnAuditEvent is called every time an audit event is appended.
+	OnAuditEvent func(AuditEvent) `json:"-"`
+	// OnUsage is called whenever cumulative usage changes.
+	OnUsage func(AgentUsage) `json:"-"`
 	// Internal fields populated by Runtime.Agent() — not exposed to JS.
 	Storage     storage.Driver
 	Namespace   string
@@ -195,6 +199,11 @@ var defaultBaseURLs = map[string]string{
 	"ollama":     "http://localhost:11434/v1",
 	"openai":     "https://api.openai.com/v1",
 }
+
+const (
+	defaultContextGuardMaxTurns  = 30
+	defaultContextGuardMaxTokens = 128000
+)
 
 // splitModel splits "provider/model-name" into ("provider", "model-name").
 // For example: "openrouter/google/gemini-3" → ("openrouter", "google/gemini-3").
@@ -551,6 +560,76 @@ func taskSummaryToMap(t taskSummary) map[string]any {
 	return m
 }
 
+// resolveContextGuardOptions normalises context guard configuration so limits
+// are always applied deterministically when a context guard block is provided.
+func normalizeContextGuardConfig(cg *AgentContextGuardConfig) (string, int, error) {
+	if cg == nil {
+		return "", 0, nil
+	}
+
+	strategy := strings.ToLower(strings.TrimSpace(cg.Strategy))
+	if strategy == "" {
+		if cg.MaxTurns > 0 {
+			strategy = "sliding_window"
+		} else {
+			strategy = "threshold"
+		}
+	}
+
+	switch strategy {
+	case "sliding_window":
+		maxTurns := cg.MaxTurns
+		if maxTurns <= 0 {
+			maxTurns = defaultContextGuardMaxTurns
+		}
+
+		return strategy, maxTurns, nil
+	case "threshold":
+		maxTokens := cg.MaxTokens
+		if maxTokens <= 0 {
+			maxTokens = defaultContextGuardMaxTokens
+		}
+
+		return strategy, maxTokens, nil
+	default:
+		return "", 0, fmt.Errorf("invalid context_guard strategy %q: expected \"threshold\" or \"sliding_window\"", cg.Strategy)
+	}
+}
+
+func resolveContextGuardOptions(cg *AgentContextGuardConfig) ([]contextguard.AgentOption, error) {
+	strategy, value, err := normalizeContextGuardConfig(cg)
+	if err != nil {
+		return nil, err
+	}
+
+	if strategy == "" {
+		return nil, nil
+	}
+
+	switch strategy {
+	case "sliding_window":
+		return []contextguard.AgentOption{contextguard.WithSlidingWindow(value)}, nil
+	case "threshold":
+		return []contextguard.AgentOption{contextguard.WithMaxTokens(value)}, nil
+	default:
+		// normalizeContextGuardConfig already validates this branch.
+		return nil, fmt.Errorf("unsupported context_guard strategy %q", strategy)
+	}
+}
+
+func emitUsageSnapshot(onUsage func(AgentUsage), usage AgentUsage) {
+	if onUsage != nil {
+		onUsage(usage)
+	}
+}
+
+func appendAuditEvent(auditEvents *[]AuditEvent, event AuditEvent, onAuditEvent func(AuditEvent)) {
+	*auditEvents = append(*auditEvents, event)
+	if onAuditEvent != nil {
+		onAuditEvent(event)
+	}
+}
+
 // RunAgent executes an LLM agent with a run_command tool backed by a sandbox container.
 // It writes a result.json to outputVolumePath when the agent finishes.
 func RunAgent(
@@ -811,22 +890,11 @@ func RunAgent(
 
 	// Wire context guard plugin when requested.
 	if config.ContextGuard != nil {
-		cg := config.ContextGuard
 		guard := contextguard.New(simpleRegistry{})
 
-		var opts []contextguard.AgentOption
-
-		switch cg.Strategy {
-		case "sliding_window":
-			if cg.MaxTurns > 0 {
-				opts = append(opts, contextguard.WithSlidingWindow(cg.MaxTurns))
-			} else {
-				opts = append(opts, contextguard.WithSlidingWindow(30))
-			}
-		default: // threshold
-			if cg.MaxTokens > 0 {
-				opts = append(opts, contextguard.WithMaxTokens(cg.MaxTokens))
-			}
+		opts, optionsErr := resolveContextGuardOptions(config.ContextGuard)
+		if optionsErr != nil {
+			return nil, fmt.Errorf("agent: %w", optionsErr)
 		}
 
 		guard.Add(config.Name, llmModel, opts...)
@@ -866,14 +934,14 @@ func RunAgent(
 				listTasksResult,
 			)
 
-			auditEvents = append(auditEvents, AuditEvent{
+			appendAuditEvent(&auditEvents, AuditEvent{
 				Timestamp:  now.Format(time.RFC3339),
 				Author:     config.Name,
 				Type:       "pre_context",
 				ToolName:   "list_tasks",
 				ToolArgs:   map[string]any{},
 				ToolResult: listTasksResult,
-			})
+			}, config.OnAuditEvent)
 		}
 	}
 
@@ -946,24 +1014,24 @@ func RunAgent(
 				result,
 			)
 
-			auditEvents = append(auditEvents, AuditEvent{
+			appendAuditEvent(&auditEvents, AuditEvent{
 				Timestamp:  now.Format(time.RFC3339),
 				Author:     config.Name,
 				Type:       "pre_context",
 				ToolName:   "get_task_result",
 				ToolArgs:   getTaskArgs,
 				ToolResult: result,
-			})
+			}, config.OnAuditEvent)
 		}
 	}
 
 	// Record the initial user message in the audit log.
-	auditEvents = append(auditEvents, AuditEvent{
+	appendAuditEvent(&auditEvents, AuditEvent{
 		Timestamp: now.Format(time.RFC3339),
 		Author:    "user",
 		Type:      "user_message",
 		Text:      config.Prompt,
-	})
+	}, config.OnAuditEvent)
 
 	// Run the agent, collecting the final text response, tool call history, and usage.
 	// The user's task prompt is the first user message; the Instruction field
@@ -996,6 +1064,7 @@ func RunAgent(
 			usage.CompletionTokens += event.UsageMetadata.CandidatesTokenCount
 			usage.TotalTokens += event.UsageMetadata.TotalTokenCount
 			usage.LLMRequests++
+			emitUsageSnapshot(config.OnUsage, usage)
 			eventUsage = &AuditUsage{
 				PromptTokens:     event.UsageMetadata.PromptTokenCount,
 				CompletionTokens: event.UsageMetadata.CandidatesTokenCount,
@@ -1033,7 +1102,7 @@ func RunAgent(
 				toolCalls = append(toolCalls, *record)
 				usage.ToolCallCount++
 
-				auditEvents = append(auditEvents, AuditEvent{
+				appendAuditEvent(&auditEvents, AuditEvent{
 					Timestamp:    ts,
 					InvocationID: event.InvocationID,
 					Author:       event.Author,
@@ -1041,7 +1110,8 @@ func RunAgent(
 					ToolName:     fc.Name,
 					ToolCallID:   fc.ID,
 					ToolArgs:     fc.Args,
-				})
+				}, config.OnAuditEvent)
+				emitUsageSnapshot(config.OnUsage, usage)
 			}
 
 			// Track function responses (tool results).
@@ -1060,7 +1130,7 @@ func RunAgent(
 					delete(pendingCalls, fr.ID)
 				}
 
-				auditEvents = append(auditEvents, AuditEvent{
+				appendAuditEvent(&auditEvents, AuditEvent{
 					Timestamp:    ts,
 					InvocationID: event.InvocationID,
 					Author:       event.Author,
@@ -1068,7 +1138,7 @@ func RunAgent(
 					ToolName:     fr.Name,
 					ToolCallID:   fr.ID,
 					ToolResult:   fr.Response,
-				})
+				}, config.OnAuditEvent)
 			}
 
 			if part.Text == "" {
@@ -1099,7 +1169,7 @@ func RunAgent(
 				usageAttached = true
 			}
 
-			auditEvents = append(auditEvents, ae)
+			appendAuditEvent(&auditEvents, ae, config.OnAuditEvent)
 		}
 	}
 

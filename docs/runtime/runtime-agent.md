@@ -161,8 +161,29 @@ context_guard?: {
 | `threshold`      | 128000               | _N/A_               | Truncates history once total tokens exceed the limit |
 | `sliding_window` | _N/A_                | 30                  | Keeps only the most-recent N conversation turns      |
 
+**Strategy inference:** If `context_guard` is provided with only `max_turns` (no
+`strategy`), the strategy automatically becomes `"sliding_window"`. If only
+`max_tokens` is provided, the strategy becomes `"threshold"`. An error is
+returned if an invalid `strategy` is explicitly specified.
+
 Omitting `context_guard` entirely disables context management; the full
 conversation history is sent to the model on every turn.
+
+## Progressive Persistence {#progressive-persistence}
+
+Agent runs write results **incrementally** as the agent executes, not just when
+finished. This ensures visibility into progress and durability against crashes:
+
+- **Usage metrics** (token counts, LLM requests, tool calls): written to the
+  task storage key after every LLM turn. The UI task tree automatically polls
+  and displays live token/tool counts while the agent is running.
+- **Audit log**: each event is appended to a dedicated storage namespace
+  (`/agent-audit/{runID}/...`) as it occurs, before the next LLM call. Events
+  are not returned in the web UI (they're for post-run analysis), but they are
+  stored immediately to prevent data loss if the agent crashes.
+
+This behavior is transparent to pipeline code. The `result` returned by
+`runtime.agent()` still includes the complete `auditLog` array in memory.
 
 ## Built-in Tools {#built-in-tools}
 
@@ -275,6 +296,55 @@ interface AuditEvent {
 | `tool_response` | The tool result is returned to the model                                                 |
 | `model_text`    | An intermediate text chunk from the model                                                |
 | `model_final`   | The concluding model response (last turn)                                                |
+
+## Callbacks {#callbacks}
+
+Agent runs support optional callbacks for streaming output, incremental usage
+updates, and audit event notifications. All callbacks are optional.
+
+```typescript
+await runtime.agent({
+  name: "agent",
+  prompt: "Build the project",
+  model: "anthropic/claude-3-5-sonnet-20241022",
+  image: "golang:1.22",
+  onOutput: (stream, chunk) => {
+    // stream is "stdout" or "stderr"
+    console.log(`${stream}: ${chunk}`);
+  },
+  onUsage: (usage) => {
+    // called after every LLM turn or tool invocation that changes token counts
+    console.log(`Tokens: ${usage.totalTokens}, Requests: ${usage.llmRequests}`);
+  },
+  onAuditEvent: (event) => {
+    // called once per audit event (model_text, tool_call, etc.)
+    console.log(`Event: ${event.type}`);
+  },
+});
+```
+
+| Callback       | Type                                                    | When invoked                                      |
+| -------------- | ------------------------------------------------------- | ------------------------------------------------- |
+| `onOutput`     | `(stream: "stdout" \| "stderr", chunk: string) => void` | Each stdout/stderr chunk from sandbox tool calls  |
+| `onUsage`      | `(usage: UsageMetrics) => void`                         | After every token count or tool call count change |
+| `onAuditEvent` | `(event: AuditEvent) => void`                           | After every audit event (model turn, tool result) |
+
+**Type definitions:**
+
+```typescript
+interface UsageMetrics {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  llmRequests: number;
+  toolCallCount: number;
+}
+```
+
+The `onUsage` and `onAuditEvent` callbacks power the
+[progressive persistence](#progressive-persistence) feature — they are
+automatically wired to incremental storage writes when called from the pipeline
+runner. Custom callbacks can observe the same events in real time.
 
 ## Examples
 

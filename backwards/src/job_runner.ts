@@ -871,6 +871,8 @@ export class JobRunner {
     pathContext: string,
   ): Promise<void> {
     const storageKey = `${this.getBaseStorageKey()}/${pathContext}`;
+    const auditBaseKey =
+      `/agent-audit/${this.buildID}/jobs/${this.jobConfig.name}/${pathContext}/events`;
 
     const image = step.config?.image_resource?.source?.repository ?? "busybox";
 
@@ -895,6 +897,8 @@ export class JobRunner {
       : "";
 
     let accumulatedOutput = "";
+    let latestUsage: AgentUsage | undefined;
+    let auditEventIndex = 0;
     const startedAt = new Date().toISOString();
     const elapsedSince = () => {
       const ms = Date.now() - new Date(startedAt).getTime();
@@ -922,13 +926,40 @@ export class JobRunner {
         safety: step.safety,
         context_guard: step.context_guard,
         context: step.context,
-        onOutput: (_stream: "stdout" | "stderr", data: string) => {
-          accumulatedOutput += data;
+        onUsage: (usage: AgentUsage) => {
+          latestUsage = usage;
           storage.set(storageKey, {
             status: "running",
             started_at: startedAt,
             stdout: accumulatedOutput,
+            usage,
           });
+        },
+        onAuditEvent: (event: AuditEvent) => {
+          storage.set(`${auditBaseKey}/${auditEventIndex}`, {
+            ...event,
+            index: auditEventIndex,
+          });
+          auditEventIndex += 1;
+        },
+        onOutput: (_stream: "stdout" | "stderr", data: string) => {
+          accumulatedOutput += data;
+          const runningPayload: {
+            status: "running";
+            started_at: string;
+            stdout: string;
+            usage?: AgentUsage;
+          } = {
+            status: "running",
+            started_at: startedAt,
+            stdout: accumulatedOutput,
+          };
+
+          if (latestUsage) {
+            runningPayload.usage = latestUsage;
+          }
+
+          storage.set(storageKey, runningPayload);
         },
       });
 
@@ -938,7 +969,7 @@ export class JobRunner {
         elapsed: elapsedSince(),
         stdout: result.text,
         toolCalls: result.toolCalls,
-        usage: result.usage,
+        usage: latestUsage ?? result.usage,
         audit_log: result.auditLog,
       });
     } catch (error) {

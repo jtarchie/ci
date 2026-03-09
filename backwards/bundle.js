@@ -889,6 +889,7 @@ var JobRunner = class {
   }
   async processAgentStep(step, pathContext) {
     const storageKey = `${this.getBaseStorageKey()}/${pathContext}`;
+    const auditBaseKey = `/agent-audit/${this.buildID}/jobs/${this.jobConfig.name}/${pathContext}/events`;
     const image = step.config?.image_resource?.source?.repository ?? "busybox";
     const mounts = {};
     for (const input of step.config?.inputs ?? []) {
@@ -904,6 +905,8 @@ var JobRunner = class {
     }
     const outputVolumePath = outputs.length > 0 ? mounts[outputs[0].name]?.path ?? "" : "";
     let accumulatedOutput = "";
+    let latestUsage;
+    let auditEventIndex = 0;
     const startedAt = (/* @__PURE__ */ new Date()).toISOString();
     const elapsedSince = () => {
       const ms = Date.now() - new Date(startedAt).getTime();
@@ -929,13 +932,33 @@ var JobRunner = class {
         safety: step.safety,
         context_guard: step.context_guard,
         context: step.context,
-        onOutput: (_stream, data) => {
-          accumulatedOutput += data;
+        onUsage: (usage) => {
+          latestUsage = usage;
           storage.set(storageKey, {
             status: "running",
             started_at: startedAt,
-            stdout: accumulatedOutput
+            stdout: accumulatedOutput,
+            usage
           });
+        },
+        onAuditEvent: (event) => {
+          storage.set(`${auditBaseKey}/${auditEventIndex}`, {
+            ...event,
+            index: auditEventIndex
+          });
+          auditEventIndex += 1;
+        },
+        onOutput: (_stream, data) => {
+          accumulatedOutput += data;
+          const runningPayload = {
+            status: "running",
+            started_at: startedAt,
+            stdout: accumulatedOutput
+          };
+          if (latestUsage) {
+            runningPayload.usage = latestUsage;
+          }
+          storage.set(storageKey, runningPayload);
         }
       });
       storage.set(storageKey, {
@@ -944,7 +967,7 @@ var JobRunner = class {
         elapsed: elapsedSince(),
         stdout: result.text,
         toolCalls: result.toolCalls,
-        usage: result.usage,
+        usage: latestUsage ?? result.usage,
         audit_log: result.auditLog
       });
     } catch (error) {

@@ -186,3 +186,92 @@ func TestTaskSummaryToMap(t *testing.T) {
 		assert.Expect(hasElapsed).To(BeFalse())
 	})
 }
+
+func TestNormalizeContextGuardConfig(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil config disables guard", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		strategy, value, err := normalizeContextGuardConfig(nil)
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(strategy).To(Equal(""))
+		assert.Expect(value).To(Equal(0))
+	})
+
+	t.Run("sliding window uses explicit max turns", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		strategy, value, err := normalizeContextGuardConfig(&AgentContextGuardConfig{
+			Strategy: "sliding_window",
+			MaxTurns: 12,
+		})
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(strategy).To(Equal("sliding_window"))
+		assert.Expect(value).To(Equal(12))
+	})
+
+	t.Run("sliding window falls back to default turns", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		strategy, value, err := normalizeContextGuardConfig(&AgentContextGuardConfig{Strategy: "sliding_window"})
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(strategy).To(Equal("sliding_window"))
+		assert.Expect(value).To(Equal(defaultContextGuardMaxTurns))
+	})
+
+	t.Run("threshold uses explicit max tokens", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		strategy, value, err := normalizeContextGuardConfig(&AgentContextGuardConfig{
+			Strategy:  "threshold",
+			MaxTokens: 64000,
+		})
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(strategy).To(Equal("threshold"))
+		assert.Expect(value).To(Equal(64000))
+	})
+
+	t.Run("threshold falls back to default tokens", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		strategy, value, err := normalizeContextGuardConfig(&AgentContextGuardConfig{Strategy: "threshold"})
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(strategy).To(Equal("threshold"))
+		assert.Expect(value).To(Equal(defaultContextGuardMaxTokens))
+	})
+
+	t.Run("missing strategy infers sliding window from max turns", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		strategy, value, err := normalizeContextGuardConfig(&AgentContextGuardConfig{MaxTurns: 7})
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(strategy).To(Equal("sliding_window"))
+		assert.Expect(value).To(Equal(7))
+	})
+
+	t.Run("missing strategy defaults to threshold", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		strategy, value, err := normalizeContextGuardConfig(&AgentContextGuardConfig{})
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(strategy).To(Equal("threshold"))
+		assert.Expect(value).To(Equal(defaultContextGuardMaxTokens))
+	})
+
+	t.Run("invalid strategy returns an error", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		_, _, err := normalizeContextGuardConfig(&AgentContextGuardConfig{Strategy: "weird"})
+		assert.Expect(err).To(HaveOccurred())
+		assert.Expect(err.Error()).To(ContainSubstring("invalid context_guard strategy"))
+	})
+}

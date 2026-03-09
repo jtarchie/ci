@@ -338,6 +338,32 @@ func (r *Runtime) Agent(call goja.FunctionCall) goja.Value {
 		}
 	}
 
+	// Extract optional onUsage callback.
+	onUsageVal := inputObj.Get("onUsage")
+	if onUsageVal != nil && !goja.IsUndefined(onUsageVal) && !goja.IsNull(onUsageVal) {
+		if onUsageFunc, ok := goja.AssertFunction(onUsageVal); ok {
+			config.OnUsage = func(usage AgentUsage) {
+				r.tasks <- func() error {
+					_, _ = onUsageFunc(goja.Undefined(), r.jsVM.ToValue(usage))
+					return nil
+				}
+			}
+		}
+	}
+
+	// Extract optional onAuditEvent callback.
+	onAuditEventVal := inputObj.Get("onAuditEvent")
+	if onAuditEventVal != nil && !goja.IsUndefined(onAuditEventVal) && !goja.IsNull(onAuditEventVal) {
+		if onAuditEventFunc, ok := goja.AssertFunction(onAuditEventVal); ok {
+			config.OnAuditEvent = func(event AuditEvent) {
+				r.tasks <- func() error {
+					_, _ = onAuditEventFunc(goja.Undefined(), r.jsVM.ToValue(event))
+					return nil
+				}
+			}
+		}
+	}
+
 	r.promises.Add(1)
 
 	go func() {
