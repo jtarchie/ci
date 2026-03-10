@@ -330,21 +330,9 @@ func (c *APIPipelinesController) Trigger(ctx *echo.Context) error {
 	}
 
 	if isHtmxRequest(ctx) {
-		result, err := c.store.SearchRunsByPipeline(ctx.Request().Context(), id, "", 1, 20)
-		if err != nil {
-			return fmt.Errorf("could not list runs: %w", err)
-		}
+		ctx.Response().Header().Set("HX-Trigger", fmt.Sprintf(`{"showToast":{"message":"%s triggered successfully","type":"success"}}`, pipeline.Name))
 
-		if result == nil || result.Items == nil {
-			result = &storage.PaginationResult[storage.PipelineRun]{Items: []storage.PipelineRun{}}
-		}
-
-		return ctx.Render(http.StatusOK, "runs-section", map[string]any{
-			"PipelineID": id,
-			"Runs":       result.Items,
-			"Pagination": result,
-			"Query":      "",
-		})
+		return ctx.NoContent(http.StatusOK)
 	}
 
 	return ctx.JSON(http.StatusAccepted, map[string]any{

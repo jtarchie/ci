@@ -56,6 +56,8 @@ type WebPipelinesController struct {
 }
 
 // Index handles GET /pipelines/ - Pipeline listing page.
+// Returns full HTML page for normal requests, or just the _pipelines_content
+// partial for HTMX requests (search, pagination, polling).
 func (c *WebPipelinesController) Index(ctx *echo.Context) error {
 	q := ctx.QueryParam("q")
 
@@ -87,51 +89,30 @@ func (c *WebPipelinesController) Index(ctx *echo.Context) error {
 
 	rows := buildPipelineRows(ctx.Request().Context(), c.store, result.Items, c.execService.DefaultDriver)
 
-	return ctx.Render(http.StatusOK, "pipelines.html", map[string]any{
-		"PipelineRows": rows,
-		"Pagination":   result,
-		"Query":        q,
-	})
-}
+	// Check if any pipeline has an active (running/queued) latest run.
+	hasActiveRuns := false
+	for _, row := range rows {
+		if row.LatestRun != nil && (row.LatestRun.Status == storage.RunStatusRunning || row.LatestRun.Status == storage.RunStatusQueued) {
+			hasActiveRuns = true
 
-// Search handles GET /pipelines/search[/] - HTMX partial: returns only the pipeline table
-// rows filtered by the ?q= full-text search query.
-func (c *WebPipelinesController) Search(ctx *echo.Context) error {
-	q := ctx.QueryParam("q")
-
-	page := 1
-	perPage := 20
-
-	if p := ctx.QueryParam("page"); p != "" {
-		_, _ = fmt.Sscanf(p, "%d", &page)
-	}
-	if pp := ctx.QueryParam("per_page"); pp != "" {
-		_, _ = fmt.Sscanf(pp, "%d", &perPage)
-	}
-
-	result, err := c.store.SearchPipelines(ctx.Request().Context(), q, page, perPage)
-	if err != nil {
-		return fmt.Errorf("could not search pipelines: %w", err)
-	}
-
-	if result == nil || result.Items == nil {
-		result = &storage.PaginationResult[storage.Pipeline]{
-			Items:      []storage.Pipeline{},
-			Page:       page,
-			PerPage:    perPage,
-			TotalItems: 0,
-			TotalPages: 0,
-			HasNext:    false,
+			break
 		}
 	}
 
-	rows := buildPipelineRows(ctx.Request().Context(), c.store, result.Items, c.execService.DefaultDriver)
+	data := map[string]any{
+		"PipelineRows":  rows,
+		"Pagination":    result,
+		"Query":         q,
+		"HasActiveRuns": hasActiveRuns,
+	}
 
-	return ctx.Render(http.StatusOK, "_pipelines_content", map[string]any{
-		"PipelineRows": rows,
-		"Pagination":   result,
-		"Query":        q,
-	})
+	if isHtmxRequest(ctx) {
+		ctx.Response().Header().Set("HX-Push-Url", buildPipelinesURL(q, page, perPage))
+
+		return ctx.Render(http.StatusOK, "_pipelines_content", data)
+	}
+
+	return ctx.Render(http.StatusOK, "pipelines.html", data)
 }
 
 // Show handles GET /pipelines/:id/ - Pipeline detail page.
@@ -259,6 +240,8 @@ func (c *WebPipelinesController) RunsSearch(ctx *echo.Context) error {
 		}
 	}
 
+	ctx.Response().Header().Set("HX-Push-Url", fmt.Sprintf("/pipelines/%s/?q=%s&page=%d&per_page=%d", id, q, page, perPage))
+
 	return ctx.Render(http.StatusOK, "runs-section", map[string]any{
 		"PipelineID": id,
 		"Runs":       result.Items,
@@ -282,11 +265,19 @@ func (c *WebPipelinesController) Source(ctx *echo.Context) error {
 	})
 }
 
+// buildPipelinesURL constructs a URL for the pipelines listing page.
+func buildPipelinesURL(q string, page, perPage int) string {
+	url := "/pipelines/"
+	if q != "" || page > 1 || perPage != 20 {
+		url += fmt.Sprintf("?q=%s&page=%d&per_page=%d", q, page, perPage)
+	}
+
+	return url
+}
+
 // RegisterRoutes registers all pipeline web view routes on the given group.
 func (c *WebPipelinesController) RegisterRoutes(web *echo.Group) {
 	web.GET("/pipelines/", c.Index)
-	web.GET("/pipelines/search", c.Search)
-	web.GET("/pipelines/search/", c.Search)
 	web.GET("/pipelines/:id/", c.Show)
 	web.GET("/pipelines/:id/runs-section", c.RunsSection)
 	web.GET("/pipelines/:id/runs-section/", c.RunsSection)

@@ -3,7 +3,7 @@
   id="runs-section"
   {{ if not .Query }}
   hx-get="/pipelines/{{ .PipelineID }}/runs-section/?page={{ .Pagination.Page }}&per_page={{ .Pagination.PerPage }}"
-  hx-trigger="load delay:3s, poll-runs from:body"
+  hx-trigger="every 5s"
   hx-swap="morph:outerHTML"
   {{ end }}
   data-pipeline-id="{{ .PipelineID }}">

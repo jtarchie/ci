@@ -51,8 +51,7 @@
             id="trigger-btn"
             class="trigger-btn w-full px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto"
             hx-post="/api/pipelines/{{ .Pipeline.ID }}/trigger"
-            hx-target="#runs-section"
-            hx-swap="morph:outerHTML"
+            hx-swap="none"
             data-pipeline-name="{{ .Pipeline.Name }}"
             aria-label="Trigger"
             title="Trigger pipeline execution">

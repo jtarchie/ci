@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"net/http"
 
 	"github.com/jtarchie/pocketci/storage"
@@ -12,6 +13,90 @@ import (
 // WebRunsController handles HTML view endpoints for pipeline runs.
 type WebRunsController struct {
 	BaseController
+}
+
+// TaskStats holds server-computed counts for task statuses.
+type TaskStats struct {
+	Success int
+	Failure int
+	Pending int
+}
+
+// countTaskStats walks the tree and counts task statuses.
+func countTaskStats(tree *storage.Tree[storage.Payload]) TaskStats {
+	var stats TaskStats
+	countTaskStatsRecursive(tree, &stats)
+
+	return stats
+}
+
+func countTaskStatsRecursive(node *storage.Tree[storage.Payload], stats *TaskStats) {
+	if node == nil {
+		return
+	}
+
+	if node.IsLeaf() && node.Name != "" {
+		status, _ := node.Value["status"].(string)
+		switch status {
+		case "success":
+			stats.Success++
+		case "failure", "error":
+			stats.Failure++
+		default:
+			stats.Pending++
+		}
+	}
+
+	for _, child := range node.Children {
+		countTaskStatsRecursive(child, stats)
+	}
+}
+
+// preloadTerminalHTML fetches stdout for all tasks and injects "terminalHTML"
+// into each leaf node's Payload. This lets templates render terminal output
+// inline without a separate lazy-loading request.
+func (c *WebRunsController) preloadTerminalHTML(ctx *echo.Context, lookupPath string, tree *storage.Tree[storage.Payload]) {
+	stdoutResults, err := c.store.GetAll(ctx.Request().Context(), lookupPath, []string{"stdout", "status"})
+	if err != nil {
+		return
+	}
+
+	// Build a map from path to stdout HTML.
+	htmlByPath := make(map[string]template.HTML, len(stdoutResults))
+	for _, r := range stdoutResults {
+		stdout, _ := r.Payload["stdout"].(string)
+		status, _ := r.Payload["status"].(string)
+		html := ToTerminalHTML(stdout)
+
+		if status == "running" || status == "" {
+			htmlByPath[r.Path] = template.HTML(fmt.Sprintf(
+				`<div class="term-container" hx-get="/terminal%s" hx-trigger="load delay:2s" hx-swap="outerHTML">%s</div>`,
+				r.Path, html,
+			))
+		} else {
+			htmlByPath[r.Path] = template.HTML(fmt.Sprintf(
+				`<div class="term-container">%s</div>`, html,
+			))
+		}
+	}
+
+	injectTerminalHTML(tree, htmlByPath)
+}
+
+func injectTerminalHTML(node *storage.Tree[storage.Payload], htmlByPath map[string]template.HTML) {
+	if node == nil {
+		return
+	}
+
+	if node.IsLeaf() && node.FullPath != "" {
+		if html, ok := htmlByPath[node.FullPath]; ok {
+			node.Value["terminalHTML"] = html
+		}
+	}
+
+	for _, child := range node.Children {
+		injectTerminalHTML(child, htmlByPath)
+	}
 }
 
 // Show handles GET /runs/:id/tasks - Task tree view for a run.
@@ -36,14 +121,19 @@ func (c *WebRunsController) Show(ctx *echo.Context) error {
 		}
 	}
 
+	tree := results.AsTree()
+	stats := countTaskStats(tree)
+	c.preloadTerminalHTML(ctx, lookupPath, tree)
+
 	return ctx.Render(http.StatusOK, "results.html", map[string]any{
-		"Tree":     results.AsTree(),
+		"Tree":     tree,
 		"Path":     lookupPath,
 		"RunID":    runID,
 		"IsActive": isActive,
 		"Run":      run,
 		"Pipeline": pipeline,
 		"Title":    title,
+		"Stats":    stats,
 	})
 }
 
@@ -104,12 +194,19 @@ func (c *WebRunsController) TasksPartial(ctx *echo.Context) error {
 			return fmt.Errorf("could not search tasks: %w", err)
 		}
 
+		tree := results.AsTree()
+		stats := countTaskStats(tree)
+		c.preloadTerminalHTML(ctx, lookupPath, tree)
+
+		ctx.Response().Header().Set("HX-Push-Url", fmt.Sprintf("/runs/%s/tasks?q=%s", runID, q))
+
 		return ctx.Render(http.StatusOK, "tasks-partial", map[string]any{
-			"Tree":     results.AsTree(),
+			"Tree":     tree,
 			"Path":     lookupPath,
 			"RunID":    runID,
 			"IsActive": false,
 			"Run":      nil,
+			"Stats":    stats,
 		})
 	}
 
@@ -121,12 +218,23 @@ func (c *WebRunsController) TasksPartial(ctx *echo.Context) error {
 	run, runErr := c.store.GetRun(ctx.Request().Context(), runID)
 	isActive := runErr == nil && (run.Status == storage.RunStatusQueued || run.Status == storage.RunStatusRunning)
 
-	return ctx.Render(http.StatusOK, "tasks-partial", map[string]any{
-		"Tree":     results.AsTree(),
+	tree := results.AsTree()
+	stats := countTaskStats(tree)
+	c.preloadTerminalHTML(ctx, lookupPath, tree)
+
+	// Return 286 to signal htmx to stop polling when the run is no longer active.
+	statusCode := http.StatusOK
+	if !isActive {
+		statusCode = 286
+	}
+
+	return ctx.Render(statusCode, "tasks-partial", map[string]any{
+		"Tree":     tree,
 		"Path":     lookupPath,
 		"RunID":    runID,
 		"IsActive": isActive,
 		"Run":      run,
+		"Stats":    stats,
 	})
 }
 
@@ -149,7 +257,13 @@ func (c *WebRunsController) GraphData(ctx *echo.Context) error {
 		return fmt.Errorf("could not marshal tree: %w", err)
 	}
 
-	return ctx.Render(http.StatusOK, "graph-partial", map[string]any{
+	// Return 286 to signal htmx to stop polling when the run is no longer active.
+	statusCode := http.StatusOK
+	if !isActive {
+		statusCode = 286
+	}
+
+	return ctx.Render(statusCode, "graph-partial", map[string]any{
 		"Tree":     tree,
 		"TreeJSON": string(treeJSON),
 		"Path":     lookupPath,

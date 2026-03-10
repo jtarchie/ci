@@ -43,10 +43,11 @@
           value="{{ .Query }}"
           aria-label="Search pipelines"
           autocomplete="off"
-          hx-get="/pipelines/search/"
+          hx-get="/pipelines/"
           hx-trigger="input changed delay:300ms, search"
           hx-target="#pipelines-content"
-          hx-swap="morph:innerHTML">
+          hx-swap="morph:innerHTML"
+          hx-include="#pipeline-page, #pipeline-per-page">
       </div>
     </div>
 
@@ -54,8 +55,8 @@
       <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
         <div
           id="pipelines-content"
-          hx-get="/pipelines/search/"
-          hx-trigger="every 5s"
+          hx-get="/pipelines/"
+          hx-trigger="{{ if .HasActiveRuns }}every 3s{{ else }}every 10s{{ end }}"
           hx-target="this"
           hx-swap="morph:innerHTML"
           hx-include="#pipeline-search, #pipeline-page, #pipeline-per-page">

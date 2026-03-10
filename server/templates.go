@@ -68,6 +68,14 @@ func newTemplates() (*TemplateRender, error) {
 
 				return strings.ReplaceAll(path, "/", " / ")
 			},
+			"safeHTML": func(s any) string {
+				switch v := s.(type) {
+				case string:
+					return v
+				default:
+					return fmt.Sprintf("%v", s)
+				}
+			},
 		}).
 		ParseFS(templatesFS, "templates/*")
 	if err != nil {

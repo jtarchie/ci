@@ -1,11 +1,8 @@
 /**
  * Results page functionality
- * - Search/filter tasks
  * - Expand/collapse all
  * - Keyboard navigation
- * - Stats display
  * - Help panel
- * - Live polling with idiomorph morphing
  */
 
 export function initResults() {
@@ -19,14 +16,7 @@ export function initResults() {
     return document.getElementById("tasks-container");
   }
 
-  // Bail if required elements don't exist
   if (!getTasksContainer()) return;
-
-  // Listen for htmx before swap to guard empty responses
-  document.body.addEventListener("htmx:beforeSwap", handleBeforeSwap);
-
-  // Listen for htmx after swap to restore state
-  document.body.addEventListener("htmx:afterSwap", handleAfterSwap);
 
   // Help panel toggle
   if (helpToggle && helpPanel) {
@@ -34,14 +24,9 @@ export function initResults() {
       const isHidden = helpPanel.classList.contains("hidden");
       helpPanel.classList.toggle("hidden");
       helpToggle.setAttribute("aria-expanded", isHidden);
-
-      // Focus management - focus first element in panel when opening
-      if (isHidden) {
-        helpPanel.focus();
-      }
+      if (isHidden) helpPanel.focus();
     });
 
-    // Close help panel when clicking outside
     document.addEventListener("click", function (e) {
       if (!helpToggle.contains(e.target) && !helpPanel.contains(e.target)) {
         helpPanel.classList.add("hidden");
@@ -49,83 +34,20 @@ export function initResults() {
       }
     });
 
-    // Close help panel with Escape key
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape" && !helpPanel.classList.contains("hidden")) {
         helpPanel.classList.add("hidden");
         helpToggle.setAttribute("aria-expanded", "false");
-        helpToggle.focus(); // Return focus to toggle button
+        helpToggle.focus();
       }
     });
   }
 
-  // Get all task items
   function getAllTasks() {
     const container = getTasksContainer();
-    return container ? container.querySelectorAll(".task-item") : [];
-  }
-
-  // Update stats
-  function updateStats() {
-    const tasks = getAllTasks();
-    let success = 0,
-      failure = 0,
-      pending = 0;
-    tasks.forEach((task) => {
-      if (
-        task.classList.contains("bg-green-100") ||
-        task.classList.contains("dark:bg-green-900/30")
-      ) {
-        success++;
-      } else if (
-        task.classList.contains("bg-red-100") ||
-        task.classList.contains("dark:bg-red-900/30")
-      ) {
-        failure++;
-      } else {
-        pending++;
-      }
-    });
-    const successEl = document.getElementById("stat-success");
-    const failureEl = document.getElementById("stat-failure");
-    const pendingEl = document.getElementById("stat-pending");
-    if (successEl) successEl.textContent = success;
-    if (failureEl) failureEl.textContent = failure;
-    if (pendingEl) pendingEl.textContent = pending;
-  }
-  updateStats();
-
-  // Search/filter functionality
-  if (searchInput) {
-    searchInput.addEventListener("input", function (e) {
-      const query = e.target.value.toLowerCase();
-      const tasks = getAllTasks();
-      const container = getTasksContainer();
-      const groups = container
-        ? container.querySelectorAll(".group-container")
-        : [];
-
-      tasks.forEach((task) => {
-        const name =
-          task.querySelector(".font-medium")?.textContent.toLowerCase() || "";
-        const matches = query === "" || name.includes(query);
-        task.style.display = matches ? "" : "none";
-      });
-
-      // Show groups that have visible children
-      groups.forEach((group) => {
-        const visibleTasks = group.querySelectorAll(
-          '.task-item:not([style*="display: none"])',
-        );
-        const visibleGroups = group.querySelectorAll(
-          '.group-container:not([style*="display: none"])',
-        );
-        group.style.display =
-          visibleTasks.length > 0 || visibleGroups.length > 0 || query === ""
-            ? ""
-            : "none";
-      });
-    });
+    return container
+      ? Array.from(container.querySelectorAll(".task-item"))
+      : [];
   }
 
   // Expand all
@@ -145,23 +67,20 @@ export function initResults() {
   // Keyboard navigation
   let currentTaskIndex = -1;
   document.addEventListener("keydown", function (e) {
-    // Skip if typing in search
     if (searchInput && e.target === searchInput) {
       if (e.key === "Escape") {
         searchInput.value = "";
-        searchInput.dispatchEvent(new Event("input"));
+        searchInput.dispatchEvent(new Event("search"));
         searchInput.blur();
       }
       return;
     }
 
-    const tasks = Array.from(getAllTasks()).filter(
-      (t) => t.style.display !== "none",
-    );
+    const tasks = getAllTasks();
     if (tasks.length === 0) return;
 
     switch (e.key) {
-      case "j": // Next task
+      case "j":
       case "ArrowDown":
         if (e.target.tagName !== "INPUT") {
           e.preventDefault();
@@ -173,7 +92,7 @@ export function initResults() {
           tasks[currentTaskIndex].focus();
         }
         break;
-      case "k": // Previous task
+      case "k":
       case "ArrowUp":
         if (e.target.tagName !== "INPUT") {
           e.preventDefault();
@@ -199,9 +118,7 @@ export function initResults() {
         }
         break;
       case "e":
-        if (e.target.tagName !== "INPUT" && expandAllBtn) {
-          expandAllBtn.click();
-        }
+        if (e.target.tagName !== "INPUT" && expandAllBtn) expandAllBtn.click();
         break;
       case "c":
         if (e.target.tagName !== "INPUT" && collapseAllBtn) {
@@ -210,12 +127,11 @@ export function initResults() {
         break;
       case "f":
         if (e.target.tagName !== "INPUT") {
-          // Jump to first failure
           const container = getTasksContainer();
           const firstFailure = container
             ? container.querySelector(
-                ".task-item.bg-red-100, .task-item.dark\\:bg-red-900\\/30",
-              )
+              ".task-item.bg-red-100, .task-item.dark\\:bg-red-900\\/30",
+            )
             : null;
           if (firstFailure) {
             firstFailure.scrollIntoView({
@@ -229,57 +145,4 @@ export function initResults() {
         break;
     }
   });
-}
-
-// Handle htmx beforeSwap - skip empty responses
-function handleBeforeSwap(event) {
-  const target = event.detail.target;
-  if (!target || target.id !== "pipeline") return;
-
-  const responseText = event.detail.xhr?.responseText || "";
-  if (!responseText.trim()) {
-    event.detail.shouldSwap = false;
-    return;
-  }
-}
-
-// Handle htmx afterSwap - update stats
-function handleAfterSwap(event) {
-  const target = event.detail.target;
-  if (!target || target.id !== "pipeline") return;
-
-  const container = target.querySelector("#tasks-container");
-  if (!container) return;
-
-  // Update stats
-  updateStatsForContainer(container);
-}
-
-// Update stats for a given container
-function updateStatsForContainer(container) {
-  const tasks = container.querySelectorAll(".task-item");
-  let success = 0,
-    failure = 0,
-    pending = 0;
-  tasks.forEach((task) => {
-    if (
-      task.classList.contains("bg-green-100") ||
-      task.classList.contains("dark:bg-green-900/30")
-    ) {
-      success++;
-    } else if (
-      task.classList.contains("bg-red-100") ||
-      task.classList.contains("dark:bg-red-900/30")
-    ) {
-      failure++;
-    } else {
-      pending++;
-    }
-  });
-  const successEl = document.getElementById("stat-success");
-  const failureEl = document.getElementById("stat-failure");
-  const pendingEl = document.getElementById("stat-pending");
-  if (successEl) successEl.textContent = success;
-  if (failureEl) failureEl.textContent = failure;
-  if (pendingEl) pendingEl.textContent = pending;
 }

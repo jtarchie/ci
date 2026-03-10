@@ -93,8 +93,7 @@
       <button
         hx-post="/api/runs/{{ .ID }}/stop"
         hx-confirm="Stop this run? All running tasks will be aborted."
-        hx-target="#runs-section"
-        hx-swap="morph:outerHTML"
+        hx-swap="none"
         class="px-2 py-1 text-xs sm:px-3 sm:py-1.5 sm:text-sm bg-red-100 hover:bg-red-200 dark:bg-red-900 dark:hover:bg-red-800 text-red-700 dark:text-red-200 rounded transition-colors"
         title="Stop this run">
         Stop

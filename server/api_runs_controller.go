@@ -147,6 +147,12 @@ func (c *APIRunsController) Stop(ctx *echo.Context) error {
 				})
 			}
 
+			if isHtmxRequest(ctx) {
+				ctx.Response().Header().Set("HX-Trigger", `{"showToast":{"message":"Run stopped","type":"success"}}`)
+
+				return ctx.NoContent(http.StatusOK)
+			}
+
 			return ctx.JSON(http.StatusOK, map[string]string{
 				"run_id": runID,
 				"status": "stopped",
@@ -156,6 +162,12 @@ func (c *APIRunsController) Stop(ctx *echo.Context) error {
 		return ctx.JSON(http.StatusInternalServerError, map[string]string{
 			"error": fmt.Sprintf("failed to stop run: %v", err),
 		})
+	}
+
+	if isHtmxRequest(ctx) {
+		ctx.Response().Header().Set("HX-Trigger", `{"showToast":{"message":"Stopping run...","type":"success"}}`)
+
+		return ctx.NoContent(http.StatusOK)
 	}
 
 	return ctx.JSON(http.StatusOK, map[string]string{

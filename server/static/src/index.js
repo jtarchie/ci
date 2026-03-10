@@ -18,14 +18,57 @@ hljs.registerLanguage("javascript", javascript);
 // Import graph module
 import { initGraph } from "./graph.js";
 
-// Import results module
+// Import results module (keyboard navigation + expand/collapse only)
 import { initResults } from "./results.js";
 
-// Import pipelines module
-import { initPipelines, showToast } from "./pipelines.js";
+// ---- Toast notifications (server-driven via HX-Trigger headers) ----
 
-// Import polling management
-import { initPolling } from "./polling.js";
+function showToast(message, type) {
+  type = type || "info";
+  const container = document.getElementById("toast-container");
+  if (!container) return;
+
+  const bgColor =
+    type === "success"
+      ? "bg-green-600"
+      : type === "error"
+        ? "bg-red-600"
+        : "bg-blue-600";
+
+  const toast = document.createElement("div");
+  toast.className = `${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 transform transition-all duration-300 translate-x-full`;
+  toast.setAttribute("role", "alert");
+  toast.setAttribute("aria-live", "assertive");
+  toast.setAttribute("aria-atomic", "true");
+
+  const messageSpan = document.createElement("span");
+  messageSpan.textContent = message;
+  toast.appendChild(messageSpan);
+
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "ml-2 hover:opacity-75";
+  closeBtn.setAttribute("aria-label", "Close notification");
+  closeBtn.innerHTML =
+    '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+  closeBtn.addEventListener("click", () => toast.remove());
+  toast.appendChild(closeBtn);
+
+  container.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.remove("translate-x-full"));
+  setTimeout(() => {
+    toast.classList.add("translate-x-full");
+    setTimeout(() => toast.remove(), 300);
+  }, 5000);
+}
+
+// Listen for server-driven showToast events via HX-Trigger response header
+document.body.addEventListener("showToast", function (event) {
+  const detail = event.detail || {};
+  showToast(detail.message || "Done", detail.type || "info");
+});
+
+// Export for global use
+window.PocketCI = { showToast };
 
 // Initialize syntax highlighting
 function initSyntaxHighlighting() {
@@ -34,12 +77,8 @@ function initSyntaxHighlighting() {
   });
 }
 
-// Export PocketCI namespace for htmx hx-on attributes
-window.PocketCI = { showToast, initSyntaxHighlighting };
-
 // Add global HTMx error handling
 document.body.addEventListener("htmx:responseError", function (event) {
-  console.error("HTMx error:", event.detail);
   const statusCode = event.detail.xhr?.status;
   const message =
     statusCode === 404
@@ -63,6 +102,24 @@ document.body.addEventListener("htmx:afterSettle", function (event) {
   if (event.detail.target) {
     event.detail.target.removeAttribute("aria-busy");
   }
+});
+
+// Preserve <details open> state across idiomorph morphs.
+// Idiomorph syncs attributes to match the server HTML, which never includes
+// the `open` attribute. We save which <details> elements the user has opened
+// before the morph and restore them afterward.
+const openDetailsIds = new Set();
+document.body.addEventListener("htmx:beforeSwap", function () {
+  openDetailsIds.clear();
+  document.querySelectorAll("details.task-item[open]").forEach(function (el) {
+    if (el.id) openDetailsIds.add(el.id);
+  });
+});
+document.body.addEventListener("htmx:afterSwap", function () {
+  openDetailsIds.forEach(function (id) {
+    const el = document.getElementById(id);
+    if (el) el.setAttribute("open", "");
+  });
 });
 
 // Initialize when DOM is ready
@@ -89,24 +146,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-  // Initialize pipelines page if we're on a pipelines page
-  const pipelinesTable = document.getElementById("pipelines-table");
-  const triggerBtn = document.getElementById("trigger-btn");
-
   // Initialize syntax highlighting
   initSyntaxHighlighting();
-  if (pipelinesTable || triggerBtn) {
-    try {
-      initPipelines();
-    } catch (e) {
-      console.error("Failed to initialize pipelines:", e);
-    }
-  }
-
-  // Initialize polling management
-  try {
-    initPolling();
-  } catch (e) {
-    console.error("Failed to initialize polling:", e);
-  }
 });
