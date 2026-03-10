@@ -59,6 +59,30 @@ func newTemplates() (*TemplateRender, error) {
 				}
 				return fmt.Sprintf("%ds", s)
 			},
+			"elapsedSince": func(v any) string {
+				if v == nil {
+					return "—"
+				}
+				s, ok := v.(string)
+				if !ok || s == "" {
+					return "—"
+				}
+				t, err := time.Parse(time.RFC3339, s)
+				if err != nil {
+					return "—"
+				}
+				d := time.Since(t).Round(time.Second)
+				h := int(d.Hours())
+				m := int(d.Minutes()) % 60
+				sec := int(d.Seconds()) % 60
+				if h > 0 {
+					return fmt.Sprintf("%dh %dm %ds", h, m, sec)
+				}
+				if m > 0 {
+					return fmt.Sprintf("%dm %ds", m, sec)
+				}
+				return fmt.Sprintf("%ds", sec)
+			},
 			"formatPath": func(path string) string {
 				path = strings.ReplaceAll(path, " ", "")
 				path = filepath.Clean(path)

@@ -55,14 +55,9 @@
       <div class="flex items-center gap-3">
         <h1 class="text-3xl font-bold dark:text-white">Tasks</h1>
         {{ if and .Run .Run.StartedAt }}
-        <span class="text-sm text-gray-500 dark:text-gray-400 font-mono">
-          {{ if .Run.CompletedAt }}
+        <span id="run-header-elapsed"
+          class="text-sm text-gray-500 dark:text-gray-400 font-mono">
           {{ durationBetween .Run.StartedAt .Run.CompletedAt }}
-          {{ else }}
-          <span
-            data-elapsed-start="{{ .Run.StartedAt.UTC.Format "2006-01-02T15:04:05Z07:00"
-            }}">—</span>
-          {{ end }}
         </span>
         {{ end }}
         {{ if .IsActive }}
@@ -289,6 +284,12 @@
 
 {{/* Tasks partial - used for htmx polling */}}
 {{ define "tasks-partial" }}
+{{ if and .RunID .Run .Run.StartedAt }}
+<span id="run-header-elapsed" hx-swap-oob="true"
+  class="text-sm text-gray-500 dark:text-gray-400 font-mono">
+  {{ durationBetween .Run.StartedAt .Run.CompletedAt }}
+</span>
+{{ end }}
 <div class="space-y-4" id="tasks-container"
   {{ if .RunID }}
   hx-get="/runs/{{ .RunID }}/tasks-partial/"
@@ -456,8 +457,8 @@ border-indigo-300 dark:border-indigo-600
       <span class="text-xs text-gray-400 dark:text-gray-500 font-mono">{{
         $path.Value.elapsed }}</span>
       {{ else if $path.Value.started_at }}
-      <span class="text-xs text-gray-400 dark:text-gray-500 font-mono"
-        data-elapsed-start="{{ $path.Value.started_at }}">—</span>
+      <span class="text-xs text-gray-400 dark:text-gray-500 font-mono">{{
+        elapsedSince $path.Value.started_at }}</span>
       {{ end }}
     </div>
   </summary>

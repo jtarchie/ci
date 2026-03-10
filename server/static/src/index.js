@@ -92,16 +92,23 @@ document.body.addEventListener("htmx:responseError", function (event) {
 });
 
 // Add loading state management
+let htmxInFlight = 0;
+const pollBar = document.getElementById("poll-bar");
+
 document.body.addEventListener("htmx:beforeRequest", function (event) {
   if (event.detail.target) {
     event.detail.target.setAttribute("aria-busy", "true");
   }
+  htmxInFlight++;
+  if (pollBar) pollBar.style.opacity = "1";
 });
 
 document.body.addEventListener("htmx:afterSettle", function (event) {
   if (event.detail.target) {
     event.detail.target.removeAttribute("aria-busy");
   }
+  htmxInFlight = Math.max(0, htmxInFlight - 1);
+  if (htmxInFlight === 0 && pollBar) pollBar.style.opacity = "0";
 });
 
 // Preserve <details open> state across idiomorph morphs.

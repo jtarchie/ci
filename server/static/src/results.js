@@ -79,6 +79,9 @@ export function initResults() {
     const tasks = getAllTasks();
     if (tasks.length === 0) return;
 
+    // Don't intercept shortcuts when modifier keys are held (e.g. Cmd+C to copy).
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+
     switch (e.key) {
       case "j":
       case "ArrowDown":
@@ -130,8 +133,8 @@ export function initResults() {
           const container = getTasksContainer();
           const firstFailure = container
             ? container.querySelector(
-              ".task-item.bg-red-100, .task-item.dark\\:bg-red-900\\/30",
-            )
+                ".task-item.bg-red-100, .task-item.dark\\:bg-red-900\\/30",
+              )
             : null;
           if (firstFailure) {
             firstFailure.scrollIntoView({

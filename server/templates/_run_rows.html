@@ -69,9 +69,7 @@
     {{ if .CompletedAt }}
     {{ durationBetween .StartedAt .CompletedAt }}
     {{ else }}
-    <span
-      data-elapsed-start="{{ .StartedAt.UTC.Format "2006-01-02T15:04:05Z07:00"
-      }}">—</span>
+    {{ durationBetween .StartedAt nil }}
     {{ end }}
     {{ else }}
     <span class="text-gray-400 dark:text-gray-500">—</span>
