@@ -1,13 +1,61 @@
 package agent
 
 import (
+	"encoding/json"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 
 	pipelinerunner "github.com/jtarchie/pocketci/runtime/runner"
 
 	. "github.com/onsi/gomega"
 )
+
+// TestResultJsonWriteCmd_StdinDependency demonstrates that the current
+// "cat > result.json" approach produces an empty file when stdin is not
+// piped — which is what happens on the Fly driver where stdin does not
+// survive nested sh -c invocations.
+func TestResultJsonWriteCmd_StdinDependency(t *testing.T) {
+	t.Parallel()
+
+	assert := NewGomegaWithT(t)
+
+	tmpDir := t.TempDir()
+	mountName := "final-review"
+
+	data, err := json.Marshal(map[string]string{
+		"status": "success",
+		"text":   "Review with $special `chars` and 'quotes' and \"doubles\".",
+	})
+	assert.Expect(err).NotTo(HaveOccurred())
+
+	// This is the exact command from RunAgent — it depends on stdin.
+	writeCmd := resultJsonWriteCmd(mountName, data)
+
+	cmd := exec.Command("sh", "-c", writeCmd) //nolint:gosec
+	cmd.Dir = tmpDir
+	// Intentionally do NOT set cmd.Stdin — simulates Fly exec behaviour
+	// where stdin is not piped through nested shell invocations.
+	out, _ := cmd.CombinedOutput()
+	_ = out
+
+	content, readErr := os.ReadFile(filepath.Join(tmpDir, mountName, "result.json"))
+	assert.Expect(readErr).NotTo(HaveOccurred())
+
+	// The file must contain the full JSON — not be empty.
+	assert.Expect(strings.TrimSpace(string(content))).NotTo(BeEmpty(),
+		"result.json was empty because stdin was not piped through the shell")
+
+	var result map[string]string
+	assert.Expect(json.Unmarshal(content, &result)).To(Succeed())
+	assert.Expect(result["status"]).To(Equal("success"))
+	assert.Expect(result["text"]).To(ContainSubstring("$special"))
+	assert.Expect(result["text"]).To(ContainSubstring("`chars`"))
+	assert.Expect(result["text"]).To(ContainSubstring("'quotes'"))
+}
 
 func TestParseTaskStepID(t *testing.T) {
 	t.Parallel()
@@ -220,6 +268,16 @@ func TestParseTaskSummaryPath(t *testing.T) {
 		assert.Expect(ok).To(BeTrue())
 		assert.Expect(idx).To(Equal(0))
 		assert.Expect(name).To(Equal("clone-pr"))
+	})
+
+	t.Run("supports backwards job task layout with attempt suffix", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		idx, name, ok := parseTaskSummaryPath("/pipeline/run-1/jobs/review-pr/5/tasks/post-comment/attempt/2")
+		assert.Expect(ok).To(BeTrue())
+		assert.Expect(idx).To(Equal(5))
+		assert.Expect(name).To(Equal("post-comment"))
 	})
 
 	t.Run("ignores non-task job paths", func(t *testing.T) {

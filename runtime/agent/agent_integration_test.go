@@ -551,3 +551,49 @@ func TestRunAgent_ContextTasksPreInjection_RealDocker(t *testing.T) {
 	assert.Expect(artifact["status"]).To(Equal("success"))
 	assert.Expect(strings.TrimSpace(artifact["text"])).NotTo(BeEmpty())
 }
+
+func TestRunAgent_WritesResultArtifactForDownstreamTask_RealDocker(t *testing.T) {
+	assert := NewGomegaWithT(t)
+
+	responses := []string{
+		`{
+			"id":"chatcmpl-artifact",
+			"object":"chat.completion",
+			"created":1730000030,
+			"model":"fake-model",
+			"choices":[{
+				"index":0,
+				"message":{
+					"role":"assistant",
+					"content":"Final synthesized review from the agent."
+				},
+				"finish_reason":"stop"
+			}],
+			"usage":{"prompt_tokens":12,"completion_tokens":6,"total_tokens":18}
+		}`,
+	}
+
+	llm, _ := newSequencedLLMServer(t, responses)
+	configureFakeOpenAI(t, llm.URL)
+
+	runner := newDockerRunner(t, "agent-int-artifact")
+	outVol := mustCreateVolume(t, runner, "final-review")
+
+	result, err := RunAgent(context.Background(), runner, nil, "", AgentConfig{
+		Name:   "final-reviewer",
+		Prompt: "Write one concise final review paragraph.",
+		Model:  "openai/fake-model",
+		Image:  "busybox",
+		Mounts: map[string]pipelinerunner.VolumeResult{
+			"final-review": outVol,
+		},
+		OutputVolumePath: outVol.Path,
+	})
+	assert.Expect(err).NotTo(HaveOccurred())
+	assert.Expect(result).NotTo(BeNil())
+	assert.Expect(result.Text).To(ContainSubstring("Final synthesized review"))
+
+	artifact := readResultArtifact(t, runner, outVol, "read-downstream-artifact")
+	assert.Expect(artifact["status"]).To(Equal("success"))
+	assert.Expect(strings.TrimSpace(artifact["text"])).To(ContainSubstring("Final synthesized review"))
+}

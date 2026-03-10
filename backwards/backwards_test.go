@@ -248,13 +248,13 @@ func TestBackwardsCompatibility(t *testing.T) {
 		defer func() { _ = store.Close() }()
 
 		// The failing task (attempts=3) should have 3 separate storage entries,
-		// one per attempt, each under its own /attempt-N/ sub-path.
+		// one per attempt, each under its own /attempt/<n>/ suffix.
 		results, err := store.GetAll(context.Background(), "/pipeline/"+runID+"/jobs/test-all-attempts-fail", nil)
 		assert.Expect(err).NotTo(HaveOccurred())
 
 		var attemptPaths []string
 		for _, r := range results {
-			if strings.Contains(r.Path, "/attempt-") && strings.HasSuffix(r.Path, "/tasks/fail-all-attempts") {
+			if strings.Contains(r.Path, "/tasks/fail-all-attempts/attempt/") {
 				attemptPaths = append(attemptPaths, r.Path)
 			}
 		}

@@ -182,10 +182,8 @@ export class JobRunner {
     let succeeded = false;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      const attemptPath = `${pathContext}/attempt-${attempt}`;
-
       try {
-        await this.processStepInternal(innerStep as Step, attemptPath);
+        await this.processStepInternal(innerStep as Step, pathContext, attempt);
         succeeded = true;
         break;
       } catch (error) {
@@ -223,6 +221,7 @@ export class JobRunner {
   private async processStepInternal(
     step: Step,
     pathContext: string,
+    attempt?: number,
   ): Promise<void> {
     // Inject job-level webhook params into task step env.
     step = this.injectJobParams(step);
@@ -236,44 +235,76 @@ export class JobRunner {
     if ("get" in step) {
       await this.processGetStep(
         step,
-        `${pathContext}/${this.getStepIdentifier(step)}`,
+        this.withAttemptPath(
+          `${pathContext}/${this.getStepIdentifier(step)}`,
+          attempt,
+        ),
       );
     } else if ("do" in step) {
       await this.processDoStep(
         step,
-        `${pathContext}/${this.getStepIdentifier(step)}`,
+        this.withAttemptPath(
+          `${pathContext}/${this.getStepIdentifier(step)}`,
+          attempt,
+        ),
       );
     } else if ("put" in step) {
       await this.processPutStep(
         step,
-        `${pathContext}/${this.getStepIdentifier(step)}`,
+        this.withAttemptPath(
+          `${pathContext}/${this.getStepIdentifier(step)}`,
+          attempt,
+        ),
       );
     } else if ("try" in step) {
       await this.processTryStep(
         step,
-        `${pathContext}/${this.getStepIdentifier(step)}`,
+        this.withAttemptPath(
+          `${pathContext}/${this.getStepIdentifier(step)}`,
+          attempt,
+        ),
       );
     } else if ("task" in step) {
       await this.processTaskStep(
         step,
-        `${pathContext}/${this.getStepIdentifier(step)}`,
+        this.withAttemptPath(
+          `${pathContext}/${this.getStepIdentifier(step)}`,
+          attempt,
+        ),
       );
     } else if ("in_parallel" in step) {
       await this.processParallelSteps(
         step,
-        `${pathContext}/${this.getStepIdentifier(step)}`,
+        this.withAttemptPath(
+          `${pathContext}/${this.getStepIdentifier(step)}`,
+          attempt,
+        ),
       );
     } else if ("notify" in step) {
       await this.processNotifyStep(
         step,
-        `${pathContext}/${this.getStepIdentifier(step)}`,
+        this.withAttemptPath(
+          `${pathContext}/${this.getStepIdentifier(step)}`,
+          attempt,
+        ),
       );
     } else if ("agent" in step) {
       await this.processAgentStep(
         step,
-        `${pathContext}/${this.getStepIdentifier(step)}`,
+        this.withAttemptPath(
+          `${pathContext}/${this.getStepIdentifier(step)}`,
+          attempt,
+        ),
       );
     }
+  }
+
+  private withAttemptPath(path: string, attempt?: number): string {
+    if (!attempt) {
+      return path;
+    }
+
+    return `${path}/attempt/${attempt}`;
   }
 
   private async getFile(file: string, pathContext: string): Promise<string> {
@@ -426,9 +457,8 @@ export class JobRunner {
       // Augment the task name with variable values so assertion tracking is
       // informative: e.g. task "build" with {platform:linux,size:small} → "build-linux-small"
       const varSuffix = Object.values(variables).join("-");
-      (clonedStep as Record<string, unknown>).task = `${
-        (clonedStep as Task).task
-      }-${varSuffix}`;
+      (clonedStep as Record<string, unknown>).task = `${(clonedStep as Task).task
+        }-${varSuffix}`;
       clonedStep.config = {
         ...clonedStep.config,
         env: {
@@ -935,9 +965,9 @@ export class JobRunner {
       mounts[output.name] = this.taskRunner.getKnownMounts()[output.name];
     }
 
-    const outputVolumePath = outputs.length > 0
-      ? mounts[outputs[0].name]?.path ?? ""
-      : "";
+    // Use the mount name instead of host path so result.json writes are
+    // driver-agnostic (Fly/Docker/native).
+    const outputVolumePath = outputs.length > 0 ? outputs[0].name : "";
 
     let accumulatedOutput = "";
     let latestUsage: AgentUsage | undefined;
@@ -1036,6 +1066,10 @@ export class JobRunner {
         usage: latestUsage ?? result.usage,
         audit_log: result.auditLog,
       });
+
+      for (const output of outputs) {
+        this.taskRunner.getKnownMounts()[output.name] = mounts[output.name];
+      }
     } catch (error) {
       storage.set(storageKey, {
         status: "failure",

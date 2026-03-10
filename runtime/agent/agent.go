@@ -447,25 +447,25 @@ func parseTaskSummaryPath(p string) (int, string, bool) {
 		return 0, "", false
 	}
 
-	name := parts[len(parts)-1]
-	if name == "" {
-		return 0, "", false
-	}
-
-	hasTaskKind := false
-	for _, part := range parts {
+	kindIndex := -1
+	for i, part := range parts {
 		if part == "tasks" || part == "agent" {
-			hasTaskKind = true
+			kindIndex = i
 
 			break
 		}
 	}
 
-	if !hasTaskKind {
+	if kindIndex < 0 || kindIndex+1 >= len(parts) {
 		return 0, "", false
 	}
 
-	for _, part := range parts[4 : len(parts)-1] {
+	name := parts[kindIndex+1]
+	if name == "" {
+		return 0, "", false
+	}
+
+	for _, part := range parts[4:kindIndex] {
 		idx, convErr := strconv.Atoi(part)
 		if convErr == nil {
 			return idx, name, true
@@ -630,6 +630,17 @@ func taskSummaryToMap(t taskSummary) map[string]any {
 	}
 
 	return m
+}
+
+// resultJsonWriteCmd builds a shell command that creates mountName/ and writes
+// data to mountName/result.json without relying on stdin.
+// The data bytes are embedded directly in the command using POSIX single-quote
+// escaping so the command is safe at any shell-nesting depth (e.g. Fly's
+// nested sh -c chain where stdin is not piped through to the inner process).
+func resultJsonWriteCmd(mountName string, data []byte) string {
+	escaped := "'" + strings.ReplaceAll(string(data), "'", `'\''`) + "'"
+	return fmt.Sprintf("mkdir -p %s && printf '%%s' %s > %s/result.json",
+		strconv.Quote(mountName), escaped, strconv.Quote(mountName))
 }
 
 // resolveOutputMountPath maps host-path-like values back to mount names used in sandbox.
@@ -1326,14 +1337,9 @@ func RunAgent(
 			return nil, fmt.Errorf("agent: marshal output result: %w", err)
 		}
 
-		// Create the directory and write via sandbox exec (the path is inside the container).
-		writeCmd := fmt.Sprintf("mkdir -p %s && cat > %s/result.json",
-			strconv.Quote(outputMountPath), strconv.Quote(outputMountPath))
-
 		var execInput pipelinerunner.ExecInput
 		execInput.Command.Path = "sh"
-		execInput.Command.Args = []string{"-c", writeCmd}
-		execInput.Stdin = string(data)
+		execInput.Command.Args = []string{"-c", resultJsonWriteCmd(outputMountPath, data)}
 
 		execResult, execErr := sandbox.Exec(execInput)
 		if execErr != nil {

@@ -343,9 +343,8 @@ var JobRunner = class {
     let lastError = null;
     let succeeded = false;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      const attemptPath = `${pathContext}/attempt-${attempt}`;
       try {
-        await this.processStepInternal(innerStep, attemptPath);
+        await this.processStepInternal(innerStep, pathContext, attempt);
         succeeded = true;
         break;
       } catch (error) {
@@ -376,7 +375,7 @@ var JobRunner = class {
       throw lastError;
     }
   }
-  async processStepInternal(step, pathContext) {
+  async processStepInternal(step, pathContext, attempt) {
     step = this.injectJobParams(step);
     if (step.across && step.across.length > 0) {
       await this.processAcrossStep(step, pathContext);
@@ -385,44 +384,74 @@ var JobRunner = class {
     if ("get" in step) {
       await this.processGetStep(
         step,
-        `${pathContext}/${this.getStepIdentifier(step)}`
+        this.withAttemptPath(
+          `${pathContext}/${this.getStepIdentifier(step)}`,
+          attempt
+        )
       );
     } else if ("do" in step) {
       await this.processDoStep(
         step,
-        `${pathContext}/${this.getStepIdentifier(step)}`
+        this.withAttemptPath(
+          `${pathContext}/${this.getStepIdentifier(step)}`,
+          attempt
+        )
       );
     } else if ("put" in step) {
       await this.processPutStep(
         step,
-        `${pathContext}/${this.getStepIdentifier(step)}`
+        this.withAttemptPath(
+          `${pathContext}/${this.getStepIdentifier(step)}`,
+          attempt
+        )
       );
     } else if ("try" in step) {
       await this.processTryStep(
         step,
-        `${pathContext}/${this.getStepIdentifier(step)}`
+        this.withAttemptPath(
+          `${pathContext}/${this.getStepIdentifier(step)}`,
+          attempt
+        )
       );
     } else if ("task" in step) {
       await this.processTaskStep(
         step,
-        `${pathContext}/${this.getStepIdentifier(step)}`
+        this.withAttemptPath(
+          `${pathContext}/${this.getStepIdentifier(step)}`,
+          attempt
+        )
       );
     } else if ("in_parallel" in step) {
       await this.processParallelSteps(
         step,
-        `${pathContext}/${this.getStepIdentifier(step)}`
+        this.withAttemptPath(
+          `${pathContext}/${this.getStepIdentifier(step)}`,
+          attempt
+        )
       );
     } else if ("notify" in step) {
       await this.processNotifyStep(
         step,
-        `${pathContext}/${this.getStepIdentifier(step)}`
+        this.withAttemptPath(
+          `${pathContext}/${this.getStepIdentifier(step)}`,
+          attempt
+        )
       );
     } else if ("agent" in step) {
       await this.processAgentStep(
         step,
-        `${pathContext}/${this.getStepIdentifier(step)}`
+        this.withAttemptPath(
+          `${pathContext}/${this.getStepIdentifier(step)}`,
+          attempt
+        )
       );
     }
+  }
+  withAttemptPath(path, attempt) {
+    if (!attempt) {
+      return path;
+    }
+    return `${path}/attempt/${attempt}`;
   }
   async getFile(file, pathContext) {
     const mountName = file.split("/")[0];
@@ -933,7 +962,7 @@ var JobRunner = class {
       this.taskRunner.getKnownMounts()[output.name] ||= await runtime.createVolume({ name: output.name });
       mounts[output.name] = this.taskRunner.getKnownMounts()[output.name];
     }
-    const outputVolumePath = outputs.length > 0 ? mounts[outputs[0].name]?.path ?? "" : "";
+    const outputVolumePath = outputs.length > 0 ? outputs[0].name : "";
     let accumulatedOutput = "";
     let latestUsage;
     const auditLog = [];
@@ -1017,6 +1046,9 @@ var JobRunner = class {
         usage: latestUsage ?? result.usage,
         audit_log: result.auditLog
       });
+      for (const output of outputs) {
+        this.taskRunner.getKnownMounts()[output.name] = mounts[output.name];
+      }
     } catch (error) {
       storage.set(storageKey, {
         status: "failure",

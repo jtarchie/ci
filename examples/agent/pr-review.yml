@@ -158,7 +158,7 @@ jobs:
 
       # ── 4. Post the comment ───────────────────────────────────────────────
       - task: post-comment
-        attempts: 5
+        attempts: 2
         config:
           platform: linux
           image_resource:
