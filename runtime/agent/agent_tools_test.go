@@ -4,6 +4,8 @@ import (
 	"sort"
 	"testing"
 
+	pipelinerunner "github.com/jtarchie/pocketci/runtime/runner"
+
 	. "github.com/onsi/gomega"
 )
 
@@ -184,6 +186,80 @@ func TestTaskSummaryToMap(t *testing.T) {
 		_, hasElapsed := m["elapsed"]
 		assert.Expect(hasStartedAt).To(BeFalse())
 		assert.Expect(hasElapsed).To(BeFalse())
+	})
+}
+
+func TestParseTaskSummaryPath(t *testing.T) {
+	t.Parallel()
+
+	t.Run("supports legacy tasks layout", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		idx, name, ok := parseTaskSummaryPath("/pipeline/run-1/tasks/2-build")
+		assert.Expect(ok).To(BeTrue())
+		assert.Expect(idx).To(Equal(2))
+		assert.Expect(name).To(Equal("build"))
+	})
+
+	t.Run("supports backwards job agent layout", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		idx, name, ok := parseTaskSummaryPath("/pipeline/run-1/jobs/review-pr/4/agent/final-reviewer")
+		assert.Expect(ok).To(BeTrue())
+		assert.Expect(idx).To(Equal(4))
+		assert.Expect(name).To(Equal("final-reviewer"))
+	})
+
+	t.Run("supports backwards job task layout", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		idx, name, ok := parseTaskSummaryPath("/pipeline/run-1/jobs/review-pr/0/tasks/clone-pr")
+		assert.Expect(ok).To(BeTrue())
+		assert.Expect(idx).To(Equal(0))
+		assert.Expect(name).To(Equal("clone-pr"))
+	})
+
+	t.Run("ignores non-task job paths", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		_, _, ok := parseTaskSummaryPath("/pipeline/run-1/jobs/review-pr")
+		assert.Expect(ok).To(BeFalse())
+	})
+}
+
+func TestResolveOutputMountPath(t *testing.T) {
+	t.Parallel()
+
+	config := AgentConfig{
+		OutputVolumePath: "/workspace/volumes/out",
+		Mounts: map[string]pipelinerunner.VolumeResult{
+			"final-review": {
+				Name: "vol-final-review",
+				Path: "/workspace/volumes/out",
+			},
+		},
+	}
+
+	t.Run("resolves host path to mount name", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		resolved := resolveOutputMountPath(config)
+		assert.Expect(resolved).To(Equal("final-review"))
+	})
+
+	t.Run("keeps mount path if already mount name", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		cfg := config
+		cfg.OutputVolumePath = "final-review"
+		resolved := resolveOutputMountPath(cfg)
+		assert.Expect(resolved).To(Equal("final-review"))
 	})
 }
 

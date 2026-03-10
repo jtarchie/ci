@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -165,6 +164,7 @@ type taskSummary struct {
 	Status    string `json:"status"`
 	StartedAt string `json:"started_at,omitempty"`
 	Elapsed   string `json:"elapsed,omitempty"`
+	Key       string `json:"-"`
 }
 
 // listTasksOutput is the list_tasks tool result.
@@ -367,19 +367,36 @@ func parseTaskStepID(stepID string) (int, string) {
 
 // loadTaskSummaries fetches all task summaries for the given run from storage.
 func loadTaskSummaries(ctx context.Context, st storage.Driver, runID string) ([]taskSummary, error) {
-	prefix := "/pipeline/" + runID + "/tasks/"
+	fields := []string{"status", "started_at", "elapsed"}
 
-	results, err := st.GetAll(ctx, prefix, []string{"status", "started_at", "elapsed"})
+	legacyResults, err := st.GetAll(ctx, "/pipeline/"+runID+"/tasks/", fields)
 	if err != nil {
-		return nil, fmt.Errorf("load tasks: %w", err)
+		return nil, fmt.Errorf("load legacy tasks: %w", err)
 	}
 
+	jobResults, err := st.GetAll(ctx, "/pipeline/"+runID+"/jobs/", fields)
+	if err != nil {
+		return nil, fmt.Errorf("load job tasks: %w", err)
+	}
+
+	results := make(storage.Results, 0, len(legacyResults)+len(jobResults))
+	results = append(results, legacyResults...)
+	results = append(results, jobResults...)
+
 	tasks := make([]taskSummary, 0, len(results))
+	seenKeys := map[string]struct{}{}
 
 	for _, r := range results {
-		stepID := path.Base(r.Path)
-		idx, name := parseTaskStepID(stepID)
-		t := taskSummary{Name: name, Index: idx}
+		if _, alreadySeen := seenKeys[r.Path]; alreadySeen {
+			continue
+		}
+
+		idx, name, ok := parseTaskSummaryPath(r.Path)
+		if !ok {
+			continue
+		}
+
+		t := taskSummary{Name: name, Index: idx, Key: r.Path}
 
 		if s, ok := r.Payload["status"].(string); ok {
 			t.Status = s
@@ -394,13 +411,68 @@ func loadTaskSummaries(ctx context.Context, st storage.Driver, runID string) ([]
 		}
 
 		tasks = append(tasks, t)
+		seenKeys[r.Path] = struct{}{}
 	}
 
 	sort.Slice(tasks, func(i, j int) bool {
-		return tasks[i].Index < tasks[j].Index
+		if tasks[i].Index != tasks[j].Index {
+			return tasks[i].Index < tasks[j].Index
+		}
+
+		return tasks[i].Name < tasks[j].Name
 	})
 
 	return tasks, nil
+}
+
+// parseTaskSummaryPath supports both legacy task paths and backwards job paths.
+func parseTaskSummaryPath(p string) (int, string, bool) {
+	trimmed := strings.TrimSpace(strings.Trim(p, "/"))
+	if trimmed == "" {
+		return 0, "", false
+	}
+
+	parts := strings.Split(trimmed, "/")
+	if len(parts) < 4 || parts[0] != "pipeline" {
+		return 0, "", false
+	}
+
+	if parts[2] == "tasks" {
+		idx, name := parseTaskStepID(parts[3])
+
+		return idx, name, true
+	}
+
+	if parts[2] != "jobs" || len(parts) < 7 {
+		return 0, "", false
+	}
+
+	name := parts[len(parts)-1]
+	if name == "" {
+		return 0, "", false
+	}
+
+	hasTaskKind := false
+	for _, part := range parts {
+		if part == "tasks" || part == "agent" {
+			hasTaskKind = true
+
+			break
+		}
+	}
+
+	if !hasTaskKind {
+		return 0, "", false
+	}
+
+	for _, part := range parts[4 : len(parts)-1] {
+		idx, convErr := strconv.Atoi(part)
+		if convErr == nil {
+			return idx, name, true
+		}
+	}
+
+	return 0, "", false
 }
 
 // levenshtein computes the edit distance between two strings (case-insensitive).
@@ -558,6 +630,26 @@ func taskSummaryToMap(t taskSummary) map[string]any {
 	}
 
 	return m
+}
+
+// resolveOutputMountPath maps host-path-like values back to mount names used in sandbox.
+func resolveOutputMountPath(config AgentConfig) string {
+	value := strings.TrimSpace(config.OutputVolumePath)
+	if value == "" {
+		return ""
+	}
+
+	if _, ok := config.Mounts[value]; ok {
+		return value
+	}
+
+	for mountPath, volume := range config.Mounts {
+		if volume.Path == value || volume.Name == value {
+			return mountPath
+		}
+	}
+
+	return value
 }
 
 // resolveContextGuardOptions normalises context guard configuration so limits
@@ -807,8 +899,11 @@ func RunAgent(
 			}
 
 			// Fetch full payload for the matched task.
-			stepID := fmt.Sprintf("%d-%s", matched.Index, matched.Name)
-			key := "/pipeline/" + config.RunID + "/tasks/" + stepID
+			key := matched.Key
+			if key == "" {
+				stepID := fmt.Sprintf("%d-%s", matched.Index, matched.Name)
+				key = "/pipeline/" + config.RunID + "/tasks/" + stepID
+			}
 
 			payload, err := config.Storage.Get(ctx, key)
 			if err != nil {
@@ -964,8 +1059,13 @@ func RunAgent(
 				continue
 			}
 
-			stepID := fmt.Sprintf("%d-%s", matched.Index, matched.Name)
-			payload, err := config.Storage.Get(ctx, "/pipeline/"+config.RunID+"/tasks/"+stepID)
+			taskKey := matched.Key
+			if taskKey == "" {
+				stepID := fmt.Sprintf("%d-%s", matched.Index, matched.Name)
+				taskKey = "/pipeline/" + config.RunID + "/tasks/" + stepID
+			}
+
+			payload, err := config.Storage.Get(ctx, taskKey)
 			if err != nil {
 				continue
 			}
@@ -1218,20 +1318,35 @@ func RunAgent(
 	}
 
 	// Write result.json to the output path inside the sandbox if configured.
-	if config.OutputVolumePath != "" {
+	outputMountPath := resolveOutputMountPath(config)
+	if outputMountPath != "" {
 		resultData := map[string]string{"status": status, "text": finalText}
-		data, _ := json.Marshal(resultData)
+		data, err := json.Marshal(resultData)
+		if err != nil {
+			return nil, fmt.Errorf("agent: marshal output result: %w", err)
+		}
 
 		// Create the directory and write via sandbox exec (the path is inside the container).
 		writeCmd := fmt.Sprintf("mkdir -p %s && cat > %s/result.json",
-			config.OutputVolumePath, config.OutputVolumePath)
+			strconv.Quote(outputMountPath), strconv.Quote(outputMountPath))
 
 		var execInput pipelinerunner.ExecInput
 		execInput.Command.Path = "sh"
 		execInput.Command.Args = []string{"-c", writeCmd}
 		execInput.Stdin = string(data)
 
-		_, _ = sandbox.Exec(execInput)
+		execResult, execErr := sandbox.Exec(execInput)
+		if execErr != nil {
+			return nil, fmt.Errorf("agent: write result.json: %w", execErr)
+		}
+
+		if execResult == nil {
+			return nil, fmt.Errorf("agent: write result.json: empty exec result")
+		}
+
+		if execResult.Code != 0 {
+			return nil, fmt.Errorf("agent: write result.json failed with exit code %d: %s", execResult.Code, execResult.Stderr)
+		}
 	}
 
 	return &AgentResult{

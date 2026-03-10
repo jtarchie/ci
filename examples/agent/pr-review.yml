@@ -158,6 +158,7 @@ jobs:
 
       # ── 4. Post the comment ───────────────────────────────────────────────
       - task: post-comment
+        attempts: 5
         config:
           platform: linux
           image_resource:
@@ -170,7 +171,10 @@ jobs:
             args:
               - -c
               - |
-                  REVIEW=$(cat final-review/result.json | jq -r .text)
+                  # Extract the JSON "text" field without jq.
+                  RAW=$(tr -d '\n' < final-review/result.json)
+                  ESCAPED=$(printf '%s' "$RAW" | sed -n 's/.*"text"[[:space:]]*:[[:space:]]*"\(.*\)"[[:space:]]*}.*/\1/p')
+                  REVIEW=$(printf '%b' "$(printf '%s' "$ESCAPED" | sed 's/\\n/\n/g; s/\\r/\r/g; s/\\t/\t/g; s/\\"/"/g; s/\\\\/\\/g')")
                   gh pr comment "$PR_NUMBER" --repo "$GH_REPO" --body "$REVIEW"
           env:
             GH_TOKEN: secret:GITHUB_TOKEN
