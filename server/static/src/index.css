@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "asciinema-player/dist/bundle/asciinema-player.css";
+@import "./terminal.css";
 @import "./highlight-theme.css";
 
 /* Custom styles */
@@ -16,10 +16,6 @@ body {
 
 .task-item[open] .task-details {
   display: block;
-}
-
-.ap-player .ap-overlay-start .ap-play-button svg {
-  display: inline-block;
 }
 
 @theme {

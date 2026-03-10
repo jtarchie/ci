@@ -11,6 +11,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager v0.1.8
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.96.4
 	github.com/bmatcuk/doublestar/v4 v4.10.0
+	github.com/buildkite/terminal-to-html/v3 v3.16.8
 	github.com/containerd/errdefs v1.0.0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/digitalocean/go-qemu v0.0.0-20250212194115-ee9b0668d242
@@ -26,6 +27,7 @@ require (
 	github.com/go-resty/resty/v2 v2.17.2
 	github.com/go-task/slim-sprig/v3 v3.0.0
 	github.com/goccy/go-yaml v1.19.2
+	github.com/google/uuid v1.6.0
 	github.com/hetznercloud/hcloud-go/v2 v2.36.0
 	github.com/jtarchie/lqs v0.0.0-20241231214705-8a34e6c2a6fc
 	github.com/kdomanski/iso9660 v0.4.0
@@ -128,7 +130,6 @@ require (
 	github.com/google/pprof v0.0.0-20260302011040-a15ffb7f9dcc // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/google/safehtml v0.1.0 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.14 // indirect
 	github.com/googleapis/gax-go/v2 v2.17.0 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect

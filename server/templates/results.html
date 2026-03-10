@@ -492,9 +492,12 @@ border-indigo-300 dark:border-indigo-600
     class="task-details mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
     <div class="grid grid-cols-1 gap-4 text-sm">
       <div class="mb-4">
-        <div id="player-{{ $path.FullPath | urlquery }}"
-          class="w-full max-w-full overflow-x-hidden asciicast-container"
-          data-asciicast-src="/asciicast/{{ $path.FullPath }}"></div>
+        <div id="terminal-{{ $path.FullPath | urlquery }}"
+          hx-get="/terminal{{ $path.FullPath }}"
+          hx-trigger="revealed once"
+          hx-target="this"
+          hx-swap="innerHTML"
+          class="w-full max-w-full overflow-x-auto font-mono text-sm bg-black text-white rounded p-2 min-h-8"></div>
       </div>
     </div>
   </div>

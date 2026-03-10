@@ -137,36 +137,45 @@ func (c *Server) Run(logger *slog.Logger) error {
 		})
 	})
 
-	router.ProtectedGroup().GET("/asciicast/*", func(ctx *echo.Context) error {
+	router.ProtectedGroup().GET("/terminal/*", func(ctx *echo.Context) error {
 		lookupPath := ctx.Param("*")
 		if lookupPath == "" || lookupPath[0] != '/' {
 			lookupPath = "/" + lookupPath
 		}
 
-		results, err := client.GetAll(ctx.Request().Context(), lookupPath, []string{"stdout"})
+		results, err := client.GetAll(ctx.Request().Context(), lookupPath, []string{"stdout", "status"})
 		if err != nil {
 			return fmt.Errorf("could not get all results: %w", err)
 		}
 
 		if len(results) > 1 {
-			return fmt.Errorf("cannot render multiple results as asciicast: %w", errors.ErrUnsupported)
+			return fmt.Errorf("cannot render multiple results as terminal HTML: %w", errors.ErrUnsupported)
 		}
 
-		stdout, ok := results[0].Payload["stdout"].(string)
-		if !ok {
-			return fmt.Errorf("stdout is not a string: %w", errors.ErrUnsupported)
-		}
+		stdout, _ := results[0].Payload["stdout"].(string)
+		status, _ := results[0].Payload["status"].(string)
 
-		ctx.Response().Header().Set("Content-Type", "application/x-asciicast")
+		html := server.ToTerminalHTML(stdout)
+
+		ctx.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
 		ctx.Response().WriteHeader(http.StatusOK)
 
-		err = server.ToAsciiCast(stdout, ctx.Response())
-		if err != nil {
-			return fmt.Errorf("could not write asciicast: %w", err)
+		// If the task is still running, embed polling attributes so HTMx re-fetches automatically.
+		// When the task completes, the server returns a plain div and polling stops naturally.
+		if status == "running" || status == "" {
+			_, err = fmt.Fprintf(ctx.Response(),
+				`<div class="term-container" hx-get="/terminal/%s" hx-trigger="load delay:2s" hx-swap="outerHTML">%s</div>`,
+				strings.TrimPrefix(lookupPath, "/"),
+				html,
+			)
+		} else {
+			_, err = fmt.Fprintf(ctx.Response(),
+				`<div class="term-container">%s</div>`,
+				html,
+			)
 		}
-
-		if f, ok := ctx.Response().(http.Flusher); ok {
-			f.Flush()
+		if err != nil {
+			return fmt.Errorf("could not write terminal HTML: %w", err)
 		}
 
 		return nil
