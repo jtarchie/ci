@@ -1,19 +1,13 @@
 assert:
   execution:
-    # Test 1: Single var with 3 values (runs task 3 times)
-    - "test-go-1.16"
-    - "test-go-1.17"
-    - "test-go-1.18"
-    # Test 2: Two vars (2x3 = 6 combinations)
-    - "build-linux-small"
-    - "build-linux-medium"
-    - "build-linux-large"
-    - "build-darwin-small"
-    - "build-darwin-medium"
-    - "build-darwin-large"
-    # Test 3: fail_fast stops at first failure
-    - "failing-test-v1"
-    # (v2 and v3 should not run due to fail_fast)
+    - "test-across-single-var"
+    - "test-across-multiple-vars"
+    - "test-across-fail-fast"
+    - "test-across-no-fail-fast"
+    - "test-across-with-assertions"
+    - "test-across-three-vars"
+    - "test-across-with-attempts"
+    - "test-across-with-ensure"
 
 jobs:
   # Test 1: Basic across with single variable

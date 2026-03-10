@@ -182,6 +182,19 @@ func TestBackwardsCompatibility(t *testing.T) {
 		assert.Expect(logs.String()).To(ContainSubstring("Task abort-task aborted"))
 	})
 
+	t.Run("across", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		runner := commands.Runner{
+			Pipeline: "steps/across.yml",
+			Driver:   "native",
+			Storage:  "sqlite://:memory:",
+		}
+		err := runner.Run(nil)
+		assert.Expect(err).NotTo(HaveOccurred())
+	})
+
 	t.Run("task/file", func(t *testing.T) {
 		t.Parallel()
 
@@ -193,6 +206,59 @@ func TestBackwardsCompatibility(t *testing.T) {
 		}
 		err := runner.Run(nil)
 		assert.Expect(err).NotTo(HaveOccurred())
+	})
+
+	t.Run("attempts", func(t *testing.T) {
+		t.Parallel()
+
+		logs, logger := createLogger()
+		assert := NewGomegaWithT(t)
+
+		dbFile, err := os.CreateTemp(t.TempDir(), "*.db")
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(dbFile.Close()).NotTo(HaveOccurred())
+		storageURL := fmt.Sprintf("sqlite://%s", dbFile.Name())
+
+		const pipelineFile = "steps/attempts.yml"
+		const runID = "attempts-test"
+
+		runner := commands.Runner{
+			Pipeline: pipelineFile,
+			Driver:   "native",
+			Storage:  storageURL,
+			RunID:    runID,
+		}
+		err = runner.Run(logger)
+		assert.Expect(err).NotTo(HaveOccurred())
+
+		// Verify retry log messages appeared.
+		assert.Expect(logs.String()).To(ContainSubstring("Attempt 1/3 failed, retrying..."))
+		assert.Expect(logs.String()).To(ContainSubstring("Attempt 2/3 failed, retrying..."))
+
+		// Verify each attempt gets its own storage path.
+		pipelinePath, err := filepath.Abs(pipelineFile)
+		assert.Expect(err).NotTo(HaveOccurred())
+		runtimeID := youtubeIDStyle(pipelinePath)
+
+		initStorage, found := storage.GetFromDSN(storageURL)
+		assert.Expect(found).To(BeTrue())
+
+		store, err := initStorage(storageURL, runtimeID, nil)
+		assert.Expect(err).NotTo(HaveOccurred())
+		defer func() { _ = store.Close() }()
+
+		// The failing task (attempts=3) should have 3 separate storage entries,
+		// one per attempt, each under its own /attempt-N/ sub-path.
+		results, err := store.GetAll(context.Background(), "/pipeline/"+runID+"/jobs/test-all-attempts-fail", nil)
+		assert.Expect(err).NotTo(HaveOccurred())
+
+		var attemptPaths []string
+		for _, r := range results {
+			if strings.Contains(r.Path, "/attempt-") && strings.HasSuffix(r.Path, "/tasks/fail-all-attempts") {
+				attemptPaths = append(attemptPaths, r.Path)
+			}
+		}
+		assert.Expect(attemptPaths).To(HaveLen(3), "expected 3 separate attempt entries")
 	})
 
 	t.Run("mutate job asserts", func(t *testing.T) {

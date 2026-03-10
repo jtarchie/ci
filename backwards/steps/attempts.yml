@@ -1,14 +1,10 @@
 assert:
   execution:
-    # First job: task succeeds on first attempt (no retries needed)
-    - "success-first-attempt"
-    # Second job: task succeeds on first attempt (no retries needed)
-    - "retry-task"
-    # Third job: task fails all 3 attempts, then cleanup runs
-    - "fail-all-attempts"
-    - "fail-all-attempts"
-    - "fail-all-attempts"
-    - "cleanup-after-failure"
+    - "test-no-attempts"
+    - "test-retry-eventually-succeeds"
+    - "test-all-attempts-fail"
+    - "test-attempts-with-ensure"
+    - "test-explicit-one-attempt"
 
 jobs:
   # Test 1: Normal task without attempts (defaults to 1)

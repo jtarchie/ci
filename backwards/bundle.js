@@ -335,17 +335,45 @@ var JobRunner = class {
   }
   async processStep(step, pathContext) {
     const maxAttempts = step.attempts || 1;
+    if (maxAttempts <= 1) {
+      await this.processStepInternal(step, pathContext);
+      return;
+    }
+    const { ensure, on_success, on_failure, on_error, on_abort, ...innerStep } = step;
+    let lastError = null;
+    let succeeded = false;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const attemptPath = `${pathContext}/attempt-${attempt}`;
       try {
-        await this.processStepInternal(step, pathContext);
-        return;
+        await this.processStepInternal(innerStep, attemptPath);
+        succeeded = true;
+        break;
       } catch (error) {
+        lastError = error;
         if (attempt < maxAttempts) {
           console.log(`Attempt ${attempt}/${maxAttempts} failed, retrying...`);
-          continue;
         }
-        throw error;
       }
+    }
+    try {
+      if (succeeded && on_success) {
+        await this.processStep(on_success, `${pathContext}/on_success`);
+      } else if (!succeeded) {
+        if (lastError instanceof TaskErrored && on_error) {
+          await this.processStep(on_error, `${pathContext}/on_error`);
+        } else if (lastError instanceof TaskAbort && on_abort) {
+          await this.processStep(on_abort, `${pathContext}/on_abort`);
+        } else if (lastError instanceof TaskFailure && on_failure) {
+          await this.processStep(on_failure, `${pathContext}/on_failure`);
+        }
+      }
+    } finally {
+      if (ensure) {
+        await this.processStep(ensure, `${pathContext}/ensure`);
+      }
+    }
+    if (!succeeded && lastError) {
+      throw lastError;
     }
   }
   async processStepInternal(step, pathContext) {
@@ -478,7 +506,7 @@ var JobRunner = class {
         console.error(`Across combination ${i} failed:`, error);
       }
     }
-    if (failureOccurred && !failFast) {
+    if (failureOccurred) {
       storage.set(storageKey, { status: "failure" });
       throw new TaskFailure("One or more across combinations failed");
     }
@@ -504,6 +532,8 @@ var JobRunner = class {
   injectAcrossVariables(step, variables) {
     const clonedStep = { ...step };
     if ("task" in clonedStep && clonedStep.config) {
+      const varSuffix = Object.values(variables).join("-");
+      clonedStep.task = `${clonedStep.task}-${varSuffix}`;
       clonedStep.config = {
         ...clonedStep.config,
         env: {

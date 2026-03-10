@@ -167,19 +167,56 @@ export class JobRunner {
     // Handle attempts wrapper - retry up to N times
     const maxAttempts = step.attempts || 1;
 
+    if (maxAttempts <= 1) {
+      await this.processStepInternal(step, pathContext);
+      return;
+    }
+
+    // Per Concourse semantics: hooks (ensure, on_success, on_failure,
+    // on_error, on_abort) wrap the entire retry, not each individual attempt.
+    // Strip them from the step before the retry loop and run them once after.
+    const { ensure, on_success, on_failure, on_error, on_abort, ...innerStep } =
+      step as Step & StepHooks;
+
+    let lastError: unknown = null;
+    let succeeded = false;
+
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const attemptPath = `${pathContext}/attempt-${attempt}`;
+
       try {
-        await this.processStepInternal(step, pathContext);
-        return; // Success - exit retry loop
+        await this.processStepInternal(innerStep as Step, attemptPath);
+        succeeded = true;
+        break;
       } catch (error) {
-        // If we haven't reached max attempts, retry
+        lastError = error;
         if (attempt < maxAttempts) {
           console.log(`Attempt ${attempt}/${maxAttempts} failed, retrying...`);
-          continue;
         }
-        // Max attempts reached, throw the error
-        throw error;
       }
+    }
+
+    // Run hooks once after all attempts
+    try {
+      if (succeeded && on_success) {
+        await this.processStep(on_success, `${pathContext}/on_success`);
+      } else if (!succeeded) {
+        if (lastError instanceof TaskErrored && on_error) {
+          await this.processStep(on_error, `${pathContext}/on_error`);
+        } else if (lastError instanceof TaskAbort && on_abort) {
+          await this.processStep(on_abort, `${pathContext}/on_abort`);
+        } else if (lastError instanceof TaskFailure && on_failure) {
+          await this.processStep(on_failure, `${pathContext}/on_failure`);
+        }
+      }
+    } finally {
+      if (ensure) {
+        await this.processStep(ensure, `${pathContext}/ensure`);
+      }
+    }
+
+    if (!succeeded && lastError) {
+      throw lastError;
     }
   }
 
@@ -346,7 +383,7 @@ export class JobRunner {
       }
     }
 
-    if (failureOccurred && !failFast) {
+    if (failureOccurred) {
       storage.set(storageKey, { status: "failure" });
       throw new TaskFailure("One or more across combinations failed");
     }
@@ -386,6 +423,11 @@ export class JobRunner {
     const clonedStep = { ...step };
 
     if ("task" in clonedStep && clonedStep.config) {
+      // Augment the task name with variable values so assertion tracking is
+      // informative: e.g. task "build" with {platform:linux,size:small} → "build-linux-small"
+      const varSuffix = Object.values(variables).join("-");
+      (clonedStep as Record<string, unknown>).task =
+        `${(clonedStep as Task).task}-${varSuffix}`;
       clonedStep.config = {
         ...clonedStep.config,
         env: {

@@ -171,10 +171,13 @@ jobs:
             args:
               - -c
               - |
-                  # Extract the JSON "text" field without jq.
-                  RAW=$(tr -d '\n' < final-review/result.json)
-                  ESCAPED=$(printf '%s' "$RAW" | sed -n 's/.*"text"[[:space:]]*:[[:space:]]*"\(.*\)"[[:space:]]*}.*/\1/p')
-                  REVIEW=$(printf '%b' "$(printf '%s' "$ESCAPED" | sed 's/\\n/\n/g; s/\\r/\r/g; s/\\t/\t/g; s/\\"/"/g; s/\\\\/\\/g')")
+                  apk add --no-cache jq >/dev/null 2>&1
+                  REVIEW=$(jq -r .text < final-review/result.json)
+                  if [ -z "$REVIEW" ] || [ "$REVIEW" = "null" ]; then
+                    echo "error: could not extract .text from final-review/result.json" >&2
+                    cat final-review/result.json >&2
+                    exit 1
+                  fi
                   gh pr comment "$PR_NUMBER" --repo "$GH_REPO" --body "$REVIEW"
           env:
             GH_TOKEN: secret:GITHUB_TOKEN
