@@ -205,15 +205,19 @@ func (c *WebRunsController) TasksPartial(ctx *echo.Context) error {
 		stats := countTaskStats(tree)
 		c.preloadTerminalHTML(ctx, lookupPath, tree)
 
+		run, runErr := c.store.GetRun(ctx.Request().Context(), runID)
+		isActive := runErr == nil && (run.Status == storage.RunStatusQueued || run.Status == storage.RunStatusRunning)
+
 		ctx.Response().Header().Set("HX-Push-Url", fmt.Sprintf("/runs/%s/tasks?q=%s", runID, q))
 
 		return ctx.Render(http.StatusOK, "tasks-partial", map[string]any{
 			"Tree":     tree,
 			"Path":     lookupPath,
 			"RunID":    runID,
-			"IsActive": false,
-			"Run":      nil,
+			"IsActive": isActive,
+			"Run":      run,
 			"Stats":    stats,
+			"OOB":      true,
 		})
 	}
 
@@ -242,6 +246,7 @@ func (c *WebRunsController) TasksPartial(ctx *echo.Context) error {
 		"IsActive": isActive,
 		"Run":      run,
 		"Stats":    stats,
+		"OOB":      true,
 	})
 }
 

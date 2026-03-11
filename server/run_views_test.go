@@ -445,6 +445,92 @@ func TestRunViews(t *testing.T) {
 				assert.Expect(rec.Body.String()).NotTo(ContainSubstring("<no value>"))
 			})
 
+			t.Run("GET /runs/:id/tasks-partial/ emits OOB header updates for active runs", func(t *testing.T) {
+				t.Parallel()
+				assert := NewGomegaWithT(t)
+
+				buildFile, err := os.CreateTemp(t.TempDir(), "")
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = buildFile.Close() }()
+
+				client, err := init(buildFile.Name(), "namespace", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = client.Close() }()
+
+				pipeline, err := client.SavePipeline(context.Background(), "active-run-pipeline", "export const pipeline = async () => {};", "docker://", "")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				run, err := client.SaveRun(context.Background(), pipeline.ID)
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				err = client.Set(context.Background(), "/pipeline/"+run.ID+"/tasks/0-build", map[string]any{"status": "success"})
+				assert.Expect(err).NotTo(HaveOccurred())
+				err = client.Set(context.Background(), "/pipeline/"+run.ID+"/tasks/1-test", map[string]any{"status": "failure"})
+				assert.Expect(err).NotTo(HaveOccurred())
+				err = client.Set(context.Background(), "/pipeline/"+run.ID+"/tasks/2-deploy", map[string]any{"status": "running"})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				req := httptest.NewRequest(http.MethodGet, "/runs/"+run.ID+"/tasks-partial/", nil)
+				rec := httptest.NewRecorder()
+				router.ServeHTTP(rec, req)
+
+				assert.Expect(rec.Code).To(Equal(http.StatusOK))
+				assert.Expect(rec.Body.String()).To(ContainSubstring(`id="run-live-badge" hx-swap-oob="true"`))
+				assert.Expect(rec.Body.String()).To(ContainSubstring(`id="run-stop-button" hx-swap-oob="true"`))
+				assert.Expect(rec.Body.String()).To(ContainSubstring(`id="stat-success" hx-swap-oob="true" aria-label="Successful tasks">1</span>`))
+				assert.Expect(rec.Body.String()).To(ContainSubstring(`id="stat-failure" hx-swap-oob="true" aria-label="Failed tasks">1</span>`))
+				assert.Expect(rec.Body.String()).To(ContainSubstring(`id="stat-pending" hx-swap-oob="true" aria-label="Pending tasks">1</span>`))
+				assert.Expect(rec.Body.String()).To(ContainSubstring("Live"))
+				assert.Expect(rec.Body.String()).To(ContainSubstring("Stop Run"))
+			})
+
+			t.Run("GET /runs/:id/tasks-partial/ clears active header updates when run completes", func(t *testing.T) {
+				t.Parallel()
+				assert := NewGomegaWithT(t)
+
+				buildFile, err := os.CreateTemp(t.TempDir(), "")
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = buildFile.Close() }()
+
+				client, err := init(buildFile.Name(), "namespace", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = client.Close() }()
+
+				pipeline, err := client.SavePipeline(context.Background(), "completed-run-pipeline", "export const pipeline = async () => {};", "docker://", "")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				run, err := client.SaveRun(context.Background(), pipeline.ID)
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				err = client.Set(context.Background(), "/pipeline/"+run.ID+"/tasks/0-build", map[string]any{"status": "success"})
+				assert.Expect(err).NotTo(HaveOccurred())
+				err = client.Set(context.Background(), "/pipeline/"+run.ID+"/tasks/1-test", map[string]any{"status": "failure"})
+				assert.Expect(err).NotTo(HaveOccurred())
+				err = client.Set(context.Background(), "/pipeline/"+run.ID+"/tasks/2-deploy", map[string]any{"status": "pending"})
+				assert.Expect(err).NotTo(HaveOccurred())
+				err = client.UpdateRunStatus(context.Background(), run.ID, storage.RunStatusSuccess, "")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				req := httptest.NewRequest(http.MethodGet, "/runs/"+run.ID+"/tasks-partial/", nil)
+				rec := httptest.NewRecorder()
+				router.ServeHTTP(rec, req)
+
+				assert.Expect(rec.Code).To(Equal(286))
+				assert.Expect(rec.Body.String()).To(ContainSubstring(`id="run-live-badge" hx-swap-oob="true"`))
+				assert.Expect(rec.Body.String()).To(ContainSubstring(`id="run-stop-button" hx-swap-oob="true"></span>`))
+				assert.Expect(rec.Body.String()).To(ContainSubstring(`id="stat-success" hx-swap-oob="true" aria-label="Successful tasks">1</span>`))
+				assert.Expect(rec.Body.String()).To(ContainSubstring(`id="stat-failure" hx-swap-oob="true" aria-label="Failed tasks">1</span>`))
+				assert.Expect(rec.Body.String()).To(ContainSubstring(`id="stat-pending" hx-swap-oob="true" aria-label="Pending tasks">1</span>`))
+				assert.Expect(rec.Body.String()).NotTo(ContainSubstring("Live"))
+				assert.Expect(rec.Body.String()).NotTo(ContainSubstring("Stop Run"))
+			})
+
 			// Regression tests: the initial /runs/:id/tasks page (Show handler) previously
 			// omitted "usage" from its GetAll field list, so the usage badge and elapsed
 			// were invisible on first load even though tasks-partial/ showed them correctly.

@@ -60,18 +60,7 @@
           {{ durationBetween .Run.StartedAt .Run.CompletedAt }}
         </span>
         {{ end }}
-        {{ if .IsActive }}
-        <span
-          class="flex items-center gap-2 text-sm text-yellow-600 dark:text-yellow-400">
-          <span class="relative flex h-2 w-2">
-            <span
-              class="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
-            <span
-              class="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
-          </span>
-          Live
-        </span>
-        {{ end }}
+        {{ template "run-live-badge" dict "IsActive" .IsActive }}
       </div>
       <div
         class="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
@@ -81,17 +70,8 @@
           class="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-center transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 sm:w-auto">
           Graph View
         </a>
-        {{ if .IsActive }}
-        <button
-          hx-post="/api/runs/{{ .RunID }}/stop"
-          hx-confirm="Stop this run? All running tasks will be aborted."
-          hx-swap="none"
-          class="w-full px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium text-center transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 sm:w-auto"
-          aria-label="Stop run"
-          title="Stop this run">
-          Stop Run
-        </button>
-        {{ end }}
+        {{ template "run-stop-button" dict "RunID" .RunID "IsActive" .IsActive
+        }}
         {{ else }}
         <a href="/graph{{ .Path }}/"
           class="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-center transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 sm:w-auto">
@@ -273,7 +253,7 @@
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6"
       id="pipeline">
       {{ template "tasks-partial" dict "Tree" .Tree "RunID" .RunID "IsActive"
-      .IsActive "Stats" .Stats }}
+      .IsActive "Run" .Run "Stats" .Stats "OOB" false }}
     </div>
   </div>
 </main>
@@ -282,13 +262,58 @@
 {{ template "toast-container" }}
 {{ template "end" }}
 
+{{ define "run-live-badge" }}
+{{ if .IsActive }}
+<span id="run-live-badge" {{ if .SwapOOB }} hx-swap-oob="true" {{ end }}
+  class="flex items-center gap-2 text-sm text-yellow-600 dark:text-yellow-400">
+  <span class="relative flex h-2 w-2">
+    <span
+      class="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+    <span
+      class="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
+  </span>
+  Live
+</span>
+{{ else }}
+<span id="run-live-badge" {{ if .SwapOOB }} hx-swap-oob="true" {{ end }}></span>
+{{ end }}
+{{ end }}
+
+{{ define "run-stop-button" }}
+{{ if and .RunID .IsActive }}
+<button id="run-stop-button" {{ if .SwapOOB }} hx-swap-oob="true" {{ end }}
+  hx-post="/api/runs/{{ .RunID }}/stop"
+  hx-confirm="Stop this run? All running tasks will be aborted."
+  hx-swap="none"
+  class="w-full px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium text-center transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 sm:w-auto"
+  aria-label="Stop run"
+  title="Stop this run">
+  Stop Run
+</button>
+{{ else }}
+<span id="run-stop-button" {{ if .SwapOOB }} hx-swap-oob="true" {{ end
+  }}></span>
+{{ end }}
+{{ end }}
+
 {{/* Tasks partial - used for htmx polling */}}
 {{ define "tasks-partial" }}
+{{ if .OOB }}
 {{ if and .RunID .Run .Run.StartedAt }}
 <span id="run-header-elapsed" hx-swap-oob="true"
   class="text-sm text-gray-500 dark:text-gray-400 font-mono">
   {{ durationBetween .Run.StartedAt .Run.CompletedAt }}
 </span>
+{{ end }}
+{{ template "run-live-badge" dict "IsActive" .IsActive "SwapOOB" true }}
+{{ template "run-stop-button" dict "RunID" .RunID "IsActive" .IsActive "SwapOOB"
+true }}
+<span id="stat-success" hx-swap-oob="true" aria-label="Successful tasks">{{
+  .Stats.Success }}</span>
+<span id="stat-failure" hx-swap-oob="true" aria-label="Failed tasks">{{
+  .Stats.Failure }}</span>
+<span id="stat-pending" hx-swap-oob="true" aria-label="Pending tasks">{{
+  .Stats.Pending }}</span>
 {{ end }}
 <div class="space-y-4" id="tasks-container"
   {{ if .RunID }}
