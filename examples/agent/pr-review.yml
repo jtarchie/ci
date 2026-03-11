@@ -27,6 +27,7 @@ jobs:
           PR_HEAD_REF: "payload.pull_request.head.ref"
           PR_BASE_REF: "payload.pull_request.base.ref"
           GH_REPO: "payload.repository.full_name"
+          PR_DESCRIPTION: "string(payload.pull_request.body || '')"
     plan:
       # ── 1. Clone the PR branch and generate the diff ─────────────────────
       - task: clone-pr
@@ -54,6 +55,12 @@ jobs:
 
                   git diff "upstream/$PR_BASE_REF"...HEAD > ../diff/pr.diff
 
+                  if [ -n "$PR_DESCRIPTION" ]; then
+                    printf '%s\n' "$PR_DESCRIPTION" > ../diff/pr_description.md
+                  else
+                    printf '%s\n' "No PR description provided." > ../diff/pr_description.md
+                  fi
+
                   DIFF_BYTES="$(wc -c < ../diff/pr.diff)"
                   if [ "$DIFF_BYTES" -eq 0 ]; then
                     echo "error: generated diff is empty for PR #$PR_NUMBER ($GH_REPO $PR_HEAD_REF -> $PR_BASE_REF)" >&2
@@ -64,6 +71,7 @@ jobs:
       - agent: code-quality-reviewer
         prompt: |
           The PR diff has been injected into your context — use it as a starting point.
+          The PR description has also been injected into your context at diff/pr_description.md.
           The full repository clone is at repo/.
 
           Your task: review for code quality — readability, naming, structure, DRY violations.
@@ -82,12 +90,15 @@ jobs:
           Rules:
           - Use repo-relative paths (no "repo/" prefix).
           - Only report a finding after verifying it in the diff or repo.
+          - You may use GitHub-flavored Markdown inside the description for emphasis (`**bold**`, `*italic*`, and backticked code).
           - Bullet points only, no prose preamble.
-        model: openrouter/openai/gpt-5.1-codex-mini
+        model: openrouter/@preset/coding-agent
         context:
           files:
             - path: diff/pr.diff
               max_bytes: 65536
+            - path: diff/pr_description.md
+              max_bytes: 32768
         config:
           platform: linux
           image_resource:
@@ -103,6 +114,7 @@ jobs:
       - agent: security-reviewer
         prompt: |
           The PR diff has been injected into your context — use it as a starting point.
+          The PR description has also been injected into your context at diff/pr_description.md.
           The full repository clone is at repo/.
 
           Your task: audit for security issues — injection, authentication, data exposure, OWASP Top 10.
@@ -122,12 +134,15 @@ jobs:
           Rules:
           - Use repo-relative paths (no "repo/" prefix).
           - Only report a finding after verifying it in the diff or repo.
+          - You may use GitHub-flavored Markdown inside the description for emphasis (`**bold**`, `*italic*`, and backticked code).
           - Bullet points only, no prose preamble.
-        model: openrouter/openai/gpt-5.1-codex-mini
+        model: openrouter/@preset/coding-agent
         context:
           files:
             - path: diff/pr.diff
               max_bytes: 65536
+            - path: diff/pr_description.md
+              max_bytes: 32768
         config:
           platform: linux
           image_resource:
@@ -143,6 +158,7 @@ jobs:
       - agent: maintainability-reviewer
         prompt: |
           The PR diff has been injected into your context — use it as a starting point.
+          The PR description has also been injected into your context at diff/pr_description.md.
           The full repository clone is at repo/.
 
           Your task: evaluate for maintainability — test coverage, cyclomatic complexity, documentation.
@@ -162,12 +178,15 @@ jobs:
           Rules:
           - Use repo-relative paths (no "repo/" prefix).
           - Only report a finding after verifying it in the diff or repo.
+          - You may use GitHub-flavored Markdown inside the description for emphasis (`**bold**`, `*italic*`, and backticked code).
           - Bullet points only, no prose preamble.
-        model: openrouter/openai/gpt-5.1-codex-mini
+        model: openrouter/@preset/coding-agent
         context:
           files:
             - path: diff/pr.diff
               max_bytes: 65536
+            - path: diff/pr_description.md
+              max_bytes: 32768
         config:
           platform: linux
           image_resource:
@@ -196,10 +215,12 @@ jobs:
             2. security-reviewer
             3. maintainability-reviewer
 
+          The PR description is also injected in context at diff/pr_description.md.
+
           Read ALL THREE carefully. You MUST include findings from every reviewer.
           Do not silently omit any reviewer's findings.
 
-          Synthesize into strict JSON only (no markdown, no code fences, no preamble).
+          Synthesize into strict JSON only (no code fences, no prose preamble outside JSON).
           Output format:
 
           {
@@ -218,12 +239,16 @@ jobs:
           Requirements:
           - Return valid JSON and nothing else.
           - Include findings from ALL THREE reviewers.
+          - You may use GitHub-flavored Markdown in `summary` and each issue `description` for emphasis and clarity.
           - `file` must be repo-relative (no "repo/" prefix).
           - `line` is an integer. For range findings it is the LAST line of the range.
           - `start_line` is optional. Include it when a finding covers a line range; must be < `line`.
           - Include only findings you are reasonably confident about.
-        model: openrouter/openai/gpt-5.1-codex-mini
+        model: openrouter/@preset/coding-agent
         context:
+          files:
+            - path: diff/pr_description.md
+              max_bytes: 32768
           tasks:
             - name: code-quality-reviewer
               field: stdout
@@ -280,6 +305,8 @@ jobs:
                   interface FallbackFinding {
                     severity: Severity;
                     description: string;
+                    file?: string;
+                    line?: number;
                   }
 
                   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -428,7 +455,7 @@ jobs:
                       }
                       inline.push(comment);
                     } else {
-                      fallback.push({ severity, description });
+                      fallback.push({ severity, description, file, line });
                     }
                   }
 
@@ -457,15 +484,26 @@ jobs:
 
                   // 6. Post one extra comment for issues that couldn't be anchored
                   if (fallback.length > 0) {
+                    const linkablePath = (path: string): string => path
+                      .split("/")
+                      .map((part) => encodeURIComponent(part))
+                      .join("/");
+
                     const body = [
                       "## Automated Review: Unanchored Findings",
                       "",
-                      "These findings could not be attached inline to the current diff:",
-                      "Locations are omitted because the reported file and line could not be anchored to the current patch.",
+                      "> [!NOTE]",
+                      "> These findings could not be attached inline to the current diff:",
+                      "> Locations below are provided for convenience, but are not anchored to the patch.",
                       "",
                       ...fallback.map(
-                        (f) =>
-                          `- [${f.severity.toUpperCase()}] ${f.description}`,
+                        (f) => {
+                          const hasLocation = Boolean(f.file) && Boolean(f.line && f.line > 0);
+                          const location = hasLocation
+                            ? `[${f.file}:${f.line}](https://github.com/${GH_REPO}/blob/${pr.head.sha}/${linkablePath(f.file as string)}#L${f.line})`
+                            : "location unavailable";
+                          return `- [${f.severity.toUpperCase()}] ${location} - ${f.description}`;
+                        },
                       ),
                     ].join("\n");
 
