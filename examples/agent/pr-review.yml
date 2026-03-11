@@ -2,14 +2,11 @@
 # Multi-agent GitHub PR review pipeline.
 #
 # Triggered by a GitHub pull_request webhook. Three specialist agents review
-# the code and emit structured JSON findings. A final aggregator agent merges
-# them into a machine-readable document; a task step then posts each finding
-# as an inline GitHub PR review comment (file-level, single-line, or
-# line-range) via the GitHub REST API. Findings that cannot be mapped to a
-# valid diff location are logged to the task output without failing the pipeline.
+# the code sequentially; a final aggregator agent synthesises their feedback
+# and a task step posts the result as a PR comment via the `gh` CLI.
 #
 # Required secrets:
-#   GITHUB_TOKEN — Personal access token with repo + pull_requests:write scope.
+#   GITHUB_TOKEN — Personal access token with repo + pull_request:write scope.
 #              Set via: pocketci run --secret GITHUB_TOKEN=<token>
 #
 # Required setup:
@@ -65,38 +62,10 @@ jobs:
       # ── 2a. Code-quality review ───────────────────────────────────────────
       - agent: code-quality-reviewer
         prompt: |
-          Review the pull request changes in diff/pr.diff for code quality.
-          Focus on the changed lines: readability, naming, structure, and DRY violations.
-
-          Parse the diff to identify exact file paths and line numbers:
-          - File paths appear after "+++ b/" in diff headers (strip the "b/" prefix).
-          - Hunk headers "@@ -old,len +new,start @@" give the first new-file line number.
-            Count forward from that start, skipping lines beginning with "-", to find
-            the new-file line number for each added line (those beginning with "+").
-          - Use side "RIGHT" for added lines and "LEFT" for deleted lines.
-
-          Return ONLY a JSON object — no prose, no markdown fences:
-          {
-            "findings": [
-              {
-                "severity": "critical|major|minor",
-                "message": "<one-sentence description of the issue>",
-                "target_type": "file|line|range",
-                "path": "<repo-relative path, e.g. src/foo/bar.go>",
-                "line": "<integer — new-file line number; omit for target_type 'file'>",
-                "side": "<RIGHT|LEFT — omit for target_type 'file'>",
-                "start_line": "<integer — first line of range; range only>",
-                "start_side": "<RIGHT|LEFT — range only>"
-              }
-            ]
-          }
-
-          Rules:
-          - "path" must match the "+++ b/<path>" diff header exactly, without the "b/" prefix.
-          - Line numbers are new-file (right-hand) line numbers.
-          - When uncertain of the exact line, use target_type "file" instead of guessing.
-          - Return {"findings": []} if there are no code-quality issues.
-          - Output valid JSON only.
+          Review the pull request changes in diff/pr.diff.
+          Focus only on the changed lines: readability, naming, structure, and DRY violations.
+          Be concise — bullet points only, no preamble.
+          Include filename and line numbers for any issues.
         model: openrouter/openai/gpt-5.1-codex-mini
         config:
           platform: linux
@@ -111,38 +80,10 @@ jobs:
       # ── 2b. Security review ───────────────────────────────────────────────
       - agent: security-reviewer
         prompt: |
-          Audit the pull request changes in diff/pr.diff for security vulnerabilities.
-          Focus on the changed lines: injection, authentication, data exposure, OWASP Top 10.
-
-          Parse the diff to identify exact file paths and line numbers:
-          - File paths appear after "+++ b/" in diff headers (strip the "b/" prefix).
-          - Hunk headers "@@ -old,len +new,start @@" give the first new-file line number.
-            Count forward from that start, skipping lines beginning with "-", to find
-            the new-file line number for each added line (those beginning with "+").
-          - Use side "RIGHT" for added lines and "LEFT" for deleted lines.
-
-          Return ONLY a JSON object — no prose, no markdown fences:
-          {
-            "findings": [
-              {
-                "severity": "critical|major|minor",
-                "message": "<one-sentence description of the issue>",
-                "target_type": "file|line|range",
-                "path": "<repo-relative path, e.g. src/foo/bar.go>",
-                "line": "<integer — new-file line number; omit for target_type 'file'>",
-                "side": "<RIGHT|LEFT — omit for target_type 'file'>",
-                "start_line": "<integer — first line of range; range only>",
-                "start_side": "<RIGHT|LEFT — range only>"
-              }
-            ]
-          }
-
-          Rules:
-          - "path" must match the "+++ b/<path>" diff header exactly, without the "b/" prefix.
-          - Line numbers are new-file (right-hand) line numbers.
-          - When uncertain of the exact line, use target_type "file" instead of guessing.
-          - Return {"findings": []} if there are no security issues.
-          - Output valid JSON only.
+          Audit the pull request changes in diff/pr.diff for security issues.
+          Focus only on the changed lines: injection, authentication, data exposure, OWASP Top 10.
+          Be concise — bullet points only, no preamble.
+          Include filename and line numbers for any issues.
         model: openrouter/openai/gpt-5.1-codex-mini
         config:
           platform: linux
@@ -158,37 +99,9 @@ jobs:
       - agent: maintainability-reviewer
         prompt: |
           Evaluate the pull request changes in diff/pr.diff for maintainability.
-          Focus on the changed lines: test coverage, cyclomatic complexity, documentation.
-
-          Parse the diff to identify exact file paths and line numbers:
-          - File paths appear after "+++ b/" in diff headers (strip the "b/" prefix).
-          - Hunk headers "@@ -old,len +new,start @@" give the first new-file line number.
-            Count forward from that start, skipping lines beginning with "-", to find
-            the new-file line number for each added line (those beginning with "+").
-          - Use side "RIGHT" for added lines and "LEFT" for deleted lines.
-
-          Return ONLY a JSON object — no prose, no markdown fences:
-          {
-            "findings": [
-              {
-                "severity": "critical|major|minor",
-                "message": "<one-sentence description of the issue>",
-                "target_type": "file|line|range",
-                "path": "<repo-relative path, e.g. src/foo/bar.go>",
-                "line": "<integer — new-file line number; omit for target_type 'file'>",
-                "side": "<RIGHT|LEFT — omit for target_type 'file'>",
-                "start_line": "<integer — first line of range; range only>",
-                "start_side": "<RIGHT|LEFT — range only>"
-              }
-            ]
-          }
-
-          Rules:
-          - "path" must match the "+++ b/<path>" diff header exactly, without the "b/" prefix.
-          - Line numbers are new-file (right-hand) line numbers.
-          - When uncertain of the exact line, use target_type "file" instead of guessing.
-          - Return {"findings": []} if there are no maintainability issues.
-          - Output valid JSON only.
+          Focus only on the changed lines: test coverage, cyclomatic complexity, documentation.
+          Be concise — bullet points only, no preamble.
+          Include filename and line numbers for any issues.
         model: openrouter/openai/gpt-5.1-codex-mini
         config:
           platform: linux
@@ -202,50 +115,33 @@ jobs:
 
       # ── 3. Aggregate and synthesize ───────────────────────────────────────
       #
-      # The three prior agent outputs (JSON findings arrays) are available two ways:
-      #   a) context.tasks — each review JSON is pre-injected into this agent's
-      #      chat history as a synthetic get_task_result response.
-      #   b) input volume mounts — result.json files are mounted at
+      # The three prior agent outputs are available two ways:
+      #   a) context.tasks — each review text is pre-injected into this
+      #      agent's chat history as a synthetic get_task_result response,
+      #      so no tool call is needed to read them.
+      #   b) input volume mounts — result.json files are also mounted at
       #      code-quality-output/result.json, security-output/result.json,
-      #      maintainability-output/result.json.
+      #      maintainability-output/result.json and can be cat'd via
+      #      run_command if the agent needs to re-read raw content.
       - agent: final-reviewer
         prompt: |
-          You have received three structured JSON reviews: code quality, security,
-          and maintainability. Each contains a "findings" array.
+          You have received three code reviews: code quality, security, and
+          maintainability. Synthesize them into a single, concise GitHub PR
+          comment written in JSON. Format:
 
-          Aggregate all findings into a single JSON document with this exact structure:
           {
-            "comments": [
+            "issues": [
               {
-                "severity": "critical|major|minor",
-                "message": "<one-sentence description>",
-                "target_type": "file|line|range",
-                "path": "<repo-relative path>",
-                "line": "<integer — new-file line; omit for target_type 'file'>",
-                "side": "<RIGHT|LEFT — omit for target_type 'file'>",
-                "start_line": "<integer — first line; range only>",
-                "start_side": "<RIGHT|LEFT — range only>"
+                "severity": "critical",
+                "description": "Description of the issue",
+                "file": "filename",
+                "line": 123
               }
             ],
-            "unmapped_findings": [
-              {
-                "severity": "critical|major|minor",
-                "message": "<description>",
-                "reason": "<why it cannot be mapped to a file or line>"
-              }
-            ]
+            "summary": "One sentence overall verdict"
           }
-
-          Rules:
-          - Deduplicate findings that refer to the same file+line+topic.
-          - Sort comments by severity: critical first, then major, then minor.
-          - Include at most 40 comments; demote excess lower-severity findings to
-            unmapped_findings with reason "comment limit exceeded".
-          - Move any finding that lacks a valid "path" to unmapped_findings.
-          - Output valid JSON only — no prose, no markdown fences.
         model: openrouter/openai/gpt-5.1-codex-mini
         context:
-          max_bytes: 16384
           tasks:
             - name: code-quality-reviewer
               field: stdout
@@ -265,16 +161,7 @@ jobs:
           outputs:
             - name: final-review
 
-      # ── 4. Post inline review comments ──────────────────────────────────────
-      #
-      # Posts each finding from the aggregator as a GitHub PR review comment via
-      # the REST API (POST /repos/{owner}/{repo}/pulls/{number}/comments).
-      # Supports three granularities:
-      #   file  — subject_type=file, anchored to the whole file in the diff.
-      #   line  — anchored to a single line (path + line + side).
-      #   range — anchored to a multi-line span (start_line/side + line/side).
-      # Findings that fail path validation or field checks are logged as unmapped
-      # and the pipeline exits successfully. API hard errors exit non-zero.
+      # ── 4. Post the comment ───────────────────────────────────────────────
       - task: post-comment
         attempts: 2
         config:
@@ -290,115 +177,12 @@ jobs:
               - -c
               - |
                   apk add --no-cache jq >/dev/null 2>&1
-
-                  # ── Extract and validate aggregated JSON ───────────────────
-                  REVIEW_TEXT=$(jq -r .text < final-review/result.json)
-                  if [ -z "$REVIEW_TEXT" ] || [ "$REVIEW_TEXT" = "null" ]; then
+                  REVIEW=$(jq -r .text < final-review/result.json)
+                  if [ -z "$REVIEW" ] || [ "$REVIEW" = "null" ]; then
                     echo "error: could not extract .text from final-review/result.json" >&2
                     cat final-review/result.json >&2
                     exit 1
                   fi
-                  if ! printf '%s' "$REVIEW_TEXT" | jq empty 2>/dev/null; then
-                    echo "error: final-reviewer output is not valid JSON" >&2
-                    printf '%s\n' "$REVIEW_TEXT" >&2
-                    exit 1
-                  fi
-
-                  # ── Resolve PR head commit SHA ──────────────────────────────
-                  HEAD_SHA=$(gh api "repos/$GH_REPO/pulls/$PR_NUMBER" \
-                    -H "Accept: application/vnd.github+json" \
-                    -H "X-GitHub-Api-Version: 2022-11-28" \
-                    --jq .head.sha)
-                  if [ -z "$HEAD_SHA" ] || [ "$HEAD_SHA" = "null" ]; then
-                    echo "error: could not resolve head SHA for PR #$PR_NUMBER" >&2
-                    exit 1
-                  fi
-                  echo "head SHA: $HEAD_SHA"
-
-                  # ── Fetch changed file paths for path validation ─────────────
-                  CHANGED_FILES=$(gh api "repos/$GH_REPO/pulls/$PR_NUMBER/files" \
-                    -H "Accept: application/vnd.github+json" \
-                    -H "X-GitHub-Api-Version: 2022-11-28" \
-                    --paginate | jq -r '.[].filename')
-                  if [ -z "$CHANGED_FILES" ]; then
-                    echo "error: could not fetch changed file list for PR #$PR_NUMBER" >&2
-                    exit 1
-                  fi
-
-                  # ── Post inline comments ────────────────────────────────────
-                  TOTAL=$(printf '%s' "$REVIEW_TEXT" | jq '.comments | length')
-                  echo "posting up to $TOTAL inline comment(s) (cap: 40)"
-                  POSTED=0
-                  FAILED=0
-                  SKIPPED=0
-                  i=0
-                  while [ "$i" -lt "$TOTAL" ] && [ "$i" -lt 40 ]; do
-                    finding=$(printf '%s' "$REVIEW_TEXT" | jq -c ".comments[$i]")
-                    TARGET_TYPE=$(printf '%s' "$finding" | jq -r '.target_type')
-                    PATH_VAL=$(printf '%s' "$finding" | jq -r '.path')
-
-                    # Validate path is among the PR's changed files
-                    if ! printf '%s\n' "$CHANGED_FILES" | grep -qxF "$PATH_VAL"; then
-                      echo "SKIP[$i] path not in PR diff: $PATH_VAL"
-                      SKIPPED=$((SKIPPED + 1))
-                      i=$((i + 1))
-                      continue
-                    fi
-
-                    # Build JSON payload — jq handles all quoting and escaping
-                    PAYLOAD=$(printf '%s' "$finding" | jq \
-                      --arg sha "$HEAD_SHA" \
-                      '{
-                        commit_id:    $sha,
-                        path:         .path,
-                        body:         ("[" + (.severity // "minor") + "] " + .message),
-                        subject_type: (if .target_type == "file"  then "file"  else null end),
-                        line:         (if .target_type != "file"  then (.line | tonumber) else null end),
-                        side:         (if .target_type != "file"  then (.side // "RIGHT") else null end),
-                        start_line:   (if .target_type == "range" then (.start_line | tonumber) else null end),
-                        start_side:   (if .target_type == "range" then (.start_side // "RIGHT") else null end)
-                      } | with_entries(select(.value != null))')
-
-                    # Validate required fields are present
-                    if ! printf '%s' "$PAYLOAD" | jq -e '.commit_id and .path and .body' \
-                        >/dev/null 2>&1; then
-                      echo "SKIP[$i] missing required fields ($TARGET_TYPE): $PATH_VAL"
-                      SKIPPED=$((SKIPPED + 1))
-                      i=$((i + 1))
-                      continue
-                    fi
-
-                    # Post the comment via GitHub REST API
-                    if printf '%s' "$PAYLOAD" | gh api \
-                        "repos/$GH_REPO/pulls/$PR_NUMBER/comments" \
-                        -X POST \
-                        --input - \
-                        -H "Accept: application/vnd.github+json" \
-                        -H "X-GitHub-Api-Version: 2022-11-28" \
-                        --silent; then
-                      echo "OK[$i] $TARGET_TYPE: $PATH_VAL"
-                      POSTED=$((POSTED + 1))
-                    else
-                      echo "FAIL[$i] $TARGET_TYPE: $PATH_VAL"
-                      FAILED=$((FAILED + 1))
-                    fi
-
-                    sleep 1
-                    i=$((i + 1))
-                  done
-
-                  # ── Log unmapped findings (not posted) ─────────────────────
-                  UNMAPPED=$(printf '%s' "$REVIEW_TEXT" | jq '.unmapped_findings | length // 0')
-                  if [ "$UNMAPPED" -gt 0 ]; then
-                    echo ""
-                    echo "── Unmapped findings (not posted) ───────────────────"
-                    printf '%s' "$REVIEW_TEXT" | jq -r \
-                      '.unmapped_findings[]? | "[" + (.severity // "minor") + "] " + .message + " — " + (.reason // "unspecified")'
-                  fi
-
-                  echo ""
-                  echo "Done: posted=$POSTED failed=$FAILED skipped=$SKIPPED unmapped=$UNMAPPED"
-                  # Hard-fail only when individual API calls returned errors
-                  [ "$FAILED" -eq 0 ] || exit 1
+                  gh pr comment "$PR_NUMBER" --repo "$GH_REPO" --body "$REVIEW"
           env:
             GH_TOKEN: secret:GITHUB_TOKEN

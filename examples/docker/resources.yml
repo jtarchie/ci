@@ -27,7 +27,7 @@ jobs:
         assert:
           stdout: "2025"
       - put: test-resource
-        params: { version: 2026 }
+        params: { version: "2026" }
       - task: check-updated-version
         config:
           platform: linux
