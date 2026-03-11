@@ -295,6 +295,67 @@ const pipeline = async ( => {
 		assert.Expect(err.Error()).To(ContainSubstring("unsupported file extension"))
 	})
 
+	t.Run("accepts YAML with opt-in templating marker", func(t *testing.T) {
+		t.Parallel()
+		assert := NewGomegaWithT(t)
+
+		client, ts := newTestServer(t, server.RouterOptions{})
+
+		// YAML pipeline with pocketci: template marker that uses Sprig functions
+		yamlWithTemplating := `# pocketci: template
+---
+jobs:
+  - name: {{ lower "HELLO_JOB" }}
+    plan:
+      - task: echo
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: { repository: alpine }
+          run:
+            path: echo
+            args: ["{{ upper "hello world" }}"]`
+
+		pipelineFile := writePipeline(t, t.TempDir(), "templated.yaml", yamlWithTemplating)
+		cmd := commands.SetPipeline{
+			Pipeline:  pipelineFile,
+			ServerURL: ts.URL,
+		}
+
+		err := cmd.Run(slog.Default())
+		assert.Expect(err).NotTo(HaveOccurred())
+
+		// Verify the pipeline was stored (name derived from filename)
+		result, err := client.SearchPipelines(context.Background(), "", 1, 100)
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(result.Items).To(HaveLen(1))
+		assert.Expect(result.Items[0].Name).To(Equal("templated"))
+	})
+
+	t.Run("rejects YAML with template syntax errors", func(t *testing.T) {
+		t.Parallel()
+		assert := NewGomegaWithT(t)
+
+		// YAML pipeline with opt-in marker but unclosed template tag
+		yamlWithBadTemplate := `# pocketci: template
+---
+jobs:
+  - name: {{ unclosed template
+    plan: []`
+
+		pipelineFile := writePipeline(t, t.TempDir(), "bad-template.yaml", yamlWithBadTemplate)
+		cmd := commands.SetPipeline{
+			Pipeline:  pipelineFile,
+			ServerURL: "http://localhost:0",
+		}
+
+		err := cmd.Run(slog.Default())
+		assert.Expect(err).To(HaveOccurred())
+		// The error should indicate a template parse failure
+		assert.Expect(err.Error()).To(ContainSubstring("pipeline template parse failed"))
+	})
+
 	t.Run("credentials are redacted from the server URL in output", func(t *testing.T) {
 		// Not parallel — captures os.Stdout, which is not goroutine-safe.
 		assert := NewGomegaWithT(t)

@@ -1,17 +1,49 @@
 package backwards
 
 import (
+	"bytes"
 	_ "embed"
 	"fmt"
 	"os"
+	"strings"
+	"text/template"
 
 	"github.com/go-playground/validator/v10"
+	sprig "github.com/go-task/slim-sprig/v3"
 	"github.com/goccy/go-yaml"
 )
 
 //go:generate go run github.com/evanw/esbuild/... --tree-shaking=true --platform=neutral --bundle --outfile=bundle.js src/index.ts
 //go:embed bundle.js
 var pipelineJS string
+
+// preprocessYAML checks for an opt-in template marker ("pocketci: template" on
+// the first line) and renders the YAML using Go text/template with Sprig functions.
+// If no marker is found, returns the original content unchanged. Template
+// rendering errors are returned as wrapped errors with "pipeline template" prefix.
+func preprocessYAML(content []byte) ([]byte, error) {
+	contentStr := string(content)
+
+	// Check for opt-in marker on first line
+	lines := strings.SplitN(contentStr, "\n", 2)
+	if len(lines) == 0 || !strings.Contains(lines[0], "pocketci: template") {
+		// No opt-in marker; return unchanged
+		return content, nil
+	}
+
+	// Marker found; render as template with Sprig functions
+	tmpl, err := template.New("pipeline").Funcs(sprig.FuncMap()).Parse(contentStr)
+	if err != nil {
+		return nil, fmt.Errorf("pipeline template parse failed: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, nil); err != nil {
+		return nil, fmt.Errorf("pipeline template render failed: %w", err)
+	}
+
+	return buf.Bytes(), nil
+}
 
 func NewPipeline(filename string) (string, error) {
 	contents, err := os.ReadFile(filename)
@@ -28,7 +60,13 @@ func NewPipeline(filename string) (string, error) {
 func NewPipelineFromContent(content string) (string, error) {
 	var config Config
 
-	err := yaml.Unmarshal([]byte(content), &config)
+	// Preprocess YAML templates if opted in
+	processed, err := preprocessYAML([]byte(content))
+	if err != nil {
+		return "", err
+	}
+
+	err = yaml.Unmarshal(processed, &config)
 	if err != nil {
 		return "", fmt.Errorf("could not unmarshal pipeline: %w", err)
 	}
@@ -66,7 +104,14 @@ func NewPipelineFromContent(content string) (string, error) {
 func ValidatePipeline(content []byte) error {
 	var config Config
 
-	if err := yaml.Unmarshal(content, &config); err != nil {
+	// Preprocess YAML templates if opted in
+	processed, err := preprocessYAML(content)
+	if err != nil {
+		return err
+	}
+
+	err = yaml.Unmarshal(processed, &config)
+	if err != nil {
 		return fmt.Errorf("could not unmarshal pipeline: %w", err)
 	}
 
