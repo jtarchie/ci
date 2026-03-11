@@ -300,10 +300,22 @@ declare global {
     field?: "stdout" | "stderr" | "both";
   }
 
-  // Configures pre-fetched task outputs to inject before the agent's first turn.
+  // Specifies a volume file whose contents are pre-read into the agent's session
+  // history before the first turn, saving a read_file tool call.
+  interface AgentContextFile {
+    /** Path as "mountname/relative/path", e.g. "diff/pr.diff". */
+    path: string;
+    /** Per-file byte limit. Falls back to AgentContext.max_bytes (default 4096). */
+    max_bytes?: number;
+  }
+
+  // Configures pre-fetched task outputs and file contents to inject before the
+  // agent's first turn, eliminating orientation tool calls.
   interface AgentContext {
     tasks?: AgentContextTask[];
-    /** Maximum bytes per stdout/stderr field. Defaults to 4096. */
+    /** Volume files to pre-inject as synthetic read_file results. */
+    files?: AgentContextFile[];
+    /** Maximum bytes per stdout/stderr/file field. Defaults to 4096. */
     max_bytes?: number;
   }
 
@@ -479,12 +491,12 @@ declare global {
     jobName: string;
     buildID: string;
     status:
-      | "pending"
-      | "running"
-      | "success"
-      | "failure"
-      | "error"
-      | "limit_exceeded";
+    | "pending"
+    | "running"
+    | "success"
+    | "failure"
+    | "error"
+    | "limit_exceeded";
     startTime: string;
     endTime: string;
     duration: string;
@@ -837,4 +849,4 @@ declare global {
   }
 }
 
-export {};
+export { };

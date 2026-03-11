@@ -3,7 +3,7 @@
 #
 # Triggered by a GitHub pull_request webhook. Three specialist agents review
 # the code sequentially; a final aggregator agent synthesises their feedback
-# and a task step posts the result as a PR comment via the `gh` CLI.
+# and a task step posts a batched inline GitHub review via the `gh` CLI.
 #
 # Required secrets:
 #   GITHUB_TOKEN — Personal access token with repo + pull_request:write scope.
@@ -37,6 +37,7 @@ jobs:
             source: { repository: alpine/git }
           outputs:
             - name: diff
+            - name: repo
           run:
             path: sh
             args:
@@ -62,11 +63,31 @@ jobs:
       # ── 2a. Code-quality review ───────────────────────────────────────────
       - agent: code-quality-reviewer
         prompt: |
-          Review the pull request changes in diff/pr.diff.
-          Focus only on the changed lines: readability, naming, structure, and DRY violations.
-          Be concise — bullet points only, no preamble.
-          Include filename and line numbers for any issues.
+          The PR diff has been injected into your context — use it as a starting point.
+          The full repository clone is at repo/.
+
+          Your task: review for code quality — readability, naming, structure, DRY violations.
+
+          Research before reporting. Use run_script with the tools available in this image
+          (git, grep, find, sed, perl):
+            grep -rn 'SymbolName' repo/              — find all usages of a changed symbol
+            sed -n '30,60p' repo/path/to/file.go    — read surrounding context for a finding
+            git -C repo log --oneline -5 -- path/file — recent change history for a file
+
+          For each finding, output one bullet:
+            - path/file.ext:LINE — description
+          For range findings:
+            - path/file.ext:START-END — description
+
+          Rules:
+          - Use repo-relative paths (no "repo/" prefix).
+          - Only report a finding after verifying it in the diff or repo.
+          - Bullet points only, no prose preamble.
         model: openrouter/openai/gpt-5.1-codex-mini
+        context:
+          files:
+            - path: diff/pr.diff
+              max_bytes: 65536
         config:
           platform: linux
           image_resource:
@@ -74,17 +95,39 @@ jobs:
             source: { repository: alpine/git }
           inputs:
             - name: diff
+            - name: repo
           outputs:
             - name: code-quality-output
 
       # ── 2b. Security review ───────────────────────────────────────────────
       - agent: security-reviewer
         prompt: |
-          Audit the pull request changes in diff/pr.diff for security issues.
-          Focus only on the changed lines: injection, authentication, data exposure, OWASP Top 10.
-          Be concise — bullet points only, no preamble.
-          Include filename and line numbers for any issues.
+          The PR diff has been injected into your context — use it as a starting point.
+          The full repository clone is at repo/.
+
+          Your task: audit for security issues — injection, authentication, data exposure, OWASP Top 10.
+
+          Research before reporting. Use run_script with the tools available in this image
+          (git, grep, find, sed, perl):
+            grep -rn 'exec\|eval\|system' repo/       — find dangerous sinks
+            grep -rn 'req\.' repo/                     — trace external inputs
+            sed -n '30,60p' repo/path/to/file.go      — read surrounding context for a finding
+            grep -rn 'TODO\|FIXME\|nosec' repo/       — check suppressed warnings
+
+          For each finding, output one bullet:
+            - path/file.ext:LINE — description
+          For range findings:
+            - path/file.ext:START-END — description
+
+          Rules:
+          - Use repo-relative paths (no "repo/" prefix).
+          - Only report a finding after verifying it in the diff or repo.
+          - Bullet points only, no prose preamble.
         model: openrouter/openai/gpt-5.1-codex-mini
+        context:
+          files:
+            - path: diff/pr.diff
+              max_bytes: 65536
         config:
           platform: linux
           image_resource:
@@ -92,17 +135,39 @@ jobs:
             source: { repository: alpine/git }
           inputs:
             - name: diff
+            - name: repo
           outputs:
             - name: security-output
 
       # ── 2c. Maintainability review ────────────────────────────────────────
       - agent: maintainability-reviewer
         prompt: |
-          Evaluate the pull request changes in diff/pr.diff for maintainability.
-          Focus only on the changed lines: test coverage, cyclomatic complexity, documentation.
-          Be concise — bullet points only, no preamble.
-          Include filename and line numbers for any issues.
+          The PR diff has been injected into your context — use it as a starting point.
+          The full repository clone is at repo/.
+
+          Your task: evaluate for maintainability — test coverage, cyclomatic complexity, documentation.
+
+          Research before reporting. Use run_script with the tools available in this image
+          (git, grep, find, sed, perl):
+            find repo/ -name '*_test*' | xargs grep -l 'ChangedFunc' — check if tests cover changed code
+            git -C repo log --oneline -10 -- path/file               — assess change frequency / churn
+            grep -rn 'TODO\|FIXME\|HACK' repo/path/                  — find tech debt near changed lines
+            sed -n '30,60p' repo/path/to/file.go                     — read surrounding context
+
+          For each finding, output one bullet:
+            - path/file.ext:LINE — description
+          For range findings:
+            - path/file.ext:START-END — description
+
+          Rules:
+          - Use repo-relative paths (no "repo/" prefix).
+          - Only report a finding after verifying it in the diff or repo.
+          - Bullet points only, no prose preamble.
         model: openrouter/openai/gpt-5.1-codex-mini
+        context:
+          files:
+            - path: diff/pr.diff
+              max_bytes: 65536
         config:
           platform: linux
           image_resource:
@@ -110,6 +175,7 @@ jobs:
             source: { repository: alpine/git }
           inputs:
             - name: diff
+            - name: repo
           outputs:
             - name: maintainability-output
 
@@ -125,21 +191,37 @@ jobs:
       #      run_command if the agent needs to re-read raw content.
       - agent: final-reviewer
         prompt: |
-          You have received three code reviews: code quality, security, and
-          maintainability. Synthesize them into a single, concise GitHub PR
-          comment written in JSON. Format:
+          You have received reviews from three specialist agents — all pre-injected in your context:
+            1. code-quality-reviewer
+            2. security-reviewer
+            3. maintainability-reviewer
+
+          Read ALL THREE carefully. You MUST include findings from every reviewer.
+          Do not silently omit any reviewer's findings.
+
+          Synthesize into strict JSON only (no markdown, no code fences, no preamble).
+          Output format:
 
           {
+            "summary": "One sentence overall verdict",
             "issues": [
               {
-                "severity": "critical",
+                "severity": "critical|high|medium|low",
                 "description": "Description of the issue",
-                "file": "filename",
-                "line": 123
+                "file": "path/from/repo/root.ext",
+                "line": 97,
+                "start_line": 36
               }
-            ],
-            "summary": "One sentence overall verdict"
+            ]
           }
+
+          Requirements:
+          - Return valid JSON and nothing else.
+          - Include findings from ALL THREE reviewers.
+          - `file` must be repo-relative (no "repo/" prefix).
+          - `line` is an integer. For range findings it is the LAST line of the range.
+          - `start_line` is optional. Include it when a finding covers a line range; must be < `line`.
+          - Include only findings you are reasonably confident about.
         model: openrouter/openai/gpt-5.1-codex-mini
         context:
           tasks:
@@ -161,28 +243,242 @@ jobs:
           outputs:
             - name: final-review
 
-      # ── 4. Post the comment ───────────────────────────────────────────────
+      # ── 4. Post batched inline review comments ────────────────────────────
+      #
+      # Uses denoland/deno:alpine — TypeScript with native fetch().
+      # No gh CLI, no jq, no awk: all logic is expressed as typed TS.
       - task: post-comment
         attempts: 2
         config:
           platform: linux
           image_resource:
             type: registry-image
-            source: { repository: maniator/gh }
+            source: { repository: denoland/deno, tag: alpine }
           inputs:
             - name: final-review
+            - name: diff
           run:
             path: sh
             args:
               - -c
               - |
-                  apk add --no-cache jq >/dev/null 2>&1
-                  REVIEW=$(jq -r .text < final-review/result.json)
-                  if [ -z "$REVIEW" ] || [ "$REVIEW" = "null" ]; then
-                    echo "error: could not extract .text from final-review/result.json" >&2
-                    cat final-review/result.json >&2
-                    exit 1
-                  fi
-                  gh pr comment "$PR_NUMBER" --repo "$GH_REPO" --body "$REVIEW"
+                  cat > /tmp/post_review.ts << '___TSEOF___'
+                  // ── Types ─────────────────────────────────────────────────────────────────
+                  interface Issue {
+                    severity?: unknown;
+                    description?: unknown;
+                    file?: unknown;
+                    line?: unknown;
+                    start_line?: unknown;
+                  }
+                  type Severity = "critical" | "high" | "medium" | "low";
+                  interface Review { summary?: unknown; issues?: unknown[] }
+                  interface InlineComment {
+                    path: string; line: number; side: "RIGHT"; body: string;
+                    start_line?: number; start_side?: "RIGHT";
+                  }
+                  interface FallbackFinding {
+                    severity: Severity;
+                    description: string;
+                  }
+
+                  // ── Helpers ───────────────────────────────────────────────────────────────
+
+                  // Extract JSON from agent .text, tolerating optional ```json fences.
+                  function parseReview(text: string): Review {
+                    const src = text.trim()
+                      .replace(/^```json\s*/i, "")
+                      .replace(/\s*```$/, "");
+                    return JSON.parse(src) as Review;
+                  }
+
+                  function normalizeSeverity(value: unknown): Severity {
+                    switch (String(value ?? "low").toLowerCase()) {
+                      case "critical":
+                      case "high":
+                      case "medium":
+                      case "low":
+                        return String(value ?? "low").toLowerCase() as Severity;
+                      default:
+                        return "low";
+                    }
+                  }
+
+                  // Build a Set<"path:line"> for every added line in the unified diff.
+                  function changedLines(diff: string): Set<string> {
+                    const changed = new Set<string>();
+                    let file = "";
+                    let line = 0;
+                    for (const raw of diff.split("\n")) {
+                      if (raw.startsWith("diff --git ")) {
+                        // Header is always "diff --git a/<path> b/<path>".
+                        // Slicing after the last " b/" gives the new-file path,
+                        // which is what the LLM reports and what GitHub expects.
+                        const bIdx = raw.lastIndexOf(" b/");
+                        file = bIdx !== -1 ? raw.slice(bIdx + 3) : "";
+                      } else if (raw.startsWith("@@ ")) {
+                        const m = raw.match(/\+(\d+)/);
+                        line = m ? Number(m[1]) - 1 : 0;
+                      } else if (raw.startsWith("--- ") || raw.startsWith("+++ ")) {
+                        // skip diff header lines
+                      } else if (raw.startsWith("+")) {
+                        // Added line — anchorable on RIGHT side.
+                        line++;
+                        if (file) changed.add(`${file}:${line}`);
+                      } else if (raw.startsWith(" ")) {
+                        // Context line — also visible in the diff and anchorable.
+                        // LLMs frequently cite unchanged lines that frame an issue.
+                        line++;
+                        if (file) changed.add(`${file}:${line}`);
+                      }
+                      // "-" deleted lines don't advance the new-file counter
+                      // and cannot be commented on the RIGHT side.
+                    }
+                    return changed;
+                  }
+
+                  // Thin wrapper around the GitHub REST API using native fetch.
+                  async function github(
+                    path: string,
+                    opts: RequestInit = {},
+                  ): Promise<unknown> {
+                    const res = await fetch(`https://api.github.com/${path}`, {
+                      ...opts,
+                      headers: {
+                        Authorization: `Bearer ${GH_TOKEN}`,
+                        Accept: "application/vnd.github+json",
+                        "X-GitHub-Api-Version": "2022-11-28",
+                        "Content-Type": "application/json",
+                        ...(opts.headers ?? {}),
+                      },
+                    });
+                    if (!res.ok) {
+                      throw new Error(
+                        `GitHub API ${path} → ${res.status} ${res.statusText}\n${await res.text()}`,
+                      );
+                    }
+                    return res.json();
+                  }
+
+                  // ── Main ─────────────────────────────────────────────────────────────────
+
+                  const GH_TOKEN  = Deno.env.get("GH_TOKEN")  ?? "";
+                  const GH_REPO   = Deno.env.get("GH_REPO")   ?? "";
+                  const PR_NUMBER = Deno.env.get("PR_NUMBER")  ?? "";
+
+                  // 1. Read & validate agent output
+                  const agentResult = JSON.parse(
+                    await Deno.readTextFile("final-review/result.json"),
+                  ) as { text?: string };
+
+                  if (!agentResult.text) {
+                    console.error("error: .text missing from final-review/result.json");
+                    Deno.exit(1);
+                  }
+
+                  let review: Review;
+                  try {
+                    review = parseReview(agentResult.text);
+                  } catch (e) {
+                    console.error("error: final-reviewer output is not valid JSON:", e);
+                    console.error(agentResult.text);
+                    Deno.exit(1);
+                  }
+
+                  if (typeof review.summary !== "string" || !Array.isArray(review.issues)) {
+                    console.error(
+                      "error: review JSON must have summary (string) and issues (array)",
+                    );
+                    Deno.exit(1);
+                  }
+
+                  // 2. Build changed-line index from the diff
+                  const diff = await Deno.readTextFile("diff/pr.diff");
+                  const changed = changedLines(diff);
+
+                  // 3. Classify each issue as inline-anchorable or fallback
+                  const summary  = review.summary || "Automated review completed.";
+                  const inline: InlineComment[] = [];
+                  const fallback: FallbackFinding[] = [];
+
+                  for (const raw of (review.issues as Issue[])) {
+                    const severity    = normalizeSeverity(raw.severity);
+                    const description = String(raw.description ?? "").trim();
+                    const file        = String(raw.file        ?? "").trim();
+                    const line        = typeof raw.line === "number"
+                      ? raw.line
+                      : Number(raw.line ?? 0);
+                    const startLine   = raw.start_line != null
+                      ? (typeof raw.start_line === "number" ? raw.start_line : Number(raw.start_line))
+                      : 0;
+
+                    if (!description) continue;
+
+                    if (file && line > 0 && changed.has(`${file}:${line}`)) {
+                      const comment: InlineComment = {
+                        path: file,
+                        line,
+                        side: "RIGHT",
+                        body: `[${severity.toUpperCase()}] ${description}`,
+                      };
+                      // Attach range fields when start_line is valid and also anchorable in the diff.
+                      if (startLine > 0 && startLine < line && changed.has(`${file}:${startLine}`)) {
+                        comment.start_line = startLine;
+                        comment.start_side = "RIGHT";
+                      }
+                      inline.push(comment);
+                    } else {
+                      fallback.push({ severity, description });
+                    }
+                  }
+
+                  // 4. Fetch head commit SHA (needed by the review API)
+                  const pr = await github(
+                    `repos/${GH_REPO}/pulls/${PR_NUMBER}`,
+                  ) as { head: { sha: string } };
+
+                  // 5. Post one batched inline review (or fall back to a plain comment)
+                  if (inline.length > 0) {
+                    await github(`repos/${GH_REPO}/pulls/${PR_NUMBER}/reviews`, {
+                      method: "POST",
+                      body: JSON.stringify({
+                        commit_id: pr.head.sha,
+                        event: "COMMENT",
+                        body: summary,
+                        comments: inline,
+                      }),
+                    });
+                  } else {
+                    await github(`repos/${GH_REPO}/issues/${PR_NUMBER}/comments`, {
+                      method: "POST",
+                      body: JSON.stringify({ body: summary }),
+                    });
+                  }
+
+                  // 6. Post one extra comment for issues that couldn't be anchored
+                  if (fallback.length > 0) {
+                    const body = [
+                      "## Automated Review: Unanchored Findings",
+                      "",
+                      "These findings could not be attached inline to the current diff:",
+                      "Locations are omitted because the reported file and line could not be anchored to the current patch.",
+                      "",
+                      ...fallback.map(
+                        (f) =>
+                          `- [${f.severity.toUpperCase()}] ${f.description}`,
+                      ),
+                    ].join("\n");
+
+                    await github(`repos/${GH_REPO}/issues/${PR_NUMBER}/comments`, {
+                      method: "POST",
+                      body: JSON.stringify({ body }),
+                    });
+                  }
+
+                  console.log(`posted inline comments : ${inline.length}`);
+                  console.log(`posted fallback comments: ${fallback.length}`);
+                  ___TSEOF___
+
+                  deno run --allow-read --allow-env --allow-net /tmp/post_review.ts
           env:
             GH_TOKEN: secret:GITHUB_TOKEN

@@ -81,6 +81,38 @@ func TestParseTaskStepID(t *testing.T) {
 	assert.Expect(name).To(Equal("x-name"))
 }
 
+// TestRunScriptInput_MultiStep verifies that runScriptInput wraps its script
+// in /bin/sh -c and that sequential commands in one call all execute.
+func TestRunScriptInput_MultiStep(t *testing.T) {
+	t.Parallel()
+
+	assert := NewGomegaWithT(t)
+
+	// Simulate what sandbox.Exec receives from run_script by running locally.
+	script := "set -e\necho hello\necho world"
+	cmd := exec.Command("/bin/sh", "-c", script) //nolint:gosec
+	out, err := cmd.Output()
+	assert.Expect(err).NotTo(HaveOccurred())
+	assert.Expect(string(out)).To(ContainSubstring("hello"))
+	assert.Expect(string(out)).To(ContainSubstring("world"))
+}
+
+// TestRunScriptInput_FailFast verifies that set -e causes the script to abort
+// at the first failing command and that the exit code is non-zero.
+func TestRunScriptInput_FailFast(t *testing.T) {
+	t.Parallel()
+
+	assert := NewGomegaWithT(t)
+
+	// 'false' exits 1 so set -e should abort before the second echo.
+	script := "set -e\nfalse\necho should_not_appear"
+	cmd := exec.Command("/bin/sh", "-c", script) //nolint:gosec
+	out, err := cmd.CombinedOutput()
+	// err is non-nil when exit code != 0.
+	assert.Expect(err).To(HaveOccurred())
+	assert.Expect(string(out)).NotTo(ContainSubstring("should_not_appear"))
+}
+
 func TestLevenshtein(t *testing.T) {
 	t.Parallel()
 

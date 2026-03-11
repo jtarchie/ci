@@ -149,10 +149,19 @@ type AgentContextTask struct {
 	Field string `yaml:"field,omitempty" json:"field,omitempty"` // stdout | stderr | both (default)
 }
 
-// AgentContext configures which prior task outputs to inject into the agent's
-// session history before the first turn, reducing orientation tool calls.
+// AgentContextFile specifies a volume file whose contents are pre-read into the
+// agent's session history before the first turn, saving a read_file tool call.
+// Path is "mountname/relative/path" (e.g. "diff/pr.diff").
+type AgentContextFile struct {
+	Path     string `yaml:"path"                json:"path"`
+	MaxBytes int    `yaml:"max_bytes,omitempty" json:"max_bytes,omitempty"`
+}
+
+// AgentContext configures which prior task outputs and file contents to inject
+// into the agent's session history before the first turn.
 type AgentContext struct {
 	Tasks    []AgentContextTask `yaml:"tasks,omitempty"    json:"tasks,omitempty"`
+	Files    []AgentContextFile `yaml:"files,omitempty"    json:"files,omitempty"`
 	MaxBytes int                `yaml:"max_bytes,omitempty" json:"max_bytes,omitempty"`
 }
 

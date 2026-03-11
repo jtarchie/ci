@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -379,6 +381,102 @@ func TestRunAgent_FakeLLM_RealDocker(t *testing.T) {
 	assert.Expect(artifact["text"]).To(ContainSubstring("Found diff file"))
 }
 
+// TestRunAgent_FakeLLM_RunScript_RealDocker verifies that the run_script tool
+// executes a multi-line script in a single round-trip and that the audit log
+// records one tool_call (not two) even though two commands run in the script.
+func TestRunAgent_FakeLLM_RunScript_RealDocker(t *testing.T) {
+	assert := NewGomegaWithT(t)
+
+	responses := []string{
+		// Turn 1: agent calls run_script with a two-step script.
+		`{
+			"id":"chatcmpl-rs-1",
+			"object":"chat.completion",
+			"created":1730000100,
+			"model":"fake-model",
+			"choices":[{
+				"index":0,
+				"message":{
+					"role":"assistant",
+					"content":"",
+					"tool_calls":[{
+						"id":"call_script",
+						"type":"function",
+						"function":{
+							"name":"run_script",
+							"arguments":"{\"script\":\"set -e\\nls diff\\ncat diff/pr.diff\"}"
+						}
+					}]
+				},
+				"finish_reason":"tool_calls"
+			}],
+			"usage":{"prompt_tokens":20,"completion_tokens":5,"total_tokens":25}
+		}`,
+		// Turn 2: agent summarizes after receiving the combined output.
+		`{
+			"id":"chatcmpl-rs-2",
+			"object":"chat.completion",
+			"created":1730000101,
+			"model":"fake-model",
+			"choices":[{
+				"index":0,
+				"message":{
+					"role":"assistant",
+					"content":"Script ran successfully: found diff and read content in one call."
+				},
+				"finish_reason":"stop"
+			}],
+			"usage":{"prompt_tokens":30,"completion_tokens":8,"total_tokens":38}
+		}`,
+	}
+
+	llm, reqCount := newSequencedLLMServer(t, responses)
+	configureFakeOpenAI(t, llm.URL)
+
+	runner := newDockerRunner(t, "agent-script")
+	diffVol := mustCreateVolume(t, runner, "diff")
+	outVol := mustCreateVolume(t, runner, "final-review")
+	seedDiffVolume(t, runner, diffVol)
+
+	result, err := RunAgent(context.Background(), runner, nil, "", AgentConfig{
+		Name:   "script-agent",
+		Prompt: "Use run_script to list and read diff/pr.diff in one call, then summarize.",
+		Model:  "openai/fake-model",
+		Image:  "busybox",
+		Mounts: map[string]pipelinerunner.VolumeResult{
+			"diff":         diffVol,
+			"final-review": outVol,
+		},
+		OutputVolumePath: outVol.Path,
+	})
+	assert.Expect(err).NotTo(HaveOccurred())
+	assert.Expect(result).NotTo(BeNil())
+	assert.Expect(result.Text).To(ContainSubstring("one call"))
+
+	// Exactly two LLM requests: one tool call, one final answer.
+	assert.Expect(atomic.LoadInt32(reqCount)).To(BeNumerically("==", 2))
+
+	// Audit log must show exactly one run_script tool_call.
+	var scriptCalls int
+	var combinedOutput string
+	for _, event := range result.AuditLog {
+		if event.Type == "tool_call" && event.ToolName == "run_script" {
+			scriptCalls++
+		}
+		if event.Type == "tool_response" && event.ToolName == "run_script" && event.ToolResult != nil {
+			combinedOutput, _ = event.ToolResult["stdout"].(string)
+		}
+	}
+
+	assert.Expect(scriptCalls).To(Equal(1), "expected exactly one run_script tool call")
+	// Both ls output and diff content must appear in the single response.
+	assert.Expect(combinedOutput).To(ContainSubstring("pr.diff"))
+	assert.Expect(combinedOutput).To(ContainSubstring("added line"))
+
+	artifact := readResultArtifact(t, runner, outVol, "read-script-result")
+	assert.Expect(artifact["status"]).To(Equal("success"))
+}
+
 func TestRunAgent_FakeLLM_InvalidToolArgs_RealDocker(t *testing.T) {
 	assert := NewGomegaWithT(t)
 
@@ -460,6 +558,157 @@ func TestRunAgent_FakeLLM_InvalidToolArgs_RealDocker(t *testing.T) {
 	artifact := readResultArtifact(t, runner, outVol, "read-invalid-result")
 	assert.Expect(artifact["status"]).To(Equal("success"))
 	assert.Expect(strings.TrimSpace(artifact["text"])).NotTo(BeEmpty())
+}
+
+func TestRunAgent_ContextFilesPreInjection_RealDocker(t *testing.T) {
+	assert := NewGomegaWithT(t)
+
+	// The agent receives the file pre-injected — it should answer in one turn
+	// without calling any tool.
+	responses := []string{
+		`{
+			"id":"chatcmpl-cf-1",
+			"object":"chat.completion",
+			"created":1730000200,
+			"model":"fake-model",
+			"choices":[{
+				"index":0,
+				"message":{
+					"role":"assistant",
+					"content":"The diff shows: added line"
+				},
+				"finish_reason":"stop"
+			}],
+			"usage":{"prompt_tokens":50,"completion_tokens":10,"total_tokens":60}
+		}`,
+	}
+
+	llm, reqCount := newSequencedLLMServer(t, responses)
+	configureFakeOpenAI(t, llm.URL)
+
+	runner := newDockerRunner(t, "agent-ctx-files")
+	diffVol := mustCreateVolume(t, runner, "diff")
+	outVol := mustCreateVolume(t, runner, "final-review")
+	seedDiffVolume(t, runner, diffVol)
+
+	result, err := RunAgent(context.Background(), runner, nil, "", AgentConfig{
+		Name:   "file-context-agent",
+		Prompt: "Summarize the diff content already injected in your context.",
+		Model:  "openai/fake-model",
+		Image:  "busybox",
+		Mounts: map[string]pipelinerunner.VolumeResult{
+			"diff":         diffVol,
+			"final-review": outVol,
+		},
+		OutputVolumePath: outVol.Path,
+		Context: &AgentContext{
+			Files: []AgentContextFile{
+				{Path: "diff/pr.diff"},
+			},
+		},
+	})
+	assert.Expect(err).NotTo(HaveOccurred())
+	assert.Expect(result).NotTo(BeNil())
+	assert.Expect(result.Text).To(ContainSubstring("added line"))
+
+	// Exactly one LLM request — the file was pre-injected, no tool call needed.
+	assert.Expect(atomic.LoadInt32(reqCount)).To(BeNumerically("==", 1))
+
+	// Audit log must contain a pre_context read_file event with the diff content.
+	var preContextEvent *AuditEvent
+	for i := range result.AuditLog {
+		if result.AuditLog[i].Type == "pre_context" && result.AuditLog[i].ToolName == "read_file" {
+			preContextEvent = &result.AuditLog[i]
+			break
+		}
+	}
+
+	assert.Expect(preContextEvent).NotTo(BeNil(), "expected a pre_context read_file audit event")
+	assert.Expect(preContextEvent.ToolArgs).To(HaveKeyWithValue("path", "diff/pr.diff"))
+	content, _ := preContextEvent.ToolResult["content"].(string)
+	assert.Expect(content).To(ContainSubstring("added line"))
+
+	// Zero tool calls — no run_command, no run_script, no explicit read_file.
+	assert.Expect(result.Usage.ToolCallCount).To(BeZero())
+
+	// Pre-injections must not count against LLM turn budget: they are
+	// AppendEvent calls that never produce UsageMetadata, so turnCount
+	// (which drives the maxTurns limit) stays at 1 for this single real turn.
+	assert.Expect(result.Usage.LLMRequests).To(BeNumerically("==", 1))
+}
+
+// TestRunAgent_ContextFilesLLMReceivesContent_RealDocker captures the raw request
+// body sent to the LLM and asserts that the pre-injected diff content is present
+// and that the user prompt appears before the file content in conversation order.
+func TestRunAgent_ContextFilesLLMReceivesContent_RealDocker(t *testing.T) {
+	assert := NewGomegaWithT(t)
+
+	var (
+		mu          sync.Mutex
+		capturedReq string
+	)
+
+	llm := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		capturedReq = string(body)
+		mu.Unlock()
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"id":"chatcmpl-cap-1",
+			"object":"chat.completion",
+			"created":1730000300,
+			"model":"fake-model",
+			"choices":[{
+				"index":0,
+				"message":{"role":"assistant","content":"Diff reviewed."},
+				"finish_reason":"stop"
+			}],
+			"usage":{"prompt_tokens":80,"completion_tokens":5,"total_tokens":85}
+		}`))
+	}))
+	t.Cleanup(llm.Close)
+	configureFakeOpenAI(t, llm.URL)
+
+	runner := newDockerRunner(t, "agent-cf-llm")
+	diffVol := mustCreateVolume(t, runner, "diff")
+	outVol := mustCreateVolume(t, runner, "final-review")
+	seedDiffVolume(t, runner, diffVol)
+
+	_, err := RunAgent(context.Background(), runner, nil, "", AgentConfig{
+		Name:   "cf-llm-agent",
+		Prompt: "Summarize the diff.",
+		Model:  "openai/fake-model",
+		Image:  "busybox",
+		Mounts: map[string]pipelinerunner.VolumeResult{
+			"diff":         diffVol,
+			"final-review": outVol,
+		},
+		OutputVolumePath: outVol.Path,
+		Context: &AgentContext{
+			Files: []AgentContextFile{
+				{Path: "diff/pr.diff"},
+			},
+		},
+	})
+	assert.Expect(err).NotTo(HaveOccurred())
+
+	mu.Lock()
+	body := capturedReq
+	mu.Unlock()
+
+	// The first (and only) LLM request must contain the pre-injected file content.
+	assert.Expect(body).To(ContainSubstring("added line"),
+		"LLM request must contain the pre-injected diff content")
+
+	// The user prompt must precede the injected content so the model sees:
+	// user: "Summarize the diff." → model: [read_file call] → user: [result with diff]
+	promptIdx := strings.Index(body, "Summarize the diff.")
+	fileIdx := strings.Index(body, "added line")
+	assert.Expect(promptIdx).To(BeNumerically(">", -1), "user prompt missing from LLM request")
+	assert.Expect(promptIdx).To(BeNumerically("<", fileIdx),
+		"user prompt must appear before pre-injected file content in LLM messages")
 }
 
 func TestRunAgent_ContextTasksPreInjection_RealDocker(t *testing.T) {

@@ -136,11 +136,29 @@ type runCommandInput struct {
 	Args    []string `json:"args"`
 }
 
-// runCommandOutput is the tool result schema for run_command.
+// runCommandOutput is the tool result schema for run_command and run_script.
 type runCommandOutput struct {
 	Stdout   string `json:"stdout"`
 	Stderr   string `json:"stderr"`
 	ExitCode int    `json:"exit_code"`
+}
+
+// runScriptInput is the tool schema for run_script.
+type runScriptInput struct {
+	Script string `json:"script"`
+}
+
+// readFileInput is the tool schema for read_file.
+type readFileInput struct {
+	Path     string `json:"path"`                // "mountname/relative/path"
+	MaxBytes int    `json:"max_bytes,omitempty"` // default 4096
+}
+
+// readFileOutput is the tool result schema for read_file.
+type readFileOutput struct {
+	Path      string `json:"path"`
+	Content   string `json:"content"`
+	Truncated bool   `json:"truncated,omitempty"`
 }
 
 // AgentContextTask specifies a prior task whose output is pre-fetched into the
@@ -150,11 +168,20 @@ type AgentContextTask struct {
 	Field string `json:"field,omitempty"` // "stdout" | "stderr" | "both" (default)
 }
 
-// AgentContext configures pre-fetched task outputs injected as synthetic tool
-// call events before the agent's first turn, saving orientation tool calls.
+// AgentContextFile specifies a volume file whose contents are pre-read into the
+// agent's session history before the first turn, saving a read tool call.
+// Path is "mountname/relative/path" (e.g. "diff/pr.diff").
+type AgentContextFile struct {
+	Path     string `json:"path"`
+	MaxBytes int    `json:"max_bytes,omitempty"` // per-file override; falls back to AgentContext.MaxBytes
+}
+
+// AgentContext configures pre-fetched task outputs and file contents injected
+// as synthetic tool call events before the agent's first turn.
 type AgentContext struct {
-	Tasks    []AgentContextTask `json:"tasks,omitempty"`
-	MaxBytes int                `json:"max_bytes,omitempty"`
+	Tasks    []AgentContextTask  `json:"tasks,omitempty"`
+	Files    []AgentContextFile  `json:"files,omitempty"`
+	MaxBytes int                 `json:"max_bytes,omitempty"`
 }
 
 // taskSummary is the list_tasks tool output element.
@@ -789,7 +816,7 @@ func RunAgent(
 	runCmd, err := functiontool.New[runCommandInput, runCommandOutput](
 		functiontool.Config{
 			Name:        "run_command",
-			Description: "Run a shell command in the sandbox container. Returns stdout, stderr, and exit code.",
+			Description: "Run a single executable with explicit args. Prefer run_script when you need multiple sequential shell steps.",
 		},
 		func(_ adktool.Context, input runCommandInput) (runCommandOutput, error) {
 			var execInput pipelinerunner.ExecInput
@@ -813,6 +840,79 @@ func RunAgent(
 	)
 	if err != nil {
 		return nil, fmt.Errorf("agent: failed to create run_command tool: %w", err)
+	}
+
+	// Build the run_script tool — accepts a raw /bin/sh script string.
+	// This is the preferred tool when multiple sequential shell steps are needed;
+	// combining them into one call avoids paying for one LLM round-trip per step.
+	runScript, err := functiontool.New[runScriptInput, runCommandOutput](
+		functiontool.Config{
+			Name:        "run_script",
+			Description: "Run a multi-line shell script via /bin/sh. Use this instead of run_command when executing multiple sequential steps — it avoids extra LLM round-trips. Add 'set -e' at the top to abort on the first failure. Volume paths are accessible as relative paths from the working directory.",
+		},
+		func(_ adktool.Context, input runScriptInput) (runCommandOutput, error) {
+			var execInput pipelinerunner.ExecInput
+			execInput.Command.Path = "/bin/sh"
+			execInput.Command.Args = []string{"-c", input.Script}
+			execInput.OnOutput = config.OnOutput
+
+			result, execErr := sandbox.Exec(execInput)
+			if execErr != nil {
+				return runCommandOutput{}, execErr
+			}
+
+			return runCommandOutput{
+				Stdout:   result.Stdout,
+				Stderr:   result.Stderr,
+				ExitCode: result.Code,
+			}, nil
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("agent: failed to create run_script tool: %w", err)
+	}
+
+	// Build the read_file tool — reads a file from a mounted volume by path.
+	// Path format: "mountname/relative/path", e.g. "diff/pr.diff".
+	// This is the complement to context.files: if the file wasn't pre-injected,
+	// the model can explicitly request it with one tool call instead of
+	// shelling out to cat.
+	readFileTool, err := functiontool.New[readFileInput, readFileOutput](
+		functiontool.Config{
+			Name:        "read_file",
+			Description: "Read the contents of a file from a mounted volume. Path format: \"mountname/relative/path\" (e.g. \"diff/pr.diff\"). Prefer this over run_script 'cat' when you only need to read a single file — it avoids a shell subprocess.",
+		},
+		func(_ adktool.Context, input readFileInput) (readFileOutput, error) {
+			var execInput pipelinerunner.ExecInput
+			execInput.Command.Path = "/bin/sh"
+			execInput.Command.Args = []string{"-c", "cat " + input.Path}
+			execInput.OnOutput = config.OnOutput
+
+			result, execErr := sandbox.Exec(execInput)
+			if execErr != nil {
+				return readFileOutput{}, execErr
+			}
+
+			if result.Code != 0 {
+				return readFileOutput{}, fmt.Errorf("read_file: cat %s exited %d: %s", input.Path, result.Code, result.Stderr)
+			}
+
+			maxBytes := input.MaxBytes
+			if maxBytes <= 0 {
+				maxBytes = 4096
+			}
+
+			content, truncated := truncateStr(result.Stdout, maxBytes)
+
+			return readFileOutput{
+				Path:      input.Path,
+				Content:   content,
+				Truncated: truncated,
+			}, nil
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("agent: failed to create read_file tool: %w", err)
 	}
 
 	// Resolve the LLM model.
@@ -855,13 +955,21 @@ func RunAgent(
 	}
 
 	instrBuilder.WriteString("\nTools available:\n")
-	instrBuilder.WriteString("  - run_command: execute shell commands inside the container\n")
+	instrBuilder.WriteString("  - run_script: run a multi-line /bin/sh script (preferred for any multi-step shell work)\n")
+	instrBuilder.WriteString("  - run_command: run a single executable with explicit args (use when you need precise argv control)\n")
+	instrBuilder.WriteString("  - read_file: read a volume file by path without a shell (e.g. \"diff/pr.diff\")\n")
 	instrBuilder.WriteString("  - list_tasks: list all tasks in the current run with their statuses (pre-fetched at start)\n")
 	instrBuilder.WriteString("  - get_task_result: retrieve stdout, stderr, and exit code for a specific task by name\n")
 
+	instrBuilder.WriteString("\nEfficiency rules:\n")
+	instrBuilder.WriteString("  - Each tool call costs one full LLM round-trip. Minimise calls.\n")
+	instrBuilder.WriteString("  - When you need multiple sequential shell steps, combine them into ONE run_script call (use 'set -e' so failures abort early).\n")
+	instrBuilder.WriteString("  - Only use separate tool calls when you need to branch on intermediate output.\n")
+	instrBuilder.WriteString("  - If context already contains the data you need (injected task results, volume file contents), do NOT re-read it with a tool call.\n")
+
 	// Tell the model about its turn budget so it can plan accordingly.
 	maxTurns, maxTotalTokens := effectiveLimits(config.Limits)
-	fmt.Fprintf(&instrBuilder, "\nYou have a budget of %d turns. Plan your work to finish well within this limit.\n", maxTurns)
+	fmt.Fprintf(&instrBuilder, "\nYou have a budget of %d turns. Use run_script to combine steps and finish well within this limit.\n", maxTurns)
 
 	instruction := instrBuilder.String()
 
@@ -971,7 +1079,7 @@ func RunAgent(
 		Model:                 llmModel,
 		Description:           "An agent running in a CI/CD system with access to a containerized environment.",
 		Instruction:           instruction,
-		Tools:                 []adktool.Tool{runCmd, listTasksTool, getTaskResultTool},
+		Tools:                 []adktool.Tool{runCmd, runScript, readFileTool, listTasksTool, getTaskResultTool},
 		GenerateContentConfig: genCfg,
 	})
 	if err != nil {
@@ -1024,6 +1132,29 @@ func RunAgent(
 	// Initialise audit log and base timestamp for pre-context entries.
 	var auditEvents []AuditEvent
 	now := time.Now().UTC()
+
+	// Add the user message to the session first so that pre-context synthetic
+	// tool calls appear AFTER it in conversation history — the LLM sees:
+	//   1. User: "Review this PR..."
+	//   2. Model: [calls get_task_result / read_file (synthetic)]
+	//   3. User: [result]
+	//   4. Model generates its real response
+	// We then pass nil to runnr.Run() so it doesn't append a duplicate message.
+	userInvID := uuid.NewString()
+	userEvent := session.NewEvent(userInvID)
+	userEvent.Author = "user"
+	userEvent.LLMResponse = adkmodel.LLMResponse{
+		Content: genai.NewContentFromText(config.Prompt, genai.RoleUser),
+	}
+
+	_ = sessionService.AppendEvent(ctx, sessResp.Session, userEvent)
+
+	appendAuditEvent(&auditEvents, AuditEvent{
+		Timestamp: now.Format(time.RFC3339),
+		Author:    "user",
+		Type:      "user_message",
+		Text:      config.Prompt,
+	}, config.OnAuditEvent)
 
 	// Pre-inject a synthetic list_tasks result so the agent knows the run
 	// state from turn 0 without spending a tool-call turn on orientation.
@@ -1140,19 +1271,63 @@ func RunAgent(
 		}
 	}
 
-	// Record the initial user message in the audit log.
-	appendAuditEvent(&auditEvents, AuditEvent{
-		Timestamp: now.Format(time.RFC3339),
-		Author:    "user",
-		Type:      "user_message",
-		Text:      config.Prompt,
-	}, config.OnAuditEvent)
+	// Pre-inject declared context files as synthetic read_file results.
+	// We use sandbox.Exec (cat) so this works for all drivers — Docker volumes
+	// have no accessible host path from the agent process.
+	if config.Context != nil && len(config.Context.Files) > 0 {
+		for _, cf := range config.Context.Files {
+			var execInput pipelinerunner.ExecInput
+			execInput.Command.Path = "/bin/sh"
+			execInput.Command.Args = []string{"-c", "cat " + cf.Path}
 
-	// Run the agent, collecting the final text response and usage.
-	// The user's task prompt is the first user message; the Instruction field
-	// holds environment context so there is no duplication.
-	userMsg := genai.NewContentFromText(config.Prompt, genai.RoleUser)
+			execResult, execErr := sandbox.Exec(execInput)
+			if execErr != nil || execResult.Code != 0 {
+				continue // file not yet written or path wrong — skip silently
+			}
 
+			maxBytes := cf.MaxBytes
+			if maxBytes <= 0 {
+				maxBytes = config.Context.MaxBytes
+			}
+
+			if maxBytes <= 0 {
+				maxBytes = 4096
+			}
+
+			content, truncated := truncateStr(execResult.Stdout, maxBytes)
+
+			fileResult := map[string]any{
+				"path":    cf.Path,
+				"content": content,
+			}
+
+			if truncated {
+				fileResult["truncated"] = true
+			}
+
+			readFileArgs := map[string]any{"path": cf.Path}
+
+			_ = injectSyntheticToolCall(
+				ctx, sessionService, sessResp.Session,
+				config.Name, "read_file",
+				readFileArgs,
+				fileResult,
+			)
+
+			appendAuditEvent(&auditEvents, AuditEvent{
+				Timestamp:  now.Format(time.RFC3339),
+				Author:     config.Name,
+				Type:       "pre_context",
+				ToolName:   "read_file",
+				ToolArgs:   readFileArgs,
+				ToolResult: fileResult,
+			}, config.OnAuditEvent)
+		}
+	}
+
+	// Run the agent. The user message was already appended to the session above
+	// so we pass nil here — runnr.Run early-returns from appendMessageToSession
+	// when msg is nil, avoiding a duplicate turn.
 	var textBuilder strings.Builder
 	var usage AgentUsage
 
@@ -1166,7 +1341,7 @@ func RunAgent(
 
 	var runErr error
 
-	for event, err := range runnr.Run(runCtx, "pipeline", sessResp.Session.ID(), userMsg, agent.RunConfig{}) {
+	for event, err := range runnr.Run(runCtx, "pipeline", sessResp.Session.ID(), nil, agent.RunConfig{}) {
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
 				runErr = err
