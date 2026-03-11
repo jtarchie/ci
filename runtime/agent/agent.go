@@ -179,9 +179,9 @@ type AgentContextFile struct {
 // AgentContext configures pre-fetched task outputs and file contents injected
 // as synthetic tool call events before the agent's first turn.
 type AgentContext struct {
-	Tasks    []AgentContextTask  `json:"tasks,omitempty"`
-	Files    []AgentContextFile  `json:"files,omitempty"`
-	MaxBytes int                 `json:"max_bytes,omitempty"`
+	Tasks    []AgentContextTask `json:"tasks,omitempty"`
+	Files    []AgentContextFile `json:"files,omitempty"`
+	MaxBytes int                `json:"max_bytes,omitempty"`
 }
 
 // taskSummary is the list_tasks tool output element.
