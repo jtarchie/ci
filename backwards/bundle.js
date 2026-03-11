@@ -1050,11 +1050,13 @@ var JobRunner = class {
         this.taskRunner.getKnownMounts()[output.name] = mounts[output.name];
       }
     } catch (error) {
+      const errorMessage = String(error);
       storage.set(storageKey, {
         status: "failure",
         started_at: startedAt,
         elapsed: elapsedSince(),
         stdout: accumulatedOutput,
+        error_message: errorMessage,
         usage: latestUsage,
         audit_log: auditLog
       });

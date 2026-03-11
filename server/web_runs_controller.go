@@ -56,7 +56,7 @@ func countTaskStatsRecursive(node *storage.Tree[storage.Payload], stats *TaskSta
 // into each leaf node's Payload. This lets templates render terminal output
 // inline without a separate lazy-loading request.
 func (c *WebRunsController) preloadTerminalHTML(ctx *echo.Context, lookupPath string, tree *storage.Tree[storage.Payload]) {
-	stdoutResults, err := c.store.GetAll(ctx.Request().Context(), lookupPath, []string{"stdout", "status"})
+	stdoutResults, err := c.store.GetAll(ctx.Request().Context(), lookupPath, []string{"stdout", "status", "error_message"})
 	if err != nil {
 		return
 	}
@@ -66,7 +66,14 @@ func (c *WebRunsController) preloadTerminalHTML(ctx *echo.Context, lookupPath st
 	for _, r := range stdoutResults {
 		stdout, _ := r.Payload["stdout"].(string)
 		status, _ := r.Payload["status"].(string)
-		html := ToTerminalHTML(stdout)
+		errorMessage, _ := r.Payload["error_message"].(string)
+
+		displayOutput := stdout
+		if displayOutput == "" && errorMessage != "" {
+			displayOutput = errorMessage
+		}
+
+		html := ToTerminalHTML(displayOutput)
 
 		if status == "running" || status == "" {
 			htmlByPath[r.Path] = template.HTML(fmt.Sprintf(
@@ -104,7 +111,7 @@ func (c *WebRunsController) Show(ctx *echo.Context) error {
 	runID := ctx.Param("id")
 	lookupPath := "/pipeline/" + runID + "/"
 
-	results, err := c.store.GetAll(ctx.Request().Context(), lookupPath, []string{"status", "elapsed", "started_at", "usage"})
+	results, err := c.store.GetAll(ctx.Request().Context(), lookupPath, []string{"status", "elapsed", "started_at", "usage", "error_message", "error_type"})
 	if err != nil {
 		return fmt.Errorf("could not get all results: %w", err)
 	}
@@ -210,7 +217,7 @@ func (c *WebRunsController) TasksPartial(ctx *echo.Context) error {
 		})
 	}
 
-	results, err = c.store.GetAll(ctx.Request().Context(), lookupPath, []string{"status", "elapsed", "started_at", "usage"})
+	results, err = c.store.GetAll(ctx.Request().Context(), lookupPath, []string{"status", "elapsed", "started_at", "usage", "error_message", "error_type"})
 	if err != nil {
 		return fmt.Errorf("could not get all results: %w", err)
 	}

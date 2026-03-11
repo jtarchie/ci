@@ -465,6 +465,16 @@ border-indigo-300 dark:border-indigo-600
   <div
     class="task-details mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
     <div class="grid grid-cols-1 gap-4 text-sm">
+      {{ if $path.Value.error_message }}
+      <div
+        class="rounded border border-red-300 bg-red-50 px-3 py-2 text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200">
+        <p class="text-xs font-semibold uppercase tracking-wide">{{ if
+          $path.Value.error_type }}{{ $path.Value.error_type }}{{ else }}error{{
+          end }}</p>
+        <p class="mt-1 whitespace-pre-wrap break-words font-mono text-xs">{{
+          $path.Value.error_message }}</p>
+      </div>
+      {{ end }}
       <div class="mb-4">
         {{ if $path.Value.terminalHTML }}
         <div id="terminal-{{ $path.FullPath | urlquery }}"

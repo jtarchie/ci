@@ -143,7 +143,7 @@ func (c *Server) Run(logger *slog.Logger) error {
 			lookupPath = "/" + lookupPath
 		}
 
-		results, err := client.GetAll(ctx.Request().Context(), lookupPath, []string{"stdout", "status"})
+		results, err := client.GetAll(ctx.Request().Context(), lookupPath, []string{"stdout", "status", "error_message"})
 		if err != nil {
 			return fmt.Errorf("could not get all results: %w", err)
 		}
@@ -154,8 +154,14 @@ func (c *Server) Run(logger *slog.Logger) error {
 
 		stdout, _ := results[0].Payload["stdout"].(string)
 		status, _ := results[0].Payload["status"].(string)
+		errorMessage, _ := results[0].Payload["error_message"].(string)
 
-		html := server.ToTerminalHTML(stdout)
+		displayOutput := stdout
+		if displayOutput == "" && errorMessage != "" {
+			displayOutput = errorMessage
+		}
+
+		html := server.ToTerminalHTML(displayOutput)
 
 		ctx.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
 		ctx.Response().WriteHeader(http.StatusOK)
