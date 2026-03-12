@@ -9,7 +9,9 @@ pocketci server [options]
 ## Options
 
 - `--port` — HTTP port (default: `8080`)
-- `--storage` — persistence backend DSN (default: `sqlite://pocketci.db`)
+- `--storage` — persistence backend DSN (default: `sqlite://pocketci.db`).
+  Supports `sqlite://` and `s3://` backends. See
+  [Storage](../operations/storage.md).
 - `--driver` — default orchestration driver
 - `--allowed-drivers` — comma-separated list of drivers to allow
 - `--allowed-features` — comma-separated list of feature gates to enable

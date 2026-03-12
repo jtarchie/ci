@@ -27,6 +27,7 @@ export default defineConfig({
       ],
       "/operations/": [
         { text: "Overview", link: "/operations/" },
+        { text: "Storage", link: "storage" },
         { text: "Secrets", link: "secrets" },
         { text: "Caching", link: "caching" },
         { text: "Feature Gates", link: "feature-gates" },

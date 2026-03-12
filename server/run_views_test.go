@@ -478,8 +478,8 @@ func TestRunViews(t *testing.T) {
 				router.ServeHTTP(rec, req)
 
 				assert.Expect(rec.Code).To(Equal(http.StatusOK))
-				assert.Expect(rec.Body.String()).To(ContainSubstring(`id="run-live-badge" hx-swap-oob="true"`))
-				assert.Expect(rec.Body.String()).To(ContainSubstring(`id="run-stop-button" hx-swap-oob="true"`))
+				assert.Expect(rec.Body.String()).To(MatchRegexp(`id="run-live-badge"\s+hx-swap-oob="true"`))
+				assert.Expect(rec.Body.String()).To(MatchRegexp(`id="run-stop-button"\s+hx-swap-oob="true"`))
 				assert.Expect(rec.Body.String()).To(ContainSubstring(`id="stat-success" hx-swap-oob="true" aria-label="Successful tasks">1</span>`))
 				assert.Expect(rec.Body.String()).To(ContainSubstring(`id="stat-failure" hx-swap-oob="true" aria-label="Failed tasks">1</span>`))
 				assert.Expect(rec.Body.String()).To(ContainSubstring(`id="stat-pending" hx-swap-oob="true" aria-label="Pending tasks">1</span>`))
@@ -522,8 +522,8 @@ func TestRunViews(t *testing.T) {
 				router.ServeHTTP(rec, req)
 
 				assert.Expect(rec.Code).To(Equal(286))
-				assert.Expect(rec.Body.String()).To(ContainSubstring(`id="run-live-badge" hx-swap-oob="true"`))
-				assert.Expect(rec.Body.String()).To(ContainSubstring(`id="run-stop-button" hx-swap-oob="true"></span>`))
+				assert.Expect(rec.Body.String()).To(MatchRegexp(`id="run-live-badge"\s+hx-swap-oob="true"`))
+				assert.Expect(rec.Body.String()).To(MatchRegexp(`id="run-stop-button"\s+hx-swap-oob="true"\s*></span>`))
 				assert.Expect(rec.Body.String()).To(ContainSubstring(`id="stat-success" hx-swap-oob="true" aria-label="Successful tasks">1</span>`))
 				assert.Expect(rec.Body.String()).To(ContainSubstring(`id="stat-failure" hx-swap-oob="true" aria-label="Failed tasks">1</span>`))
 				assert.Expect(rec.Body.String()).To(ContainSubstring(`id="stat-pending" hx-swap-oob="true" aria-label="Pending tasks">1</span>`))
