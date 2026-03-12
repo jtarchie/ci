@@ -285,3 +285,36 @@ func TestS3Driver_Search(t *testing.T) {
 	assert.Expect(err).NotTo(HaveOccurred())
 	assert.Expect(results).To(BeNil())
 }
+
+// TestS3Driver_SSEWithAES256 verifies that a driver can be constructed with
+// sse=AES256 in the DSN. Actual server-side encryption requires a KMS-enabled
+// S3-compatible service; correct parsing is also exercised in s3config tests.
+func TestS3Driver_SSEWithAES256(t *testing.T) {
+	assert := NewGomegaWithT(t)
+
+	// Construction succeeds — no real S3 calls needed to verify config parsing.
+	client, err := s3storage.NewS3("s3://bucket?region=us-east-1&sse=AES256", "sse-ns", slog.Default())
+	assert.Expect(err).NotTo(HaveOccurred())
+	t.Cleanup(func() { _ = client.Close() })
+}
+
+// TestS3Driver_DSNParams verifies that non-default DSN parameters (force_path_style,
+// sse) are accepted without error during driver construction.
+func TestS3Driver_DSNParams(t *testing.T) {
+	assert := NewGomegaWithT(t)
+
+	// force_path_style=false is a valid param; construction must not return an error.
+	client, err := s3storage.NewS3("s3://bucket?region=us-east-1&force_path_style=false", "params-ns", slog.Default())
+	assert.Expect(err).NotTo(HaveOccurred())
+	t.Cleanup(func() { _ = client.Close() })
+}
+
+// TestS3Driver_InvalidSSE verifies that an unsupported sse param value is rejected
+// at construction time, before any requests are made.
+func TestS3Driver_InvalidSSE(t *testing.T) {
+	assert := NewGomegaWithT(t)
+
+	_, err := s3storage.NewS3("s3://bucket?region=us-east-1&sse=SSE-C", "ns", slog.Default())
+	assert.Expect(err).To(HaveOccurred())
+	assert.Expect(err.Error()).To(ContainSubstring("unsupported sse value"))
+}

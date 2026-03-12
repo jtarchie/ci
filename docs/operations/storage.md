@@ -29,10 +29,13 @@ works with AWS S3, MinIO, R2, and any S3-compatible object store.
 s3://bucket-name/optional/prefix?region=us-east-1&endpoint=http://localhost:9000
 ```
 
-| Parameter  | Description                          | Default         | Example                 |
-| ---------- | ------------------------------------ | --------------- | ----------------------- |
-| `region`   | AWS region                           | AWS SDK default | `us-east-1`             |
-| `endpoint` | Custom S3 endpoint (for MinIO, etc.) | AWS S3          | `http://localhost:9000` |
+| Parameter          | Description                                                               | Default               | Example                        |
+| ------------------ | ------------------------------------------------------------------------- | --------------------- | ------------------------------ |
+| `region`           | AWS region                                                                | AWS SDK default       | `us-east-1`                    |
+| `endpoint`         | Custom S3 endpoint (MinIO, R2, etc.)                                      | AWS S3                | `http://localhost:9000`        |
+| `force_path_style` | Force path-style URLs (`true`/`false`). Auto-enabled when `endpoint` set. | `true` when endpoint  | `false` for virtual-host style |
+| `sse`              | Server-side encryption: `AES256` or `aws:kms`                             | None (no SSE headers) | `AES256`                       |
+| `sse_kms_key_id`   | KMS key ARN/ID (only with `sse=aws:kms`; omit for provider default key)   | Provider default key  | `arn:aws:kms:…:key/mrk-abc`    |
 
 The URL path component (`/optional/prefix`) scopes all objects under a key
 prefix, allowing multiple PocketCI instances to share a single bucket.
@@ -80,6 +83,34 @@ pocketci server \
 ```bash
 pocketci server \
   --storage "s3://ci-data?region=us-east-1&endpoint=http://localhost:9000"
+```
+
+**Cloudflare R2:**
+
+```bash
+pocketci server \
+  --storage "s3://ci-data?endpoint=https://ACCOUNT_ID.r2.cloudflarestorage.com&region=auto"
+```
+
+**AWS S3 with SSE-S3 (AES256) encryption:**
+
+```bash
+pocketci server \
+  --storage "s3://my-ci-bucket/production?region=us-east-1&sse=AES256"
+```
+
+**AWS S3 with SSE-KMS (default KMS key):**
+
+```bash
+pocketci server \
+  --storage "s3://my-ci-bucket/production?region=us-east-1&sse=aws:kms"
+```
+
+**AWS S3 with SSE-KMS (specific KMS key):**
+
+```bash
+pocketci server \
+  --storage "s3://my-ci-bucket/production?region=us-east-1&sse=aws:kms&sse_kms_key_id=arn:aws:kms:us-east-1:123456789012:key/mrk-abc123"
 ```
 
 **Shared bucket with prefix isolation:**

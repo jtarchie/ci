@@ -5,16 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/url"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
+	tmtypes "github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/jtarchie/pocketci/orchestra/cache"
+	"github.com/jtarchie/pocketci/s3config"
 )
 
 func init() {
@@ -23,10 +23,12 @@ func init() {
 
 // S3Store implements CacheStore using AWS S3.
 type S3Store struct {
-	client *s3.Client
-	bucket string
-	prefix string
-	ttl    time.Duration
+	client   *s3.Client
+	bucket   string
+	prefix   string
+	ttl      time.Duration
+	sse      types.ServerSideEncryption
+	sseKeyID string
 }
 
 // Option configures an S3Store.
@@ -42,63 +44,28 @@ func WithTTL(ttl time.Duration) Option {
 // NewS3Store creates a new S3-backed cache store.
 // URL format: s3://bucket/prefix?region=us-east-1&endpoint=http://localhost:9000
 func NewS3Store(urlStr string) (cache.CacheStore, error) {
-	parsed, err := url.Parse(urlStr)
+	s3cfg, err := s3config.ParseDSN(urlStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse S3 URL: %w", err)
 	}
 
-	if parsed.Scheme != "s3" {
-		return nil, fmt.Errorf("expected s3:// URL, got %s://", parsed.Scheme)
-	}
-
-	bucket := parsed.Host
-	prefix := strings.TrimPrefix(parsed.Path, "/")
-
-	// Load AWS config
 	ctx := context.Background()
-	cfg, err := config.LoadDefaultConfig(ctx)
 
+	awsCfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
-	// Apply URL query parameters
-	query := parsed.Query()
+	client := s3.NewFromConfig(awsCfg, s3cfg.ClientOptions()...)
 
-	clientOptions := []func(*s3.Options){}
-
-	if region := query.Get("region"); region != "" {
-		clientOptions = append(clientOptions, func(o *s3.Options) {
-			o.Region = region
-		})
-	}
-
-	if endpoint := query.Get("endpoint"); endpoint != "" {
-		clientOptions = append(clientOptions, func(o *s3.Options) {
-			o.BaseEndpoint = aws.String(endpoint)
-			o.UsePathStyle = true // Required for MinIO and local S3-compatible stores
-		})
-	}
-
-	client := s3.NewFromConfig(cfg, clientOptions...)
-
-	store := &S3Store{
-		client: client,
-		bucket: bucket,
-		prefix: prefix,
-	}
-
-	// Parse TTL from query if provided
-	if ttlStr := query.Get("ttl"); ttlStr != "" {
-		ttl, err := time.ParseDuration(ttlStr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse TTL: %w", err)
-		}
-
-		store.ttl = ttl
-	}
-
-	return store, nil
+	return &S3Store{
+		client:   client,
+		bucket:   s3cfg.Bucket,
+		prefix:   s3cfg.Prefix,
+		ttl:      s3cfg.TTL,
+		sse:      s3cfg.SSE,
+		sseKeyID: s3cfg.SSEKMSKeyID,
+	}, nil
 }
 
 // Restore downloads cached content from S3.
@@ -151,11 +118,20 @@ func (s *S3Store) Persist(ctx context.Context, key string, reader io.Reader) err
 		u.Concurrency = 3
 	})
 
-	_, err := uploader.UploadObject(ctx, &transfermanager.UploadObjectInput{
+	uploadInput := &transfermanager.UploadObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(fullKey),
 		Body:   reader,
-	})
+	}
+
+	if s.sse != "" {
+		uploadInput.ServerSideEncryption = tmtypes.ServerSideEncryption(s.sse)
+		if s.sseKeyID != "" {
+			uploadInput.SSEKMSKeyID = aws.String(s.sseKeyID)
+		}
+	}
+
+	_, err := uploader.UploadObject(ctx, uploadInput)
 	if err != nil {
 		return fmt.Errorf("failed to upload to S3: %w", err)
 	}

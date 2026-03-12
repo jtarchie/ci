@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net/url"
 	"path"
 	"sort"
 	"strings"
@@ -19,6 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/jtarchie/pocketci/runtime"
+	"github.com/jtarchie/pocketci/s3config"
 	"github.com/jtarchie/pocketci/storage"
 )
 
@@ -33,54 +33,34 @@ type S3 struct {
 	prefix    string
 	namespace string
 	logger    *slog.Logger
+	sse       types.ServerSideEncryption
+	sseKeyID  string
 }
 
 // NewS3 creates a new S3-backed storage driver.
 func NewS3(dsn string, namespace string, logger *slog.Logger) (storage.Driver, error) {
-	parsed, err := url.Parse(dsn)
+	s3cfg, err := s3config.ParseDSN(dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse S3 DSN: %w", err)
 	}
 
-	if parsed.Scheme != "s3" {
-		return nil, fmt.Errorf("expected s3:// DSN, got %s://", parsed.Scheme)
-	}
-
-	bucket := parsed.Host
-	prefix := strings.TrimPrefix(parsed.Path, "/")
-
 	ctx := context.Background()
 
-	cfg, err := config.LoadDefaultConfig(ctx)
+	awsCfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
-	var clientOptions []func(*s3.Options)
-
-	query := parsed.Query()
-
-	if region := query.Get("region"); region != "" {
-		clientOptions = append(clientOptions, func(o *s3.Options) {
-			o.Region = region
-		})
-	}
-
-	if endpoint := query.Get("endpoint"); endpoint != "" {
-		clientOptions = append(clientOptions, func(o *s3.Options) {
-			o.BaseEndpoint = aws.String(endpoint)
-			o.UsePathStyle = true
-		})
-	}
-
-	client := s3.NewFromConfig(cfg, clientOptions...)
+	client := s3.NewFromConfig(awsCfg, s3cfg.ClientOptions()...)
 
 	return &S3{
 		client:    client,
-		bucket:    bucket,
-		prefix:    prefix,
+		bucket:    s3cfg.Bucket,
+		prefix:    s3cfg.Prefix,
 		namespace: namespace,
 		logger:    logger,
+		sse:       s3cfg.SSE,
+		sseKeyID:  s3cfg.SSEKMSKeyID,
 	}, nil
 }
 
@@ -564,12 +544,21 @@ func (s *S3) getJSON(ctx context.Context, key string) (storage.Payload, error) {
 }
 
 func (s *S3) putJSON(ctx context.Context, key string, data []byte) error {
-	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
+	input := &s3.PutObjectInput{
 		Bucket:      aws.String(s.bucket),
 		Key:         aws.String(key),
 		Body:        bytes.NewReader(data),
 		ContentType: aws.String("application/json"),
-	})
+	}
+
+	if s.sse != "" {
+		input.ServerSideEncryption = s.sse
+		if s.sseKeyID != "" {
+			input.SSEKMSKeyId = aws.String(s.sseKeyID)
+		}
+	}
+
+	_, err := s.client.PutObject(ctx, input)
 	if err != nil {
 		return fmt.Errorf("failed to put object %q: %w", key, err)
 	}
