@@ -39,7 +39,9 @@ func StartMinIO(t *testing.T) *MinioServer {
 	assert.Expect(err).NotTo(gomega.HaveOccurred())
 	endpoint := fmt.Sprintf("http://localhost:%d", port)
 
-	bucket := "testcache" + strings.ReplaceAll(strings.ToLower(gonanoid.Must()), "_", "")
+	// S3 bucket names must be lowercase alphanumeric or hyphens, cannot start/end with hyphens.
+	id := strings.ReplaceAll(strings.ReplaceAll(strings.ToLower(gonanoid.Must()), "_", ""), "-", "")
+	bucket := "testcache" + id
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cmd := exec.CommandContext(ctx, "minio", "server", dataDir, "--address", fmt.Sprintf(":%d", port), "--quiet")

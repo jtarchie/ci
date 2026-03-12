@@ -45,9 +45,7 @@ export class TaskRunner {
       image = step.config?.image_resource.source.repository!;
     }
 
-    // Accumulate stdout/stderr for streaming updates
-    let accumulatedStdout = "";
-    let accumulatedStderr = "";
+    const logs: Array<{ type: "stdout" | "stderr"; content: string }> = [];
 
     try {
       result = await runtime.run({
@@ -66,15 +64,11 @@ export class TaskRunner {
         timeout: step.timeout,
         storage_key: taskStorageKey,
         onOutput: (stream: "stdout" | "stderr", data: string) => {
-          if (stream === "stdout") {
-            accumulatedStdout += data;
-          } else {
-            accumulatedStderr += data;
-          }
+          logs.push({ type: stream, content: data });
+
           storage.set(taskStorageKey, {
             status: "running",
-            stdout: accumulatedStdout,
-            stderr: accumulatedStderr,
+            logs: logs.slice(),
           });
         },
       });
@@ -91,8 +85,7 @@ export class TaskRunner {
         {
           status: status,
           code: result.code,
-          stdout: result.stdout,
-          stderr: result.stderr,
+          logs: logs.slice(),
         },
       );
 

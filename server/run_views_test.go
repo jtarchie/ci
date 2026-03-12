@@ -622,6 +622,43 @@ func TestRunViews(t *testing.T) {
 				assert.Expect(rec.Body.String()).NotTo(ContainSubstring("<no value>"))
 			})
 
+			t.Run("GET /runs/:id/tasks renders stderr-only task logs", func(t *testing.T) {
+				t.Parallel()
+				assert := NewGomegaWithT(t)
+
+				buildFile, err := os.CreateTemp(t.TempDir(), "")
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = buildFile.Close() }()
+
+				client, err := init(buildFile.Name(), "namespace", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = client.Close() }()
+
+				pipeline, err := client.SavePipeline(context.Background(), "stderr-only-pipeline", "export const pipeline = async () => {};", "docker://", "")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				run, err := client.SaveRun(context.Background(), pipeline.ID)
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				err = client.Set(context.Background(), "/pipeline/"+run.ID+"/tasks/0-lint", map[string]any{
+					"status": "failure",
+					"logs": []map[string]any{
+						{"type": "stderr", "content": "lint failed: missing semicolon"},
+					},
+				})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				req := httptest.NewRequest(http.MethodGet, "/runs/"+run.ID+"/tasks", nil)
+				rec := httptest.NewRecorder()
+				router.ServeHTTP(rec, req)
+
+				assert.Expect(rec.Code).To(Equal(http.StatusOK))
+				assert.Expect(rec.Body.String()).To(ContainSubstring("lint failed: missing semicolon"))
+			})
+
 		})
 	})
 }

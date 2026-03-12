@@ -31,8 +31,7 @@ var TaskRunner = class {
     } else {
       image = step.config?.image_resource.source.repository;
     }
-    let accumulatedStdout = "";
-    let accumulatedStderr = "";
+    const logs = [];
     try {
       result = await runtime.run({
         command: {
@@ -50,15 +49,10 @@ var TaskRunner = class {
         timeout: step.timeout,
         storage_key: taskStorageKey,
         onOutput: (stream, data) => {
-          if (stream === "stdout") {
-            accumulatedStdout += data;
-          } else {
-            accumulatedStderr += data;
-          }
+          logs.push({ type: stream, content: data });
           storage.set(taskStorageKey, {
             status: "running",
-            stdout: accumulatedStdout,
-            stderr: accumulatedStderr
+            logs: logs.slice()
           });
         }
       });
@@ -73,8 +67,7 @@ var TaskRunner = class {
         {
           status,
           code: result.code,
-          stdout: result.stdout,
-          stderr: result.stderr
+          logs: logs.slice()
         }
       );
       this.validateTaskResult(step, result);

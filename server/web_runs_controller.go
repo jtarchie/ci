@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"strings"
 
 	"github.com/jtarchie/pocketci/storage"
 	"github.com/labstack/echo/v5"
@@ -52,28 +53,33 @@ func countTaskStatsRecursive(node *storage.Tree[storage.Payload], stats *TaskSta
 	}
 }
 
-// preloadTerminalHTML fetches stdout for all tasks and injects "terminalHTML"
+// preloadTerminalHTML fetches logs for all tasks and injects "terminalHTML"
 // into each leaf node's Payload. This lets templates render terminal output
 // inline without a separate lazy-loading request.
 func (c *WebRunsController) preloadTerminalHTML(ctx *echo.Context, lookupPath string, tree *storage.Tree[storage.Payload]) {
-	stdoutResults, err := c.store.GetAll(ctx.Request().Context(), lookupPath, []string{"stdout", "status", "error_message"})
+	stdoutResults, err := c.store.GetAll(ctx.Request().Context(), lookupPath, []string{"logs", "stdout", "stderr", "status", "error_message"})
 	if err != nil {
 		return
 	}
 
-	// Build a map from path to stdout HTML.
+	// Build a map from path to terminal HTML.
 	htmlByPath := make(map[string]template.HTML, len(stdoutResults))
 	for _, r := range stdoutResults {
+		logs := ParseTerminalLogs(r.Payload["logs"])
 		stdout, _ := r.Payload["stdout"].(string)
+		stderr, _ := r.Payload["stderr"].(string)
 		status, _ := r.Payload["status"].(string)
 		errorMessage, _ := r.Payload["error_message"].(string)
 
-		displayOutput := stdout
-		if displayOutput == "" && errorMessage != "" {
-			displayOutput = errorMessage
-		}
+		html := ToTerminalHTMLFromLogs(logs)
+		if html == "" {
+			displayOutput := stdout + stderr
+			if displayOutput == "" && errorMessage != "" {
+				displayOutput = errorMessage
+			}
 
-		html := ToTerminalHTML(displayOutput)
+			html = ToTerminalHTML(displayOutput)
+		}
 
 		if status == "running" || status == "" {
 			htmlByPath[r.Path] = template.HTML(fmt.Sprintf(
@@ -88,6 +94,45 @@ func (c *WebRunsController) preloadTerminalHTML(ctx *echo.Context, lookupPath st
 	}
 
 	injectTerminalHTML(tree, htmlByPath)
+}
+
+// Terminal handles GET /terminal/* and returns a rendered task terminal fragment.
+func (c *WebRunsController) Terminal(ctx *echo.Context) error {
+	lookupPath := "/" + strings.TrimPrefix(ctx.Param("*"), "/")
+	if lookupPath == "/" {
+		return ctx.HTML(http.StatusNotFound, `<div class="term-container"></div>`)
+	}
+
+	payload, err := c.store.Get(ctx.Request().Context(), lookupPath)
+	if err != nil {
+		return ctx.HTML(http.StatusNotFound, `<div class="term-container"></div>`)
+	}
+
+	logs := ParseTerminalLogs(payload["logs"])
+	html := ToTerminalHTMLFromLogs(logs)
+	if html == "" {
+		stdout, _ := payload["stdout"].(string)
+		stderr, _ := payload["stderr"].(string)
+		errorMessage, _ := payload["error_message"].(string)
+
+		displayOutput := stdout + stderr
+		if displayOutput == "" {
+			displayOutput = errorMessage
+		}
+
+		html = ToTerminalHTML(displayOutput)
+	}
+
+	status, _ := payload["status"].(string)
+	if status == "running" || status == "" {
+		return ctx.HTML(http.StatusOK, fmt.Sprintf(
+			`<div class="term-container" hx-get="/terminal%s" hx-trigger="load delay:2s" hx-swap="outerHTML">%s</div>`,
+			lookupPath,
+			html,
+		))
+	}
+
+	return ctx.HTML(http.StatusOK, fmt.Sprintf(`<div class="term-container">%s</div>`, html))
 }
 
 func injectTerminalHTML(node *storage.Tree[storage.Payload], htmlByPath map[string]template.HTML) {
@@ -292,4 +337,5 @@ func (c *WebRunsController) RegisterRoutes(web *echo.Group) {
 	web.GET("/runs/:id/tasks-partial/", c.TasksPartial)
 	web.GET("/runs/:id/graph-data", c.GraphData)
 	web.GET("/runs/:id/graph-data/", c.GraphData)
+	web.GET("/terminal/*", c.Terminal)
 }

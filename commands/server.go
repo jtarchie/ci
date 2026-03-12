@@ -137,56 +137,6 @@ func (c *Server) Run(logger *slog.Logger) error {
 		})
 	})
 
-	router.ProtectedGroup().GET("/terminal/*", func(ctx *echo.Context) error {
-		lookupPath := ctx.Param("*")
-		if lookupPath == "" || lookupPath[0] != '/' {
-			lookupPath = "/" + lookupPath
-		}
-
-		results, err := client.GetAll(ctx.Request().Context(), lookupPath, []string{"stdout", "status", "error_message"})
-		if err != nil {
-			return fmt.Errorf("could not get all results: %w", err)
-		}
-
-		if len(results) > 1 {
-			return fmt.Errorf("cannot render multiple results as terminal HTML: %w", errors.ErrUnsupported)
-		}
-
-		stdout, _ := results[0].Payload["stdout"].(string)
-		status, _ := results[0].Payload["status"].(string)
-		errorMessage, _ := results[0].Payload["error_message"].(string)
-
-		displayOutput := stdout
-		if displayOutput == "" && errorMessage != "" {
-			displayOutput = errorMessage
-		}
-
-		html := server.ToTerminalHTML(displayOutput)
-
-		ctx.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
-		ctx.Response().WriteHeader(http.StatusOK)
-
-		// If the task is still running, embed polling attributes so HTMx re-fetches automatically.
-		// When the task completes, the server returns a plain div and polling stops naturally.
-		if status == "running" || status == "" {
-			_, err = fmt.Fprintf(ctx.Response(),
-				`<div class="term-container" hx-get="/terminal/%s" hx-trigger="load delay:2s" hx-swap="outerHTML">%s</div>`,
-				strings.TrimPrefix(lookupPath, "/"),
-				html,
-			)
-		} else {
-			_, err = fmt.Fprintf(ctx.Response(),
-				`<div class="term-container">%s</div>`,
-				html,
-			)
-		}
-		if err != nil {
-			return fmt.Errorf("could not write terminal HTML: %w", err)
-		}
-
-		return nil
-	})
-
 	err = router.Start(fmt.Sprintf(":%d", c.Port))
 	if err != nil {
 		return fmt.Errorf("could not start server: %w", err)

@@ -170,6 +170,11 @@ type RunResult struct {
 	Status RunStatus `json:"status"`
 }
 
+type TaskLogEntry struct {
+	Type    string `json:"type"`
+	Content string `json:"content"`
+}
+
 // OutputCallback is called with streaming output chunks.
 // stream is either "stdout" or "stderr", data is the output chunk.
 type OutputCallback func(stream string, data string)
@@ -266,7 +271,10 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 			if err != nil {
 				c.setTaskStatus(effectiveStorageKey, map[string]any{
 					"status": "error",
-					"stderr": err.Error(),
+					"logs": []TaskLogEntry{{
+						Type:    "stderr",
+						Content: err.Error(),
+					}},
 				})
 
 				return nil, fmt.Errorf("failed to load secrets for task %q: %w", input.Name, err)
@@ -357,6 +365,26 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 	})
 
 	var containerStatus orchestra.ContainerStatus
+	logs := make([]TaskLogEntry, 0, 32)
+	var logsMu sync.Mutex
+
+	appendLog := func(stream, data string) {
+		if data == "" {
+			return
+		}
+
+		logsMu.Lock()
+		logs = append(logs, TaskLogEntry{Type: stream, Content: data})
+		logsMu.Unlock()
+	}
+
+	streamCallback := OutputCallback(func(stream, data string) {
+		appendLog(stream, data)
+
+		if input.OnOutput != nil {
+			input.OnOutput(stream, data)
+		}
+	})
 
 	// Create a streaming writer that calls the callback
 	streamCtx, cancelStream := context.WithCancel(ctx)
@@ -369,7 +397,7 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 	if input.OnOutput != nil {
 
 		streamWg.Go(func() {
-			c.streamLogsWithCallback(streamCtx, container, input.OnOutput, stdout, stderr)
+			c.streamLogsWithCallback(streamCtx, container, streamCallback, stdout, stderr)
 		})
 	}
 
@@ -458,6 +486,20 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 	if len(c.secretValues) > 0 {
 		stdoutStr = support.RedactSecrets(stdoutStr, c.secretValues)
 		stderrStr = support.RedactSecrets(stderrStr, c.secretValues)
+
+		for idx := range logs {
+			logs[idx].Content = support.RedactSecrets(logs[idx].Content, c.secretValues)
+		}
+	}
+
+	if len(logs) == 0 {
+		if stdoutStr != "" {
+			logs = append(logs, TaskLogEntry{Type: "stdout", Content: stdoutStr})
+		}
+
+		if stderrStr != "" {
+			logs = append(logs, TaskLogEntry{Type: "stderr", Content: stderrStr})
+		}
 	}
 
 	status := "success"
@@ -471,8 +513,7 @@ func (c *PipelineRunner) Run(input RunInput) (*RunResult, error) {
 	c.setTaskStatus(storageKey, map[string]any{
 		"status":     status,
 		"code":       containerStatus.ExitCode(),
-		"stdout":     stdoutStr,
-		"stderr":     stderrStr,
+		"logs":       logs,
 		"started_at": taskStartedAt.UTC().Format(time.RFC3339),
 		"elapsed":    formatElapsed(time.Since(taskStartedAt)),
 	})

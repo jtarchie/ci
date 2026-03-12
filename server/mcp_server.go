@@ -18,8 +18,8 @@ func buildMCPServer(store storage.Driver) *mcp.Server {
 	}, &mcp.ServerOptions{
 		Instructions: "Use these tools to inspect CI pipeline runs, tasks, and agents. " +
 			"Start with get_run to get the run status, then list_run_tasks to see all tasks and their outputs. " +
-			"Use get_run_task to fetch a single task with full payload fields (including long stdout/audit/tool call data). " +
-			"Use search_tasks with a run_id to search task stdout/stderr within a specific run, " +
+			"Use get_run_task to fetch a single task with full payload fields (including long logs/audit/tool call data). " +
+			"Use search_tasks with a run_id to search task logs within a specific run, " +
 			"or with a pipeline_id to search across all runs for that pipeline (by ID, status, or error message).",
 	})
 
@@ -52,9 +52,9 @@ func buildMCPServer(store storage.Driver) *mcp.Server {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "list_run_tasks",
-		Description: "List all tasks for a pipeline run. Returns each task's path, status, type (task/agent/pipeline), stdout/stderr output, elapsed time, and other details. Use this to identify which step failed and why.",
+		Description: "List all tasks for a pipeline run. Returns each task's path, status, type (task/agent/pipeline), typed log output, elapsed time, and other details. Use this to identify which step failed and why.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, input ListRunTasksInput) (*mcp.CallToolResult, any, error) {
-		fields := []string{"status", "elapsed", "started_at", "type", "text", "tokensUsed", "duration", "stderr", "stdout", "dependsOn"}
+		fields := []string{"status", "elapsed", "started_at", "type", "text", "tokensUsed", "duration", "logs", "dependsOn"}
 		prefix := fmt.Sprintf("/pipeline/%s/", input.RunID)
 
 		results, err := store.GetAll(ctx, prefix, fields)
@@ -79,7 +79,7 @@ func buildMCPServer(store storage.Driver) *mcp.Server {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "get_run_task",
-		Description: "Get a single task payload for a run. Returns full stored payload fields (for example: stdout, stderr, usage, audit_log).",
+		Description: "Get a single task payload for a run. Returns full stored payload fields (for example: logs, usage, audit_log).",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, input GetRunTaskInput) (*mcp.CallToolResult, any, error) {
 		if input.Path == "" {
 			return nil, nil, fmt.Errorf("path is required")
@@ -126,7 +126,7 @@ func buildMCPServer(store storage.Driver) *mcp.Server {
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "search_tasks",
 		Description: "Full-text search in two modes: " +
-			"(1) provide run_id to search task stdout/stderr within a specific run — useful for finding error messages or stack traces; " +
+			"(1) provide run_id to search task logs within a specific run — useful for finding error messages or stack traces; " +
 			"(2) provide pipeline_id to search across all runs for that pipeline by run ID, status, or error message — mirrors the pipeline runs search in the web UI.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, input SearchTasksInput) (*mcp.CallToolResult, any, error) {
 		if input.RunID == "" && input.PipelineID == "" {

@@ -136,16 +136,14 @@ func TestMCPListRunTasks(t *testing.T) {
 	// Write two task payloads under the run's path prefix.
 	err = store.Set(ctx, "/pipeline/"+run.ID+"/tasks/echo", map[string]any{
 		"status": "success",
-		"stdout": "hello world",
-		"stderr": "",
+		"logs":   []map[string]any{{"type": "stdout", "content": "hello world"}},
 		"type":   "task",
 	})
 	assert.Expect(err).NotTo(HaveOccurred())
 
 	err = store.Set(ctx, "/pipeline/"+run.ID+"/tasks/build", map[string]any{
 		"status": "failed",
-		"stdout": "",
-		"stderr": "build failed: exit 1",
+		"logs":   []map[string]any{{"type": "stderr", "content": "build failed: exit 1"}},
 		"type":   "task",
 	})
 	assert.Expect(err).NotTo(HaveOccurred())
@@ -182,7 +180,7 @@ func TestMCPGetRunTask(t *testing.T) {
 	taskPath := "/pipeline/" + run.ID + "/jobs/review-pr/1/agent/code-quality-reviewer"
 	err = store.Set(ctx, taskPath, map[string]any{
 		"status":    "running",
-		"stdout":    "line 1\nline 2\n",
+		"logs":      []map[string]any{{"type": "stdout", "content": "line 1\nline 2\n"}},
 		"audit_log": []any{map[string]any{"type": "tool_call", "toolName": "run_command"}},
 	})
 	assert.Expect(err).NotTo(HaveOccurred())
@@ -257,13 +255,13 @@ func TestMCPSearchTasks(t *testing.T) {
 
 	err = store.Set(ctx, "/pipeline/"+run.ID+"/tasks/echo", map[string]any{
 		"status": "success",
-		"stdout": "unique-token-xyz hello",
+		"logs":   []map[string]any{{"type": "stdout", "content": "unique-token-xyz hello"}},
 	})
 	assert.Expect(err).NotTo(HaveOccurred())
 
 	err = store.Set(ctx, "/pipeline/"+run.ID+"/tasks/other", map[string]any{
 		"status": "success",
-		"stdout": "something else entirely",
+		"logs":   []map[string]any{{"type": "stdout", "content": "something else entirely"}},
 	})
 	assert.Expect(err).NotTo(HaveOccurred())
 
