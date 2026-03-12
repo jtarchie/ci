@@ -337,8 +337,10 @@ func TestExecutionAPI(t *testing.T) {
 
 				assert.Expect(rec.Code).To(Equal(http.StatusOK))
 				assert.Expect(rec.Header().Get("Content-Type")).To(ContainSubstring("text/event-stream"))
-				assert.Expect(rec.Body.String()).To(ContainSubstring(`"event":"exit"`))
-				assert.Expect(rec.Body.String()).To(ContainSubstring(`"code":0`))
+				events := mustSSEJSONEvents(t, rec)
+				exitEvent := events[len(events)-1]
+				assert.Expect(exitEvent["event"]).To(Equal("exit"))
+				assert.Expect(exitEvent["code"]).To(Equal(float64(0)))
 			})
 
 			t.Run("POST /api/pipelines/:name/run returns error event for unknown pipeline", func(t *testing.T) {
@@ -361,7 +363,8 @@ func TestExecutionAPI(t *testing.T) {
 				router.ServeHTTP(rec, req)
 
 				assert.Expect(rec.Code).To(Equal(http.StatusNotFound))
-				assert.Expect(rec.Body.String()).To(ContainSubstring(`"error"`))
+				errPayload := mustJSONMap(t, rec)
+				assert.Expect(errPayload).To(HaveKey("error"))
 			})
 		})
 	})

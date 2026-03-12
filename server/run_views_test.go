@@ -53,8 +53,9 @@ func TestRunViews(t *testing.T) {
 
 				assert.Expect(rec.Code).To(Equal(http.StatusOK))
 				assert.Expect(rec.Header().Get("Content-Type")).To(ContainSubstring("text/html"))
-				assert.Expect(rec.Body.String()).To(ContainSubstring(">Tasks</h1>"))
-				assert.Expect(rec.Body.String()).To(ContainSubstring("test-job"))
+				doc := mustHTMLDocument(t, rec)
+				assert.Expect(hasSelectorWithText(doc, "h1", "Tasks")).To(BeTrue())
+				assert.Expect(doc.Find(`details[data-task-id*="test-job"]`).Length()).To(BeNumerically(">", 0))
 			})
 
 			t.Run("GET /runs/:id/graph returns HTML with graph view", func(t *testing.T) {
@@ -89,8 +90,9 @@ func TestRunViews(t *testing.T) {
 
 				assert.Expect(rec.Code).To(Equal(http.StatusOK))
 				assert.Expect(rec.Header().Get("Content-Type")).To(ContainSubstring("text/html"))
-				assert.Expect(rec.Body.String()).To(ContainSubstring("Task Graph"))
-				assert.Expect(rec.Body.String()).To(ContainSubstring("test-job"))
+				doc := mustHTMLDocument(t, rec)
+				assert.Expect(hasSelectorWithText(doc, "h1", "Task Graph")).To(BeTrue())
+				assert.Expect(hasSelectorWithText(doc, "script#graph-data", "test-job")).To(BeTrue())
 			})
 
 			t.Run("GET /runs/:id/tasks shows run error alert when error_message is set", func(t *testing.T) {
@@ -122,8 +124,9 @@ func TestRunViews(t *testing.T) {
 				router.ServeHTTP(rec, req)
 
 				assert.Expect(rec.Code).To(Equal(http.StatusOK))
-				assert.Expect(rec.Body.String()).To(ContainSubstring("Run failed"))
-				assert.Expect(rec.Body.String()).To(ContainSubstring("failed to create volume: unauthorized"))
+				doc := mustHTMLDocument(t, rec)
+				assert.Expect(hasSelectorWithText(doc, "[role='alert']", "Run failed")).To(BeTrue())
+				assert.Expect(hasSelectorWithText(doc, "[role='alert']", "failed to create volume: unauthorized")).To(BeTrue())
 			})
 
 			t.Run("GET /runs/:id/graph shows run error alert when error_message is set", func(t *testing.T) {
@@ -158,8 +161,9 @@ func TestRunViews(t *testing.T) {
 				router.ServeHTTP(rec, req)
 
 				assert.Expect(rec.Code).To(Equal(http.StatusOK))
-				assert.Expect(rec.Body.String()).To(ContainSubstring("Run failed"))
-				assert.Expect(rec.Body.String()).To(ContainSubstring("failed to create volume: unauthorized"))
+				doc := mustHTMLDocument(t, rec)
+				assert.Expect(hasSelectorWithText(doc, "[role='alert']", "Run failed")).To(BeTrue())
+				assert.Expect(hasSelectorWithText(doc, "[role='alert']", "failed to create volume: unauthorized")).To(BeTrue())
 			})
 
 			t.Run("GET /runs/:id/tasks returns empty tree for non-existent run", func(t *testing.T) {
@@ -214,7 +218,8 @@ func TestRunViews(t *testing.T) {
 
 				assert.Expect(rec.Code).To(Equal(http.StatusOK))
 				// The template should show "Run <runID>" in breadcrumb
-				assert.Expect(rec.Body.String()).To(ContainSubstring("Run " + run.ID))
+				doc := mustHTMLDocument(t, rec)
+				assert.Expect(hasSelectorWithText(doc, "nav[aria-label='Breadcrumb'] a", "Run "+run.ID)).To(BeTrue())
 			})
 
 			t.Run("GET /runs/:id/graph includes correct link to tasks view", func(t *testing.T) {
@@ -245,9 +250,10 @@ func TestRunViews(t *testing.T) {
 
 				assert.Expect(rec.Code).To(Equal(http.StatusOK))
 				// The template should have a link to /runs/:id/tasks
-				assert.Expect(rec.Body.String()).To(ContainSubstring("/runs/" + run.ID + "/tasks"))
-				assert.Expect(rec.Body.String()).To(ContainSubstring("/api/runs/" + run.ID + "/status"))
-				assert.Expect(rec.Body.String()).To(ContainSubstring("/api/runs/" + run.ID + "/tasks"))
+				doc := mustHTMLDocument(t, rec)
+				assert.Expect(selectorHasAttrValue(doc, "a", "href", "/runs/"+run.ID+"/tasks")).To(BeTrue())
+				assert.Expect(selectorHasAttrValue(doc, "a", "href", "/api/runs/"+run.ID+"/status")).To(BeTrue())
+				assert.Expect(selectorHasAttrValue(doc, "a", "href", "/api/runs/"+run.ID+"/tasks")).To(BeTrue())
 			})
 
 			t.Run("GET /runs/:id/tasks shows execution number for single task", func(t *testing.T) {
@@ -280,14 +286,13 @@ func TestRunViews(t *testing.T) {
 				router.ServeHTTP(rec, req)
 
 				assert.Expect(rec.Code).To(Equal(http.StatusOK))
-				// The execution number badge must not be empty — <no value> must not appear
-				assert.Expect(rec.Body.String()).NotTo(ContainSubstring("no value"))
-				// The number "1" must appear inside the badge span
-				assert.Expect(rec.Body.String()).To(MatchRegexp(`w-6 h-6[^>]*>\s*1\s*<`))
-				assert.Expect(rec.Body.String()).To(ContainSubstring("/api/runs/" + run.ID + "/status"))
-				assert.Expect(rec.Body.String()).To(ContainSubstring("/api/runs/" + run.ID + "/tasks"))
-				assert.Expect(rec.Body.String()).To(ContainSubstring("/api/runs/" + run.ID + "/tasks?path="))
-				assert.Expect(rec.Body.String()).To(ContainSubstring("tasks/0-k6"))
+				doc := mustHTMLDocument(t, rec)
+				assert.Expect(hasSelectorWithText(doc, "*", "no value")).To(BeFalse())
+				assert.Expect(hasSelectorWithText(doc, `details[data-task-id*="tasks/0-k6"] span.w-6.h-6`, "1")).To(BeTrue())
+				assert.Expect(selectorHasAttrValue(doc, "a", "href", "/api/runs/"+run.ID+"/status")).To(BeTrue())
+				assert.Expect(selectorHasAttrValue(doc, "a", "href", "/api/runs/"+run.ID+"/tasks")).To(BeTrue())
+				assert.Expect(selectorHasAttrContaining(doc, "a", "href", "/api/runs/"+run.ID+"/tasks?path=")).To(BeTrue())
+				assert.Expect(selectorHasAttrContaining(doc, "a", "href", "0-k6")).To(BeTrue())
 			})
 
 			t.Run("GET /runs/:id/tasks shows correct execution numbers for multiple tasks", func(t *testing.T) {
@@ -321,7 +326,10 @@ func TestRunViews(t *testing.T) {
 				router.ServeHTTP(rec, req)
 
 				assert.Expect(rec.Code).To(Equal(http.StatusOK))
-				assert.Expect(rec.Body.String()).NotTo(ContainSubstring("no value"))
+				doc := mustHTMLDocument(t, rec)
+				assert.Expect(hasSelectorWithText(doc, "*", "no value")).To(BeFalse())
+				assert.Expect(hasSelectorWithText(doc, `details[data-task-id*="tasks/0-task-a"] span.w-6.h-6`, "1")).To(BeTrue())
+				assert.Expect(hasSelectorWithText(doc, `details[data-task-id*="tasks/1-task-b"] span.w-6.h-6`, "2")).To(BeTrue())
 			})
 
 			t.Run("GET /runs/:id/tasks includes correct link to graph view", func(t *testing.T) {
@@ -352,7 +360,8 @@ func TestRunViews(t *testing.T) {
 
 				assert.Expect(rec.Code).To(Equal(http.StatusOK))
 				// The template should have a link to /runs/:id/graph
-				assert.Expect(rec.Body.String()).To(ContainSubstring("/runs/" + run.ID + "/graph"))
+				doc := mustHTMLDocument(t, rec)
+				assert.Expect(selectorHasAttrValue(doc, "a", "href", "/runs/"+run.ID+"/graph")).To(BeTrue())
 			})
 
 			t.Run("GET /runs/:id/tasks-partial/ shows agent usage badge when usage field is present", func(t *testing.T) {
@@ -397,12 +406,13 @@ func TestRunViews(t *testing.T) {
 
 				assert.Expect(rec.Code).To(Equal(http.StatusOK))
 				// Usage badge must appear with tool count and token total
-				assert.Expect(rec.Body.String()).To(ContainSubstring("tools"))
-				assert.Expect(rec.Body.String()).To(ContainSubstring("tok"))
+				doc := mustHTMLDocument(t, rec)
+				assert.Expect(hasSelectorWithText(doc, ".font-mono", "tools")).To(BeTrue())
+				assert.Expect(hasSelectorWithText(doc, ".font-mono", "tok")).To(BeTrue())
 				// Elapsed time must also appear
-				assert.Expect(rec.Body.String()).To(ContainSubstring("42s"))
+				assert.Expect(hasSelectorWithText(doc, ".font-mono", "42s")).To(BeTrue())
 				// Must not leak template errors
-				assert.Expect(rec.Body.String()).NotTo(ContainSubstring("<no value>"))
+				assert.Expect(hasSelectorWithText(doc, "*", "no value")).To(BeFalse())
 			})
 
 			t.Run("GET /runs/:id/tasks-partial/ shows no usage badge for regular tasks", func(t *testing.T) {
@@ -439,10 +449,11 @@ func TestRunViews(t *testing.T) {
 
 				assert.Expect(rec.Code).To(Equal(http.StatusOK))
 				// No usage badge should appear
-				assert.Expect(rec.Body.String()).NotTo(ContainSubstring("tok"))
+				doc := mustHTMLDocument(t, rec)
+				assert.Expect(hasSelectorWithText(doc, ".font-mono", "tok")).To(BeFalse())
 				// Elapsed time should still show
-				assert.Expect(rec.Body.String()).To(ContainSubstring("1.2s"))
-				assert.Expect(rec.Body.String()).NotTo(ContainSubstring("<no value>"))
+				assert.Expect(hasSelectorWithText(doc, ".font-mono", "1.2s")).To(BeTrue())
+				assert.Expect(hasSelectorWithText(doc, "*", "no value")).To(BeFalse())
 			})
 
 			t.Run("GET /runs/:id/tasks-partial/ emits OOB header updates for active runs", func(t *testing.T) {
@@ -478,13 +489,14 @@ func TestRunViews(t *testing.T) {
 				router.ServeHTTP(rec, req)
 
 				assert.Expect(rec.Code).To(Equal(http.StatusOK))
-				assert.Expect(rec.Body.String()).To(MatchRegexp(`id="run-live-badge"\s+hx-swap-oob="true"`))
-				assert.Expect(rec.Body.String()).To(MatchRegexp(`id="run-stop-button"\s+hx-swap-oob="true"`))
-				assert.Expect(rec.Body.String()).To(ContainSubstring(`id="stat-success" hx-swap-oob="true" aria-label="Successful tasks">1</span>`))
-				assert.Expect(rec.Body.String()).To(ContainSubstring(`id="stat-failure" hx-swap-oob="true" aria-label="Failed tasks">1</span>`))
-				assert.Expect(rec.Body.String()).To(ContainSubstring(`id="stat-pending" hx-swap-oob="true" aria-label="Pending tasks">1</span>`))
-				assert.Expect(rec.Body.String()).To(ContainSubstring("Live"))
-				assert.Expect(rec.Body.String()).To(ContainSubstring("Stop Run"))
+				doc := mustHTMLDocument(t, rec)
+				assert.Expect(doc.Find(`#run-live-badge[hx-swap-oob="true"]`).Length()).To(BeNumerically(">", 0))
+				assert.Expect(doc.Find(`button#run-stop-button[hx-swap-oob="true"]`).Length()).To(BeNumerically(">", 0))
+				assert.Expect(hasSelectorWithText(doc, `#stat-success[hx-swap-oob="true"][aria-label="Successful tasks"]`, "1")).To(BeTrue())
+				assert.Expect(hasSelectorWithText(doc, `#stat-failure[hx-swap-oob="true"][aria-label="Failed tasks"]`, "1")).To(BeTrue())
+				assert.Expect(hasSelectorWithText(doc, `#stat-pending[hx-swap-oob="true"][aria-label="Pending tasks"]`, "1")).To(BeTrue())
+				assert.Expect(hasSelectorWithText(doc, "#run-live-badge", "Live")).To(BeTrue())
+				assert.Expect(hasSelectorWithText(doc, "#run-stop-button", "Stop Run")).To(BeTrue())
 			})
 
 			t.Run("GET /runs/:id/tasks-partial/ clears active header updates when run completes", func(t *testing.T) {
@@ -522,13 +534,14 @@ func TestRunViews(t *testing.T) {
 				router.ServeHTTP(rec, req)
 
 				assert.Expect(rec.Code).To(Equal(286))
-				assert.Expect(rec.Body.String()).To(MatchRegexp(`id="run-live-badge"\s+hx-swap-oob="true"`))
-				assert.Expect(rec.Body.String()).To(MatchRegexp(`id="run-stop-button"\s+hx-swap-oob="true"\s*></span>`))
-				assert.Expect(rec.Body.String()).To(ContainSubstring(`id="stat-success" hx-swap-oob="true" aria-label="Successful tasks">1</span>`))
-				assert.Expect(rec.Body.String()).To(ContainSubstring(`id="stat-failure" hx-swap-oob="true" aria-label="Failed tasks">1</span>`))
-				assert.Expect(rec.Body.String()).To(ContainSubstring(`id="stat-pending" hx-swap-oob="true" aria-label="Pending tasks">1</span>`))
-				assert.Expect(rec.Body.String()).NotTo(ContainSubstring("Live"))
-				assert.Expect(rec.Body.String()).NotTo(ContainSubstring("Stop Run"))
+				doc := mustHTMLDocument(t, rec)
+				assert.Expect(doc.Find(`#run-live-badge[hx-swap-oob="true"]`).Length()).To(BeNumerically(">", 0))
+				assert.Expect(doc.Find(`span#run-stop-button[hx-swap-oob="true"]`).Length()).To(BeNumerically(">", 0))
+				assert.Expect(hasSelectorWithText(doc, `#stat-success[hx-swap-oob="true"][aria-label="Successful tasks"]`, "1")).To(BeTrue())
+				assert.Expect(hasSelectorWithText(doc, `#stat-failure[hx-swap-oob="true"][aria-label="Failed tasks"]`, "1")).To(BeTrue())
+				assert.Expect(hasSelectorWithText(doc, `#stat-pending[hx-swap-oob="true"][aria-label="Pending tasks"]`, "1")).To(BeTrue())
+				assert.Expect(hasSelectorWithText(doc, "#run-live-badge", "Live")).To(BeFalse())
+				assert.Expect(doc.Find("button#run-stop-button").Length()).To(Equal(0))
 			})
 
 			// Regression tests: the initial /runs/:id/tasks page (Show handler) previously
@@ -575,11 +588,12 @@ func TestRunViews(t *testing.T) {
 
 				assert.Expect(rec.Code).To(Equal(http.StatusOK))
 				// Usage badge (tools · tok) must appear on the initial page load
-				assert.Expect(rec.Body.String()).To(ContainSubstring("tools"))
-				assert.Expect(rec.Body.String()).To(ContainSubstring("tok"))
+				doc := mustHTMLDocument(t, rec)
+				assert.Expect(hasSelectorWithText(doc, ".font-mono", "tools")).To(BeTrue())
+				assert.Expect(hasSelectorWithText(doc, ".font-mono", "tok")).To(BeTrue())
 				// Elapsed time must appear
-				assert.Expect(rec.Body.String()).To(ContainSubstring("7s"))
-				assert.Expect(rec.Body.String()).NotTo(ContainSubstring("<no value>"))
+				assert.Expect(hasSelectorWithText(doc, ".font-mono", "7s")).To(BeTrue())
+				assert.Expect(hasSelectorWithText(doc, "*", "no value")).To(BeFalse())
 			})
 
 			t.Run("GET /runs/:id/tasks shows no usage badge for regular tasks on initial page load", func(t *testing.T) {
@@ -616,10 +630,11 @@ func TestRunViews(t *testing.T) {
 
 				assert.Expect(rec.Code).To(Equal(http.StatusOK))
 				// No usage badge for a plain task
-				assert.Expect(rec.Body.String()).NotTo(ContainSubstring("tok"))
+				doc := mustHTMLDocument(t, rec)
+				assert.Expect(hasSelectorWithText(doc, ".font-mono", "tok")).To(BeFalse())
 				// Elapsed time should still appear
-				assert.Expect(rec.Body.String()).To(ContainSubstring("3s"))
-				assert.Expect(rec.Body.String()).NotTo(ContainSubstring("<no value>"))
+				assert.Expect(hasSelectorWithText(doc, ".font-mono", "3s")).To(BeTrue())
+				assert.Expect(hasSelectorWithText(doc, "*", "no value")).To(BeFalse())
 			})
 
 			t.Run("GET /runs/:id/tasks renders stderr-only task logs", func(t *testing.T) {
@@ -656,7 +671,8 @@ func TestRunViews(t *testing.T) {
 				router.ServeHTTP(rec, req)
 
 				assert.Expect(rec.Code).To(Equal(http.StatusOK))
-				assert.Expect(rec.Body.String()).To(ContainSubstring("lint failed: missing semicolon"))
+				doc := mustHTMLDocument(t, rec)
+				assert.Expect(hasSelectorWithText(doc, "div[id^='terminal-']", "lint failed: missing semicolon")).To(BeTrue())
 			})
 
 		})

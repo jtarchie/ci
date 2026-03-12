@@ -55,8 +55,9 @@ func TestDriverRestriction(t *testing.T) {
 				router.ServeHTTP(rec, req)
 
 				assert.Expect(rec.Code).To(Equal(http.StatusBadRequest))
-				assert.Expect(rec.Body.String()).To(ContainSubstring("docker"))
-				assert.Expect(rec.Body.String()).To(ContainSubstring("not allowed"))
+				message := mustJSONErrorText(t, rec)
+				assert.Expect(message).To(ContainSubstring("docker"))
+				assert.Expect(message).To(ContainSubstring("not allowed"))
 
 				// Try to create pipeline with native driver (should succeed)
 				body["driver_dsn"] = "native"
@@ -264,8 +265,9 @@ func TestDriverRestriction(t *testing.T) {
 				rec = httptest.NewRecorder()
 				router.ServeHTTP(rec, req)
 				assert.Expect(rec.Code).To(Equal(http.StatusBadRequest))
-				assert.Expect(rec.Body.String()).To(ContainSubstring("qemu"))
-				assert.Expect(rec.Body.String()).To(ContainSubstring("not allowed"))
+				message := mustJSONErrorText(t, rec)
+				assert.Expect(message).To(ContainSubstring("qemu"))
+				assert.Expect(message).To(ContainSubstring("not allowed"))
 			})
 		})
 	})

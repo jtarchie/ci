@@ -57,7 +57,8 @@ func TestFeatureRestriction(t *testing.T) {
 				router.ServeHTTP(rec, req)
 
 				assert.Expect(rec.Code).To(Equal(http.StatusBadRequest))
-				assert.Expect(rec.Body.String()).To(ContainSubstring("webhooks feature is not enabled"))
+				message := mustJSONErrorText(t, rec)
+				assert.Expect(message).To(ContainSubstring("webhooks feature is not enabled"))
 			})
 
 			t.Run("allows webhook_secret when webhooks feature is enabled", func(t *testing.T) {
@@ -124,7 +125,8 @@ func TestFeatureRestriction(t *testing.T) {
 				router.ServeHTTP(rec, req)
 
 				assert.Expect(rec.Code).To(Equal(http.StatusForbidden))
-				assert.Expect(rec.Body.String()).To(ContainSubstring("webhooks feature is not enabled"))
+				message := mustJSONErrorText(t, rec)
+				assert.Expect(message).To(ContainSubstring("webhooks feature is not enabled"))
 			})
 
 			t.Run("wildcard enables all features", func(t *testing.T) {
