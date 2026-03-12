@@ -7,8 +7,8 @@ storage.
 
 ## How It Works
 
-1. **Storage**: Secrets are stored in an encrypted backend (currently SQLite).
-   Each secret is encrypted with a key derived from a passphrase you provide.
+1. **Storage**: Secrets are stored in an encrypted backend (SQLite or S3). Each
+   secret is encrypted with a key derived from a passphrase you provide.
 2. **Injection**: Pipelines reference secrets in `env` using a `secret:` prefix.
    At runtime, the system resolves the secret and injects the plaintext value
    into the container's environment.
@@ -258,6 +258,50 @@ pocketci run examples/both/secrets-basic.ts \
   --global-secret WEBHOOK_TOKEN=whsec-xyz789
 ```
 
+## Backend Configuration
+
+### S3
+
+The `s3` backend stores encrypted secrets as JSON objects in an S3-compatible
+bucket. Every object is protected by two independent encryption layers:
+
+1. **Application-layer AES-256-GCM** — applied by PocketCI before any bytes
+   leave the process. Key derived from the `key=` passphrase.
+2. **S3 Server-Side Encryption (SSE)** — enforced at construction time. If the
+   provider does not support SSE, the driver refuses to start.
+
+**DSN Format**:
+
+```
+s3://[http://|https://][ACCESS_KEY_ID:SECRET_ACCESS_KEY@]host[:port]/bucket[/prefix]?region=...&sse=AES256&key=passphrase
+```
+
+| Parameter        | Description                           | Required | Example                        |
+| ---------------- | ------------------------------------- | -------- | ------------------------------ |
+| `sse`            | `AES256` or `aws:kms` (mandatory)     | ✅       | `sse=AES256`                   |
+| `key`            | Passphrase for app-layer AES-256-GCM  | ✅       | `key=my-strong-passphrase`     |
+| `region`         | AWS region                            | —        | `region=us-east-1`             |
+| `sse_kms_key_id` | KMS key ARN (only with `sse=aws:kms`) | —        | `sse_kms_key_id=arn:aws:kms:…` |
+
+**Examples**:
+
+```bash
+# AWS S3 with AES256 SSE
+--secrets "s3://s3.amazonaws.com/my-secrets-bucket?region=us-east-1&sse=AES256&key=my-passphrase"
+
+# MinIO (local) with inline credentials
+--secrets "s3://http://minioadmin:minioadmin@localhost:9000/secrets?region=us-east-1&sse=AES256&key=my-passphrase"
+
+# Cloudflare R2
+--secrets "s3://https://AKID:SECRET@ACCOUNT_ID.r2.cloudflarestorage.com/secrets?region=auto&sse=AES256&key=my-passphrase"
+```
+
+Object layout within the bucket:
+
+```
+[prefix/]secrets/{scope}/{url-encoded-key}.json
+```
+
 ## Architecture
 
 The secrets system follows the same pluggable backend pattern as the
@@ -267,8 +311,10 @@ The secrets system follows the same pluggable backend pattern as the
 secrets/
   secrets.go          # Manager interface, Register/New registry
   encryption.go       # AES-256-GCM encryption primitives
-  local/
-    local.go          # SQLite-backed encrypted backend (self-registers via init())
+  sqlite/
+    sqlite.go         # SQLite-backed encrypted backend (self-registers via init())
+  s3/
+    s3.go             # S3-backed double-encrypted backend (self-registers via init())
 ```
 
 New backends (e.g., HashiCorp Vault, AWS Secrets Manager) can be added by

@@ -35,17 +35,20 @@ Caching is configured via the driver DSN using query parameters:
 ### S3 URL Format
 
 ```
-s3://bucket-name/optional-prefix?region=us-east-1&endpoint=http://localhost:9000&ttl=24h
+s3://[http://|https://][ACCESS_KEY_ID:SECRET_ACCESS_KEY@]host[:port]/bucket[/prefix]?region=us-east-1&ttl=24h
 ```
 
-| Parameter          | Description                                                               | Default               | Example                        |
-| ------------------ | ------------------------------------------------------------------------- | --------------------- | ------------------------------ |
-| `region`           | AWS region                                                                | AWS SDK default       | `us-east-1`                    |
-| `endpoint`         | Custom S3 endpoint (MinIO, R2, etc.)                                      | AWS S3                | `http://localhost:9000`        |
-| `force_path_style` | Force path-style URLs (`true`/`false`). Auto-enabled when `endpoint` set. | `true` when endpoint  | `false` for virtual-host style |
-| `sse`              | Server-side encryption: `AES256` or `aws:kms`                             | None (no SSE headers) | `AES256`                       |
-| `sse_kms_key_id`   | KMS key ARN/ID (only with `sse=aws:kms`; omit for provider default key)   | Provider default key  | `arn:aws:kms:…:key/mrk-abc`    |
-| `ttl`              | Cache expiration duration                                                 | No expiration         | `24h`, `7d`, `168h`            |
+The host is the S3 endpoint. Prefix with `http://` or `https://` to control the
+transport scheme (`https://` assumed when omitted). Credentials may be embedded
+as `id:secret@` userinfo immediately after the scheme.
+
+| Parameter          | Description                                                                       | Default                 | Example                        |
+| ------------------ | --------------------------------------------------------------------------------- | ----------------------- | ------------------------------ |
+| `region`           | AWS region                                                                        | AWS SDK default         | `us-east-1`                    |
+| `force_path_style` | Force path-style URLs (`true`/`false`). Auto-enabled when a custom host is given. | `true` when custom host | `false` for virtual-host style |
+| `sse`              | Server-side encryption: `AES256` or `aws:kms`                                     | None (no SSE headers)   | `AES256`                       |
+| `sse_kms_key_id`   | KMS key ARN/ID (only with `sse=aws:kms`; omit for provider default key)           | Provider default key    | `arn:aws:kms:…:key/mrk-abc`    |
+| `ttl`              | Cache expiration duration                                                         | No expiration           | `24h`, `7d`, `168h`            |
 
 ## Full Examples
 
@@ -53,14 +56,14 @@ s3://bucket-name/optional-prefix?region=us-east-1&endpoint=http://localhost:9000
 
 ```bash
 pocketci run pipeline.yml \
-  --driver='docker://?cache=s3://my-pocketci-cache?region=us-west-2&cache_prefix=project-a'
+  --driver='docker://?cache=s3://s3.amazonaws.com/my-pocketci-cache?region=us-west-2&cache_prefix=project-a'
 ```
 
 ### Cloudflare R2
 
 ```bash
 pocketci run pipeline.yml \
-  --driver='docker://?cache=s3://cache-bucket?endpoint=https://ACCOUNT_ID.r2.cloudflarestorage.com&region=auto&cache_prefix=project-a'
+  --driver='docker://?cache=s3://https://AKID:SECRET@ACCOUNT_ID.r2.cloudflarestorage.com/cache-bucket?region=auto&cache_prefix=project-a'
 ```
 
 ### AWS S3 with SSE encryption
@@ -68,11 +71,11 @@ pocketci run pipeline.yml \
 ```bash
 # SSE-S3 (AES256) — AWS-managed encryption key
 pocketci run pipeline.yml \
-  --driver='docker://?cache=s3://cache-bucket?region=us-east-1&sse=AES256'
+  --driver='docker://?cache=s3://s3.amazonaws.com/cache-bucket?region=us-east-1&sse=AES256'
 
 # SSE-KMS — provider default KMS key
 pocketci run pipeline.yml \
-  --driver='docker://?cache=s3://cache-bucket?region=us-east-1&sse=aws:kms'
+  --driver='docker://?cache=s3://s3.amazonaws.com/cache-bucket?region=us-east-1&sse=aws:kms'
 ```
 
 ### MinIO (Local S3-Compatible)
@@ -89,7 +92,7 @@ aws --endpoint-url http://localhost:9000 s3 mb s3://cache-bucket
 
 # Run with caching
 pocketci run pipeline.yml \
-  --driver='docker://?cache=s3://cache-bucket?endpoint=http://localhost:9000&region=us-east-1'
+  --driver='docker://?cache=s3://http://minioadmin:minioadmin@localhost:9000/cache-bucket?region=us-east-1'
 ```
 
 ### With Compression Options

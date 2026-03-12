@@ -17,7 +17,7 @@ full-text search (FTS5) for pipeline and run search queries. Use
 ## S3
 
 ```bash
-pocketci server --storage "s3://bucket-name?region=us-east-1"
+pocketci server --storage "s3://s3.amazonaws.com/bucket-name?region=us-east-1"
 ```
 
 The S3 backend stores all data as JSON objects in an S3-compatible bucket. It
@@ -26,16 +26,20 @@ works with AWS S3, MinIO, R2, and any S3-compatible object store.
 ### DSN Format
 
 ```
-s3://bucket-name/optional/prefix?region=us-east-1&endpoint=http://localhost:9000
+s3://[http://|https://][ACCESS_KEY_ID:SECRET_ACCESS_KEY@]host[:port]/bucket[/prefix]?region=us-east-1
 ```
 
-| Parameter          | Description                                                               | Default               | Example                        |
-| ------------------ | ------------------------------------------------------------------------- | --------------------- | ------------------------------ |
-| `region`           | AWS region                                                                | AWS SDK default       | `us-east-1`                    |
-| `endpoint`         | Custom S3 endpoint (MinIO, R2, etc.)                                      | AWS S3                | `http://localhost:9000`        |
-| `force_path_style` | Force path-style URLs (`true`/`false`). Auto-enabled when `endpoint` set. | `true` when endpoint  | `false` for virtual-host style |
-| `sse`              | Server-side encryption: `AES256` or `aws:kms`                             | None (no SSE headers) | `AES256`                       |
-| `sse_kms_key_id`   | KMS key ARN/ID (only with `sse=aws:kms`; omit for provider default key)   | Provider default key  | `arn:aws:kms:…:key/mrk-abc`    |
+The host portion is the S3 endpoint. Prefix it with `http://` or `https://` to
+control the transport scheme — if no scheme is given, `https://` is assumed.
+Credentials may be embedded as `id:secret@` userinfo immediately after the
+scheme.
+
+| Parameter          | Description                                                                       | Default                 | Example                        |
+| ------------------ | --------------------------------------------------------------------------------- | ----------------------- | ------------------------------ |
+| `region`           | AWS region                                                                        | AWS SDK default         | `us-east-1`                    |
+| `force_path_style` | Force path-style URLs (`true`/`false`). Auto-enabled when a custom host is given. | `true` when custom host | `false` for virtual-host style |
+| `sse`              | Server-side encryption: `AES256` or `aws:kms`                                     | None (no SSE headers)   | `AES256`                       |
+| `sse_kms_key_id`   | KMS key ARN/ID (only with `sse=aws:kms`; omit for provider default key)           | Provider default key    | `arn:aws:kms:…:key/mrk-abc`    |
 
 The URL path component (`/optional/prefix`) scopes all objects under a key
 prefix, allowing multiple PocketCI instances to share a single bucket.
@@ -54,10 +58,15 @@ configured prefix):
 
 ### Authentication
 
-The S3 driver uses the standard AWS SDK credential chain. Configure credentials
-via environment variables or AWS config files:
+Credentials can be embedded directly in the DSN or supplied via the standard AWS
+SDK credential chain (environment variables, `~/.aws/credentials`, IAM role):
 
 ```bash
+# Inline credentials
+pocketci server \
+  --storage "s3://http://ACCESS_KEY:SECRET@localhost:9000/bucket?region=us-east-1"
+
+# Environment variable credential chain
 export AWS_ACCESS_KEY_ID=your-key
 export AWS_SECRET_ACCESS_KEY=your-secret
 export AWS_REGION=us-east-1
@@ -75,52 +84,52 @@ simple substring matching after listing.
 
 ```bash
 pocketci server \
-  --storage "s3://my-ci-bucket/production?region=us-west-2"
+  --storage "s3://s3.amazonaws.com/my-ci-bucket/production?region=us-west-2"
 ```
 
 **MinIO (local development):**
 
 ```bash
 pocketci server \
-  --storage "s3://ci-data?region=us-east-1&endpoint=http://localhost:9000"
+  --storage "s3://http://minioadmin:minioadmin@localhost:9000/ci-data?region=us-east-1"
 ```
 
 **Cloudflare R2:**
 
 ```bash
 pocketci server \
-  --storage "s3://ci-data?endpoint=https://ACCOUNT_ID.r2.cloudflarestorage.com&region=auto"
+  --storage "s3://https://AKID:SECRET@ACCOUNT_ID.r2.cloudflarestorage.com/ci-data?region=auto"
 ```
 
 **AWS S3 with SSE-S3 (AES256) encryption:**
 
 ```bash
 pocketci server \
-  --storage "s3://my-ci-bucket/production?region=us-east-1&sse=AES256"
+  --storage "s3://s3.amazonaws.com/my-ci-bucket/production?region=us-east-1&sse=AES256"
 ```
 
 **AWS S3 with SSE-KMS (default KMS key):**
 
 ```bash
 pocketci server \
-  --storage "s3://my-ci-bucket/production?region=us-east-1&sse=aws:kms"
+  --storage "s3://s3.amazonaws.com/my-ci-bucket/production?region=us-east-1&sse=aws:kms"
 ```
 
 **AWS S3 with SSE-KMS (specific KMS key):**
 
 ```bash
 pocketci server \
-  --storage "s3://my-ci-bucket/production?region=us-east-1&sse=aws:kms&sse_kms_key_id=arn:aws:kms:us-east-1:123456789012:key/mrk-abc123"
+  --storage "s3://s3.amazonaws.com/my-ci-bucket/production?region=us-east-1&sse=aws:kms&sse_kms_key_id=arn:aws:kms:us-east-1:123456789012:key/mrk-abc123"
 ```
 
 **Shared bucket with prefix isolation:**
 
 ```bash
 # Team A
-pocketci server --storage "s3://shared-bucket/team-a"
+pocketci server --storage "s3://s3.amazonaws.com/shared-bucket/team-a"
 
 # Team B
-pocketci server --storage "s3://shared-bucket/team-b"
+pocketci server --storage "s3://s3.amazonaws.com/shared-bucket/team-b"
 ```
 
 ### Trade-offs
