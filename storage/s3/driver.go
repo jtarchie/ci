@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
 	tmtypes "github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -48,9 +47,9 @@ func NewS3(dsn string, namespace string, logger *slog.Logger) (storage.Driver, e
 
 	ctx := context.Background()
 
-	awsCfg, err := config.LoadDefaultConfig(ctx)
+	awsCfg, err := s3cfg.LoadAWSConfig(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load AWS config: %w", err)
+		return nil, err
 	}
 
 	client := s3.NewFromConfig(awsCfg, s3cfg.ClientOptions()...)

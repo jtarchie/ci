@@ -159,3 +159,24 @@ func TestClientOptions_WithRegionAndEndpoint(t *testing.T) {
 	opts := cfg.ClientOptions()
 	assert.Expect(opts).To(HaveLen(2))
 }
+
+func TestParseDSN_InlineCredentials(t *testing.T) {
+	assert := NewGomegaWithT(t)
+
+	cfg, err := s3config.ParseDSN("s3://AKID:SECRET@mybucket?region=auto&endpoint=https://account.r2.cloudflarestorage.com")
+	assert.Expect(err).NotTo(HaveOccurred())
+	assert.Expect(cfg.Bucket).To(Equal("mybucket"))
+	assert.Expect(cfg.AccessKeyID).To(Equal("AKID"))
+	assert.Expect(cfg.SecretAccessKey).To(Equal("SECRET"))
+	assert.Expect(cfg.Region).To(Equal("auto"))
+}
+
+func TestParseDSN_NoCredentials(t *testing.T) {
+	assert := NewGomegaWithT(t)
+
+	// Without userinfo the credential fields are empty (SDK chain takes over).
+	cfg, err := s3config.ParseDSN("s3://mybucket?region=us-east-1")
+	assert.Expect(err).NotTo(HaveOccurred())
+	assert.Expect(cfg.AccessKeyID).To(Equal(""))
+	assert.Expect(cfg.SecretAccessKey).To(Equal(""))
+}

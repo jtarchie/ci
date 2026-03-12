@@ -4,15 +4,19 @@
 // DSN format:
 //
 //	s3://bucket/optional/prefix?region=us-east-1&endpoint=http://localhost:9000
+//	s3://ACCESS_KEY_ID:SECRET_ACCESS_KEY@bucket/optional/prefix?region=auto&endpoint=https://...
 package s3config
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
@@ -21,6 +25,12 @@ import (
 type Config struct {
 	Bucket string
 	Prefix string
+
+	// AccessKeyID and SecretAccessKey are static credentials parsed from the
+	// DSN userinfo (s3://ID:SECRET@bucket/...). When empty the SDK credential
+	// chain (env vars, ~/.aws/credentials, IAM role, etc.) is used instead.
+	AccessKeyID     string
+	SecretAccessKey string
 
 	// Region is the AWS region. Uses the SDK credential-chain default when empty.
 	Region string
@@ -50,6 +60,13 @@ type Config struct {
 
 // ParseDSN parses an S3 DSN and returns a validated Config.
 //
+// Credentials may be embedded in the URL userinfo:
+//
+//	s3://ACCESS_KEY_ID:SECRET_ACCESS_KEY@bucket/prefix?...
+//
+// When no userinfo is present the AWS SDK credential chain is used (env vars,
+// ~/.aws/credentials, IAM role, etc.).
+//
 // Supported query parameters:
 //   - region            AWS region (default: SDK credential-chain default)
 //   - endpoint          Custom S3-compatible endpoint URL (MinIO, R2, etc.)
@@ -74,6 +91,12 @@ func ParseDSN(dsn string) (*Config, error) {
 	cfg := &Config{
 		Bucket: parsed.Host,
 		Prefix: strings.TrimPrefix(parsed.Path, "/"),
+	}
+
+	// Extract inline credentials from userinfo (s3://ID:SECRET@bucket/...).
+	if parsed.User != nil {
+		cfg.AccessKeyID = parsed.User.Username()
+		cfg.SecretAccessKey, _ = parsed.User.Password()
 	}
 
 	q := parsed.Query()
@@ -114,6 +137,25 @@ func ParseDSN(dsn string) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// LoadAWSConfig loads an AWS config using the SDK default credential chain,
+// optionally overriding with static credentials when they were embedded in the DSN.
+func (c *Config) LoadAWSConfig(ctx context.Context) (aws.Config, error) {
+	var opts []func(*config.LoadOptions) error
+
+	if c.AccessKeyID != "" && c.SecretAccessKey != "" {
+		opts = append(opts, config.WithCredentialsProvider(
+			credentials.NewStaticCredentialsProvider(c.AccessKeyID, c.SecretAccessKey, ""),
+		))
+	}
+
+	awsCfg, err := config.LoadDefaultConfig(ctx, opts...)
+	if err != nil {
+		return aws.Config{}, fmt.Errorf("failed to load AWS config: %w", err)
+	}
+
+	return awsCfg, nil
 }
 
 // ClientOptions returns the S3 client functional options derived from Region
