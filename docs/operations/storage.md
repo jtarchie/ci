@@ -38,8 +38,9 @@ scheme.
 | ------------------ | --------------------------------------------------------------------------------- | ----------------------- | ------------------------------ |
 | `region`           | AWS region                                                                        | AWS SDK default         | `us-east-1`                    |
 | `force_path_style` | Force path-style URLs (`true`/`false`). Auto-enabled when a custom host is given. | `true` when custom host | `false` for virtual-host style |
-| `sse`              | Server-side encryption: `AES256` or `aws:kms`                                     | None (no SSE headers)   | `AES256`                       |
-| `sse_kms_key_id`   | KMS key ARN/ID (only with `sse=aws:kms`; omit for provider default key)           | Provider default key    | `arn:aws:kms:…:key/mrk-abc`    |
+| `encrypt`          | Provider SSE: `sse-s3` (AES-256), `sse-kms` (KMS), or `sse-c` (customer key)      | None (no SSE headers)   | `sse-s3`                       |
+| `sse_kms_key_id`   | KMS key ARN/ID (only with `encrypt=sse-kms`; omit for provider default key)       | Provider default key    | `arn:aws:kms:…:key/mrk-abc`    |
+| `key`              | Customer-provided key passphrase (required for `encrypt=sse-c`)                   | —                       | `my-passphrase`                |
 
 The URL path component (`/optional/prefix`) scopes all objects under a key
 prefix, allowing multiple PocketCI instances to share a single bucket.
@@ -101,25 +102,32 @@ pocketci server \
   --storage "s3://https://AKID:SECRET@ACCOUNT_ID.r2.cloudflarestorage.com/ci-data?region=auto"
 ```
 
-**AWS S3 with SSE-S3 (AES256) encryption:**
+**AWS S3 with SSE-S3 (AES-256) encryption:**
 
 ```bash
 pocketci server \
-  --storage "s3://s3.amazonaws.com/my-ci-bucket/production?region=us-east-1&sse=AES256"
+  --storage "s3://s3.amazonaws.com/my-ci-bucket/production?region=us-east-1&encrypt=sse-s3"
 ```
 
 **AWS S3 with SSE-KMS (default KMS key):**
 
 ```bash
 pocketci server \
-  --storage "s3://s3.amazonaws.com/my-ci-bucket/production?region=us-east-1&sse=aws:kms"
+  --storage "s3://s3.amazonaws.com/my-ci-bucket/production?region=us-east-1&encrypt=sse-kms"
 ```
 
 **AWS S3 with SSE-KMS (specific KMS key):**
 
 ```bash
 pocketci server \
-  --storage "s3://s3.amazonaws.com/my-ci-bucket/production?region=us-east-1&sse=aws:kms&sse_kms_key_id=arn:aws:kms:us-east-1:123456789012:key/mrk-abc123"
+  --storage "s3://s3.amazonaws.com/my-ci-bucket/production?region=us-east-1&encrypt=sse-kms&sse_kms_key_id=arn:aws:kms:us-east-1:123456789012:key/mrk-abc123"
+```
+
+**AWS S3 with SSE-C (customer-provided key):**
+
+```bash
+pocketci server \
+  --storage "s3://s3.amazonaws.com/my-ci-bucket/production?region=us-east-1&encrypt=sse-c&key=my-passphrase"
 ```
 
 **Shared bucket with prefix isolation:**

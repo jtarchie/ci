@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/jtarchie/pocketci/s3config"
 	. "github.com/onsi/gomega"
 )
@@ -19,7 +18,7 @@ func TestParseDSN_Minimal(t *testing.T) {
 	assert.Expect(cfg.Region).To(Equal(""))
 	assert.Expect(cfg.Endpoint).To(Equal("https://s3.amazonaws.com"))
 	assert.Expect(cfg.ForcePathStyle).To(BeTrue())
-	assert.Expect(cfg.SSE).To(BeEmpty())
+	assert.Expect(cfg.EncryptMode).To(Equal(""))
 	assert.Expect(cfg.SSEKMSKeyID).To(Equal(""))
 	assert.Expect(cfg.TTL).To(Equal(time.Duration(0)))
 }
@@ -62,40 +61,58 @@ func TestParseDSN_ForcePathStyleFalse(t *testing.T) {
 	assert.Expect(cfg.ForcePathStyle).To(BeFalse())
 }
 
-func TestParseDSN_SSE_AES256(t *testing.T) {
+func TestParseDSN_Encrypt_SseS3(t *testing.T) {
 	assert := NewGomegaWithT(t)
 
-	cfg, err := s3config.ParseDSN("s3://s3.amazonaws.com/mybucket?sse=AES256")
+	cfg, err := s3config.ParseDSN("s3://s3.amazonaws.com/mybucket?encrypt=sse-s3")
 	assert.Expect(err).NotTo(HaveOccurred())
-	assert.Expect(cfg.SSE).To(Equal(types.ServerSideEncryptionAes256))
+	assert.Expect(cfg.EncryptMode).To(Equal("sse-s3"))
 	assert.Expect(cfg.SSEKMSKeyID).To(Equal(""))
 }
 
-func TestParseDSN_SSE_KMS_WithoutKey(t *testing.T) {
+func TestParseDSN_Encrypt_SseKms_WithoutKeyID(t *testing.T) {
 	assert := NewGomegaWithT(t)
 
-	// Allow aws:kms without a key ID — provider uses its default KMS key.
-	cfg, err := s3config.ParseDSN("s3://s3.amazonaws.com/mybucket?sse=aws:kms")
+	// Allow sse-kms without a key ID — provider uses its default KMS key.
+	cfg, err := s3config.ParseDSN("s3://s3.amazonaws.com/mybucket?encrypt=sse-kms")
 	assert.Expect(err).NotTo(HaveOccurred())
-	assert.Expect(cfg.SSE).To(Equal(types.ServerSideEncryptionAwsKms))
+	assert.Expect(cfg.EncryptMode).To(Equal("sse-kms"))
 	assert.Expect(cfg.SSEKMSKeyID).To(Equal(""))
 }
 
-func TestParseDSN_SSE_KMS_WithKey(t *testing.T) {
+func TestParseDSN_Encrypt_SseKms_WithKeyID(t *testing.T) {
 	assert := NewGomegaWithT(t)
 
-	cfg, err := s3config.ParseDSN("s3://s3.amazonaws.com/mybucket?sse=aws:kms&sse_kms_key_id=arn:aws:kms:us-east-1:123456789012:key/mrk-abc123")
+	cfg, err := s3config.ParseDSN("s3://s3.amazonaws.com/mybucket?encrypt=sse-kms&sse_kms_key_id=arn:aws:kms:us-east-1:123456789012:key/mrk-abc123")
 	assert.Expect(err).NotTo(HaveOccurred())
-	assert.Expect(cfg.SSE).To(Equal(types.ServerSideEncryptionAwsKms))
+	assert.Expect(cfg.EncryptMode).To(Equal("sse-kms"))
 	assert.Expect(cfg.SSEKMSKeyID).To(Equal("arn:aws:kms:us-east-1:123456789012:key/mrk-abc123"))
 }
 
-func TestParseDSN_SSE_InvalidValue(t *testing.T) {
+func TestParseDSN_Encrypt_SseC(t *testing.T) {
 	assert := NewGomegaWithT(t)
 
-	_, err := s3config.ParseDSN("s3://s3.amazonaws.com/mybucket?sse=SSE-C")
+	cfg, err := s3config.ParseDSN("s3://s3.amazonaws.com/mybucket?encrypt=sse-c&key=mypassphrase")
+	assert.Expect(err).NotTo(HaveOccurred())
+	assert.Expect(cfg.EncryptMode).To(Equal("sse-c"))
+	assert.Expect(cfg.SSECKey).To(HaveLen(32)) // SHA-256 output is always 32 bytes
+	assert.Expect(cfg.Key).To(Equal("mypassphrase"))
+}
+
+func TestParseDSN_Encrypt_SseC_MissingKey(t *testing.T) {
+	assert := NewGomegaWithT(t)
+
+	_, err := s3config.ParseDSN("s3://s3.amazonaws.com/mybucket?encrypt=sse-c")
 	assert.Expect(err).To(HaveOccurred())
-	assert.Expect(err.Error()).To(ContainSubstring("unsupported sse value"))
+	assert.Expect(err.Error()).To(ContainSubstring("key="))
+}
+
+func TestParseDSN_Encrypt_InvalidValue(t *testing.T) {
+	assert := NewGomegaWithT(t)
+
+	_, err := s3config.ParseDSN("s3://s3.amazonaws.com/mybucket?encrypt=bogus")
+	assert.Expect(err).To(HaveOccurred())
+	assert.Expect(err.Error()).To(ContainSubstring("unsupported encrypt value"))
 }
 
 func TestParseDSN_TTL(t *testing.T) {
@@ -133,14 +150,14 @@ func TestParseDSN_MissingBucket(t *testing.T) {
 func TestParseDSN_FullParams(t *testing.T) {
 	assert := NewGomegaWithT(t)
 
-	cfg, err := s3config.ParseDSN("s3://http://minio:9000/ci-bucket/prod/prefix?region=eu-west-1&sse=AES256&ttl=48h")
+	cfg, err := s3config.ParseDSN("s3://http://minio:9000/ci-bucket/prod/prefix?region=eu-west-1&encrypt=sse-s3&ttl=48h")
 	assert.Expect(err).NotTo(HaveOccurred())
 	assert.Expect(cfg.Bucket).To(Equal("ci-bucket"))
 	assert.Expect(cfg.Prefix).To(Equal("prod/prefix"))
 	assert.Expect(cfg.Region).To(Equal("eu-west-1"))
 	assert.Expect(cfg.Endpoint).To(Equal("http://minio:9000"))
 	assert.Expect(cfg.ForcePathStyle).To(BeTrue())
-	assert.Expect(cfg.SSE).To(Equal(types.ServerSideEncryptionAes256))
+	assert.Expect(cfg.EncryptMode).To(Equal("sse-s3"))
 	assert.Expect(cfg.TTL).To(Equal(48 * time.Hour))
 }
 

@@ -3,7 +3,7 @@
 //
 // DSN format:
 //
-//	s3://[http://|https://][ACCESS_KEY_ID:SECRET_ACCESS_KEY@]host[:port]/bucket[/prefix]?region=...
+//	s3://[http://|https://][ACCESS_KEY_ID:SECRET_ACCESS_KEY@]host[:port]/bucket[/prefix]?region=...&encrypt=...
 //
 // When no http/https scheme prefix is provided, https is assumed. When a custom
 // host is omitted entirely (bare bucket-only form) the AWS SDK default endpoint
@@ -12,13 +12,16 @@
 // Examples:
 //
 //	s3://s3.amazonaws.com/mybucket/prefix?region=us-east-1
-//	s3://http://localhost:9000/mybucket?region=us-east-1
+//	s3://http://localhost:9000/mybucket?region=us-east-1&encrypt=sse-s3
 //	s3://http://minioadmin:minioadmin@localhost:9000/mybucket?region=us-east-1
 //	s3://https://AKID:SECRET@account.r2.cloudflarestorage.com/mybucket?region=auto
 package s3config
 
 import (
 	"context"
+	"crypto/md5"
+	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"net/url"
 	"strings"
@@ -27,6 +30,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
+	tmtypes "github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
@@ -54,13 +59,22 @@ type Config struct {
 	// Cloudflare R2 with custom domain).
 	ForcePathStyle bool
 
-	// SSE is the server-side encryption algorithm.
-	// Supported values: "" (none, default), "AES256", "aws:kms".
-	SSE types.ServerSideEncryption
+	// EncryptMode is the server-side encryption mode.
+	// Values: "" (none, default), "sse-s3" (AES-256), "sse-kms" (KMS), "sse-c" (customer-provided key).
+	EncryptMode string
 
-	// SSEKMSKeyID is the KMS key ID used when SSE == "aws:kms".
+	// SSEKMSKeyID is the KMS key ID used when EncryptMode == "sse-kms".
 	// When empty the provider's default KMS key is used.
 	SSEKMSKeyID string
+
+	// SSECKey is the 32-byte customer-provided key used when EncryptMode == "sse-c".
+	// Derived as SHA-256 of the key= passphrase.
+	SSECKey []byte
+
+	// Key is the raw passphrase from the key= query parameter.
+	// Used by the secrets driver for application-layer AES-256-GCM encryption,
+	// and as the source material for SSECKey when EncryptMode == "sse-c".
+	Key string
 
 	// TTL is the optional cache expiry duration.
 	// Only populated when the ttl query parameter is present.
@@ -81,8 +95,10 @@ type Config struct {
 // Supported query parameters:
 //   - region            AWS region (default: SDK credential-chain default)
 //   - force_path_style  "true" | "false" — defaults to true when a custom host is set
-//   - sse               "AES256" | "aws:kms" — server-side encryption; omit for none
-//   - sse_kms_key_id    KMS key ID (only with sse=aws:kms; provider default when omitted)
+//   - encrypt           "sse-s3" | "sse-kms" | "sse-c" — server-side encryption; omit for none
+//   - sse_kms_key_id    KMS key ID (only with encrypt=sse-kms; provider default when omitted)
+//   - key               Passphrase — required when encrypt=sse-c; also used by the secrets
+//     driver for application-layer AES-256-GCM encryption
 //   - ttl               Cache expiry duration, e.g. "24h" (cache driver only)
 func ParseDSN(dsn string) (*Config, error) {
 	const prefix = "s3://"
@@ -154,15 +170,25 @@ func ParseDSN(dsn string) (*Config, error) {
 		cfg.ForcePathStyle = cfg.Endpoint != ""
 	}
 
-	switch sse := q.Get("sse"); sse {
+	cfg.Key = q.Get("key")
+
+	switch encrypt := q.Get("encrypt"); encrypt {
 	case "":
-		// No SSE configured — preserve current default: no explicit SSE headers.
-	case "AES256":
-		cfg.SSE = types.ServerSideEncryptionAes256
-	case "aws:kms":
-		cfg.SSE = types.ServerSideEncryptionAwsKms
+		// No provider-level encryption.
+	case "sse-s3":
+		cfg.EncryptMode = "sse-s3"
+	case "sse-kms":
+		cfg.EncryptMode = "sse-kms"
+	case "sse-c":
+		if cfg.Key == "" {
+			return nil, fmt.Errorf("encrypt=sse-c requires key= passphrase in DSN")
+		}
+
+		sum := sha256.Sum256([]byte(cfg.Key))
+		cfg.SSECKey = sum[:]
+		cfg.EncryptMode = "sse-c"
 	default:
-		return nil, fmt.Errorf("unsupported sse value %q: must be AES256 or aws:kms", sse)
+		return nil, fmt.Errorf("unsupported encrypt value %q: must be sse-s3, sse-kms, or sse-c", encrypt)
 	}
 
 	cfg.SSEKMSKeyID = q.Get("sse_kms_key_id")
@@ -222,15 +248,76 @@ func (c *Config) ClientOptions() []func(*s3.Options) {
 	return opts
 }
 
-// ApplySSEToPut sets server-side encryption fields on a PutObjectInput when
-// SSE is configured. No-op when SSE is not set (preserves current default).
+// ssecStrings returns the base64-encoded key and key MD5 for SSE-C operations.
+// Only valid when EncryptMode == "sse-c".
+func (c *Config) ssecStrings() (algorithm, key, keyMD5 string) {
+	b64key := base64.StdEncoding.EncodeToString(c.SSECKey)
+	sum := md5.Sum(c.SSECKey) //nolint:gosec // SSE-C protocol requires MD5 of the key, not for security
+	b64md5 := base64.StdEncoding.EncodeToString(sum[:])
+
+	return "AES256", b64key, b64md5
+}
+
+// ApplySSEToPut sets server-side encryption fields on a PutObjectInput.
+// No-op when EncryptMode is empty.
 func (c *Config) ApplySSEToPut(input *s3.PutObjectInput) {
-	if c.SSE == "" {
+	switch c.EncryptMode {
+	case "sse-s3":
+		input.ServerSideEncryption = types.ServerSideEncryptionAes256
+	case "sse-kms":
+		input.ServerSideEncryption = types.ServerSideEncryptionAwsKms
+		if c.SSEKMSKeyID != "" {
+			input.SSEKMSKeyId = aws.String(c.SSEKMSKeyID)
+		}
+	case "sse-c":
+		algorithm, key, keyMD5 := c.ssecStrings()
+		input.SSECustomerAlgorithm = aws.String(algorithm)
+		input.SSECustomerKey = aws.String(key)
+		input.SSECustomerKeyMD5 = aws.String(keyMD5)
+	}
+}
+
+// ApplySSEToGet sets SSE-C fields on a GetObjectInput.
+// No-op when EncryptMode is not "sse-c" (server-managed modes need no headers on reads).
+func (c *Config) ApplySSEToGet(input *s3.GetObjectInput) {
+	if c.EncryptMode != "sse-c" {
 		return
 	}
 
-	input.ServerSideEncryption = c.SSE
-	if c.SSEKMSKeyID != "" {
-		input.SSEKMSKeyId = aws.String(c.SSEKMSKeyID)
+	algorithm, key, keyMD5 := c.ssecStrings()
+	input.SSECustomerAlgorithm = aws.String(algorithm)
+	input.SSECustomerKey = aws.String(key)
+	input.SSECustomerKeyMD5 = aws.String(keyMD5)
+}
+
+// ApplySSEToHead sets SSE-C fields on a HeadObjectInput.
+// No-op when EncryptMode is not "sse-c".
+func (c *Config) ApplySSEToHead(input *s3.HeadObjectInput) {
+	if c.EncryptMode != "sse-c" {
+		return
+	}
+
+	algorithm, key, keyMD5 := c.ssecStrings()
+	input.SSECustomerAlgorithm = aws.String(algorithm)
+	input.SSECustomerKey = aws.String(key)
+	input.SSECustomerKeyMD5 = aws.String(keyMD5)
+}
+
+// ApplySSEToUpload sets server-side encryption fields on a transfermanager UploadObjectInput.
+// No-op when EncryptMode is empty.
+func (c *Config) ApplySSEToUpload(input *transfermanager.UploadObjectInput) {
+	switch c.EncryptMode {
+	case "sse-s3":
+		input.ServerSideEncryption = tmtypes.ServerSideEncryptionAes256
+	case "sse-kms":
+		input.ServerSideEncryption = tmtypes.ServerSideEncryptionAwsKms
+		if c.SSEKMSKeyID != "" {
+			input.SSEKMSKeyID = aws.String(c.SSEKMSKeyID)
+		}
+	case "sse-c":
+		algorithm, key, keyMD5 := c.ssecStrings()
+		input.SSECustomerAlgorithm = aws.String(algorithm)
+		input.SSECustomerKey = aws.String(key)
+		input.SSECustomerKeyMD5 = aws.String(keyMD5)
 	}
 }

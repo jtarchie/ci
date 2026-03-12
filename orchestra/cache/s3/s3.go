@@ -9,7 +9,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
-	tmtypes "github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/jtarchie/pocketci/orchestra/cache"
@@ -22,12 +21,11 @@ func init() {
 
 // S3Store implements CacheStore using AWS S3.
 type S3Store struct {
-	client   *s3.Client
-	bucket   string
-	prefix   string
-	ttl      time.Duration
-	sse      types.ServerSideEncryption
-	sseKeyID string
+	client *s3.Client
+	bucket string
+	prefix string
+	ttl    time.Duration
+	s3cfg  *s3config.Config
 }
 
 // Option configures an S3Store.
@@ -58,12 +56,11 @@ func NewS3Store(urlStr string) (cache.CacheStore, error) {
 	client := s3.NewFromConfig(awsCfg, s3cfg.ClientOptions()...)
 
 	return &S3Store{
-		client:   client,
-		bucket:   s3cfg.Bucket,
-		prefix:   s3cfg.Prefix,
-		ttl:      s3cfg.TTL,
-		sse:      s3cfg.SSE,
-		sseKeyID: s3cfg.SSEKMSKeyID,
+		client: client,
+		bucket: s3cfg.Bucket,
+		prefix: s3cfg.Prefix,
+		ttl:    s3cfg.TTL,
+		s3cfg:  s3cfg,
 	}, nil
 }
 
@@ -71,10 +68,14 @@ func NewS3Store(urlStr string) (cache.CacheStore, error) {
 func (s *S3Store) Restore(ctx context.Context, key string) (io.ReadCloser, error) {
 	fullKey := s.fullKey(key)
 
-	result, err := s.client.GetObject(ctx, &s3.GetObjectInput{
+	getInput := &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(fullKey),
-	})
+	}
+
+	s.s3cfg.ApplySSEToGet(getInput)
+
+	result, err := s.client.GetObject(ctx, getInput)
 	if err != nil {
 		var noSuchKey *types.NoSuchKey
 		if errors.As(err, &noSuchKey) {
@@ -123,12 +124,7 @@ func (s *S3Store) Persist(ctx context.Context, key string, reader io.Reader) err
 		Body:   reader,
 	}
 
-	if s.sse != "" {
-		uploadInput.ServerSideEncryption = tmtypes.ServerSideEncryption(s.sse)
-		if s.sseKeyID != "" {
-			uploadInput.SSEKMSKeyID = aws.String(s.sseKeyID)
-		}
-	}
+	s.s3cfg.ApplySSEToUpload(uploadInput)
 
 	_, err := uploader.UploadObject(ctx, uploadInput)
 	if err != nil {
@@ -142,10 +138,14 @@ func (s *S3Store) Persist(ctx context.Context, key string, reader io.Reader) err
 func (s *S3Store) Exists(ctx context.Context, key string) (bool, error) {
 	fullKey := s.fullKey(key)
 
-	result, err := s.client.HeadObject(ctx, &s3.HeadObjectInput{
+	headInput := &s3.HeadObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(fullKey),
-	})
+	}
+
+	s.s3cfg.ApplySSEToHead(headInput)
+
+	result, err := s.client.HeadObject(ctx, headInput)
 	if err != nil {
 		var notFound *types.NotFound
 		if errors.As(err, &notFound) {

@@ -2,23 +2,20 @@
 //
 // # Security model
 //
-// Secrets are protected by two independent layers:
-//  1. Application-layer AES-256-GCM encryption (key derived from the passphrase
-//     in "key=" query param), applied before any bytes leave the process.
-//  2. S3 Server-Side Encryption (SSE-S3 or SSE-KMS), configured via "sse=" and
-//     enforced by an SSE probe at construction time.  If the target provider
-//     does not support SSE, the constructor returns an error.
+// Secrets are protected by application-layer AES-256-GCM encryption (key
+// derived from the passphrase in the "key=" query param), applied before any
+// bytes leave the process. An optional S3 Server-Side Encryption layer may
+// be added via the "encrypt=" query parameter (sse-s3, sse-kms, or sse-c).
 //
 // # DSN format
 //
-//	s3://[http://|https://][ACCESS_KEY_ID:SECRET_ACCESS_KEY@]host[:port]/bucket[/prefix]?region=...&sse=AES256&key=passphrase
+//	s3://[http://|https://][ACCESS_KEY_ID:SECRET_ACCESS_KEY@]host[:port]/bucket[/prefix]?region=...&key=passphrase[&encrypt=sse-s3]
 //
 // Parameters:
-//   - sse      (required) "AES256" or "aws:kms"
 //   - key      (required) Encryption passphrase for application-layer AES-256-GCM
+//   - encrypt  (optional) "sse-s3", "sse-kms", or "sse-c" — provider-level SSE
 //   - region   AWS region (default: SDK credential-chain default)
-//   - endpoint Custom S3-compatible endpoint (MinIO, Cloudflare R2, etc.)
-//   - sse_kms_key_id  KMS key ID (only with sse=aws:kms; provider default when omitted)
+//   - sse_kms_key_id  KMS key ID (only with encrypt=sse-kms; provider default when omitted)
 //   - force_path_style "true"/"false" — defaults to true when endpoint is set
 package s3
 
@@ -37,7 +34,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
-	tmtypes "github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/jtarchie/pocketci/s3config"
@@ -49,16 +45,14 @@ func init() {
 }
 
 // S3 implements secrets.Manager using an S3-compatible object store as the
-// backend. Every stored object is AES-256-GCM encrypted before upload; S3
-// Server-Side Encryption provides an additional at-rest protection layer.
+// backend. Every stored object is AES-256-GCM encrypted before upload.
 type S3 struct {
 	client    *s3.Client
 	bucket    string
 	prefix    string
 	encryptor *secrets.Encryptor
 	logger    *slog.Logger
-	sse       types.ServerSideEncryption
-	sseKeyID  string
+	s3cfg     *s3config.Config
 }
 
 // secretRecord is the JSON structure persisted in each S3 object.
@@ -71,11 +65,10 @@ type secretRecord struct {
 
 // New creates a new S3-backed secrets manager.
 //
-// The sse and key query parameters are both mandatory. Construction fails when:
-//   - "sse" is absent (provider-level encryption not configured)
-//   - "key" is absent (no application-layer encryption passphrase)
-//   - The SSE probe PutObject/HeadObject round-trip shows the S3 provider does
-//     not actually apply server-side encryption to the stored object.
+// The key= query parameter is mandatory: it is the passphrase for
+// application-layer AES-256-GCM encryption. The encrypt= parameter is
+// optional; when set to sse-s3, sse-kms, or sse-c a construction-time probe
+// verifies that the S3 provider accepts the encryption headers.
 func New(dsn string, logger *slog.Logger) (secrets.Manager, error) {
 	if logger == nil {
 		logger = slog.Default()
@@ -88,14 +81,8 @@ func New(dsn string, logger *slog.Logger) (secrets.Manager, error) {
 		return nil, fmt.Errorf("invalid secrets S3 DSN: %w", err)
 	}
 
-	if s3cfg.SSE == "" {
-		return nil, fmt.Errorf("s3 secrets driver requires sse= param (AES256 or aws:kms): data at rest must be encrypted by the provider")
-	}
-
-	// Extract the application-layer encryption passphrase from "key" param.
-	// url.Parse is safe here — ParseDSN already validated the DSN.
-	parsed, _ := url.Parse(dsn)
-	passphrase := parsed.Query().Get("key")
+	// key= is required for application-layer AES-256-GCM encryption.
+	passphrase := s3cfg.Key
 
 	if passphrase == "" {
 		return nil, fmt.Errorf("s3 secrets driver requires key= param for application-layer encryption")
@@ -123,25 +110,24 @@ func New(dsn string, logger *slog.Logger) (secrets.Manager, error) {
 		prefix:    s3cfg.Prefix,
 		encryptor: encryptor,
 		logger:    logger,
-		sse:       s3cfg.SSE,
-		sseKeyID:  s3cfg.SSEKMSKeyID,
+		s3cfg:     s3cfg,
 	}
 
-	// Probe SSE: upload a tiny sentinel object and verify that HeadObject
-	// reports server-side encryption was applied. Fail fast if the provider
-	// does not honour SSE headers.
-	if err := mgr.probeSSE(ctx); err != nil {
-		return nil, fmt.Errorf("s3 secrets SSE probe failed — provider does not support SSE %q: %w", s3cfg.SSE, err)
+	// Probe SSE: when encrypt= is configured, upload a tiny sentinel object and
+	// verify that the S3 provider accepts the encryption headers.
+	if s3cfg.EncryptMode != "" {
+		if err := mgr.probeSSE(ctx); err != nil {
+			return nil, fmt.Errorf("s3 secrets SSE probe failed — provider does not support encrypt=%q: %w", s3cfg.EncryptMode, err)
+		}
 	}
 
-	logger.Info("secrets.s3.initialized", "bucket", s3cfg.Bucket, "prefix", s3cfg.Prefix, "sse", s3cfg.SSE)
+	logger.Info("secrets.s3.initialized", "bucket", s3cfg.Bucket, "prefix", s3cfg.Prefix, "encrypt", s3cfg.EncryptMode)
 
 	return mgr, nil
 }
 
-// probeSSE writes a tiny sentinel object with SSE headers and verifies via
-// HeadObject that the provider applied server-side encryption. The sentinel is
-// deleted immediately regardless of the outcome.
+// probeSSE writes a tiny sentinel object with SSE headers and verifies the
+// provider accepts them. The sentinel is deleted immediately after upload.
 func (s *S3) probeSSE(ctx context.Context) error {
 	sentinelKey := s.scopePrefix("__probe__") + "__sse_check__.json"
 	data := []byte(`{"probe":true}`)
@@ -149,16 +135,13 @@ func (s *S3) probeSSE(ctx context.Context) error {
 	uploader := transfermanager.New(s.client)
 
 	input := &transfermanager.UploadObjectInput{
-		Bucket:               aws.String(s.bucket),
-		Key:                  aws.String(sentinelKey),
-		Body:                 bytes.NewReader(data),
-		ContentType:          aws.String("application/json"),
-		ServerSideEncryption: tmtypes.ServerSideEncryption(s.sse),
+		Bucket:      aws.String(s.bucket),
+		Key:         aws.String(sentinelKey),
+		Body:        bytes.NewReader(data),
+		ContentType: aws.String("application/json"),
 	}
 
-	if s.sseKeyID != "" {
-		input.SSEKMSKeyID = aws.String(s.sseKeyID)
-	}
+	s.s3cfg.ApplySSEToUpload(input)
 
 	_, uploadErr := uploader.UploadObject(ctx, input)
 
@@ -205,16 +188,13 @@ func (s *S3) upload(ctx context.Context, key string, rec secretRecord) error {
 	uploader := transfermanager.New(s.client)
 
 	input := &transfermanager.UploadObjectInput{
-		Bucket:               aws.String(s.bucket),
-		Key:                  aws.String(key),
-		Body:                 bytes.NewReader(data),
-		ContentType:          aws.String("application/json"),
-		ServerSideEncryption: tmtypes.ServerSideEncryption(s.sse),
+		Bucket:      aws.String(s.bucket),
+		Key:         aws.String(key),
+		Body:        bytes.NewReader(data),
+		ContentType: aws.String("application/json"),
 	}
 
-	if s.sseKeyID != "" {
-		input.SSEKMSKeyID = aws.String(s.sseKeyID)
-	}
+	s.s3cfg.ApplySSEToUpload(input)
 
 	_, err = uploader.UploadObject(ctx, input)
 	if err != nil {
@@ -226,10 +206,14 @@ func (s *S3) upload(ctx context.Context, key string, rec secretRecord) error {
 
 // download retrieves and deserialises a secretRecord from S3.
 func (s *S3) download(ctx context.Context, key string) (*secretRecord, error) {
-	result, err := s.client.GetObject(ctx, &s3.GetObjectInput{
+	getInput := &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
-	})
+	}
+
+	s.s3cfg.ApplySSEToGet(getInput)
+
+	result, err := s.client.GetObject(ctx, getInput)
 	if err != nil {
 		if isNotFound(err) {
 			return nil, secrets.ErrNotFound

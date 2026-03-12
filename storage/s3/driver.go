@@ -15,7 +15,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
-	tmtypes "github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/jtarchie/pocketci/runtime"
@@ -34,8 +33,7 @@ type S3 struct {
 	prefix    string
 	namespace string
 	logger    *slog.Logger
-	sse       types.ServerSideEncryption
-	sseKeyID  string
+	s3cfg     *s3config.Config
 }
 
 // NewS3 creates a new S3-backed storage driver.
@@ -60,8 +58,7 @@ func NewS3(dsn string, namespace string, logger *slog.Logger) (storage.Driver, e
 		prefix:    s3cfg.Prefix,
 		namespace: namespace,
 		logger:    logger,
-		sse:       s3cfg.SSE,
-		sseKeyID:  s3cfg.SSEKMSKeyID,
+		s3cfg:     s3cfg,
 	}, nil
 }
 
@@ -513,10 +510,14 @@ func (s *S3) runKey(id string) string {
 // ─── S3 low-level helpers ───────────────────────────────────────────────────
 
 func (s *S3) getJSON(ctx context.Context, key string) (storage.Payload, error) {
-	result, err := s.client.GetObject(ctx, &s3.GetObjectInput{
+	getInput := &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
-	})
+	}
+
+	s.s3cfg.ApplySSEToGet(getInput)
+
+	result, err := s.client.GetObject(ctx, getInput)
 	if err != nil {
 		if isNotFound(err) {
 			return nil, storage.ErrNotFound
@@ -554,12 +555,7 @@ func (s *S3) putJSON(ctx context.Context, key string, data []byte) error {
 		ContentType: aws.String("application/json"),
 	}
 
-	if s.sse != "" {
-		input.ServerSideEncryption = tmtypes.ServerSideEncryption(s.sse)
-		if s.sseKeyID != "" {
-			input.SSEKMSKeyID = aws.String(s.sseKeyID)
-		}
-	}
+	s.s3cfg.ApplySSEToUpload(input)
 
 	_, err := uploader.UploadObject(ctx, input)
 	if err != nil {
@@ -604,10 +600,14 @@ func (s *S3) listKeys(ctx context.Context, prefix string) ([]string, error) {
 }
 
 func (s *S3) getPipeline(ctx context.Context, key string) (*storage.Pipeline, error) {
-	result, err := s.client.GetObject(ctx, &s3.GetObjectInput{
+	getInput := &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
-	})
+	}
+
+	s.s3cfg.ApplySSEToGet(getInput)
+
+	result, err := s.client.GetObject(ctx, getInput)
 	if err != nil {
 		if isNotFound(err) {
 			return nil, storage.ErrNotFound
@@ -636,10 +636,14 @@ func (s *S3) getPipeline(ctx context.Context, key string) (*storage.Pipeline, er
 }
 
 func (s *S3) getRun(ctx context.Context, key string) (*storage.PipelineRun, error) {
-	result, err := s.client.GetObject(ctx, &s3.GetObjectInput{
+	getInput := &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
-	})
+	}
+
+	s.s3cfg.ApplySSEToGet(getInput)
+
+	result, err := s.client.GetObject(ctx, getInput)
 	if err != nil {
 		if isNotFound(err) {
 			return nil, storage.ErrNotFound

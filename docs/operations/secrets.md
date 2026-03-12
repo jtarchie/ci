@@ -263,37 +263,37 @@ pocketci run examples/both/secrets-basic.ts \
 ### S3
 
 The `s3` backend stores encrypted secrets as JSON objects in an S3-compatible
-bucket. Every object is protected by two independent encryption layers:
-
-1. **Application-layer AES-256-GCM** — applied by PocketCI before any bytes
-   leave the process. Key derived from the `key=` passphrase.
-2. **S3 Server-Side Encryption (SSE)** — enforced at construction time. If the
-   provider does not support SSE, the driver refuses to start.
+bucket. Every object is protected by application-layer AES-256-GCM encryption
+(key derived from the `key=` passphrase) before any bytes leave the process. An
+optional provider-level SSE layer may be added via the `encrypt=` parameter.
 
 **DSN Format**:
 
 ```
-s3://[http://|https://][ACCESS_KEY_ID:SECRET_ACCESS_KEY@]host[:port]/bucket[/prefix]?region=...&sse=AES256&key=passphrase
+s3://[http://|https://][ACCESS_KEY_ID:SECRET_ACCESS_KEY@]host[:port]/bucket[/prefix]?region=...&key=passphrase[&encrypt=sse-s3]
 ```
 
-| Parameter        | Description                           | Required | Example                        |
-| ---------------- | ------------------------------------- | -------- | ------------------------------ |
-| `sse`            | `AES256` or `aws:kms` (mandatory)     | ✅       | `sse=AES256`                   |
-| `key`            | Passphrase for app-layer AES-256-GCM  | ✅       | `key=my-strong-passphrase`     |
-| `region`         | AWS region                            | —        | `region=us-east-1`             |
-| `sse_kms_key_id` | KMS key ARN (only with `sse=aws:kms`) | —        | `sse_kms_key_id=arn:aws:kms:…` |
+| Parameter        | Description                                              | Required | Example                        |
+| ---------------- | -------------------------------------------------------- | -------- | ------------------------------ |
+| `key`            | Passphrase for app-layer AES-256-GCM                     | ✅       | `key=my-strong-passphrase`     |
+| `region`         | AWS region                                               | —        | `region=us-east-1`             |
+| `encrypt`        | Provider SSE: `sse-s3`, `sse-kms`, or `sse-c` (optional) | —        | `encrypt=sse-s3`               |
+| `sse_kms_key_id` | KMS key ARN (only with `encrypt=sse-kms`)                | —        | `sse_kms_key_id=arn:aws:kms:…` |
 
 **Examples**:
 
 ```bash
-# AWS S3 with AES256 SSE
---secrets "s3://s3.amazonaws.com/my-secrets-bucket?region=us-east-1&sse=AES256&key=my-passphrase"
+# AWS S3 — app-layer AES only (recommended for R2, providers without SSE)
+--secrets "s3://s3.amazonaws.com/my-secrets-bucket?region=us-east-1&key=my-passphrase"
+
+# AWS S3 with provider-level SSE-S3 (double encryption)
+--secrets "s3://s3.amazonaws.com/my-secrets-bucket?region=us-east-1&key=my-passphrase&encrypt=sse-s3"
 
 # MinIO (local) with inline credentials
---secrets "s3://http://minioadmin:minioadmin@localhost:9000/secrets?region=us-east-1&sse=AES256&key=my-passphrase"
+--secrets "s3://http://minioadmin:minioadmin@localhost:9000/secrets?region=us-east-1&key=my-passphrase"
 
-# Cloudflare R2
---secrets "s3://https://AKID:SECRET@ACCOUNT_ID.r2.cloudflarestorage.com/secrets?region=auto&sse=AES256&key=my-passphrase"
+# Cloudflare R2 (no provider SSE needed — R2 encrypts at rest by default)
+--secrets "s3://https://AKID:SECRET@ACCOUNT_ID.r2.cloudflarestorage.com/secrets?region=auto&key=my-passphrase"
 ```
 
 Object layout within the bucket:

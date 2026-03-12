@@ -286,14 +286,14 @@ func TestS3Driver_Search(t *testing.T) {
 	assert.Expect(results).To(BeNil())
 }
 
-// TestS3Driver_SSEWithAES256 verifies that a driver can be constructed with
-// sse=AES256 in the DSN. Actual server-side encryption requires a KMS-enabled
+// TestS3Driver_EncryptWithSseS3 verifies that a driver can be constructed with
+// encrypt=sse-s3 in the DSN. Actual server-side encryption requires a KMS-enabled
 // S3-compatible service; correct parsing is also exercised in s3config tests.
-func TestS3Driver_SSEWithAES256(t *testing.T) {
+func TestS3Driver_EncryptWithSseS3(t *testing.T) {
 	assert := NewGomegaWithT(t)
 
 	// Construction succeeds — no real S3 calls needed to verify config parsing.
-	client, err := s3storage.NewS3("s3://s3.amazonaws.com/bucket?region=us-east-1&sse=AES256", "sse-ns", slog.Default())
+	client, err := s3storage.NewS3("s3://s3.amazonaws.com/bucket?region=us-east-1&encrypt=sse-s3", "sse-ns", slog.Default())
 	assert.Expect(err).NotTo(HaveOccurred())
 	t.Cleanup(func() { _ = client.Close() })
 }
@@ -309,12 +309,12 @@ func TestS3Driver_DSNParams(t *testing.T) {
 	t.Cleanup(func() { _ = client.Close() })
 }
 
-// TestS3Driver_InvalidSSE verifies that an unsupported sse param value is rejected
+// TestS3Driver_InvalidEncrypt verifies that an unsupported encrypt param value is rejected
 // at construction time, before any requests are made.
-func TestS3Driver_InvalidSSE(t *testing.T) {
+func TestS3Driver_InvalidEncrypt(t *testing.T) {
 	assert := NewGomegaWithT(t)
 
-	_, err := s3storage.NewS3("s3://s3.amazonaws.com/bucket?region=us-east-1&sse=SSE-C", "ns", slog.Default())
+	_, err := s3storage.NewS3("s3://s3.amazonaws.com/bucket?region=us-east-1&encrypt=bogus", "ns", slog.Default())
 	assert.Expect(err).To(HaveOccurred())
-	assert.Expect(err.Error()).To(ContainSubstring("unsupported sse value"))
+	assert.Expect(err.Error()).To(ContainSubstring("unsupported encrypt value"))
 }

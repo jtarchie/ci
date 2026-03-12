@@ -46,8 +46,9 @@ as `id:secret@` userinfo immediately after the scheme.
 | ------------------ | --------------------------------------------------------------------------------- | ----------------------- | ------------------------------ |
 | `region`           | AWS region                                                                        | AWS SDK default         | `us-east-1`                    |
 | `force_path_style` | Force path-style URLs (`true`/`false`). Auto-enabled when a custom host is given. | `true` when custom host | `false` for virtual-host style |
-| `sse`              | Server-side encryption: `AES256` or `aws:kms`                                     | None (no SSE headers)   | `AES256`                       |
-| `sse_kms_key_id`   | KMS key ARN/ID (only with `sse=aws:kms`; omit for provider default key)           | Provider default key    | `arn:aws:kms:…:key/mrk-abc`    |
+| `encrypt`          | Provider SSE: `sse-s3` (AES-256), `sse-kms` (KMS), or `sse-c` (customer key)      | None (no SSE headers)   | `sse-s3`                       |
+| `sse_kms_key_id`   | KMS key ARN/ID (only with `encrypt=sse-kms`; omit for provider default key)       | Provider default key    | `arn:aws:kms:…:key/mrk-abc`    |
+| `key`              | Customer-provided key passphrase (required for `encrypt=sse-c`)                   | —                       | `my-passphrase`                |
 | `ttl`              | Cache expiration duration                                                         | No expiration           | `24h`, `7d`, `168h`            |
 
 ## Full Examples
@@ -69,13 +70,13 @@ pocketci run pipeline.yml \
 ### AWS S3 with SSE encryption
 
 ```bash
-# SSE-S3 (AES256) — AWS-managed encryption key
+# SSE-S3 (AES-256) — AWS-managed encryption key
 pocketci run pipeline.yml \
-  --driver='docker://?cache=s3://s3.amazonaws.com/cache-bucket?region=us-east-1&sse=AES256'
+  --driver='docker://?cache=s3://s3.amazonaws.com/cache-bucket?region=us-east-1&encrypt=sse-s3'
 
 # SSE-KMS — provider default KMS key
 pocketci run pipeline.yml \
-  --driver='docker://?cache=s3://s3.amazonaws.com/cache-bucket?region=us-east-1&sse=aws:kms'
+  --driver='docker://?cache=s3://s3.amazonaws.com/cache-bucket?region=us-east-1&encrypt=sse-kms'
 ```
 
 ### MinIO (Local S3-Compatible)

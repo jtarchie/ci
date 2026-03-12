@@ -26,7 +26,7 @@ func newTestManager(t *testing.T) secrets.Manager {
 	server := testhelpers.StartMinIO(t)
 	t.Cleanup(server.Stop)
 
-	dsn := server.CacheURL() + "&sse=AES256&key=test-encryption-passphrase"
+	dsn := server.CacheURL() + "&encrypt=sse-s3&key=test-encryption-passphrase"
 
 	assert := NewGomegaWithT(t)
 
@@ -42,35 +42,25 @@ func newTestManager(t *testing.T) secrets.Manager {
 	return mgr
 }
 
-func TestS3Secrets_RequiresSSE(t *testing.T) {
+func TestS3Secrets_RequiresKey(t *testing.T) {
 	t.Parallel()
-
-	t.Run("missing sse param returns error", func(t *testing.T) {
-		t.Parallel()
-
-		assert := NewGomegaWithT(t)
-
-		_, err := secrets.New("s3", "s3://s3.amazonaws.com/test-bucket?region=us-east-1&key=passphrase", nil)
-		assert.Expect(err).To(HaveOccurred())
-		assert.Expect(err.Error()).To(ContainSubstring("sse="))
-	})
 
 	t.Run("missing key param returns error", func(t *testing.T) {
 		t.Parallel()
 
 		assert := NewGomegaWithT(t)
 
-		_, err := secrets.New("s3", "s3://s3.amazonaws.com/test-bucket?region=us-east-1&sse=AES256", nil)
+		_, err := secrets.New("s3", "s3://s3.amazonaws.com/test-bucket?region=us-east-1", nil)
 		assert.Expect(err).To(HaveOccurred())
 		assert.Expect(err.Error()).To(ContainSubstring("key="))
 	})
 
-	t.Run("invalid sse value returns error", func(t *testing.T) {
+	t.Run("invalid encrypt value returns error", func(t *testing.T) {
 		t.Parallel()
 
 		assert := NewGomegaWithT(t)
 
-		_, err := secrets.New("s3", "s3://s3.amazonaws.com/test-bucket?region=us-east-1&sse=INVALID&key=passphrase", nil)
+		_, err := secrets.New("s3", "s3://s3.amazonaws.com/test-bucket?region=us-east-1&encrypt=INVALID&key=passphrase", nil)
 		assert.Expect(err).To(HaveOccurred())
 	})
 
@@ -81,6 +71,22 @@ func TestS3Secrets_RequiresSSE(t *testing.T) {
 
 		_, err := secrets.New("s3", "docker://example.com/bucket", nil)
 		assert.Expect(err).To(HaveOccurred())
+	})
+
+	t.Run("no encrypt param is allowed (app-layer AES only)", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+
+		// No encrypt= means no provider SSE; construction should still succeed
+		// when credentials are valid (it won't connect, but the DSN parses fine).
+		_, err := secrets.New("s3", "s3://s3.amazonaws.com/test-bucket?region=us-east-1&key=passphrase", nil)
+		// This may succeed or fail based on connectivity; what it must NOT do is
+		// fail with a "sse= required" error.
+		if err != nil {
+			assert.Expect(err.Error()).NotTo(ContainSubstring("sse="))
+			assert.Expect(err.Error()).NotTo(ContainSubstring("requires sse"))
+		}
 	})
 }
 
