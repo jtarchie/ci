@@ -4,36 +4,59 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"os/exec"
 	"testing"
 
 	"github.com/jtarchie/pocketci/storage"
+	_ "github.com/jtarchie/pocketci/storage/s3"
 	_ "github.com/jtarchie/pocketci/storage/sqlite"
+	"github.com/jtarchie/pocketci/testhelpers"
 	. "github.com/onsi/gomega"
 )
 
-func TestDrivers(t *testing.T) {
-	t.Parallel()
+func newStorageClient(t *testing.T, name string, init storage.InitFunc, namespace string) storage.Driver {
+	t.Helper()
 
+	var dsn string
+
+	switch name {
+	case "s3":
+		if _, err := exec.LookPath("minio"); err != nil {
+			t.Skip("minio not installed, skipping S3 storage test")
+		}
+
+		server := testhelpers.StartMinIO(t)
+		t.Cleanup(server.Stop)
+		dsn = server.CacheURL()
+	default:
+		f, err := os.CreateTemp(t.TempDir(), "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		t.Cleanup(func() { _ = f.Close() })
+		dsn = f.Name()
+	}
+
+	client, err := init(dsn, namespace, slog.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Cleanup(func() { _ = client.Close() })
+
+	return client
+}
+
+func TestDrivers(t *testing.T) {
 	storage.Each(func(name string, init storage.InitFunc) {
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-
 			t.Run("Add Path", func(t *testing.T) {
-				t.Parallel()
-
 				assert := NewGomegaWithT(t)
 
-				buildFile, err := os.CreateTemp(t.TempDir(), "")
-				assert.Expect(err).NotTo(HaveOccurred())
+				client := newStorageClient(t, name, init, "namespace")
 
-				defer func() { _ = buildFile.Close() }()
-
-				client, err := init(buildFile.Name(), "namespace", slog.Default())
-				assert.Expect(err).NotTo(HaveOccurred())
-
-				defer func() { _ = client.Close() }()
-
-				err = client.Set(context.Background(), "/foo", map[string]string{
+				err := client.Set(context.Background(), "/foo", map[string]string{
 					"field":   "123",
 					"another": "456",
 				})
@@ -59,21 +82,11 @@ func TestDrivers(t *testing.T) {
 			})
 
 			t.Run("Wildcard returns all fields", func(t *testing.T) {
-				t.Parallel()
-
 				assert := NewGomegaWithT(t)
 
-				buildFile, err := os.CreateTemp(t.TempDir(), "")
-				assert.Expect(err).NotTo(HaveOccurred())
+				client := newStorageClient(t, name, init, "namespace")
 
-				defer func() { _ = buildFile.Close() }()
-
-				client, err := init(buildFile.Name(), "namespace", slog.Default())
-				assert.Expect(err).NotTo(HaveOccurred())
-
-				defer func() { _ = client.Close() }()
-
-				err = client.Set(context.Background(), "/bar", map[string]any{
+				err := client.Set(context.Background(), "/bar", map[string]any{
 					"field":   "123",
 					"another": "456",
 					"third":   "789",
@@ -91,6 +104,64 @@ func TestDrivers(t *testing.T) {
 				}))
 			})
 
+			t.Run("Get not found returns ErrNotFound", func(t *testing.T) {
+				assert := NewGomegaWithT(t)
+
+				client := newStorageClient(t, name, init, "namespace")
+
+				_, err := client.Get(context.Background(), "/nonexistent")
+				assert.Expect(err).To(Equal(storage.ErrNotFound))
+			})
+
+			t.Run("SetMerge merges fields into existing payload", func(t *testing.T) {
+				assert := NewGomegaWithT(t)
+
+				client := newStorageClient(t, name, init, "namespace")
+
+				err := client.Set(context.Background(), "/merge-test", map[string]string{
+					"a": "1",
+					"b": "2",
+				})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				err = client.Set(context.Background(), "/merge-test", map[string]string{
+					"b": "updated",
+					"c": "3",
+				})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				payload, err := client.Get(context.Background(), "/merge-test")
+				assert.Expect(err).NotTo(HaveOccurred())
+				assert.Expect(payload["a"]).To(Equal("1"))
+				assert.Expect(payload["b"]).To(Equal("updated"))
+				assert.Expect(payload["c"]).To(Equal("3"))
+			})
+
+			t.Run("UpdateStatusForPrefix updates matching entries", func(t *testing.T) {
+				assert := NewGomegaWithT(t)
+
+				client := newStorageClient(t, name, init, "namespace")
+
+				ctx := context.Background()
+
+				err := client.Set(ctx, "/tasks/1", map[string]string{"status": "running", "name": "task1"})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				err = client.Set(ctx, "/tasks/2", map[string]string{"status": "pending", "name": "task2"})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				err = client.UpdateStatusForPrefix(ctx, "/tasks", []string{"running"}, "cancelled")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				p1, err := client.Get(ctx, "/tasks/1")
+				assert.Expect(err).NotTo(HaveOccurred())
+				assert.Expect(p1["status"]).To(Equal("cancelled"))
+				assert.Expect(p1["name"]).To(Equal("task1"))
+
+				p2, err := client.Get(ctx, "/tasks/2")
+				assert.Expect(err).NotTo(HaveOccurred())
+				assert.Expect(p2["status"]).To(Equal("pending"))
+			})
 		})
 	})
 }

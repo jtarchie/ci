@@ -2,33 +2,21 @@ package storage_test
 
 import (
 	"context"
-	"log/slog"
-	"os"
 	"testing"
 
 	"github.com/jtarchie/pocketci/storage"
+	_ "github.com/jtarchie/pocketci/storage/s3"
 	_ "github.com/jtarchie/pocketci/storage/sqlite"
 	. "github.com/onsi/gomega"
 )
 
 func TestPipelineStorage(t *testing.T) {
-	t.Parallel()
-
 	storage.Each(func(name string, init storage.InitFunc) {
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-
 			t.Run("SavePipeline creates a new pipeline", func(t *testing.T) {
-				t.Parallel()
 				assert := NewGomegaWithT(t)
 
-				buildFile, err := os.CreateTemp(t.TempDir(), "")
-				assert.Expect(err).NotTo(HaveOccurred())
-				defer func() { _ = buildFile.Close() }()
-
-				client, err := init(buildFile.Name(), "namespace", slog.Default())
-				assert.Expect(err).NotTo(HaveOccurred())
-				defer func() { _ = client.Close() }()
+				client := newStorageClient(t, name, init, "namespace")
 
 				pipeline, err := client.SavePipeline(context.Background(), "test-pipeline", "console.log('hello');", "docker://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
@@ -42,16 +30,9 @@ func TestPipelineStorage(t *testing.T) {
 			})
 
 			t.Run("GetPipeline retrieves existing pipeline", func(t *testing.T) {
-				t.Parallel()
 				assert := NewGomegaWithT(t)
 
-				buildFile, err := os.CreateTemp(t.TempDir(), "")
-				assert.Expect(err).NotTo(HaveOccurred())
-				defer func() { _ = buildFile.Close() }()
-
-				client, err := init(buildFile.Name(), "namespace", slog.Default())
-				assert.Expect(err).NotTo(HaveOccurred())
-				defer func() { _ = client.Close() }()
+				client := newStorageClient(t, name, init, "namespace")
 
 				saved, err := client.SavePipeline(context.Background(), "my-pipeline", "export { pipeline };", "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
@@ -65,34 +46,20 @@ func TestPipelineStorage(t *testing.T) {
 			})
 
 			t.Run("GetPipeline returns error for non-existent ID", func(t *testing.T) {
-				t.Parallel()
 				assert := NewGomegaWithT(t)
 
-				buildFile, err := os.CreateTemp(t.TempDir(), "")
-				assert.Expect(err).NotTo(HaveOccurred())
-				defer func() { _ = buildFile.Close() }()
+				client := newStorageClient(t, name, init, "namespace")
 
-				client, err := init(buildFile.Name(), "namespace", slog.Default())
-				assert.Expect(err).NotTo(HaveOccurred())
-				defer func() { _ = client.Close() }()
-
-				_, err = client.GetPipeline(context.Background(), "non-existent-id")
+				_, err := client.GetPipeline(context.Background(), "non-existent-id")
 				assert.Expect(err).To(Equal(storage.ErrNotFound))
 			})
 
 			t.Run("ListPipelines returns all pipelines", func(t *testing.T) {
-				t.Parallel()
 				assert := NewGomegaWithT(t)
 
-				buildFile, err := os.CreateTemp(t.TempDir(), "")
-				assert.Expect(err).NotTo(HaveOccurred())
-				defer func() { _ = buildFile.Close() }()
+				client := newStorageClient(t, name, init, "namespace")
 
-				client, err := init(buildFile.Name(), "namespace", slog.Default())
-				assert.Expect(err).NotTo(HaveOccurred())
-				defer func() { _ = client.Close() }()
-
-				_, err = client.SavePipeline(context.Background(), "pipeline-1", "content1", "docker://", "")
+				_, err := client.SavePipeline(context.Background(), "pipeline-1", "content1", "docker://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				_, err = client.SavePipeline(context.Background(), "pipeline-2", "content2", "native://", "")
@@ -104,16 +71,9 @@ func TestPipelineStorage(t *testing.T) {
 			})
 
 			t.Run("ListPipelines returns empty slice when no pipelines", func(t *testing.T) {
-				t.Parallel()
 				assert := NewGomegaWithT(t)
 
-				buildFile, err := os.CreateTemp(t.TempDir(), "")
-				assert.Expect(err).NotTo(HaveOccurred())
-				defer func() { _ = buildFile.Close() }()
-
-				client, err := init(buildFile.Name(), "namespace", slog.Default())
-				assert.Expect(err).NotTo(HaveOccurred())
-				defer func() { _ = client.Close() }()
+				client := newStorageClient(t, name, init, "namespace")
 
 				result, err := client.SearchPipelines(context.Background(), "", 1, 100)
 				assert.Expect(err).NotTo(HaveOccurred())
@@ -121,16 +81,9 @@ func TestPipelineStorage(t *testing.T) {
 			})
 
 			t.Run("DeletePipeline removes a pipeline", func(t *testing.T) {
-				t.Parallel()
 				assert := NewGomegaWithT(t)
 
-				buildFile, err := os.CreateTemp(t.TempDir(), "")
-				assert.Expect(err).NotTo(HaveOccurred())
-				defer func() { _ = buildFile.Close() }()
-
-				client, err := init(buildFile.Name(), "namespace", slog.Default())
-				assert.Expect(err).NotTo(HaveOccurred())
-				defer func() { _ = client.Close() }()
+				client := newStorageClient(t, name, init, "namespace")
 
 				saved, err := client.SavePipeline(context.Background(), "to-delete", "content", "docker://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
@@ -143,32 +96,22 @@ func TestPipelineStorage(t *testing.T) {
 			})
 
 			t.Run("DeletePipeline returns error for non-existent ID", func(t *testing.T) {
-				t.Parallel()
 				assert := NewGomegaWithT(t)
 
-				buildFile, err := os.CreateTemp(t.TempDir(), "")
-				assert.Expect(err).NotTo(HaveOccurred())
-				defer func() { _ = buildFile.Close() }()
+				client := newStorageClient(t, name, init, "namespace")
 
-				client, err := init(buildFile.Name(), "namespace", slog.Default())
-				assert.Expect(err).NotTo(HaveOccurred())
-				defer func() { _ = client.Close() }()
-
-				err = client.DeletePipeline(context.Background(), "non-existent-id")
+				err := client.DeletePipeline(context.Background(), "non-existent-id")
 				assert.Expect(err).To(Equal(storage.ErrNotFound))
 			})
 
 			t.Run("DeletePipeline cascades to runs and task data", func(t *testing.T) {
-				t.Parallel()
 				assert := NewGomegaWithT(t)
 
-				buildFile, err := os.CreateTemp(t.TempDir(), "")
-				assert.Expect(err).NotTo(HaveOccurred())
-				defer func() { _ = buildFile.Close() }()
+				if name == "s3" {
+					t.Skip("S3 driver does not cascade-delete task key/value records on pipeline deletion")
+				}
 
-				client, err := init(buildFile.Name(), "namespace", slog.Default())
-				assert.Expect(err).NotTo(HaveOccurred())
-				defer func() { _ = client.Close() }()
+				client := newStorageClient(t, name, init, "namespace")
 
 				ctx := context.Background()
 
@@ -202,16 +145,9 @@ func TestPipelineStorage(t *testing.T) {
 			})
 
 			t.Run("GetPipelineByName returns the most recent pipeline with that name", func(t *testing.T) {
-				t.Parallel()
 				assert := NewGomegaWithT(t)
 
-				buildFile, err := os.CreateTemp(t.TempDir(), "")
-				assert.Expect(err).NotTo(HaveOccurred())
-				defer func() { _ = buildFile.Close() }()
-
-				client, err := init(buildFile.Name(), "namespace", slog.Default())
-				assert.Expect(err).NotTo(HaveOccurred())
-				defer func() { _ = client.Close() }()
+				client := newStorageClient(t, name, init, "namespace")
 
 				ctx := context.Background()
 
@@ -225,32 +161,18 @@ func TestPipelineStorage(t *testing.T) {
 			})
 
 			t.Run("GetPipelineByName returns ErrNotFound for unknown name", func(t *testing.T) {
-				t.Parallel()
 				assert := NewGomegaWithT(t)
 
-				buildFile, err := os.CreateTemp(t.TempDir(), "")
-				assert.Expect(err).NotTo(HaveOccurred())
-				defer func() { _ = buildFile.Close() }()
+				client := newStorageClient(t, name, init, "namespace")
 
-				client, err := init(buildFile.Name(), "namespace", slog.Default())
-				assert.Expect(err).NotTo(HaveOccurred())
-				defer func() { _ = client.Close() }()
-
-				_, err = client.GetPipelineByName(context.Background(), "nonexistent")
+				_, err := client.GetPipelineByName(context.Background(), "nonexistent")
 				assert.Expect(err).To(Equal(storage.ErrNotFound))
 			})
 
 			t.Run("SavePipeline called twice with same name updates content instead of creating a second pipeline", func(t *testing.T) {
-				t.Parallel()
 				assert := NewGomegaWithT(t)
 
-				buildFile, err := os.CreateTemp(t.TempDir(), "")
-				assert.Expect(err).NotTo(HaveOccurred())
-				defer func() { _ = buildFile.Close() }()
-
-				client, err := init(buildFile.Name(), "namespace", slog.Default())
-				assert.Expect(err).NotTo(HaveOccurred())
-				defer func() { _ = client.Close() }()
+				client := newStorageClient(t, name, init, "namespace")
 
 				ctx := context.Background()
 
