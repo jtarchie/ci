@@ -15,6 +15,8 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
+	tmtypes "github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/jtarchie/pocketci/runtime"
@@ -544,7 +546,9 @@ func (s *S3) getJSON(ctx context.Context, key string) (storage.Payload, error) {
 }
 
 func (s *S3) putJSON(ctx context.Context, key string, data []byte) error {
-	input := &s3.PutObjectInput{
+	uploader := transfermanager.New(s.client)
+
+	input := &transfermanager.UploadObjectInput{
 		Bucket:      aws.String(s.bucket),
 		Key:         aws.String(key),
 		Body:        bytes.NewReader(data),
@@ -552,13 +556,13 @@ func (s *S3) putJSON(ctx context.Context, key string, data []byte) error {
 	}
 
 	if s.sse != "" {
-		input.ServerSideEncryption = s.sse
+		input.ServerSideEncryption = tmtypes.ServerSideEncryption(s.sse)
 		if s.sseKeyID != "" {
-			input.SSEKMSKeyId = aws.String(s.sseKeyID)
+			input.SSEKMSKeyID = aws.String(s.sseKeyID)
 		}
 	}
 
-	_, err := s.client.PutObject(ctx, input)
+	_, err := uploader.UploadObject(ctx, input)
 	if err != nil {
 		return fmt.Errorf("failed to put object %q: %w", key, err)
 	}
