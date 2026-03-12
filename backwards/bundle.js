@@ -7,12 +7,24 @@ var TaskRunner = class {
   knownMounts = {};
   async runTask(step, stdin, storageKey) {
     const taskStorageKey = storageKey;
+    const startedAt = (/* @__PURE__ */ new Date()).toISOString();
+    const elapsedSince = () => {
+      const ms = Date.now() - new Date(startedAt).getTime();
+      const totalSeconds = Math.floor(ms / 1e3);
+      const h = Math.floor(totalSeconds / 3600);
+      const m = Math.floor(totalSeconds % 3600 / 60);
+      const s = totalSeconds % 60;
+      if (h > 0) return `${h}h ${m}m ${s}s`;
+      if (m > 0) return `${m}m ${s}s`;
+      return `${s}s`;
+    };
     const mounts = await this.prepareMounts(step);
     this.taskNames.push(step.task);
     storage.set(
       taskStorageKey,
       {
-        status: "pending"
+        status: "pending",
+        started_at: startedAt
       }
     );
     let result;
@@ -52,6 +64,7 @@ var TaskRunner = class {
           logs.push({ type: stream, content: data });
           storage.set(taskStorageKey, {
             status: "running",
+            started_at: startedAt,
             logs: logs.slice()
           });
         }
@@ -67,13 +80,19 @@ var TaskRunner = class {
         {
           status,
           code: result.code,
+          started_at: startedAt,
+          elapsed: elapsedSince(),
           logs: logs.slice()
         }
       );
       this.validateTaskResult(step, result);
       return result;
     } catch (error) {
-      storage.set(taskStorageKey, { status: "error" });
+      storage.set(taskStorageKey, {
+        status: "error",
+        started_at: startedAt,
+        elapsed: elapsedSince()
+      });
       throw new TaskErrored(
         `Task ${step.task} errored with message ${error}`
       );

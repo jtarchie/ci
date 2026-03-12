@@ -6,7 +6,7 @@ export class TaskRunner {
   constructor(
     private taskNames: string[],
     private resources: Resource[],
-  ) {}
+  ) { }
 
   async runTask(
     step: Task,
@@ -14,6 +14,17 @@ export class TaskRunner {
     storageKey: string,
   ): Promise<RunTaskResult> {
     const taskStorageKey = storageKey;
+    const startedAt = new Date().toISOString();
+    const elapsedSince = () => {
+      const ms = Date.now() - new Date(startedAt).getTime();
+      const totalSeconds = Math.floor(ms / 1000);
+      const h = Math.floor(totalSeconds / 3600);
+      const m = Math.floor((totalSeconds % 3600) / 60);
+      const s = totalSeconds % 60;
+      if (h > 0) return `${h}h ${m}m ${s}s`;
+      if (m > 0) return `${m}m ${s}s`;
+      return `${s}s`;
+    };
     const mounts = await this.prepareMounts(step);
     this.taskNames.push(step.task);
 
@@ -21,6 +32,7 @@ export class TaskRunner {
       taskStorageKey,
       {
         status: "pending",
+        started_at: startedAt,
       },
     );
 
@@ -68,6 +80,7 @@ export class TaskRunner {
 
           storage.set(taskStorageKey, {
             status: "running",
+            started_at: startedAt,
             logs: logs.slice(),
           });
         },
@@ -85,6 +98,8 @@ export class TaskRunner {
         {
           status: status,
           code: result.code,
+          started_at: startedAt,
+          elapsed: elapsedSince(),
           logs: logs.slice(),
         },
       );
@@ -93,7 +108,11 @@ export class TaskRunner {
 
       return result;
     } catch (error) {
-      storage.set(taskStorageKey, { status: "error" });
+      storage.set(taskStorageKey, {
+        status: "error",
+        started_at: startedAt,
+        elapsed: elapsedSince(),
+      });
 
       throw new TaskErrored(
         `Task ${step.task} errored with message ${error}`,
@@ -171,6 +190,6 @@ class CustomError extends Error {
   }
 }
 
-export class TaskFailure extends CustomError {}
-export class TaskErrored extends CustomError {}
-export class TaskAbort extends CustomError {}
+export class TaskFailure extends CustomError { }
+export class TaskErrored extends CustomError { }
+export class TaskAbort extends CustomError { }

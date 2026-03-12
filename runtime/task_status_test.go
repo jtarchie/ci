@@ -83,6 +83,13 @@ func TestTaskStatusPersistence(t *testing.T) {
 		assert.Expect(firstLog["type"]).To(Equal("stdout"))
 		assert.Expect(firstLog["content"]).To(ContainSubstring("hello world"))
 		assert.Expect(payload["code"]).To(BeEquivalentTo(0))
+		startedAt, ok := payload["started_at"].(string)
+		assert.Expect(ok).To(BeTrue())
+		_, err = time.Parse(time.RFC3339, startedAt)
+		assert.Expect(err).NotTo(HaveOccurred())
+		elapsed, ok := payload["elapsed"].(string)
+		assert.Expect(ok).To(BeTrue())
+		assert.Expect(elapsed).To(ContainSubstring("s"))
 	})
 
 	t.Run("failed task writes failure status to storage", func(t *testing.T) {
@@ -136,6 +143,13 @@ func TestTaskStatusPersistence(t *testing.T) {
 		assert.Expect(firstLog["type"]).To(Equal("stdout"))
 		assert.Expect(firstLog["content"]).To(ContainSubstring("some output"))
 		assert.Expect(payload["code"]).To(BeEquivalentTo(1))
+		startedAt, ok := payload["started_at"].(string)
+		assert.Expect(ok).To(BeTrue())
+		_, err = time.Parse(time.RFC3339, startedAt)
+		assert.Expect(err).NotTo(HaveOccurred())
+		elapsed, ok := payload["elapsed"].(string)
+		assert.Expect(ok).To(BeTrue())
+		assert.Expect(elapsed).To(ContainSubstring("s"))
 	})
 
 	t.Run("multiple tasks get unique storage keys", func(t *testing.T) {

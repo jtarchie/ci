@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/goccy/go-yaml"
 	"github.com/jtarchie/pocketci/backwards"
@@ -62,6 +63,64 @@ func TestBackwardsCompatibility(t *testing.T) {
 		err := runner.Run(logger)
 		assert.Expect(err).NotTo(HaveOccurred())
 		assert.Expect(logs.String()).To(ContainSubstring("failing-task failed with code 1"))
+	})
+
+	t.Run("on_failure stores elapsed timing fields", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+
+		dbFile, err := os.CreateTemp(t.TempDir(), "*.db")
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(dbFile.Close()).NotTo(HaveOccurred())
+		storageURL := fmt.Sprintf("sqlite://%s", dbFile.Name())
+
+		const pipelineFile = "steps/on_failure.yml"
+		const runID = "on-failure-elapsed"
+
+		runner := commands.Runner{
+			Pipeline: pipelineFile,
+			Driver:   "native",
+			Storage:  storageURL,
+			RunID:    runID,
+		}
+		err = runner.Run(nil)
+		assert.Expect(err).NotTo(HaveOccurred())
+
+		pipelinePath, err := filepath.Abs(pipelineFile)
+		assert.Expect(err).NotTo(HaveOccurred())
+		runtimeID := youtubeIDStyle(pipelinePath)
+
+		initStorage, found := storage.GetFromDSN(storageURL)
+		assert.Expect(found).To(BeTrue())
+
+		store, err := initStorage(storageURL, runtimeID, nil)
+		assert.Expect(err).NotTo(HaveOccurred())
+		defer func() { _ = store.Close() }()
+
+		results, err := store.GetAll(context.Background(), "/pipeline/"+runID+"/", []string{"status", "started_at", "elapsed"})
+		assert.Expect(err).NotTo(HaveOccurred())
+		assert.Expect(results).NotTo(BeEmpty())
+
+		var failureTaskPayload storage.Payload
+		for _, result := range results {
+			status, ok := result.Payload["status"].(string)
+			if ok && status == "failure" && strings.Contains(result.Path, "/tasks/") {
+				failureTaskPayload = result.Payload
+				break
+			}
+		}
+
+		assert.Expect(failureTaskPayload).NotTo(BeNil(), "expected a failed task payload in storage")
+
+		startedAt, ok := failureTaskPayload["started_at"].(string)
+		assert.Expect(ok).To(BeTrue())
+		_, err = time.Parse(time.RFC3339, startedAt)
+		assert.Expect(err).NotTo(HaveOccurred())
+
+		elapsed, ok := failureTaskPayload["elapsed"].(string)
+		assert.Expect(ok).To(BeTrue())
+		assert.Expect(elapsed).To(ContainSubstring("s"))
 	})
 
 	t.Run("on_success", func(t *testing.T) {
