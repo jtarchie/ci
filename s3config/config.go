@@ -3,8 +3,18 @@
 //
 // DSN format:
 //
-//	s3://bucket/optional/prefix?region=us-east-1&endpoint=http://localhost:9000
-//	s3://ACCESS_KEY_ID:SECRET_ACCESS_KEY@bucket/optional/prefix?region=auto&endpoint=https://...
+//	s3://[http://|https://][ACCESS_KEY_ID:SECRET_ACCESS_KEY@]host[:port]/bucket[/prefix]?region=...
+//
+// When no http/https scheme prefix is provided, https is assumed. When a custom
+// host is omitted entirely (bare bucket-only form) the AWS SDK default endpoint
+// is used.
+//
+// Examples:
+//
+//	s3://s3.amazonaws.com/mybucket/prefix?region=us-east-1
+//	s3://http://localhost:9000/mybucket?region=us-east-1
+//	s3://http://minioadmin:minioadmin@localhost:9000/mybucket?region=us-east-1
+//	s3://https://AKID:SECRET@account.r2.cloudflarestorage.com/mybucket?region=auto
 package s3config
 
 import (
@@ -27,8 +37,8 @@ type Config struct {
 	Prefix string
 
 	// AccessKeyID and SecretAccessKey are static credentials parsed from the
-	// DSN userinfo (s3://ID:SECRET@bucket/...). When empty the SDK credential
-	// chain (env vars, ~/.aws/credentials, IAM role, etc.) is used instead.
+	// DSN userinfo (s3://http://ID:SECRET@host/bucket/...). When empty the SDK
+	// credential chain (env vars, ~/.aws/credentials, IAM role, etc.) is used.
 	AccessKeyID     string
 	SecretAccessKey string
 
@@ -60,40 +70,71 @@ type Config struct {
 
 // ParseDSN parses an S3 DSN and returns a validated Config.
 //
-// Credentials may be embedded in the URL userinfo:
+// Format:
 //
-//	s3://ACCESS_KEY_ID:SECRET_ACCESS_KEY@bucket/prefix?...
+//	s3://[http://|https://][ACCESS_KEY_ID:SECRET_ACCESS_KEY@]host[:port]/bucket[/prefix]?params
 //
-// When no userinfo is present the AWS SDK credential chain is used (env vars,
+// When no http/https scheme prefix is present, https is assumed. Credentials
+// are optional; when absent the AWS SDK credential chain is used (env vars,
 // ~/.aws/credentials, IAM role, etc.).
 //
 // Supported query parameters:
 //   - region            AWS region (default: SDK credential-chain default)
-//   - endpoint          Custom S3-compatible endpoint URL (MinIO, R2, etc.)
-//   - force_path_style  "true" | "false" — defaults to true when endpoint is set
+//   - force_path_style  "true" | "false" — defaults to true when a custom host is set
 //   - sse               "AES256" | "aws:kms" — server-side encryption; omit for none
 //   - sse_kms_key_id    KMS key ID (only with sse=aws:kms; provider default when omitted)
 //   - ttl               Cache expiry duration, e.g. "24h" (cache driver only)
 func ParseDSN(dsn string) (*Config, error) {
-	parsed, err := url.Parse(dsn)
+	const prefix = "s3://"
+
+	if !strings.HasPrefix(dsn, prefix) {
+		return nil, fmt.Errorf("expected s3:// DSN, got %q", dsn)
+	}
+
+	// Strip the "s3://" scheme to get the inner URI, then normalise to an
+	// http/https URL so url.Parse can extract host, credentials, and path.
+	inner := dsn[len(prefix):]
+
+	if inner == "" {
+		return nil, fmt.Errorf("S3 DSN missing host/bucket in %q", dsn)
+	}
+
+	var innerURL string
+
+	if strings.HasPrefix(inner, "http://") || strings.HasPrefix(inner, "https://") {
+		innerURL = inner
+	} else {
+		// No explicit scheme — assume https (covers bare AWS S3 hostnames and
+		// the common s3://host/bucket shorthand).
+		innerURL = "https://" + inner
+	}
+
+	parsed, err := url.Parse(innerURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse S3 DSN %q: %w", dsn, err)
 	}
 
-	if parsed.Scheme != "s3" {
-		return nil, fmt.Errorf("expected s3:// DSN, got %s://", parsed.Scheme)
-	}
+	// Extract bucket (first path segment) and optional prefix (remainder).
+	pathParts := strings.SplitN(strings.TrimPrefix(parsed.Path, "/"), "/", 2)
+	bucket := pathParts[0]
 
-	if parsed.Host == "" {
+	if bucket == "" {
 		return nil, fmt.Errorf("S3 DSN missing bucket name in %q", dsn)
 	}
 
 	cfg := &Config{
-		Bucket: parsed.Host,
-		Prefix: strings.TrimPrefix(parsed.Path, "/"),
+		Bucket: bucket,
 	}
 
-	// Extract inline credentials from userinfo (s3://ID:SECRET@bucket/...).
+	if len(pathParts) == 2 {
+		cfg.Prefix = pathParts[1]
+	}
+
+	// Endpoint: scheme + host (empty when using bare AWS hostname via SDK default).
+	// We always set it when a host is present so callers can point at MinIO etc.
+	cfg.Endpoint = parsed.Scheme + "://" + parsed.Host
+
+	// Extract inline credentials from userinfo (http://ID:SECRET@host/...).
 	if parsed.User != nil {
 		cfg.AccessKeyID = parsed.User.Username()
 		cfg.SecretAccessKey, _ = parsed.User.Password()
@@ -102,12 +143,11 @@ func ParseDSN(dsn string) (*Config, error) {
 	q := parsed.Query()
 
 	cfg.Region = q.Get("region")
-	cfg.Endpoint = q.Get("endpoint")
 
 	// Path-style defaults to true when a custom endpoint is set — required for
 	// MinIO, DigitalOcean Spaces, and most non-AWS S3-compatible stores.
 	// Callers can opt out via force_path_style=false for providers that require
-	// virtual-hosted-style URLs (e.g. some Cloudflare R2 configurations).
+	// virtual-hosted-style URLs (e.g. Cloudflare R2 with custom domain).
 	if q.Get("force_path_style") == "false" {
 		cfg.ForcePathStyle = false
 	} else {

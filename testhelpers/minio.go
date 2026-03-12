@@ -97,7 +97,9 @@ func (m *MinioServer) Stop() {
 
 // CacheURL returns the S3 URL for use with the cache parameter.
 func (m *MinioServer) CacheURL() string {
-	return fmt.Sprintf("s3://%s?endpoint=%s&region=us-east-1", m.bucket, m.endpoint)
+	// m.endpoint is "http://localhost:PORT"; insert credentials after the scheme.
+	endpointWithCreds := strings.Replace(m.endpoint, "://", "://minioadmin:minioadmin@", 1)
+	return fmt.Sprintf("s3://%s/%s?region=us-east-1", endpointWithCreds, m.bucket)
 }
 
 // Endpoint returns the HTTP endpoint of the MinIO server.

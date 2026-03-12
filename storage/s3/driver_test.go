@@ -293,7 +293,7 @@ func TestS3Driver_SSEWithAES256(t *testing.T) {
 	assert := NewGomegaWithT(t)
 
 	// Construction succeeds — no real S3 calls needed to verify config parsing.
-	client, err := s3storage.NewS3("s3://bucket?region=us-east-1&sse=AES256", "sse-ns", slog.Default())
+	client, err := s3storage.NewS3("s3://s3.amazonaws.com/bucket?region=us-east-1&sse=AES256", "sse-ns", slog.Default())
 	assert.Expect(err).NotTo(HaveOccurred())
 	t.Cleanup(func() { _ = client.Close() })
 }
@@ -304,7 +304,7 @@ func TestS3Driver_DSNParams(t *testing.T) {
 	assert := NewGomegaWithT(t)
 
 	// force_path_style=false is a valid param; construction must not return an error.
-	client, err := s3storage.NewS3("s3://bucket?region=us-east-1&force_path_style=false", "params-ns", slog.Default())
+	client, err := s3storage.NewS3("s3://s3.amazonaws.com/bucket?region=us-east-1&force_path_style=false", "params-ns", slog.Default())
 	assert.Expect(err).NotTo(HaveOccurred())
 	t.Cleanup(func() { _ = client.Close() })
 }
@@ -314,7 +314,7 @@ func TestS3Driver_DSNParams(t *testing.T) {
 func TestS3Driver_InvalidSSE(t *testing.T) {
 	assert := NewGomegaWithT(t)
 
-	_, err := s3storage.NewS3("s3://bucket?region=us-east-1&sse=SSE-C", "ns", slog.Default())
+	_, err := s3storage.NewS3("s3://s3.amazonaws.com/bucket?region=us-east-1&sse=SSE-C", "ns", slog.Default())
 	assert.Expect(err).To(HaveOccurred())
 	assert.Expect(err.Error()).To(ContainSubstring("unsupported sse value"))
 }

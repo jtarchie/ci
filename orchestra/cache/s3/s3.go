@@ -41,7 +41,7 @@ func WithTTL(ttl time.Duration) Option {
 }
 
 // NewS3Store creates a new S3-backed cache store.
-// URL format: s3://bucket/prefix?region=us-east-1&endpoint=http://localhost:9000
+// URL format: s3://http://localhost:9000/bucket/prefix?region=us-east-1
 func NewS3Store(urlStr string) (cache.CacheStore, error) {
 	s3cfg, err := s3config.ParseDSN(urlStr)
 	if err != nil {

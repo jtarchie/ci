@@ -11,7 +11,7 @@
 //
 // # DSN format
 //
-//	s3://[ACCESS_KEY_ID:SECRET_ACCESS_KEY@]bucket[/prefix]?region=...&endpoint=...&sse=AES256&key=passphrase
+//	s3://[http://|https://][ACCESS_KEY_ID:SECRET_ACCESS_KEY@]host[:port]/bucket[/prefix]?region=...&sse=AES256&key=passphrase
 //
 // Parameters:
 //   - sse      (required) "AES256" or "aws:kms"

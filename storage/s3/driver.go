@@ -27,7 +27,7 @@ import (
 // stores like MinIO) as the backend. All data is stored as JSON objects at
 // hierarchical paths within the configured bucket and prefix.
 //
-// DSN format: s3://bucket/optional/prefix?region=us-east-1&endpoint=http://localhost:9000
+// DSN format: s3://[http://|https://][id:secret@]host[:port]/bucket[/prefix]?region=us-east-1
 type S3 struct {
 	client    *s3.Client
 	bucket    string

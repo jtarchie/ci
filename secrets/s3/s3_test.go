@@ -50,7 +50,7 @@ func TestS3Secrets_RequiresSSE(t *testing.T) {
 
 		assert := NewGomegaWithT(t)
 
-		_, err := secrets.New("s3", "s3://test-bucket?region=us-east-1&key=passphrase", nil)
+		_, err := secrets.New("s3", "s3://s3.amazonaws.com/test-bucket?region=us-east-1&key=passphrase", nil)
 		assert.Expect(err).To(HaveOccurred())
 		assert.Expect(err.Error()).To(ContainSubstring("sse="))
 	})
@@ -60,7 +60,7 @@ func TestS3Secrets_RequiresSSE(t *testing.T) {
 
 		assert := NewGomegaWithT(t)
 
-		_, err := secrets.New("s3", "s3://test-bucket?region=us-east-1&sse=AES256", nil)
+		_, err := secrets.New("s3", "s3://s3.amazonaws.com/test-bucket?region=us-east-1&sse=AES256", nil)
 		assert.Expect(err).To(HaveOccurred())
 		assert.Expect(err.Error()).To(ContainSubstring("key="))
 	})
@@ -70,7 +70,7 @@ func TestS3Secrets_RequiresSSE(t *testing.T) {
 
 		assert := NewGomegaWithT(t)
 
-		_, err := secrets.New("s3", "s3://test-bucket?region=us-east-1&sse=INVALID&key=passphrase", nil)
+		_, err := secrets.New("s3", "s3://s3.amazonaws.com/test-bucket?region=us-east-1&sse=INVALID&key=passphrase", nil)
 		assert.Expect(err).To(HaveOccurred())
 	})
 
@@ -79,7 +79,7 @@ func TestS3Secrets_RequiresSSE(t *testing.T) {
 
 		assert := NewGomegaWithT(t)
 
-		_, err := secrets.New("s3", "https://example.com/bucket", nil)
+		_, err := secrets.New("s3", "docker://example.com/bucket", nil)
 		assert.Expect(err).To(HaveOccurred())
 	})
 }
