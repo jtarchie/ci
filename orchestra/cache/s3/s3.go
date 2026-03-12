@@ -2,15 +2,11 @@ package s3
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/jtarchie/pocketci/orchestra/cache"
 	"github.com/jtarchie/pocketci/s3config"
 )
@@ -21,11 +17,8 @@ func init() {
 
 // S3Store implements CacheStore using AWS S3.
 type S3Store struct {
-	client *s3.Client
-	bucket string
-	prefix string
-	ttl    time.Duration
-	s3cfg  *s3config.Config
+	*s3config.Client
+	ttl time.Duration
 }
 
 // Option configures an S3Store.
@@ -46,44 +39,24 @@ func NewS3Store(urlStr string) (cache.CacheStore, error) {
 		return nil, fmt.Errorf("failed to parse S3 URL: %w", err)
 	}
 
-	ctx := context.Background()
-
-	awsCfg, err := s3cfg.LoadAWSConfig(ctx)
+	client, err := s3config.NewClient(context.Background(), s3cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	client := s3.NewFromConfig(awsCfg, s3cfg.ClientOptions()...)
-
 	return &S3Store{
-		client: client,
-		bucket: s3cfg.Bucket,
-		prefix: s3cfg.Prefix,
+		Client: client,
 		ttl:    s3cfg.TTL,
-		s3cfg:  s3cfg,
 	}, nil
 }
 
 // Restore downloads cached content from S3.
 func (s *S3Store) Restore(ctx context.Context, key string) (io.ReadCloser, error) {
-	fullKey := s.fullKey(key)
+	fullKey := s.FullKey(key)
 
-	getInput := &s3.GetObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(fullKey),
-	}
-
-	s.s3cfg.ApplySSEToGet(getInput)
-
-	result, err := s.client.GetObject(ctx, getInput)
+	result, err := s.GetStream(ctx, fullKey)
 	if err != nil {
-		var noSuchKey *types.NoSuchKey
-		if errors.As(err, &noSuchKey) {
-			return nil, nil // Cache miss - not an error
-		}
-
-		var notFound *types.NotFound
-		if errors.As(err, &notFound) {
+		if s3config.IsNotFound(err) {
 			return nil, nil // Cache miss - not an error
 		}
 
@@ -107,26 +80,14 @@ func (s *S3Store) Restore(ctx context.Context, key string) (io.ReadCloser, error
 // Persist uploads content to S3 using streaming multipart upload.
 // Data is uploaded in chunks without buffering the entire content in memory.
 func (s *S3Store) Persist(ctx context.Context, key string, reader io.Reader) error {
-	fullKey := s.fullKey(key)
+	fullKey := s.FullKey(key)
 
-	// Use the transfer manager for efficient multipart uploads
-	// It automatically handles chunking, parallelization, and retries
-	uploader := transfermanager.New(s.client, func(u *transfermanager.Options) {
+	err := s.PutStream(ctx, fullKey, reader, func(u *transfermanager.Options) {
 		// Use 10MB part size for efficient streaming
 		u.PartSizeBytes = 10 * 1024 * 1024
 		// Upload 3 parts concurrently
 		u.Concurrency = 3
 	})
-
-	uploadInput := &transfermanager.UploadObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(fullKey),
-		Body:   reader,
-	}
-
-	s.s3cfg.ApplySSEToUpload(uploadInput)
-
-	_, err := uploader.UploadObject(ctx, uploadInput)
 	if err != nil {
 		return fmt.Errorf("failed to upload to S3: %w", err)
 	}
@@ -136,19 +97,11 @@ func (s *S3Store) Persist(ctx context.Context, key string, reader io.Reader) err
 
 // Exists checks if a cache key exists in S3.
 func (s *S3Store) Exists(ctx context.Context, key string) (bool, error) {
-	fullKey := s.fullKey(key)
+	fullKey := s.FullKey(key)
 
-	headInput := &s3.HeadObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(fullKey),
-	}
-
-	s.s3cfg.ApplySSEToHead(headInput)
-
-	result, err := s.client.HeadObject(ctx, headInput)
+	result, err := s.HeadKey(ctx, fullKey)
 	if err != nil {
-		var notFound *types.NotFound
-		if errors.As(err, &notFound) {
+		if s3config.IsNotFound(err) {
 			return false, nil
 		}
 
@@ -167,23 +120,11 @@ func (s *S3Store) Exists(ctx context.Context, key string) (bool, error) {
 
 // Delete removes a cache entry from S3.
 func (s *S3Store) Delete(ctx context.Context, key string) error {
-	fullKey := s.fullKey(key)
+	fullKey := s.FullKey(key)
 
-	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(fullKey),
-	})
-	if err != nil {
+	if err := s.DeleteKey(ctx, fullKey); err != nil {
 		return fmt.Errorf("failed to delete object from S3: %w", err)
 	}
 
 	return nil
-}
-
-func (s *S3Store) fullKey(key string) string {
-	if s.prefix == "" {
-		return key
-	}
-
-	return s.prefix + "/" + key
 }

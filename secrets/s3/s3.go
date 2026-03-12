@@ -20,22 +20,16 @@
 package s3
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/url"
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/jtarchie/pocketci/s3config"
 	"github.com/jtarchie/pocketci/secrets"
 )
@@ -47,12 +41,9 @@ func init() {
 // S3 implements secrets.Manager using an S3-compatible object store as the
 // backend. Every stored object is AES-256-GCM encrypted before upload.
 type S3 struct {
-	client    *s3.Client
-	bucket    string
-	prefix    string
+	*s3config.Client
 	encryptor *secrets.Encryptor
 	logger    *slog.Logger
-	s3cfg     *s3config.Config
 }
 
 // secretRecord is the JSON structure persisted in each S3 object.
@@ -97,20 +88,15 @@ func New(dsn string, logger *slog.Logger) (secrets.Manager, error) {
 
 	ctx := context.Background()
 
-	awsCfg, err := s3cfg.LoadAWSConfig(ctx)
+	client, err := s3config.NewClient(ctx, s3cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	client := s3.NewFromConfig(awsCfg, s3cfg.ClientOptions()...)
-
 	mgr := &S3{
-		client:    client,
-		bucket:    s3cfg.Bucket,
-		prefix:    s3cfg.Prefix,
+		Client:    client,
 		encryptor: encryptor,
 		logger:    logger,
-		s3cfg:     s3cfg,
 	}
 
 	// Probe SSE: when encrypt= is configured, upload a tiny sentinel object and
@@ -130,26 +116,11 @@ func New(dsn string, logger *slog.Logger) (secrets.Manager, error) {
 // provider accepts them. The sentinel is deleted immediately after upload.
 func (s *S3) probeSSE(ctx context.Context) error {
 	sentinelKey := s.scopePrefix("__probe__") + "__sse_check__.json"
-	data := []byte(`{"probe":true}`)
 
-	uploader := transfermanager.New(s.client)
-
-	input := &transfermanager.UploadObjectInput{
-		Bucket:      aws.String(s.bucket),
-		Key:         aws.String(sentinelKey),
-		Body:        bytes.NewReader(data),
-		ContentType: aws.String("application/json"),
-	}
-
-	s.s3cfg.ApplySSEToUpload(input)
-
-	_, uploadErr := uploader.UploadObject(ctx, input)
+	uploadErr := s.PutBytes(ctx, sentinelKey, []byte(`{"probe":true}`), "application/json")
 
 	// Always attempt cleanup — even if upload failed the key might exist.
-	_, _ = s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(sentinelKey),
-	})
+	_ = s.DeleteKey(ctx, sentinelKey)
 
 	if uploadErr != nil {
 		return fmt.Errorf("SSE probe upload failed: %w", uploadErr)
@@ -163,8 +134,8 @@ func (s *S3) probeSSE(ctx context.Context) error {
 func (s *S3) scopePrefix(scope string) string {
 	parts := []string{}
 
-	if s.prefix != "" {
-		parts = append(parts, s.prefix)
+	if p := s.Prefix(); p != "" {
+		parts = append(parts, p)
 	}
 
 	parts = append(parts, "secrets", scope)
@@ -185,53 +156,23 @@ func (s *S3) upload(ctx context.Context, key string, rec secretRecord) error {
 		return fmt.Errorf("could not marshal secret record: %w", err)
 	}
 
-	uploader := transfermanager.New(s.client)
-
-	input := &transfermanager.UploadObjectInput{
-		Bucket:      aws.String(s.bucket),
-		Key:         aws.String(key),
-		Body:        bytes.NewReader(data),
-		ContentType: aws.String("application/json"),
-	}
-
-	s.s3cfg.ApplySSEToUpload(input)
-
-	_, err = uploader.UploadObject(ctx, input)
-	if err != nil {
-		return fmt.Errorf("could not upload secret: %w", err)
-	}
-
-	return nil
+	return s.PutBytes(ctx, key, data, "application/json")
 }
 
 // download retrieves and deserialises a secretRecord from S3.
 func (s *S3) download(ctx context.Context, key string) (*secretRecord, error) {
-	getInput := &s3.GetObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(key),
-	}
-
-	s.s3cfg.ApplySSEToGet(getInput)
-
-	result, err := s.client.GetObject(ctx, getInput)
+	data, err := s.GetBytes(ctx, key)
 	if err != nil {
-		if isNotFound(err) {
+		if s3config.IsNotFound(err) {
 			return nil, secrets.ErrNotFound
 		}
 
 		return nil, fmt.Errorf("could not get secret: %w", err)
 	}
 
-	defer func() { _ = result.Body.Close() }()
-
-	body, err := io.ReadAll(result.Body)
-	if err != nil {
-		return nil, fmt.Errorf("could not read secret body: %w", err)
-	}
-
 	var rec secretRecord
 
-	if err := json.Unmarshal(body, &rec); err != nil {
+	if err := json.Unmarshal(data, &rec); err != nil {
 		return nil, fmt.Errorf("could not unmarshal secret record: %w", err)
 	}
 
@@ -303,10 +244,7 @@ func (s *S3) Delete(ctx context.Context, scope string, key string) error {
 		return err
 	}
 
-	if _, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(objKey),
-	}); err != nil {
+	if err := s.DeleteKey(ctx, objKey); err != nil {
 		return fmt.Errorf("could not delete secret: %w", err)
 	}
 
@@ -319,7 +257,7 @@ func (s *S3) Delete(ctx context.Context, scope string, key string) error {
 func (s *S3) ListByScope(ctx context.Context, scope string) ([]string, error) {
 	prefix := s.scopePrefix(scope)
 
-	keys, err := s.listKeys(ctx, prefix)
+	keys, err := s.ListKeys(ctx, prefix)
 	if err != nil {
 		return nil, fmt.Errorf("could not list secrets by scope: %w", err)
 	}
@@ -346,16 +284,13 @@ func (s *S3) ListByScope(ctx context.Context, scope string) ([]string, error) {
 func (s *S3) DeleteByScope(ctx context.Context, scope string) error {
 	prefix := s.scopePrefix(scope)
 
-	keys, err := s.listKeys(ctx, prefix)
+	keys, err := s.ListKeys(ctx, prefix)
 	if err != nil {
 		return fmt.Errorf("could not list secrets for scope deletion: %w", err)
 	}
 
 	for _, k := range keys {
-		if _, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
-			Bucket: aws.String(s.bucket),
-			Key:    aws.String(k),
-		}); err != nil {
+		if err := s.DeleteKey(ctx, k); err != nil {
 			return fmt.Errorf("could not delete secret %q: %w", k, err)
 		}
 	}
@@ -368,44 +303,6 @@ func (s *S3) DeleteByScope(ctx context.Context, scope string) error {
 // Close is a no-op; the S3 client holds no persistent connections.
 func (s *S3) Close() error {
 	return nil
-}
-
-// listKeys returns all S3 object keys under the given prefix.
-func (s *S3) listKeys(ctx context.Context, prefix string) ([]string, error) {
-	var keys []string
-
-	paginator := s3.NewListObjectsV2Paginator(s.client, &s3.ListObjectsV2Input{
-		Bucket: aws.String(s.bucket),
-		Prefix: aws.String(prefix),
-	})
-
-	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to list objects with prefix %q: %w", prefix, err)
-		}
-
-		for _, obj := range page.Contents {
-			keys = append(keys, aws.ToString(obj.Key))
-		}
-	}
-
-	return keys, nil
-}
-
-// isNotFound reports whether err represents a missing S3 object.
-func isNotFound(err error) bool {
-	var noSuchKey *types.NoSuchKey
-	if errors.As(err, &noSuchKey) {
-		return true
-	}
-
-	var notFound *types.NotFound
-	if errors.As(err, &notFound) {
-		return true
-	}
-
-	return strings.Contains(err.Error(), "NoSuchKey") || strings.Contains(err.Error(), "StatusCode: 404")
 }
 
 // incrementVersion increments a version string like "v1" → "v2".

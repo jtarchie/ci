@@ -1,22 +1,16 @@
 package s3
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"path"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/jtarchie/pocketci/runtime"
 	"github.com/jtarchie/pocketci/s3config"
 	"github.com/jtarchie/pocketci/storage"
@@ -28,12 +22,9 @@ import (
 //
 // DSN format: s3://[http://|https://][id:secret@]host[:port]/bucket[/prefix]?region=us-east-1
 type S3 struct {
-	client    *s3.Client
-	bucket    string
-	prefix    string
+	*s3config.Client
 	namespace string
 	logger    *slog.Logger
-	s3cfg     *s3config.Config
 }
 
 // NewS3 creates a new S3-backed storage driver.
@@ -43,22 +34,15 @@ func NewS3(dsn string, namespace string, logger *slog.Logger) (storage.Driver, e
 		return nil, fmt.Errorf("failed to parse S3 DSN: %w", err)
 	}
 
-	ctx := context.Background()
-
-	awsCfg, err := s3cfg.LoadAWSConfig(ctx)
+	client, err := s3config.NewClient(context.Background(), s3cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	client := s3.NewFromConfig(awsCfg, s3cfg.ClientOptions()...)
-
 	return &S3{
-		client:    client,
-		bucket:    s3cfg.Bucket,
-		prefix:    s3cfg.Prefix,
+		Client:    client,
 		namespace: namespace,
 		logger:    logger,
-		s3cfg:     s3cfg,
 	}, nil
 }
 
@@ -66,16 +50,8 @@ func (s *S3) Close() error {
 	return nil
 }
 
-func (s *S3) fullKey(key string) string {
-	if s.prefix == "" {
-		return key
-	}
-
-	return s.prefix + "/" + key
-}
-
 func (s *S3) taskKey(prefix string) string {
-	return s.fullKey("tasks" + path.Clean("/"+s.namespace+"/"+prefix))
+	return s.FullKey("tasks" + path.Clean("/"+s.namespace+"/"+prefix))
 }
 
 // Set stores a payload at the given prefix, merging with any existing payload
@@ -132,7 +108,7 @@ func (s *S3) GetAll(ctx context.Context, prefix string, fields []string) (storag
 
 	keyPrefix := s.taskKey(prefix)
 
-	keys, err := s.listKeys(ctx, keyPrefix)
+	keys, err := s.ListKeys(ctx, keyPrefix)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list tasks: %w", err)
 	}
@@ -147,11 +123,7 @@ func (s *S3) GetAll(ctx context.Context, prefix string, fields []string) (storag
 			continue
 		}
 
-		logicalPath := key
-		if s.prefix != "" {
-			logicalPath = strings.TrimPrefix(key, s.prefix+"/")
-		}
-
+		logicalPath := s.StripPrefix(key)
 		logicalPath = strings.TrimPrefix(logicalPath, "tasks")
 
 		if len(fields) != 1 || fields[0] != "*" {
@@ -182,7 +154,7 @@ func (s *S3) UpdateStatusForPrefix(ctx context.Context, prefix string, matchStat
 
 	keyPrefix := s.taskKey(prefix)
 
-	keys, err := s.listKeys(ctx, keyPrefix)
+	keys, err := s.ListKeys(ctx, keyPrefix)
 	if err != nil {
 		return fmt.Errorf("failed to list tasks for status update: %w", err)
 	}
@@ -231,7 +203,7 @@ func (s *S3) SavePipeline(ctx context.Context, name, content, driverDSN, content
 		storedID = existing.ID
 
 		if storedID != newID {
-			_ = s.deleteObject(ctx, s.pipelineByIDKey(storedID))
+			_ = s.DeleteKey(ctx, s.pipelineByIDKey(storedID))
 		}
 	}
 
@@ -283,15 +255,15 @@ func (s *S3) DeletePipeline(ctx context.Context, id string) error {
 		return err
 	}
 
-	if err := s.deleteObject(ctx, s.pipelineByIDKey(id)); err != nil {
+	if err := s.DeleteKey(ctx, s.pipelineByIDKey(id)); err != nil {
 		return fmt.Errorf("failed to delete pipeline by id: %w", err)
 	}
 
-	if err := s.deleteObject(ctx, s.pipelineByNameKey(pipeline.Name)); err != nil {
+	if err := s.DeleteKey(ctx, s.pipelineByNameKey(pipeline.Name)); err != nil {
 		return fmt.Errorf("failed to delete pipeline by name: %w", err)
 	}
 
-	runKeys, err := s.listKeys(ctx, s.fullKey("runs/"))
+	runKeys, err := s.ListKeys(ctx, s.FullKey("runs/"))
 	if err != nil {
 		return nil
 	}
@@ -303,7 +275,7 @@ func (s *S3) DeletePipeline(ctx context.Context, id string) error {
 		}
 
 		if run.PipelineID == id {
-			_ = s.deleteObject(ctx, key)
+			_ = s.DeleteKey(ctx, key)
 		}
 	}
 
@@ -373,7 +345,7 @@ func (s *S3) SearchRunsByPipeline(ctx context.Context, pipelineID, query string,
 		perPage = 20
 	}
 
-	runKeys, err := s.listKeys(ctx, s.fullKey("runs/"))
+	runKeys, err := s.ListKeys(ctx, s.FullKey("runs/"))
 	if err != nil {
 		return emptyRunPage(page, perPage), nil
 	}
@@ -415,7 +387,7 @@ func (s *S3) SearchPipelines(ctx context.Context, query string, page, perPage in
 		perPage = 20
 	}
 
-	keys, err := s.listKeys(ctx, s.fullKey("pipelines/by-id/"))
+	keys, err := s.ListKeys(ctx, s.FullKey("pipelines/by-id/"))
 	if err != nil {
 		return emptyPipelinePage(page, perPage), nil
 	}
@@ -447,7 +419,7 @@ func (s *S3) Search(ctx context.Context, prefix, query string) (storage.Results,
 
 	keyPrefix := s.taskKey(prefix)
 
-	keys, err := s.listKeys(ctx, keyPrefix)
+	keys, err := s.ListKeys(ctx, keyPrefix)
 	if err != nil {
 		return nil, nil
 	}
@@ -461,11 +433,7 @@ func (s *S3) Search(ctx context.Context, prefix, query string) (storage.Results,
 			continue
 		}
 
-		logicalPath := key
-		if s.prefix != "" {
-			logicalPath = strings.TrimPrefix(key, s.prefix+"/")
-		}
-
+		logicalPath := s.StripPrefix(key)
 		logicalPath = strings.TrimPrefix(logicalPath, "tasks")
 
 		if pathOrPayloadMatches(logicalPath, payload, lowerQuery) {
@@ -496,49 +464,32 @@ func (s *S3) Search(ctx context.Context, prefix, query string) (storage.Results,
 // ─── S3 key helpers ─────────────────────────────────────────────────────────
 
 func (s *S3) pipelineByIDKey(id string) string {
-	return s.fullKey("pipelines/by-id/" + id + ".json")
+	return s.FullKey("pipelines/by-id/" + id + ".json")
 }
 
 func (s *S3) pipelineByNameKey(name string) string {
-	return s.fullKey("pipelines/by-name/" + name + ".json")
+	return s.FullKey("pipelines/by-name/" + name + ".json")
 }
 
 func (s *S3) runKey(id string) string {
-	return s.fullKey("runs/" + id + ".json")
+	return s.FullKey("runs/" + id + ".json")
 }
 
 // ─── S3 low-level helpers ───────────────────────────────────────────────────
 
 func (s *S3) getJSON(ctx context.Context, key string) (storage.Payload, error) {
-	getInput := &s3.GetObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(key),
-	}
-
-	s.s3cfg.ApplySSEToGet(getInput)
-
-	result, err := s.client.GetObject(ctx, getInput)
+	data, err := s.GetBytes(ctx, key)
 	if err != nil {
-		if isNotFound(err) {
+		if s3config.IsNotFound(err) {
 			return nil, storage.ErrNotFound
 		}
 
-		return nil, fmt.Errorf("failed to get object %q: %w", key, err)
-	}
-
-	defer func() {
-		_ = result.Body.Close()
-	}()
-
-	data, err := io.ReadAll(result.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read object %q: %w", key, err)
+		return nil, err
 	}
 
 	var payload storage.Payload
 
-	err = json.Unmarshal(data, &payload)
-	if err != nil {
+	if err := json.Unmarshal(data, &payload); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal object %q: %w", key, err)
 	}
 
@@ -546,89 +497,22 @@ func (s *S3) getJSON(ctx context.Context, key string) (storage.Payload, error) {
 }
 
 func (s *S3) putJSON(ctx context.Context, key string, data []byte) error {
-	uploader := transfermanager.New(s.client)
-
-	input := &transfermanager.UploadObjectInput{
-		Bucket:      aws.String(s.bucket),
-		Key:         aws.String(key),
-		Body:        bytes.NewReader(data),
-		ContentType: aws.String("application/json"),
-	}
-
-	s.s3cfg.ApplySSEToUpload(input)
-
-	_, err := uploader.UploadObject(ctx, input)
-	if err != nil {
-		return fmt.Errorf("failed to put object %q: %w", key, err)
-	}
-
-	return nil
-}
-
-func (s *S3) deleteObject(ctx context.Context, key string) error {
-	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(key),
-	})
-	if err != nil {
-		return fmt.Errorf("failed to delete object %q: %w", key, err)
-	}
-
-	return nil
-}
-
-func (s *S3) listKeys(ctx context.Context, prefix string) ([]string, error) {
-	var keys []string
-
-	paginator := s3.NewListObjectsV2Paginator(s.client, &s3.ListObjectsV2Input{
-		Bucket: aws.String(s.bucket),
-		Prefix: aws.String(prefix),
-	})
-
-	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to list objects with prefix %q: %w", prefix, err)
-		}
-
-		for _, obj := range page.Contents {
-			keys = append(keys, *obj.Key)
-		}
-	}
-
-	return keys, nil
+	return s.PutBytes(ctx, key, data, "application/json")
 }
 
 func (s *S3) getPipeline(ctx context.Context, key string) (*storage.Pipeline, error) {
-	getInput := &s3.GetObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(key),
-	}
-
-	s.s3cfg.ApplySSEToGet(getInput)
-
-	result, err := s.client.GetObject(ctx, getInput)
+	data, err := s.GetBytes(ctx, key)
 	if err != nil {
-		if isNotFound(err) {
+		if s3config.IsNotFound(err) {
 			return nil, storage.ErrNotFound
 		}
 
 		return nil, fmt.Errorf("failed to get pipeline %q: %w", key, err)
 	}
 
-	defer func() {
-		_ = result.Body.Close()
-	}()
-
-	data, err := io.ReadAll(result.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read pipeline %q: %w", key, err)
-	}
-
 	var pipeline storage.Pipeline
 
-	err = json.Unmarshal(data, &pipeline)
-	if err != nil {
+	if err := json.Unmarshal(data, &pipeline); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal pipeline %q: %w", key, err)
 	}
 
@@ -636,35 +520,18 @@ func (s *S3) getPipeline(ctx context.Context, key string) (*storage.Pipeline, er
 }
 
 func (s *S3) getRun(ctx context.Context, key string) (*storage.PipelineRun, error) {
-	getInput := &s3.GetObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(key),
-	}
-
-	s.s3cfg.ApplySSEToGet(getInput)
-
-	result, err := s.client.GetObject(ctx, getInput)
+	data, err := s.GetBytes(ctx, key)
 	if err != nil {
-		if isNotFound(err) {
+		if s3config.IsNotFound(err) {
 			return nil, storage.ErrNotFound
 		}
 
 		return nil, fmt.Errorf("failed to get run %q: %w", key, err)
 	}
 
-	defer func() {
-		_ = result.Body.Close()
-	}()
-
-	data, err := io.ReadAll(result.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read run %q: %w", key, err)
-	}
-
 	var run storage.PipelineRun
 
-	err = json.Unmarshal(data, &run)
-	if err != nil {
+	if err := json.Unmarshal(data, &run); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal run %q: %w", key, err)
 	}
 
@@ -672,20 +539,6 @@ func (s *S3) getRun(ctx context.Context, key string) (*storage.PipelineRun, erro
 }
 
 // ─── Utility functions ──────────────────────────────────────────────────────
-
-func isNotFound(err error) bool {
-	var noSuchKey *types.NoSuchKey
-	if errors.As(err, &noSuchKey) {
-		return true
-	}
-
-	var notFound *types.NotFound
-	if errors.As(err, &notFound) {
-		return true
-	}
-
-	return strings.Contains(err.Error(), "NoSuchKey") || strings.Contains(err.Error(), "StatusCode: 404")
-}
 
 func runMatchesQuery(run *storage.PipelineRun, query string) bool {
 	lower := strings.ToLower(query)
