@@ -6,7 +6,7 @@ export class TaskRunner {
   constructor(
     private taskNames: string[],
     private resources: Resource[],
-  ) { }
+  ) {}
 
   async runTask(
     step: Task,
@@ -190,6 +190,6 @@ class CustomError extends Error {
   }
 }
 
-export class TaskFailure extends CustomError { }
-export class TaskErrored extends CustomError { }
-export class TaskAbort extends CustomError { }
+export class TaskFailure extends CustomError {}
+export class TaskErrored extends CustomError {}
+export class TaskAbort extends CustomError {}

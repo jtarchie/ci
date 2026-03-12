@@ -38,7 +38,7 @@ func TestHTMLEndpointsAreStrictlyValid(t *testing.T) {
 
 			err = client.Set(context.Background(), "/pipeline/"+run.ID+"/tasks/0-build", map[string]any{
 				"status": "success",
-				"logs": []map[string]any{{"type": "stdout", "content": "ok"}},
+				"logs":   []map[string]any{{"type": "stdout", "content": "ok"}},
 			})
 			assert.Expect(err).NotTo(HaveOccurred())
 

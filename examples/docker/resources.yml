@@ -26,6 +26,7 @@ jobs:
             args: ["-c", "cat ./test-resource/version"]
         assert:
           stdout: "2025"
+          code: 0
       - put: test-resource
         params: { version: "2026" }
       - task: check-updated-version
@@ -41,6 +42,7 @@ jobs:
             args: ["-c", "cat ./test-resource/version"]
         assert:
           stdout: "2026"
+          code: 0
     assert:
       execution:
         - check-test-resource
