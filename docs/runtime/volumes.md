@@ -36,3 +36,12 @@ await runtime.run({
 
 Volumes are scoped to a single pipeline execution. After the pipeline completes,
 volumes are cleaned up by the driver.
+
+## Parallel Task Limitation
+
+Sharing a single volume across parallel instances of the same task (for example
+using YAML `parallelism`) is currently undefined behavior.
+
+In practice, concurrent access semantics depend on the active orchestration
+driver and may vary. Prefer isolated volumes per parallel instance when writes
+are involved.

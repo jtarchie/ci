@@ -49,3 +49,52 @@ if (result.code !== 0) {
 ```
 
 See [Secrets](../operations/secrets.md) for secret injection details.
+
+## YAML Parallelism And Throttling
+
+When using Concourse-compatible YAML, task fan-out and throttling are available
+at the step, job, and pipeline levels:
+
+- `parallelism` on a `task` step expands that step into N parallel task
+  instances.
+- `max_in_flight` on `job` limits concurrent work inside that job.
+- `max_in_flight` at pipeline root provides a fallback limit for jobs that do
+  not set their own `max_in_flight`.
+- `in_parallel.limit` limits concurrent substeps for an `in_parallel` block.
+- `across.max_in_flight` limits concurrent `across` combinations.
+
+Parallel task instances receive these environment variables:
+
+- `CI_TASK_COUNT`: total number of instances in the fan-out set.
+- `CI_TASK_INDEX`: 1-based index of the current instance.
+
+Example:
+
+```yaml
+max_in_flight: 4
+
+jobs:
+  - name: test
+    max_in_flight: 2
+    plan:
+      - task: unit
+        parallelism: 3
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: busybox
+          run:
+            path: sh
+            args: ["-c", "echo $CI_TASK_INDEX/$CI_TASK_COUNT"]
+```
+
+## Current Limitation
+
+Sharing the same volume handle across parallel instances of the same task is
+currently undefined behavior. Different orchestration drivers may behave
+differently under concurrent reads/writes to the same mounted volume.
+
+For now, avoid relying on concurrent shared-volume mutation within a single
+parallelized task set.

@@ -491,12 +491,12 @@ declare global {
     jobName: string;
     buildID: string;
     status:
-      | "pending"
-      | "running"
-      | "success"
-      | "failure"
-      | "error"
-      | "limit_exceeded";
+    | "pending"
+    | "running"
+    | "success"
+    | "failure"
+    | "error"
+    | "limit_exceeded";
     startTime: string;
     endTime: string;
     duration: string;
@@ -670,6 +670,7 @@ declare global {
   // Step interfaces
   interface Task extends StepHooks {
     task: string;
+    parallelism?: number;
     config: TaskConfig;
     container_limits?: ContainerLimits;
     file?: string;
@@ -758,12 +759,14 @@ declare global {
   // Pipeline configuration
   interface Job extends StepHooks {
     name: string;
+    max_in_flight?: number;
     plan: Step[];
     assert: AssertionBase;
   }
 
   interface JobConfig {
     name: string;
+    max_in_flight?: number;
     plan: Step[];
     on_success?: Step;
     on_failure?: Step;
@@ -842,6 +845,7 @@ declare global {
 
   interface PipelineConfig {
     assert: AssertionBase;
+    max_in_flight?: number;
     jobs: Job[];
     notifications?: Record<string, NotifyConfig>; // Top-level notification configs
     resource_types: ResourceType[];
@@ -849,4 +853,4 @@ declare global {
   }
 }
 
-export {};
+export { };

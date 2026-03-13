@@ -66,6 +66,15 @@ Uses default configuration for the specified driver.
    - Each driver reads its specific configuration from this parameter map
    - Driver defaults are used for any unspecified parameters
 
+## Current Driver Limitation
+
+Parallel task fan-out can mount volumes concurrently. Sharing the same volume
+across parallel instances of the same task is currently undefined behavior.
+
+This is a known limitation at the orchestration-driver layer. Behavior may vary
+by driver implementation, so do not assume cross-driver consistency for
+concurrent shared-volume access.
+
 ## Driver-Specific Parameters
 
 ### K8s Driver

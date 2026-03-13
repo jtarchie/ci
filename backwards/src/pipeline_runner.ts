@@ -242,6 +242,7 @@ export class PipelineRunner {
         job,
         this.config.resources,
         this.config.resource_types,
+        this.config.max_in_flight,
       );
       await jobRunner.run();
 

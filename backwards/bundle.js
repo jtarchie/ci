@@ -235,10 +235,11 @@ function zeroPadWithLength(num, length) {
 }
 var buildID = typeof pipelineContext !== "undefined" && pipelineContext.runID ? pipelineContext.runID : zeroPad2(Date.now(), 20);
 var JobRunner = class {
-  constructor(jobConfig, resources, resourceTypes) {
+  constructor(jobConfig, resources, resourceTypes, pipelineMaxInFlight) {
     this.jobConfig = jobConfig;
     this.resources = resources;
     this.resourceTypes = resourceTypes;
+    this.pipelineMaxInFlight = pipelineMaxInFlight;
     this.buildID = buildID;
     this.taskRunner = new TaskRunner(this.taskNames, this.resources);
   }
@@ -344,6 +345,63 @@ var JobRunner = class {
     const basePath = this.getBaseStorageKey();
     const stepId = this.getStepIdentifier(step);
     return `${basePath}/${currentPath}/${stepId}`;
+  }
+  getDefaultMaxInFlight() {
+    if (this.jobConfig.max_in_flight && this.jobConfig.max_in_flight > 0) {
+      return this.jobConfig.max_in_flight;
+    }
+    if (this.pipelineMaxInFlight && this.pipelineMaxInFlight > 0) {
+      return this.pipelineMaxInFlight;
+    }
+    return void 0;
+  }
+  resolveMaxInFlight(localLimit) {
+    if (localLimit && localLimit > 0) {
+      return localLimit;
+    }
+    const fallback = this.getDefaultMaxInFlight();
+    if (fallback && fallback > 0) {
+      return fallback;
+    }
+    return Number.MAX_SAFE_INTEGER;
+  }
+  async runWithConcurrencyLimit(items, worker, localLimit, failFast = false) {
+    if (items.length === 0) {
+      return { failed: false };
+    }
+    const maxInFlight = Math.max(
+      1,
+      Math.min(this.resolveMaxInFlight(localLimit), items.length)
+    );
+    let nextIndex = 0;
+    let activeCount = 0;
+    let failed = false;
+    let firstError = void 0;
+    await new Promise((resolve) => {
+      const launch = () => {
+        if (nextIndex >= items.length && activeCount === 0) {
+          resolve();
+          return;
+        }
+        while (activeCount < maxInFlight && nextIndex < items.length && !(failFast && failed)) {
+          const currentIndex = nextIndex;
+          nextIndex += 1;
+          activeCount += 1;
+          Promise.resolve(worker(items[currentIndex], currentIndex)).catch((error) => {
+            failed = true;
+            firstError ??= error;
+          }).finally(() => {
+            activeCount -= 1;
+            launch();
+          });
+        }
+        if ((failFast && failed || nextIndex >= items.length) && activeCount === 0) {
+          resolve();
+        }
+      };
+      launch();
+    });
+    return { failed, firstError };
   }
   async processStep(step, pathContext) {
     const maxAttempts = step.attempts || 1;
@@ -495,27 +553,58 @@ var JobRunner = class {
     return result.stdout;
   }
   async processTaskStep(step, pathContext) {
+    let taskStep = step;
     if ("file" in step) {
       const contents = await this.getFile(step.file, pathContext);
       const taskConfig = YAML.parse(contents);
-      await this.runTask(
-        {
-          task: step.task,
-          config: taskConfig,
-          assert: step.assert,
-          ensure: step.ensure,
-          on_success: step.on_success,
-          on_failure: step.on_failure,
-          on_error: step.on_error,
-          on_abort: step.on_abort,
-          timeout: step.timeout
-        },
-        void 0,
-        pathContext
-      );
-    } else {
-      await this.runTask(step, void 0, pathContext);
+      taskStep = {
+        task: step.task,
+        parallelism: step.parallelism,
+        config: taskConfig,
+        assert: step.assert,
+        ensure: step.ensure,
+        on_success: step.on_success,
+        on_failure: step.on_failure,
+        on_error: step.on_error,
+        on_abort: step.on_abort,
+        timeout: step.timeout
+      };
     }
+    const parallelism = taskStep.parallelism || 1;
+    if (parallelism <= 1) {
+      await this.runTask(taskStep, void 0, pathContext);
+      return;
+    }
+    const storageKey = `${this.getBaseStorageKey()}/${pathContext}/parallelism`;
+    storage.set(storageKey, { status: "pending", total: parallelism });
+    const indexes = Array.from({ length: parallelism }, (_, i) => i + 1);
+    const result = await this.runWithConcurrencyLimit(
+      indexes,
+      async (parallelIndex) => {
+        const indexedTask = {
+          ...taskStep,
+          task: `${taskStep.task}-${parallelIndex}`,
+          config: {
+            ...taskStep.config,
+            env: {
+              ...taskStep.config.env,
+              CI_TASK_COUNT: String(parallelism),
+              CI_TASK_INDEX: String(parallelIndex)
+            }
+          }
+        };
+        await this.runTask(
+          indexedTask,
+          void 0,
+          `${pathContext}/parallelism/${parallelIndex}`
+        );
+      }
+    );
+    if (result.failed) {
+      storage.set(storageKey, { status: "failure", total: parallelism });
+      throw result.firstError ?? new TaskFailure("One or more parallel task instances failed");
+    }
+    storage.set(storageKey, { status: "success", total: parallelism });
   }
   async processParallelSteps(step, pathContext) {
     await this.processDoStep(step, pathContext);
@@ -526,25 +615,33 @@ var JobRunner = class {
     storage.set(storageKey, { status: "pending", total: combinations.length });
     let failureOccurred = false;
     const failFast = step.fail_fast || false;
-    for (let i = 0; i < combinations.length; i++) {
-      if (failureOccurred && failFast) {
-        break;
-      }
-      const combination = combinations[i];
-      const varContext = Object.entries(combination).map(([key, value]) => `${key}_${value}`).join("_");
-      const modifiedStep = this.injectAcrossVariables(step, combination);
-      try {
-        await this.processStepInternal(
-          modifiedStep,
-          `${pathContext}/across/${i}_${varContext}`
-        );
-      } catch (error) {
-        failureOccurred = true;
-        if (failFast) {
-          storage.set(storageKey, { status: "failure", failed_at: i });
+    const acrossLimitCandidates = step.across.map((acrossVar) => acrossVar.max_in_flight).filter((limit) => Boolean(limit && limit > 0));
+    const acrossLimit = acrossLimitCandidates.length > 0 ? Math.min(...acrossLimitCandidates) : 1;
+    const effectiveAcrossLimit = failFast ? 1 : acrossLimit;
+    const result = await this.runWithConcurrencyLimit(
+      combinations,
+      async (combination, i) => {
+        const varContext = Object.entries(combination).map(([key, value]) => `${key}_${value}`).join("_");
+        const modifiedStep = this.injectAcrossVariables(step, combination);
+        try {
+          await this.processStepInternal(
+            modifiedStep,
+            `${pathContext}/across/${i}_${varContext}`
+          );
+        } catch (error) {
+          failureOccurred = true;
+          console.error(`Across combination ${i} failed:`, error);
           throw error;
         }
-        console.error(`Across combination ${i} failed:`, error);
+      },
+      effectiveAcrossLimit,
+      failFast
+    );
+    if (result.failed) {
+      failureOccurred = true;
+      if (failFast) {
+        storage.set(storageKey, { status: "failure" });
+        throw result.firstError ?? new TaskFailure("One or more across combinations failed");
       }
     }
     if (failureOccurred) {
@@ -666,12 +763,29 @@ var JobRunner = class {
       } else if ("try" in step) {
         steps = step.try;
       }
-      for (let i = 0; i < steps.length; i++) {
-        const subStep = steps[i];
-        await this.processStep(
-          subStep,
-          `${pathContext}/${zeroPadWithLength(i, steps.length)}`
+      if ("in_parallel" in step) {
+        const result = await this.runWithConcurrencyLimit(
+          steps,
+          async (subStep, i) => {
+            await this.processStep(
+              subStep,
+              `${pathContext}/${zeroPadWithLength(i, steps.length)}`
+            );
+          },
+          step.in_parallel.limit,
+          step.in_parallel.fail_fast
         );
+        if (result.failed) {
+          throw result.firstError;
+        }
+      } else {
+        for (let i = 0; i < steps.length; i++) {
+          const subStep = steps[i];
+          await this.processStep(
+            subStep,
+            `${pathContext}/${zeroPadWithLength(i, steps.length)}`
+          );
+        }
       }
     } catch (error) {
       failure = error;
@@ -1296,7 +1410,8 @@ var PipelineRunner = class {
       const jobRunner = new JobRunner(
         job,
         this.config.resources,
-        this.config.resource_types
+        this.config.resource_types,
+        this.config.max_in_flight
       );
       await jobRunner.run();
       this.jobResults.set(job.name, true);

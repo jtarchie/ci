@@ -173,6 +173,7 @@ type Step struct {
 	} `yaml:"assert,omitempty"`
 
 	Task            string           `yaml:"task,omitempty"`
+	Parallelism     int              `yaml:"parallelism,omitempty"`
 	TaskConfig      *TaskConfig      `yaml:"config,omitempty"`
 	ContainerLimits *ContainerLimits `yaml:"container_limits,omitempty"`
 	File            string           `yaml:"file,omitempty"`
@@ -243,6 +244,7 @@ type Job struct {
 
 	Name           string        `validate:"required,min=3"      yaml:"name,omitempty"`
 	Plan           Steps         `validate:"required,min=1,dive" yaml:"plan,omitempty"`
+	MaxInFlight    int           `yaml:"max_in_flight,omitempty"`
 	Public         bool          `yaml:"public,omitempty"`
 	Ensure         *Step         `yaml:"ensure,omitempty"`
 	OnAbort        *Step         `yaml:"on_abort,omitempty"`
@@ -277,6 +279,7 @@ type Config struct {
 	Assert struct {
 		Execution []string `yaml:"execution,omitempty"`
 	} `yaml:"assert,omitempty"`
+	MaxInFlight   int           `yaml:"max_in_flight,omitempty"`
 	Jobs          Jobs          `validate:"required,min=1,dive" yaml:"jobs"`
 	Resources     Resources     `yaml:"resources"`
 	ResourceTypes ResourceTypes `yaml:"resource_types"`

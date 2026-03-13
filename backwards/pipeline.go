@@ -86,6 +86,10 @@ func NewPipelineFromContent(content string) (string, error) {
 		return "", err
 	}
 
+	if err := validateConcurrency(&config); err != nil {
+		return "", err
+	}
+
 	jsonBytes, err := yaml.MarshalWithOptions(config, yaml.JSON())
 	if err != nil {
 		return "", fmt.Errorf("could not marshal pipeline: %w", err)
@@ -129,6 +133,10 @@ func ValidatePipeline(content []byte) error {
 		return err
 	}
 
+	if err := validateConcurrency(&config); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -141,6 +149,66 @@ func validateSteps(jobs Jobs) error {
 					return fmt.Errorf("task step %q in job %q (index %d) requires config.run.path", step.Task, job.Name, i)
 				}
 			}
+		}
+	}
+
+	return nil
+}
+
+func validateConcurrency(config *Config) error {
+	if config.MaxInFlight < 0 {
+		return fmt.Errorf("pipeline max_in_flight must be greater than 0 when set")
+	}
+
+	for _, job := range config.Jobs {
+		if job.MaxInFlight < 0 {
+			return fmt.Errorf("job %q max_in_flight must be greater than 0 when set", job.Name)
+		}
+
+		for i, step := range job.Plan {
+			if err := validateStepConcurrency(job.Name, i, step); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func validateStepConcurrency(jobName string, stepIndex int, step Step) error {
+	if step.Parallelism < 0 {
+		return fmt.Errorf("job %q step %d parallelism must be greater than 0 when set", jobName, stepIndex)
+	}
+
+	if step.Parallelism > 0 && step.Task == "" {
+		return fmt.Errorf("job %q step %d parallelism is only valid on task steps", jobName, stepIndex)
+	}
+
+	if step.InParallel.Limit < 0 {
+		return fmt.Errorf("job %q step %d in_parallel.limit must be greater than 0 when set", jobName, stepIndex)
+	}
+
+	for _, acrossVar := range step.Across {
+		if acrossVar.MaxInFlight < 0 {
+			return fmt.Errorf("job %q step %d across.max_in_flight must be greater than 0 when set", jobName, stepIndex)
+		}
+	}
+
+	for nestedIndex, nested := range step.Do {
+		if err := validateStepConcurrency(jobName, nestedIndex, nested); err != nil {
+			return err
+		}
+	}
+
+	for nestedIndex, nested := range step.Try {
+		if err := validateStepConcurrency(jobName, nestedIndex, nested); err != nil {
+			return err
+		}
+	}
+
+	for nestedIndex, nested := range step.InParallel.Steps {
+		if err := validateStepConcurrency(jobName, nestedIndex, nested); err != nil {
+			return err
 		}
 	}
 

@@ -254,6 +254,19 @@ func TestBackwardsCompatibility(t *testing.T) {
 		assert.Expect(err).NotTo(HaveOccurred())
 	})
 
+	t.Run("parallelism", func(t *testing.T) {
+		t.Parallel()
+
+		assert := NewGomegaWithT(t)
+		runner := commands.Runner{
+			Pipeline: "steps/parallelism.yml",
+			Driver:   "native",
+			Storage:  "sqlite://:memory:",
+		}
+		err := runner.Run(nil)
+		assert.Expect(err).NotTo(HaveOccurred())
+	})
+
 	t.Run("task/file", func(t *testing.T) {
 		t.Parallel()
 
