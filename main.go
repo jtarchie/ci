@@ -20,6 +20,7 @@ import (
 	_ "github.com/jtarchie/pocketci/storage/sqlite"
 	_ "github.com/jtarchie/pocketci/webhooks/generic"
 	_ "github.com/jtarchie/pocketci/webhooks/github"
+	_ "github.com/jtarchie/pocketci/webhooks/honeybadger"
 	_ "github.com/jtarchie/pocketci/webhooks/slack"
 	"github.com/lmittmann/tint"
 )

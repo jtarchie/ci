@@ -14,8 +14,11 @@ pocketci set-pipeline my-pipeline.ts \
   --webhook-secret "my-secret-key"
 ```
 
-The webhook secret is optional. If omitted, the webhook endpoint accepts all
-requests without signature validation.
+The webhook secret is optional for GitHub, Slack, and Generic webhooks. If
+omitted, those webhook requests are accepted without signature validation.
+
+Honeybadger webhooks always require `--webhook-secret` and a matching
+`Honeybadger-Token` header.
 
 ### 2. Configure the server
 
@@ -39,8 +42,10 @@ curl -X POST http://localhost:8080/api/webhooks/<pipeline-id> \
 
 ### Signature Validation
 
-When a pipeline has a webhook secret configured, requests must include an
-HMAC-SHA256 signature of the raw request body.
+When a pipeline has a webhook secret configured, providers validate requests
+using their provider-specific authentication scheme.
+
+For Generic webhooks, this is an HMAC-SHA256 signature of the raw request body.
 
 **Via header** (preferred):
 
@@ -111,6 +116,18 @@ Detected when the request includes an `X-Slack-Signature` header.
 - Both `X-Slack-Signature` and `X-Slack-Request-Timestamp` must be present when
   a secret is configured.
 
+### Honeybadger
+
+Detected when the request includes a `Honeybadger-Token` header.
+
+- **`provider`**: `"honeybadger"`
+- **`eventType`**: top-level `type` field, falling back to top-level `event`
+  from the JSON body
+- **Authentication header**: `Honeybadger-Token: <webhook-secret>`
+- `--webhook-secret` is required for Honeybadger. Requests are rejected with
+  `401 Unauthorized` when the secret is missing or when the token does not
+  match.
+
 ### Generic (fallback)
 
 Used for all other requests that don't match a specific provider.
@@ -134,7 +151,7 @@ triggered via webhook.
 
 ```typescript
 interface HttpRequest {
-  provider: string; // Detected provider: "github", "slack", or "generic"
+  provider: string; // Detected provider: "github", "slack", "honeybadger", or "generic"
   eventType: string; // Provider-specific event type (e.g. "push", "event_callback")
   method: string; // "GET", "POST", etc.
   url: string; // Request URL path with query string
@@ -288,15 +305,15 @@ webhook matches specific criteria, using the
 
 ### Available variables
 
-| Variable    | Type                     | Description                                           |
-| ----------- | ------------------------ | ----------------------------------------------------- |
-| `provider`  | `string`                 | Detected provider: `"github"`, `"slack"`, `"generic"` |
-| `eventType` | `string`                 | Provider-specific event type (e.g. `"push"`)          |
-| `method`    | `string`                 | HTTP method (`"GET"`, `"POST"`, …)                    |
-| `headers`   | `map[string]string`      | Request headers (keys are lowercase)                  |
-| `query`     | `map[string]string`      | Parsed query parameters                               |
-| `body`      | `string`                 | Raw request body                                      |
-| `payload`   | `map[string]any` / `nil` | JSON-decoded body; `nil` when body is not valid JSON  |
+| Variable    | Type                     | Description                                                            |
+| ----------- | ------------------------ | ---------------------------------------------------------------------- |
+| `provider`  | `string`                 | Detected provider: `"github"`, `"slack"`, `"honeybadger"`, `"generic"` |
+| `eventType` | `string`                 | Provider-specific event type (e.g. `"push"`)                           |
+| `method`    | `string`                 | HTTP method (`"GET"`, `"POST"`, …)                                     |
+| `headers`   | `map[string]string`      | Request headers (keys are lowercase)                                   |
+| `query`     | `map[string]string`      | Parsed query parameters                                                |
+| `body`      | `string`                 | Raw request body                                                       |
+| `payload`   | `map[string]any` / `nil` | JSON-decoded body; `nil` when body is not valid JSON                   |
 
 ### `webhookTrigger(expression)` — JS/TS pipelines
 
@@ -414,6 +431,7 @@ jobs:
 | Pipeline doesn't call `http.respond()` in time | `202 Accepted` with `{"run_id": "..."}`     |
 | Pipeline errors before responding              | `202 Accepted` (pipeline still ran)         |
 | No webhook secret, no signature sent           | Request accepted (no validation)            |
+| Honeybadger webhook with no `--webhook-secret` | `401 Unauthorized`                          |
 | Webhook secret set, no signature               | `401 Unauthorized`                          |
 | Webhook secret set, invalid signature          | `401 Unauthorized`                          |
 
