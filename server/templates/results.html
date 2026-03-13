@@ -55,10 +55,17 @@
       <div class="flex items-center gap-3">
         <h1 class="text-3xl font-bold dark:text-white">Tasks</h1>
         {{ if and .Run .Run.StartedAt }}
-        <span id="run-header-elapsed"
+        {{ $runStartedISO := .Run.StartedAt.Format "2006-01-02T15:04:05Z07:00"
+        }}
+        {{ $runStartedHuman := .Run.StartedAt.Format "Jan 02, 2006 15:04:05 MST"
+        }}
+        <time id="run-header-elapsed"
+          datetime="{{ $runStartedISO }}"
+          title="Started at {{ $runStartedHuman }}"
+          aria-label="Run duration, started at {{ $runStartedHuman }}"
           class="text-sm text-gray-500 dark:text-gray-400 font-mono">
           {{ durationBetween .Run.StartedAt .Run.CompletedAt }}
-        </span>
+        </time>
         {{ end }}
         {{ template "run-live-badge" dict "IsActive" .IsActive }}
       </div>
@@ -300,10 +307,15 @@
 {{ define "tasks-partial" }}
 {{ if .OOB }}
 {{ if and .RunID .Run .Run.StartedAt }}
-<span id="run-header-elapsed" hx-swap-oob="true"
+{{ $runStartedISO := .Run.StartedAt.Format "2006-01-02T15:04:05Z07:00" }}
+{{ $runStartedHuman := .Run.StartedAt.Format "Jan 02, 2006 15:04:05 MST" }}
+<time id="run-header-elapsed" hx-swap-oob="true"
+  datetime="{{ $runStartedISO }}"
+  title="Started at {{ $runStartedHuman }}"
+  aria-label="Run duration, started at {{ $runStartedHuman }}"
   class="text-sm text-gray-500 dark:text-gray-400 font-mono">
   {{ durationBetween .Run.StartedAt .Run.CompletedAt }}
-</span>
+</time>
 {{ end }}
 {{ template "run-live-badge" dict "IsActive" .IsActive "SwapOOB" true }}
 {{ template "run-stop-button" dict "RunID" .RunID "IsActive" .IsActive "SwapOOB"
@@ -479,10 +491,18 @@ border-indigo-300 dark:border-indigo-600
       </span>
       {{ end }}
       {{ if $path.Value.elapsed }}
-      <span class="text-xs text-gray-400 dark:text-gray-500 font-mono">{{
+      {{ $taskStartedAt := printf "%v" $path.Value.started_at }}
+      <span
+        class="text-xs text-gray-400 dark:text-gray-500 font-mono"
+        title="Started at {{ $taskStartedAt }}"
+        aria-label="Task duration, started at {{ $taskStartedAt }}">{{
         $path.Value.elapsed }}</span>
       {{ else if $path.Value.started_at }}
-      <span class="text-xs text-gray-400 dark:text-gray-500 font-mono">{{
+      {{ $taskStartedAt := printf "%v" $path.Value.started_at }}
+      <span
+        class="text-xs text-gray-400 dark:text-gray-500 font-mono"
+        title="Started at {{ $taskStartedAt }}"
+        aria-label="Task duration, started at {{ $taskStartedAt }}">{{
         elapsedSince $path.Value.started_at }}</span>
       {{ end }}
     </div>

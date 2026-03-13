@@ -66,10 +66,20 @@
   </td>
   <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 font-mono">
     {{ if .StartedAt }}
+    {{ $startedAtISO := .StartedAt.Format "2006-01-02T15:04:05Z07:00" }}
+    {{ $startedAtHuman := .StartedAt.Format "Jan 02, 2006 15:04:05 MST" }}
     {{ if .CompletedAt }}
-    {{ durationBetween .StartedAt .CompletedAt }}
+    <time datetime="{{ $startedAtISO }}"
+      title="Started at {{ $startedAtHuman }}"
+      aria-label="Duration, started at {{ $startedAtHuman }}">
+      {{ durationBetween .StartedAt .CompletedAt }}
+    </time>
     {{ else }}
-    {{ durationBetween .StartedAt nil }}
+    <time datetime="{{ $startedAtISO }}"
+      title="Started at {{ $startedAtHuman }}"
+      aria-label="Duration, started at {{ $startedAtHuman }}">
+      {{ durationBetween .StartedAt nil }}
+    </time>
     {{ end }}
     {{ else }}
     <span class="text-gray-400 dark:text-gray-500">—</span>
