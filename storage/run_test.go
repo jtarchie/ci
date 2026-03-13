@@ -129,6 +129,30 @@ func TestPipelineRunStorage(t *testing.T) {
 				assert.Expect(updated.ErrorMessage).To(Equal("something went wrong"))
 			})
 
+			t.Run("UpdateRunStatus to skipped sets completed_at", func(t *testing.T) {
+				assert := NewGomegaWithT(t)
+
+				client := newStorageClient(t, name, init, "namespace")
+
+				pipeline, err := client.SavePipeline(context.Background(), "pipeline", "content", "docker://", "")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				run, err := client.SaveRun(context.Background(), pipeline.ID)
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				err = client.UpdateRunStatus(context.Background(), run.ID, storage.RunStatusRunning, "")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				err = client.UpdateRunStatus(context.Background(), run.ID, storage.RunStatusSkipped, "")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				updated, err := client.GetRun(context.Background(), run.ID)
+				assert.Expect(err).NotTo(HaveOccurred())
+				assert.Expect(updated.Status).To(Equal(storage.RunStatusSkipped))
+				assert.Expect(updated.CompletedAt).NotTo(BeNil())
+				assert.Expect(updated.ErrorMessage).To(BeEmpty())
+			})
+
 			t.Run("UpdateRunStatus returns error for non-existent ID", func(t *testing.T) {
 				assert := NewGomegaWithT(t)
 

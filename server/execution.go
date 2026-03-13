@@ -282,9 +282,12 @@ func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *stor
 		return
 	}
 
-	if finalStatus == storage.RunStatusSuccess {
+	switch finalStatus {
+	case storage.RunStatusSuccess:
 		logger.Info("pipeline.execute.success")
-	} else {
+	case storage.RunStatusSkipped:
+		logger.Info("pipeline.execute.skipped")
+	default:
 		logger.Info("pipeline.execute.completed_with_failures")
 	}
 }
@@ -437,6 +440,11 @@ func (s *ExecutionService) RunByNameSync(
 		finalStatus = storage.RunStatusFailed
 		// TODO: we never display this error message anywhere in the UI - consider surfacing it in the run details page or similar
 		errMsg = execErr.Error()
+	} else {
+		finalStatus = s.determineRunStatus(ctx, run.ID, s.logger)
+		if finalStatus == storage.RunStatusFailed {
+			exitCode = 1
+		}
 	}
 
 	if err = s.store.UpdateRunStatus(ctx, run.ID, finalStatus, errMsg); err != nil {
@@ -472,14 +480,27 @@ func (s *ExecutionService) determineRunStatus(ctx context.Context, runID string,
 		return storage.RunStatusSuccess
 	}
 
-	// Check if any job has a failed/error status
+	hasStatuses := false
+	allSkipped := true
+
+	// Check if any job has a failed/error status.
 	for _, result := range results {
 		if status, ok := result.Payload["status"].(string); ok {
+			hasStatuses = true
+
 			switch status {
 			case "failure", "error", "abort":
 				return storage.RunStatusFailed
 			}
+
+			if status != string(storage.RunStatusSkipped) {
+				allSkipped = false
+			}
 		}
+	}
+
+	if hasStatuses && allSkipped {
+		return storage.RunStatusSkipped
 	}
 
 	return storage.RunStatusSuccess

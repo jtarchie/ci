@@ -26,7 +26,7 @@ Response includes:
 
 - `id` — run ID
 - `pipeline_id` — owning pipeline
-- `status` — `queued`, `running`, `success`, `failed`
+- `status` — `queued`, `running`, `success`, `failed`, `skipped`
 - `started_at`, `completed_at`, `created_at` — timestamps
 - `error_message` — optional failure reason
 

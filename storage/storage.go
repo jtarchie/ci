@@ -41,6 +41,7 @@ const (
 	RunStatusRunning RunStatus = "running"
 	RunStatusSuccess RunStatus = "success"
 	RunStatusFailed  RunStatus = "failed"
+	RunStatusSkipped RunStatus = "skipped"
 )
 
 // PipelineRun represents an execution of a pipeline.

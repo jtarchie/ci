@@ -324,6 +324,76 @@ export const pipeline = async () => {
 				assert.Expect(err).NotTo(HaveOccurred())
 				assert.Expect(finalRun.Status).To(Equal(storage.RunStatusSuccess))
 			})
+
+			t.Run("pipeline is skipped when all jobs are skipped", func(t *testing.T) {
+				t.Parallel()
+				assert := NewGomegaWithT(t)
+				buildFile, err := os.CreateTemp(t.TempDir(), "")
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = buildFile.Close() }()
+
+				client, err := init(buildFile.Name(), "namespace", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = client.Close() }()
+
+				pipelineContent := `
+export const pipeline = async () => {
+	const runID = typeof pipelineContext !== "undefined" && pipelineContext.runID ? pipelineContext.runID : String(Date.now());
+	storage.set("/pipeline/" + runID + "/jobs/job-1", { status: "skipped" });
+	storage.set("/pipeline/" + runID + "/jobs/job-2", { status: "skipped" });
+};`
+
+				pipeline, err := client.SavePipeline(context.Background(), "all-skipped-pipeline", pipelineContent, "native://", "")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				execService := router.ExecutionService()
+				run, err := execService.TriggerPipeline(context.Background(), pipeline)
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				execService.Wait()
+
+				finalRun, err := client.GetRun(context.Background(), run.ID)
+				assert.Expect(err).NotTo(HaveOccurred())
+				assert.Expect(finalRun.Status).To(Equal(storage.RunStatusSkipped))
+			})
+
+			t.Run("pipeline succeeds when skipped and success jobs are mixed", func(t *testing.T) {
+				t.Parallel()
+				assert := NewGomegaWithT(t)
+				buildFile, err := os.CreateTemp(t.TempDir(), "")
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = buildFile.Close() }()
+
+				client, err := init(buildFile.Name(), "namespace", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = client.Close() }()
+
+				pipelineContent := `
+export const pipeline = async () => {
+	const runID = typeof pipelineContext !== "undefined" && pipelineContext.runID ? pipelineContext.runID : String(Date.now());
+	storage.set("/pipeline/" + runID + "/jobs/job-1", { status: "skipped" });
+	storage.set("/pipeline/" + runID + "/jobs/job-2", { status: "success" });
+};`
+
+				pipeline, err := client.SavePipeline(context.Background(), "mixed-skipped-success-pipeline", pipelineContent, "native://", "")
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				execService := router.ExecutionService()
+				run, err := execService.TriggerPipeline(context.Background(), pipeline)
+				assert.Expect(err).NotTo(HaveOccurred())
+
+				execService.Wait()
+
+				finalRun, err := client.GetRun(context.Background(), run.ID)
+				assert.Expect(err).NotTo(HaveOccurred())
+				assert.Expect(finalRun.Status).To(Equal(storage.RunStatusSuccess))
+			})
 		})
 	})
 }

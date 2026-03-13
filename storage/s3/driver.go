@@ -323,7 +323,7 @@ func (s *S3) UpdateRunStatus(ctx context.Context, runID string, status storage.R
 	switch status {
 	case storage.RunStatusRunning:
 		run.StartedAt = &now
-	case storage.RunStatusSuccess, storage.RunStatusFailed:
+	case storage.RunStatusSuccess, storage.RunStatusFailed, storage.RunStatusSkipped:
 		run.CompletedAt = &now
 		run.ErrorMessage = errorMessage
 	}

@@ -610,7 +610,7 @@ func (s *Sqlite) UpdateRunStatus(ctx context.Context, runID string, status stora
 	case storage.RunStatusRunning:
 		query = `UPDATE pipeline_runs SET status = ?, started_at = ? WHERE id = ?`
 		args = []any{status, now.Format(time.RFC3339), runID}
-	case storage.RunStatusSuccess, storage.RunStatusFailed:
+	case storage.RunStatusSuccess, storage.RunStatusFailed, storage.RunStatusSkipped:
 		query = `UPDATE pipeline_runs SET status = ?, completed_at = ?, error_message = ? WHERE id = ?`
 		args = []any{status, now.Format(time.RFC3339), errorMessage, runID}
 	default:
