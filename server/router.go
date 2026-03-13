@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -117,6 +118,10 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	execService.AllowedFeatures = allowedFeatures
 	execService.FetchTimeout = opts.FetchTimeout
 	execService.FetchMaxResponseBytes = opts.FetchMaxResponseBytes
+
+	// Recover orphaned runs from previous server instance
+	execService.RecoverOrphanedRuns(context.Background())
+
 	router.Use(newSlogMiddleware(logger))
 	router.Use(middleware.Recover())
 
@@ -195,7 +200,7 @@ func registerRoutes(
 
 	// API controllers (JSON responses)
 	(&APIPipelinesController{BaseController: base, allowedDrivers: allowedDrivers, allowedFeatures: allowedFeatures, secretsMgr: secretsMgr}).RegisterRoutes(api)
-	(&APIRunsController{BaseController: base}).RegisterRoutes(api)
+	(&APIRunsController{BaseController: base, allowedFeatures: allowedFeatures}).RegisterRoutes(api)
 	(&APIDriversController{allowedDrivers: allowedDrivers}).RegisterRoutes(api)
 	(&APIFeaturesController{allowedFeatures: allowedFeatures}).RegisterRoutes(api)
 

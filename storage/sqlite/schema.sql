@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS pipelines (
   content TEXT NOT NULL,
   content_type TEXT NOT NULL DEFAULT '',
   driver_dsn TEXT NOT NULL,
+  resume_enabled INTEGER NOT NULL DEFAULT 0,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 ) STRICT;

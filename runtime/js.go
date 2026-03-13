@@ -126,6 +126,14 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 			resumableRunner.SetSecretsManager(opts.SecretsManager, opts.PipelineID)
 		}
 
+		if opts.PreseededVolumes != nil {
+			resumableRunner.SetPreseededVolumes(opts.PreseededVolumes)
+		}
+
+		if opts.OutputCallback != nil {
+			resumableRunner.SetOutputCallback(opts.OutputCallback)
+		}
+
 		runner = resumableRunner
 	} else {
 		pipelineRunner := NewPipelineRunner(ctx, driver, storage, j.logger, opts.Namespace, opts.RunID)
@@ -379,7 +387,19 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 
 	err = runtime.Wait()
 	if err != nil {
+		// Mark in-progress steps as aborted if using resumable runner
+		if resumable, ok := runner.(*ResumableRunner); ok {
+			resumable.MarkInProgressAsAborted()
+		}
+
 		return fmt.Errorf("pipeline did not successfully execute: %w", err)
+	}
+
+	// If the context was cancelled, mark any remaining in-progress steps as aborted
+	if ctx.Err() != nil {
+		if resumable, ok := runner.(*ResumableRunner); ok {
+			resumable.MarkInProgressAsAborted()
+		}
 	}
 
 	// Cleanup volumes after pipeline completes - this triggers cache persistence

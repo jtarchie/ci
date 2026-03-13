@@ -15,7 +15,7 @@ func TestParseAllowedFeatures(t *testing.T) {
 
 		features, err := ParseAllowedFeatures("*")
 		assert.Expect(err).NotTo(HaveOccurred())
-		assert.Expect(features).To(ConsistOf(FeatureWebhooks, FeatureSecrets, FeatureNotifications, FeatureFetch))
+		assert.Expect(features).To(ConsistOf(FeatureWebhooks, FeatureSecrets, FeatureNotifications, FeatureFetch, FeatureResume))
 	})
 
 	t.Run("empty returns all features", func(t *testing.T) {
@@ -24,7 +24,7 @@ func TestParseAllowedFeatures(t *testing.T) {
 
 		features, err := ParseAllowedFeatures("")
 		assert.Expect(err).NotTo(HaveOccurred())
-		assert.Expect(features).To(ConsistOf(FeatureWebhooks, FeatureSecrets, FeatureNotifications, FeatureFetch))
+		assert.Expect(features).To(ConsistOf(FeatureWebhooks, FeatureSecrets, FeatureNotifications, FeatureFetch, FeatureResume))
 	})
 
 	t.Run("single feature", func(t *testing.T) {

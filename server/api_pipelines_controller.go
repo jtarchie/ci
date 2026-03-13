@@ -23,16 +23,18 @@ type PipelineRequest struct {
 	DriverDSN     string            `json:"driver_dsn"`
 	WebhookSecret *string           `json:"webhook_secret,omitempty"`
 	Secrets       map[string]string `json:"secrets,omitempty"`
+	ResumeEnabled *bool             `json:"resume_enabled,omitempty"`
 }
 
 // PipelineAPIResponse is a sanitized pipeline representation for the public API.
 type PipelineAPIResponse struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Content     string    `json:"content"`
-	ContentType string    `json:"content_type"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID            string    `json:"id"`
+	Name          string    `json:"name"`
+	Content       string    `json:"content"`
+	ContentType   string    `json:"content_type"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	ResumeEnabled bool      `json:"resume_enabled"`
 }
 
 func toPipelineAPIResponse(pipeline *storage.Pipeline) PipelineAPIResponse {
@@ -41,12 +43,13 @@ func toPipelineAPIResponse(pipeline *storage.Pipeline) PipelineAPIResponse {
 	}
 
 	return PipelineAPIResponse{
-		ID:          pipeline.ID,
-		Name:        pipeline.Name,
-		Content:     pipeline.Content,
-		ContentType: pipeline.ContentType,
-		CreatedAt:   pipeline.CreatedAt,
-		UpdatedAt:   pipeline.UpdatedAt,
+		ID:            pipeline.ID,
+		Name:          pipeline.Name,
+		Content:       pipeline.Content,
+		ContentType:   pipeline.ContentType,
+		CreatedAt:     pipeline.CreatedAt,
+		UpdatedAt:     pipeline.UpdatedAt,
+		ResumeEnabled: pipeline.ResumeEnabled,
 	}
 }
 
@@ -261,6 +264,24 @@ func (c *APIPipelinesController) Upsert(ctx *echo.Context) error {
 				})
 			}
 		}
+	}
+
+	if req.ResumeEnabled != nil && *req.ResumeEnabled {
+		if !IsFeatureEnabled(FeatureResume, c.allowedFeatures) {
+			return ctx.JSON(http.StatusBadRequest, map[string]string{
+				"error": "resume feature is not enabled",
+			})
+		}
+	}
+
+	if req.ResumeEnabled != nil {
+		if err := c.store.UpdatePipelineResumeEnabled(ctx.Request().Context(), pipeline.ID, *req.ResumeEnabled); err != nil {
+			return ctx.JSON(http.StatusInternalServerError, map[string]string{
+				"error": fmt.Sprintf("failed to update resume_enabled: %v", err),
+			})
+		}
+
+		pipeline.ResumeEnabled = *req.ResumeEnabled
 	}
 
 	return ctx.JSON(http.StatusOK, toPipelineAPIResponse(pipeline))

@@ -2,7 +2,10 @@ package runtime
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"log/slog"
+	"runtime/debug"
 	"sync"
 
 	"github.com/dop251/goja"
@@ -95,6 +98,16 @@ func (r *Runtime) Run(call goja.FunctionCall) goja.Value {
 	r.promises.Add(1)
 
 	go func() {
+		defer func() {
+			if p := recover(); p != nil {
+				slog.Error("runtime.run.panic", "panic", p, "stack", string(debug.Stack()))
+				r.tasks <- func() error {
+					defer r.promises.Done()
+					return reject(r.jsVM.NewGoError(fmt.Errorf("panic in run: %v", p)))
+				}
+			}
+		}()
+
 		result, err := r.runner.Run(input)
 
 		r.tasks <- func() error {
@@ -136,6 +149,16 @@ func (r *Runtime) CreateVolume(input VolumeInput) *goja.Promise {
 	r.promises.Add(1)
 
 	go func() {
+		defer func() {
+			if p := recover(); p != nil {
+				slog.Error("runtime.createVolume.panic", "panic", p, "stack", string(debug.Stack()))
+				r.tasks <- func() error {
+					defer r.promises.Done()
+					return reject(r.jsVM.NewGoError(fmt.Errorf("panic in createVolume: %v", p)))
+				}
+			}
+		}()
+
 		result, err := r.runner.CreateVolume(input)
 
 		r.tasks <- func() error {
@@ -183,6 +206,16 @@ func (r *Runtime) StartSandbox(call goja.FunctionCall) goja.Value {
 	r.promises.Add(1)
 
 	go func() {
+		defer func() {
+			if p := recover(); p != nil {
+				slog.Error("runtime.startSandbox.panic", "panic", p, "stack", string(debug.Stack()))
+				r.tasks <- func() error {
+					defer r.promises.Done()
+					return reject(r.jsVM.NewGoError(fmt.Errorf("panic in startSandbox: %v", p)))
+				}
+			}
+		}()
+
 		handle, err := r.runner.StartSandbox(input)
 
 		r.tasks <- func() error {
@@ -237,6 +270,16 @@ func (r *Runtime) StartSandbox(call goja.FunctionCall) goja.Value {
 				r.promises.Add(1)
 
 				go func() {
+					defer func() {
+						if p := recover(); p != nil {
+							slog.Error("runtime.sandbox.exec.panic", "panic", p, "stack", string(debug.Stack()))
+							r.tasks <- func() error {
+								defer r.promises.Done()
+								return execReject(r.jsVM.NewGoError(fmt.Errorf("panic in sandbox exec: %v", p)))
+							}
+						}
+					}()
+
 					result, err := handle.Exec(execInput)
 
 					r.tasks <- func() error {
@@ -269,6 +312,16 @@ func (r *Runtime) StartSandbox(call goja.FunctionCall) goja.Value {
 				r.promises.Add(1)
 
 				go func() {
+					defer func() {
+						if p := recover(); p != nil {
+							slog.Error("runtime.sandbox.close.panic", "panic", p, "stack", string(debug.Stack()))
+							r.tasks <- func() error {
+								defer r.promises.Done()
+								return closeReject(r.jsVM.NewGoError(fmt.Errorf("panic in sandbox close: %v", p)))
+							}
+						}
+					}()
+
 					err := handle.Close()
 
 					r.tasks <- func() error {
@@ -367,6 +420,16 @@ func (r *Runtime) Agent(call goja.FunctionCall) goja.Value {
 	r.promises.Add(1)
 
 	go func() {
+		defer func() {
+			if p := recover(); p != nil {
+				slog.Error("runtime.agent.panic", "panic", p, "stack", string(debug.Stack()))
+				r.tasks <- func() error {
+					defer r.promises.Done()
+					return reject(r.jsVM.NewGoError(fmt.Errorf("panic in agent: %v", p)))
+				}
+			}
+		}()
+
 		ctx := r.ctx
 		if ctx == nil {
 			ctx = context.Background()
@@ -378,7 +441,54 @@ func (r *Runtime) Agent(call goja.FunctionCall) goja.Value {
 		config.RunID = r.runID
 		config.TriggeredBy = r.triggeredBy
 
-		result, err := RunAgent(ctx, r.runner, r.secretsManager, r.pipelineID, config)
+		// Set the AgentFunc on the runner so that ResumableRunner can track
+		// and cache agent results. The func captures per-call context
+		// (callbacks, secrets, storage, etc.) and delegates to agent.RunAgent.
+		r.runner.SetAgentFunc(func(configJSON json.RawMessage) (json.RawMessage, error) {
+			// Unmarshal the serializable parts of config, keeping the
+			// non-serialisable fields (callbacks, Storage, etc.) from the
+			// outer config closure.
+			var serializableConfig AgentConfig
+			if err := json.Unmarshal(configJSON, &serializableConfig); err != nil {
+				return nil, fmt.Errorf("could not unmarshal agent config: %w", err)
+			}
+
+			// Merge: serializable fields from JSON, non-serializable from closure.
+			serializableConfig.OnOutput = config.OnOutput
+			serializableConfig.OnAuditEvent = config.OnAuditEvent
+			serializableConfig.OnUsage = config.OnUsage
+			serializableConfig.Storage = config.Storage
+			serializableConfig.Namespace = config.Namespace
+			serializableConfig.RunID = config.RunID
+			serializableConfig.PipelineID = config.PipelineID
+			serializableConfig.TriggeredBy = config.TriggeredBy
+
+			result, err := RunAgent(ctx, r.runner, r.secretsManager, r.pipelineID, serializableConfig)
+			if err != nil {
+				return nil, err
+			}
+
+			resultJSON, err := json.Marshal(result)
+			if err != nil {
+				return nil, fmt.Errorf("could not marshal agent result: %w", err)
+			}
+
+			return resultJSON, nil
+		})
+
+		// Marshal the serializable config to JSON for the runner interface.
+		configJSON, err := json.Marshal(config)
+		if err != nil {
+			r.tasks <- func() error {
+				defer r.promises.Done()
+
+				return reject(r.jsVM.NewGoError(fmt.Errorf("could not marshal agent config: %w", err)))
+			}
+
+			return
+		}
+
+		resultJSON, err := r.runner.RunAgent(configJSON)
 
 		r.tasks <- func() error {
 			defer r.promises.Done()
@@ -390,6 +500,11 @@ func (r *Runtime) Agent(call goja.FunctionCall) goja.Value {
 				}
 
 				return nil
+			}
+
+			var result AgentResult
+			if unmarshalErr := json.Unmarshal(resultJSON, &result); unmarshalErr != nil {
+				return reject(r.jsVM.NewGoError(fmt.Errorf("could not unmarshal agent result: %w", unmarshalErr)))
 			}
 
 			err = resolve(result)

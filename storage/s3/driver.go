@@ -282,6 +282,27 @@ func (s *S3) DeletePipeline(ctx context.Context, id string) error {
 	return nil
 }
 
+// UpdatePipelineResumeEnabled updates the resume_enabled flag for a pipeline.
+func (s *S3) UpdatePipelineResumeEnabled(ctx context.Context, pipelineID string, enabled bool) error {
+	pipeline, err := s.GetPipeline(ctx, pipelineID)
+	if err != nil {
+		return err
+	}
+
+	pipeline.ResumeEnabled = enabled
+
+	data, err := json.Marshal(pipeline)
+	if err != nil {
+		return fmt.Errorf("failed to marshal pipeline: %w", err)
+	}
+
+	if err := s.putJSON(ctx, s.pipelineByIDKey(pipelineID), data); err != nil {
+		return fmt.Errorf("failed to update pipeline: %w", err)
+	}
+
+	return nil
+}
+
 // ─── Pipeline Run operations ────────────────────────────────────────────────
 
 func (s *S3) SaveRun(ctx context.Context, pipelineID string) (*storage.PipelineRun, error) {
@@ -309,6 +330,29 @@ func (s *S3) SaveRun(ctx context.Context, pipelineID string) (*storage.PipelineR
 
 func (s *S3) GetRun(ctx context.Context, runID string) (*storage.PipelineRun, error) {
 	return s.getRun(ctx, s.runKey(runID))
+}
+
+// GetRunsByStatus returns all pipeline runs with the given status.
+func (s *S3) GetRunsByStatus(ctx context.Context, status storage.RunStatus) ([]storage.PipelineRun, error) {
+	keys, err := s.ListKeys(ctx, s.runsPrefix())
+	if err != nil {
+		return nil, fmt.Errorf("failed to list runs: %w", err)
+	}
+
+	var runs []storage.PipelineRun
+
+	for _, key := range keys {
+		run, err := s.getRun(ctx, key)
+		if err != nil {
+			continue
+		}
+
+		if run.Status == status {
+			runs = append(runs, *run)
+		}
+	}
+
+	return runs, nil
 }
 
 func (s *S3) UpdateRunStatus(ctx context.Context, runID string, status storage.RunStatus, errorMessage string) error {
@@ -473,6 +517,10 @@ func (s *S3) pipelineByNameKey(name string) string {
 
 func (s *S3) runKey(id string) string {
 	return s.FullKey("runs/" + id + ".json")
+}
+
+func (s *S3) runsPrefix() string {
+	return s.FullKey("runs/")
 }
 
 // ─── S3 low-level helpers ───────────────────────────────────────────────────

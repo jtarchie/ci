@@ -13,6 +13,7 @@ import (
 // APIRunsController handles JSON API endpoints for pipeline runs.
 type APIRunsController struct {
 	BaseController
+	allowedFeatures []Feature
 }
 
 type APIRunTask struct {
@@ -176,9 +177,65 @@ func (c *APIRunsController) Stop(ctx *echo.Context) error {
 	})
 }
 
+// Resume handles POST /api/runs/:run_id/resume - Resume a failed or aborted run.
+func (c *APIRunsController) Resume(ctx *echo.Context) error {
+	if !IsFeatureEnabled(FeatureResume, c.allowedFeatures) {
+		return ctx.JSON(http.StatusForbidden, map[string]string{
+			"error": "resume feature is not enabled",
+		})
+	}
+
+	runID := ctx.Param("run_id")
+
+	reqCtx := ctx.Request().Context()
+
+	run, err := c.store.GetRun(reqCtx, runID)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return ctx.JSON(http.StatusNotFound, map[string]string{
+				"error": "run not found",
+			})
+		}
+
+		return ctx.JSON(http.StatusInternalServerError, map[string]string{
+			"error": fmt.Sprintf("failed to get run: %v", err),
+		})
+	}
+
+	if run.Status != storage.RunStatusFailed {
+		return ctx.JSON(http.StatusConflict, map[string]string{
+			"error": "only failed runs can be resumed",
+		})
+	}
+
+	pipeline, err := c.store.GetPipeline(reqCtx, run.PipelineID)
+	if err != nil {
+		return ctx.JSON(http.StatusInternalServerError, map[string]string{
+			"error": fmt.Sprintf("failed to get pipeline: %v", err),
+		})
+	}
+
+	if err := c.execService.ResumePipeline(reqCtx, pipeline, run); err != nil {
+		return ctx.JSON(http.StatusInternalServerError, map[string]string{
+			"error": fmt.Sprintf("failed to resume run: %v", err),
+		})
+	}
+
+	if isHtmxRequest(ctx) {
+		ctx.Response().Header().Set("HX-Trigger", `{"showToast":{"message":"Resuming run...","type":"success"}}`)
+		return ctx.NoContent(http.StatusOK)
+	}
+
+	return ctx.JSON(http.StatusOK, map[string]string{
+		"run_id": runID,
+		"status": "resuming",
+	})
+}
+
 // RegisterRoutes registers all run API routes on the given group.
 func (c *APIRunsController) RegisterRoutes(api *echo.Group) {
 	api.GET("/runs/:run_id/status", c.Status)
 	api.GET("/runs/:run_id/tasks", c.Tasks)
 	api.POST("/runs/:run_id/stop", c.Stop)
+	api.POST("/runs/:run_id/resume", c.Resume)
 }

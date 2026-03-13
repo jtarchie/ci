@@ -120,12 +120,13 @@ func (r *ResumableRunner) saveState() error {
 
 // Run executes a task with resume support.
 // If the task was previously completed, returns the cached result.
+// If the task was previously failed/aborted, re-runs it.
 // If the task was in progress and the container is still running, reattaches.
 // Otherwise, starts a new container.
 func (r *ResumableRunner) Run(input RunInput) (*RunResult, error) {
 	// First, try to find an existing step by looking at steps in order
 	// This allows for resuming even if step names are the same
-	stepID := r.findOrGenerateStepID(input)
+	stepID := r.findOrGenerateStepID(input.Name)
 
 	// Check if this step already exists in state
 	existingStep := r.state.GetStep(stepID)
@@ -135,6 +136,16 @@ func (r *ResumableRunner) Run(input RunInput) (*RunResult, error) {
 		if existingStep.CanSkip() {
 			r.logger.Info("resume.skip_completed", "stepID", stepID, "name", input.Name)
 			return existingStep.Result, nil
+		}
+
+		// Handle failed/aborted step - retry
+		if existingStep.ShouldRetry() {
+			r.logger.Info("resume.retry_step", "stepID", stepID, "name", input.Name, "previousStatus", existingStep.Status)
+			existingStep.MarkForRetry()
+			if err := r.saveState(); err != nil {
+				r.logger.Error("resume.save_state_failed.retry", "stepID", stepID, "err", err)
+			}
+			// Fall through to run fresh
 		}
 
 		// Handle step that was in progress - try to reattach
@@ -155,8 +166,8 @@ func (r *ResumableRunner) Run(input RunInput) (*RunResult, error) {
 
 // findOrGenerateStepID finds an existing step ID or generates a new one.
 // For resuming, we need to match steps by their position in the pipeline.
-func (r *ResumableRunner) findOrGenerateStepID(input RunInput) string {
-	sanitizedName := sanitizeName(input.Name)
+func (r *ResumableRunner) findOrGenerateStepID(name string) string {
+	sanitizedName := sanitizeName(name)
 	stepID := fmt.Sprintf("%d-%s", r.callIndex, sanitizedName)
 	r.callIndex++ // Increment for next call
 	return stepID
@@ -200,6 +211,7 @@ func (r *ResumableRunner) runStep(stepID string, input RunInput) (*RunResult, er
 	step := &StepState{
 		StepID:    stepID,
 		Name:      input.Name,
+		Kind:      StepKindRun,
 		Status:    StepStatusRunning,
 		TaskID:    taskID,
 		StartedAt: &now,
@@ -402,14 +414,144 @@ func (r *ResumableRunner) reattachToContainer(step *StepState) (*RunResult, erro
 	return step.Result, nil
 }
 
-// CreateVolume creates a volume (passthrough to underlying runner).
+// CreateVolume creates a volume with resume support.
+// On resume, previously-created volumes are tracked so the same names are reused.
 func (r *ResumableRunner) CreateVolume(input VolumeInput) (*VolumeResult, error) {
-	return r.runner.CreateVolume(input)
+	result, err := r.runner.CreateVolume(input)
+	if err != nil {
+		return nil, err
+	}
+
+	// Track volume in state for resume awareness
+	if r.state.Volumes == nil {
+		r.state.Volumes = make(map[string]*VolumeState)
+	}
+
+	r.state.Volumes[input.Name] = &VolumeState{
+		Name: result.Name,
+		Path: result.Path,
+	}
+
+	if saveErr := r.saveState(); saveErr != nil {
+		r.logger.Error("resume.save_state_failed.volume", "name", input.Name, "err", saveErr)
+	}
+
+	return result, nil
 }
 
 // CleanupVolumes cleans up all tracked volumes (passthrough to underlying runner).
 func (r *ResumableRunner) CleanupVolumes() error {
 	return r.runner.CleanupVolumes()
+}
+
+// SetPreseededVolumes configures the underlying pipeline runner to reuse pre-created volumes.
+func (r *ResumableRunner) SetPreseededVolumes(vols map[string]orchestra.Volume) {
+	r.runner.SetPreseededVolumes(vols)
+}
+
+// SetOutputCallback configures the underlying pipeline runner's global output callback.
+func (r *ResumableRunner) SetOutputCallback(cb OutputCallback) {
+	r.runner.SetOutputCallback(cb)
+}
+
+// SetAgentFunc configures the function used to execute agent steps.
+func (r *ResumableRunner) SetAgentFunc(fn AgentFunc) {
+	r.runner.SetAgentFunc(fn)
+}
+
+// RunAgent executes an LLM agent step with resume support.
+// Completed agents are skipped; failed/aborted agents are retried from scratch.
+func (r *ResumableRunner) RunAgent(configJSON json.RawMessage) (json.RawMessage, error) {
+	// Extract name from config for step ID generation
+	var meta struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(configJSON, &meta); err != nil {
+		return nil, fmt.Errorf("could not parse agent config name: %w", err)
+	}
+
+	name := meta.Name
+	if name == "" {
+		name = "agent"
+	}
+
+	stepID := r.findOrGenerateStepID(name)
+	existingStep := r.state.GetStep(stepID)
+
+	if existingStep != nil {
+		// Completed agent — return cached result
+		if existingStep.CanSkip() {
+			r.logger.Info("resume.skip_completed_agent", "stepID", stepID, "name", name)
+			return existingStep.AgentResultJSON, nil
+		}
+
+		// Failed/aborted agent — retry from scratch
+		if existingStep.ShouldRetry() {
+			r.logger.Info("resume.retry_agent", "stepID", stepID, "name", name, "previousStatus", existingStep.Status)
+			existingStep.MarkForRetry()
+			if err := r.saveState(); err != nil {
+				r.logger.Error("resume.save_state_failed.agent_retry", "stepID", stepID, "err", err)
+			}
+		}
+
+		// Running agent (interrupted mid-conversation) — treat as needing re-run
+		if existingStep.Status == StepStatusRunning {
+			r.logger.Info("resume.agent_was_running", "stepID", stepID, "name", name)
+			existingStep.MarkForRetry()
+			if err := r.saveState(); err != nil {
+				r.logger.Error("resume.save_state_failed.agent_running", "stepID", stepID, "err", err)
+			}
+		}
+	}
+
+	// Execute agent fresh
+	now := time.Now()
+	step := &StepState{
+		StepID:    stepID,
+		Name:      name,
+		Kind:      StepKindAgent,
+		Status:    StepStatusRunning,
+		StartedAt: &now,
+	}
+	r.state.SetStep(step)
+
+	if err := r.saveState(); err != nil {
+		r.logger.Error("resume.save_state_failed.agent_running", "stepID", stepID, "err", err)
+	}
+
+	resultJSON, err := r.runner.RunAgent(configJSON)
+	if err != nil {
+		step.Status = StepStatusFailed
+		step.Error = err.Error()
+		_ = r.saveState()
+
+		return nil, err
+	}
+
+	// Persist completed result
+	completedAt := time.Now()
+	step.CompletedAt = &completedAt
+	step.Status = StepStatusCompleted
+	step.AgentResultJSON = resultJSON
+
+	if err := r.saveState(); err != nil {
+		r.logger.Error("resume.save_state_failed.agent_completed", "stepID", stepID, "err", err)
+	}
+
+	return resultJSON, nil
+}
+
+// MarkInProgressAsAborted marks all currently-running steps as aborted.
+// Called during context cancellation cleanup to ensure state is consistent.
+func (r *ResumableRunner) MarkInProgressAsAborted() {
+	for _, step := range r.state.InProgressSteps() {
+		step.Status = StepStatusAborted
+		step.Error = "context cancelled"
+	}
+
+	if err := r.saveState(); err != nil {
+		r.logger.Error("resume.save_state_failed.abort_cleanup", "err", err)
+	}
 }
 
 // State returns the current pipeline state.

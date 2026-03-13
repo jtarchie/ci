@@ -24,13 +24,14 @@ const (
 
 // Pipeline represents a stored pipeline definition.
 type Pipeline struct {
-	ID          string      `json:"id"`
-	Name        string      `json:"name"`
-	Content     string      `json:"content"`
-	ContentType ContentType `json:"content_type"`
-	DriverDSN   string      `json:"driver_dsn"`
-	CreatedAt   time.Time   `json:"created_at"`
-	UpdatedAt   time.Time   `json:"updated_at"`
+	ID            string      `json:"id"`
+	Name          string      `json:"name"`
+	Content       string      `json:"content"`
+	ContentType   ContentType `json:"content_type"`
+	DriverDSN     string      `json:"driver_dsn"`
+	ResumeEnabled bool        `json:"resume_enabled"`
+	CreatedAt     time.Time   `json:"created_at"`
+	UpdatedAt     time.Time   `json:"updated_at"`
 }
 
 // RunStatus represents the status of a pipeline run.
@@ -78,6 +79,7 @@ type Driver interface {
 
 	// Pipeline CRUD operations
 	SavePipeline(ctx context.Context, name, content, driverDSN, contentType string) (*Pipeline, error)
+	UpdatePipelineResumeEnabled(ctx context.Context, pipelineID string, enabled bool) error
 	GetPipeline(ctx context.Context, id string) (*Pipeline, error)
 	GetPipelineByName(ctx context.Context, name string) (*Pipeline, error)
 	DeletePipeline(ctx context.Context, id string) error
@@ -85,6 +87,7 @@ type Driver interface {
 	// Pipeline run operations
 	SaveRun(ctx context.Context, pipelineID string) (*PipelineRun, error)
 	GetRun(ctx context.Context, runID string) (*PipelineRun, error)
+	GetRunsByStatus(ctx context.Context, status RunStatus) ([]PipelineRun, error)
 	SearchRunsByPipeline(ctx context.Context, pipelineID, query string, page, perPage int) (*PaginationResult[PipelineRun], error)
 	UpdateRunStatus(ctx context.Context, runID string, status RunStatus, errorMessage string) error
 

@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +16,11 @@ import (
 	"github.com/jtarchie/pocketci/secrets"
 	"github.com/jtarchie/pocketci/storage"
 )
+
+// AgentFunc is a function that runs an LLM agent. It takes config as raw JSON
+// and returns the result as raw JSON. This is injected by the runtime layer
+// to avoid import cycles between runner and agent packages.
+type AgentFunc func(configJSON json.RawMessage) (json.RawMessage, error)
 
 type PipelineRunner struct {
 	client           orchestra.Driver
@@ -31,6 +37,7 @@ type PipelineRunner struct {
 	secretValues     []string                    // Cached secret values for redaction
 	preseededVolumes map[string]orchestra.Volume // volume name → pre-created volume
 	outputCallback   OutputCallback              // Global output callback for all tasks
+	agentFunc        AgentFunc                   // Injected agent execution function
 }
 
 func NewPipelineRunner(
@@ -63,6 +70,20 @@ func (c *PipelineRunner) SetPreseededVolumes(vols map[string]orchestra.Volume) {
 // their own OnOutput field.
 func (c *PipelineRunner) SetOutputCallback(cb OutputCallback) {
 	c.outputCallback = cb
+}
+
+// SetAgentFunc sets the function used to execute agent steps.
+func (c *PipelineRunner) SetAgentFunc(fn AgentFunc) {
+	c.agentFunc = fn
+}
+
+// RunAgent executes an LLM agent step via the injected AgentFunc.
+func (c *PipelineRunner) RunAgent(configJSON json.RawMessage) (json.RawMessage, error) {
+	if c.agentFunc == nil {
+		return nil, fmt.Errorf("agent execution not configured on this runner")
+	}
+
+	return c.agentFunc(configJSON)
 }
 
 // SetSecretsManager configures the pipeline runner to load secrets

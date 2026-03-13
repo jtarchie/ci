@@ -1,6 +1,9 @@
 package runner
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // StepStatus represents the execution status of a pipeline step.
 type StepStatus string
@@ -18,12 +21,22 @@ const (
 	StepStatusAborted StepStatus = "aborted"
 )
 
+// StepKind distinguishes between different types of steps.
+type StepKind string
+
+const (
+	StepKindRun   StepKind = "run"
+	StepKindAgent StepKind = "agent"
+)
+
 // StepState represents the persisted state of a pipeline step.
 type StepState struct {
 	// StepID is a unique identifier for this step within the pipeline run.
 	StepID string `json:"step_id"`
 	// Name is the human-readable name of the step.
 	Name string `json:"name"`
+	// Kind distinguishes run steps from agent steps.
+	Kind StepKind `json:"kind"`
 	// Status is the current execution status.
 	Status StepStatus `json:"status"`
 	// ContainerID is the driver-specific container identifier (for reattachment).
@@ -36,8 +49,11 @@ type StepState struct {
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
 	// ExitCode is the container exit code (if completed).
 	ExitCode *int `json:"exit_code,omitempty"`
-	// Result stores the serialized step result for completed steps.
+	// Result stores the serialized step result for completed run steps.
 	Result *RunResult `json:"result,omitempty"`
+	// AgentResultJSON stores the serialized agent result for completed agent steps.
+	// Stored as raw JSON to avoid import cycles with the agent package.
+	AgentResultJSON json.RawMessage `json:"agent_result,omitempty"`
 	// Error stores the error message if the step failed.
 	Error string `json:"error,omitempty"`
 }
@@ -59,7 +75,37 @@ func (s *StepState) IsResumable() bool {
 
 // CanSkip returns true if the step was already completed successfully and can be skipped on resume.
 func (s *StepState) CanSkip() bool {
-	return s.Status == StepStatusCompleted && s.Result != nil
+	if s.Status != StepStatusCompleted {
+		return false
+	}
+
+	if s.Kind == StepKindAgent {
+		return len(s.AgentResultJSON) > 0
+	}
+
+	return s.Result != nil
+}
+
+// ShouldRetry returns true if the step previously failed or was aborted and should be re-run.
+func (s *StepState) ShouldRetry() bool {
+	return s.Status == StepStatusFailed || s.Status == StepStatusAborted
+}
+
+// MarkForRetry resets a failed/aborted step so it can be re-executed.
+func (s *StepState) MarkForRetry() {
+	s.Status = StepStatusPending
+	s.Error = ""
+	s.Result = nil
+	s.AgentResultJSON = nil
+	s.ExitCode = nil
+	s.CompletedAt = nil
+	s.ContainerID = ""
+}
+
+// VolumeState represents the persisted state of a pipeline volume.
+type VolumeState struct {
+	Name string `json:"name"`
+	Path string `json:"path"`
 }
 
 // PipelineState represents the persisted state of an entire pipeline run.
@@ -70,6 +116,8 @@ type PipelineState struct {
 	Steps map[string]*StepState `json:"steps"`
 	// StepOrder maintains the order in which steps were created.
 	StepOrder []string `json:"step_order"`
+	// Volumes contains the state of each volume, keyed by volume name.
+	Volumes map[string]*VolumeState `json:"volumes,omitempty"`
 	// StartedAt is when the pipeline run started.
 	StartedAt *time.Time `json:"started_at,omitempty"`
 	// CompletedAt is when the pipeline run finished.
@@ -85,6 +133,7 @@ func NewPipelineState(runID string, resumeEnabled bool) *PipelineState {
 		RunID:         runID,
 		Steps:         make(map[string]*StepState),
 		StepOrder:     make([]string, 0),
+		Volumes:       make(map[string]*VolumeState),
 		StartedAt:     &now,
 		ResumeEnabled: resumeEnabled,
 	}

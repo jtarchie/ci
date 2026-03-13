@@ -24,6 +24,7 @@ type SetPipeline struct {
 	WebhookSecret string   `env:"CI_WEBHOOK_SECRET"  help:"Secret for webhook signature validation"                        short:"w"`
 	Secret        []string `help:"Set a pipeline-scoped secret as KEY=VALUE (can be repeated)" short:"e"`
 	SecretFile    string   `help:"Path to a file containing secrets in KEY=VALUE format (one per line)" type:"existingfile"`
+	Resume        bool     `help:"Enable automatic resume for this pipeline" default:"false"`
 }
 
 // pipelineRequest matches the server's expected JSON body for PUT /api/pipelines/:name.
@@ -33,6 +34,7 @@ type pipelineRequest struct {
 	DriverDSN     string            `json:"driver_dsn"`
 	WebhookSecret string            `json:"webhook_secret"`
 	Secrets       map[string]string `json:"secrets,omitempty"`
+	ResumeEnabled *bool             `json:"resume_enabled,omitempty"`
 }
 
 func (c *SetPipeline) Run(logger *slog.Logger) error {
@@ -118,6 +120,7 @@ func (c *SetPipeline) Run(logger *slog.Logger) error {
 		DriverDSN:     c.Driver,
 		WebhookSecret: c.WebhookSecret,
 		Secrets:       secretsMap,
+		ResumeEnabled: &c.Resume,
 	}
 
 	client := resty.New()

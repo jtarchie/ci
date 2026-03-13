@@ -180,6 +180,10 @@ export const pipeline = async () => {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
+				// Create router first so that RecoverOrphanedRuns runs before we create the orphan.
+				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
+				assert.Expect(err).NotTo(HaveOccurred())
+
 				// Simulate a run that was left in "running" state (e.g. after a server crash)
 				// by saving a run then manually forcing its status to running without a live goroutine.
 				pipeline, err := client.SavePipeline(context.Background(), "orphan-pipeline",
@@ -190,9 +194,6 @@ export const pipeline = async () => {
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				err = client.UpdateRunStatus(context.Background(), run.ID, storage.RunStatusRunning, "")
-				assert.Expect(err).NotTo(HaveOccurred())
-
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				req := httptest.NewRequest(http.MethodPost, "/api/runs/"+run.ID+"/stop", nil)

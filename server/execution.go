@@ -118,7 +118,7 @@ func (s *ExecutionService) TriggerPipeline(ctx context.Context, pipeline *storag
 	s.wg.Add(1)
 
 	// Launch execution goroutine
-	go s.executePipeline(pipeline, run, nil)
+	go s.executePipeline(pipeline, run, execOptions{})
 
 	return run, nil
 }
@@ -145,12 +145,74 @@ func (s *ExecutionService) TriggerWebhookPipeline(
 	s.wg.Add(1)
 
 	// Launch execution goroutine with webhook data
-	go s.executePipeline(pipeline, run, &webhookExecData{
-		webhookData:  webhookData,
-		responseChan: responseChan,
+	go s.executePipeline(pipeline, run, execOptions{
+		webhook: &webhookExecData{
+			webhookData:  webhookData,
+			responseChan: responseChan,
+		},
 	})
 
 	return run, nil
+}
+
+// ResumePipeline resumes a failed or aborted pipeline run.
+// It reuses the existing run ID so that the ResumableRunner can load
+// previous state and skip completed steps.
+func (s *ExecutionService) ResumePipeline(ctx context.Context, pipeline *storage.Pipeline, run *storage.PipelineRun) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Reset run status to queued for the resumed execution
+	if err := s.store.UpdateRunStatus(ctx, run.ID, storage.RunStatusQueued, ""); err != nil {
+		return fmt.Errorf("failed to reset run status: %w", err)
+	}
+
+	s.inFlight.Add(1)
+	s.wg.Add(1)
+
+	go s.executePipeline(pipeline, run, execOptions{resume: true})
+
+	return nil
+}
+
+// RecoverOrphanedRuns handles runs that were in-flight when the server stopped.
+// If the resume feature is enabled, resume-enabled pipelines are restarted;
+// otherwise all orphaned runs are marked as failed.
+func (s *ExecutionService) RecoverOrphanedRuns(ctx context.Context) {
+	runs, err := s.store.GetRunsByStatus(ctx, storage.RunStatusRunning)
+	if err != nil {
+		s.logger.Error("orphan.recovery.list_failed", "error", err)
+		return
+	}
+
+	resumeEnabled := IsFeatureEnabled(FeatureResume, s.AllowedFeatures)
+
+	for _, run := range runs {
+		logger := s.logger.With("run_id", run.ID, "pipeline_id", run.PipelineID)
+
+		if resumeEnabled {
+			pipeline, pErr := s.store.GetPipeline(ctx, run.PipelineID)
+			if pErr != nil {
+				logger.Error("orphan.recovery.get_pipeline_failed", "error", pErr)
+				_ = s.store.UpdateRunStatus(ctx, run.ID, storage.RunStatusFailed, "Server restarted; pipeline not found for resume")
+				continue
+			}
+
+			if pipeline.ResumeEnabled {
+				logger.Info("orphan.recovery.resuming")
+				runCopy := run
+				if rErr := s.ResumePipeline(ctx, pipeline, &runCopy); rErr != nil {
+					logger.Error("orphan.recovery.resume_failed", "error", rErr)
+					_ = s.store.UpdateRunStatus(ctx, run.ID, storage.RunStatusFailed, "Server restarted; resume failed: "+rErr.Error())
+				}
+				continue
+			}
+		}
+
+		logger.Info("orphan.recovery.marking_failed")
+		_ = s.store.UpdateRunStatus(ctx, run.ID, storage.RunStatusFailed, "Server restarted during execution")
+		_ = s.store.UpdateStatusForPrefix(ctx, "/pipeline/"+run.ID+"/", []string{"pending", "running"}, "aborted")
+	}
 }
 
 // webhookExecData holds webhook-specific execution data.
@@ -159,7 +221,13 @@ type webhookExecData struct {
 	responseChan chan *runtime.HTTPResponse
 }
 
-func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *storage.PipelineRun, webhook *webhookExecData) {
+// execOptions holds options for executePipeline.
+type execOptions struct {
+	webhook *webhookExecData
+	resume  bool
+}
+
+func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *storage.PipelineRun, opts execOptions) {
 	defer s.inFlight.Add(-1)
 	defer s.wg.Done()
 
@@ -202,29 +270,30 @@ func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *stor
 	}
 
 	// Execute the pipeline
-	opts := runtime.ExecutorOptions{
+	execOpts := runtime.ExecutorOptions{
 		RunID:      run.ID,
 		PipelineID: pipeline.ID,
+		Resume:     IsFeatureEnabled(FeatureResume, s.AllowedFeatures) && (opts.resume || pipeline.ResumeEnabled),
 	}
 
 	// Only pass secrets manager if the secrets feature is enabled
 	if IsFeatureEnabled(FeatureSecrets, s.AllowedFeatures) {
-		opts.SecretsManager = s.SecretsManager
+		execOpts.SecretsManager = s.SecretsManager
 	}
 
 	// Only pass webhook data if the webhooks feature is enabled
-	if webhook != nil && IsFeatureEnabled(FeatureWebhooks, s.AllowedFeatures) {
-		opts.WebhookData = webhook.webhookData
-		opts.ResponseChan = webhook.responseChan
+	if opts.webhook != nil && IsFeatureEnabled(FeatureWebhooks, s.AllowedFeatures) {
+		execOpts.WebhookData = opts.webhook.webhookData
+		execOpts.ResponseChan = opts.webhook.responseChan
 	}
 
 	// Disable notifications if the feature is not enabled
-	opts.DisableNotifications = !IsFeatureEnabled(FeatureNotifications, s.AllowedFeatures)
+	execOpts.DisableNotifications = !IsFeatureEnabled(FeatureNotifications, s.AllowedFeatures)
 
 	// Disable fetch if the feature is not enabled
-	opts.DisableFetch = !IsFeatureEnabled(FeatureFetch, s.AllowedFeatures)
-	opts.FetchTimeout = s.FetchTimeout
-	opts.FetchMaxResponseBytes = s.FetchMaxResponseBytes
+	execOpts.DisableFetch = !IsFeatureEnabled(FeatureFetch, s.AllowedFeatures)
+	execOpts.FetchTimeout = s.FetchTimeout
+	execOpts.FetchMaxResponseBytes = s.FetchMaxResponseBytes
 
 	executableContent, err := resolveExecutableContent(pipeline)
 	if err != nil {
@@ -238,7 +307,7 @@ func (s *ExecutionService) executePipeline(pipeline *storage.Pipeline, run *stor
 		return
 	}
 
-	err = runtime.ExecutePipeline(ctx, executableContent, driverDSN, s.store, logger, opts)
+	err = runtime.ExecutePipeline(ctx, executableContent, driverDSN, s.store, logger, execOpts)
 	if err != nil {
 		logger.Error("pipeline.execute.failed", "error", err)
 
@@ -432,7 +501,7 @@ func (s *ExecutionService) RunByNameSync(
 	execErr := runtime.ExecutePipeline(ctx, executableContent, driverDSN, s.store, s.logger, opts)
 
 	exitCode := 0
-	finalStatus := storage.RunStatusSuccess
+	var finalStatus storage.RunStatus
 	errMsg := ""
 
 	if execErr != nil {

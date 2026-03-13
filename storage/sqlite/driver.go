@@ -33,13 +33,14 @@ type Sqlite struct {
 // pipelineScan is an intermediate struct for scanning pipeline rows.
 // SQLite stores timestamps as RFC3339 strings, so we scan into strings first.
 type pipelineScan struct {
-	ID          string `db:"id"`
-	Name        string `db:"name"`
-	Content     string `db:"content"`
-	ContentType string `db:"content_type"`
-	DriverDSN   string `db:"driver_dsn"`
-	CreatedAt   string `db:"created_at"`
-	UpdatedAt   string `db:"updated_at"`
+	ID            string `db:"id"`
+	Name          string `db:"name"`
+	Content       string `db:"content"`
+	ContentType   string `db:"content_type"`
+	DriverDSN     string `db:"driver_dsn"`
+	ResumeEnabled int    `db:"resume_enabled"`
+	CreatedAt     string `db:"created_at"`
+	UpdatedAt     string `db:"updated_at"`
 }
 
 func (p pipelineScan) toStorage() storage.Pipeline {
@@ -47,13 +48,14 @@ func (p pipelineScan) toStorage() storage.Pipeline {
 	updatedAt, _ := time.Parse(time.RFC3339, p.UpdatedAt)
 
 	return storage.Pipeline{
-		ID:          p.ID,
-		Name:        p.Name,
-		Content:     p.Content,
-		ContentType: p.ContentType,
-		DriverDSN:   p.DriverDSN,
-		CreatedAt:   createdAt,
-		UpdatedAt:   updatedAt,
+		ID:            p.ID,
+		Name:          p.Name,
+		Content:       p.Content,
+		ContentType:   p.ContentType,
+		DriverDSN:     p.DriverDSN,
+		ResumeEnabled: p.ResumeEnabled != 0,
+		CreatedAt:     createdAt,
+		UpdatedAt:     updatedAt,
 	}
 }
 
@@ -381,7 +383,7 @@ func (s *Sqlite) GetPipeline(ctx context.Context, id string) (*storage.Pipeline,
 	var row pipelineScan
 
 	err := sqlscan.Get(ctx, s.writer, &row, `
-		SELECT id, name, content, content_type, driver_dsn, created_at, updated_at
+		SELECT id, name, content, content_type, driver_dsn, resume_enabled, created_at, updated_at
 		FROM pipelines WHERE id = ?
 	`, id)
 	if err != nil {
@@ -402,7 +404,7 @@ func (s *Sqlite) GetPipelineByName(ctx context.Context, name string) (*storage.P
 	var row pipelineScan
 
 	err := sqlscan.Get(ctx, s.writer, &row, `
-		SELECT id, name, content, content_type, driver_dsn, created_at, updated_at
+		SELECT id, name, content, content_type, driver_dsn, resume_enabled, created_at, updated_at
 		FROM pipelines WHERE name = ?
 		ORDER BY updated_at DESC LIMIT 1
 	`, name)
@@ -466,6 +468,30 @@ func (s *Sqlite) DeletePipeline(ctx context.Context, id string) error {
 	return nil
 }
 
+// UpdatePipelineResumeEnabled updates the resume_enabled flag for a pipeline.
+func (s *Sqlite) UpdatePipelineResumeEnabled(ctx context.Context, pipelineID string, enabled bool) error {
+	val := 0
+	if enabled {
+		val = 1
+	}
+
+	result, err := s.writer.ExecContext(ctx, `UPDATE pipelines SET resume_enabled = ? WHERE id = ?`, val, pipelineID)
+	if err != nil {
+		return fmt.Errorf("failed to update pipeline resume_enabled: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return storage.ErrNotFound
+	}
+
+	return nil
+}
+
 // SaveRun creates a new pipeline run record.
 func (s *Sqlite) SaveRun(ctx context.Context, pipelineID string) (*storage.PipelineRun, error) {
 	id := runtime.UniqueID()
@@ -506,6 +532,27 @@ func (s *Sqlite) GetRun(ctx context.Context, runID string) (*storage.PipelineRun
 	run := row.toStorage()
 
 	return &run, nil
+}
+
+// GetRunsByStatus returns all pipeline runs with the given status.
+func (s *Sqlite) GetRunsByStatus(ctx context.Context, status storage.RunStatus) ([]storage.PipelineRun, error) {
+	var rows []pipelineRunScan
+
+	err := sqlscan.Select(ctx, s.writer, &rows, `
+		SELECT id, pipeline_id, status, started_at, completed_at, error_message, created_at
+		FROM pipeline_runs WHERE status = ?
+		ORDER BY created_at DESC
+	`, string(status))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get runs by status: %w", err)
+	}
+
+	runs := make([]storage.PipelineRun, 0, len(rows))
+	for _, row := range rows {
+		runs = append(runs, row.toStorage())
+	}
+
+	return runs, nil
 }
 
 // SearchRunsByPipeline returns a paginated list of runs for a specific pipeline
@@ -659,7 +706,7 @@ func (s *Sqlite) SearchPipelines(ctx context.Context, query string, page, perPag
 
 		var rows []pipelineScan
 		err = sqlscan.Select(ctx, s.writer, &rows, `
-			SELECT id, name, content, content_type, driver_dsn, created_at, updated_at
+			SELECT id, name, content, content_type, driver_dsn, resume_enabled, created_at, updated_at
 			FROM pipelines ORDER BY created_at DESC
 			LIMIT ? OFFSET ?
 		`, perPage, offset)
@@ -699,7 +746,7 @@ func (s *Sqlite) SearchPipelines(ctx context.Context, query string, page, perPag
 	var rows []pipelineScan
 
 	err = sqlscan.Select(ctx, s.writer, &rows, `
-		SELECT p.id, p.name, p.content, p.content_type, p.driver_dsn, p.created_at, p.updated_at
+		SELECT p.id, p.name, p.content, p.content_type, p.driver_dsn, p.resume_enabled, p.created_at, p.updated_at
 		FROM pipelines p
 		WHERE p.id IN (SELECT id FROM pipelines_fts WHERE pipelines_fts MATCH ?)
 		ORDER BY p.created_at DESC

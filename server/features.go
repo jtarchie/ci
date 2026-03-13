@@ -13,6 +13,7 @@ const (
 	FeatureSecrets       Feature = "secrets"
 	FeatureNotifications Feature = "notifications"
 	FeatureFetch         Feature = "fetch"
+	FeatureResume        Feature = "resume"
 )
 
 // AllFeatures is the canonical list of known features.
@@ -21,6 +22,7 @@ var AllFeatures = []Feature{
 	FeatureSecrets,
 	FeatureNotifications,
 	FeatureFetch,
+	FeatureResume,
 }
 
 // ParseAllowedFeatures parses a comma-separated allowlist of feature names.
