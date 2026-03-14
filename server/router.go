@@ -210,4 +210,5 @@ func registerRoutes(
 	// Web controllers (HTML responses)
 	(&WebPipelinesController{BaseController: base}).RegisterRoutes(web)
 	(&WebRunsController{BaseController: base}).RegisterRoutes(web)
+	(&WebMetricsController{BaseController: base}).RegisterRoutes(web)
 }

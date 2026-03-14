@@ -88,6 +88,10 @@ type Driver interface {
 	SaveRun(ctx context.Context, pipelineID string) (*PipelineRun, error)
 	GetRun(ctx context.Context, runID string) (*PipelineRun, error)
 	GetRunsByStatus(ctx context.Context, status RunStatus) ([]PipelineRun, error)
+	// GetRunStats returns the count of runs grouped by status.
+	GetRunStats(ctx context.Context) (map[RunStatus]int, error)
+	// GetRecentRunsByStatus returns the most recent N runs with the given status.
+	GetRecentRunsByStatus(ctx context.Context, status RunStatus, limit int) ([]PipelineRun, error)
 	SearchRunsByPipeline(ctx context.Context, pipelineID, query string, page, perPage int) (*PaginationResult[PipelineRun], error)
 	UpdateRunStatus(ctx context.Context, runID string, status RunStatus, errorMessage string) error
 

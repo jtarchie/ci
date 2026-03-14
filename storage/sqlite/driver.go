@@ -135,6 +135,11 @@ func NewSqlite(dsn string, namespace string, _ *slog.Logger) (storage.Driver, er
 	//nolint: noctx
 	_, _ = writer.Exec(`ALTER TABLE pipelines ADD COLUMN content_type TEXT NOT NULL DEFAULT ''`)
 
+	// Idempotent migration: add resume_enabled column to existing databases.
+	// This is a no-op if the column already exists.
+	//nolint: noctx
+	_, _ = writer.Exec(`ALTER TABLE pipelines ADD COLUMN resume_enabled INTEGER NOT NULL DEFAULT 0`)
+
 	writer.SetMaxIdleConns(1)
 	writer.SetMaxOpenConns(1)
 
@@ -545,6 +550,50 @@ func (s *Sqlite) GetRunsByStatus(ctx context.Context, status storage.RunStatus) 
 	`, string(status))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get runs by status: %w", err)
+	}
+
+	runs := make([]storage.PipelineRun, 0, len(rows))
+	for _, row := range rows {
+		runs = append(runs, row.toStorage())
+	}
+
+	return runs, nil
+}
+
+// GetRunStats returns the count of pipeline runs grouped by status.
+func (s *Sqlite) GetRunStats(ctx context.Context) (map[storage.RunStatus]int, error) {
+	type row struct {
+		Status string `db:"status"`
+		Count  int    `db:"count"`
+	}
+
+	var rows []row
+
+	err := sqlscan.Select(ctx, s.writer, &rows, `SELECT status, COUNT(*) AS count FROM pipeline_runs GROUP BY status`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get run stats: %w", err)
+	}
+
+	stats := make(map[storage.RunStatus]int, len(rows))
+	for _, r := range rows {
+		stats[storage.RunStatus(r.Status)] = r.Count
+	}
+
+	return stats, nil
+}
+
+// GetRecentRunsByStatus returns the most recent N pipeline runs with the given status.
+func (s *Sqlite) GetRecentRunsByStatus(ctx context.Context, status storage.RunStatus, limit int) ([]storage.PipelineRun, error) {
+	var rows []pipelineRunScan
+
+	err := sqlscan.Select(ctx, s.writer, &rows, `
+		SELECT id, pipeline_id, status, started_at, completed_at, error_message, created_at
+		FROM pipeline_runs WHERE status = ?
+		ORDER BY created_at DESC
+		LIMIT ?
+	`, string(status), limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get recent runs by status: %w", err)
 	}
 
 	runs := make([]storage.PipelineRun, 0, len(rows))

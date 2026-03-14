@@ -355,6 +355,45 @@ func (s *S3) GetRunsByStatus(ctx context.Context, status storage.RunStatus) ([]s
 	return runs, nil
 }
 
+// GetRunStats returns the count of runs grouped by status.
+func (s *S3) GetRunStats(ctx context.Context) (map[storage.RunStatus]int, error) {
+	keys, err := s.ListKeys(ctx, s.runsPrefix())
+	if err != nil {
+		return nil, fmt.Errorf("failed to list runs: %w", err)
+	}
+
+	stats := make(map[storage.RunStatus]int)
+
+	for _, key := range keys {
+		run, rErr := s.getRun(ctx, key)
+		if rErr != nil {
+			continue
+		}
+		stats[run.Status]++
+	}
+
+	return stats, nil
+}
+
+// GetRecentRunsByStatus returns the most recent N runs with the given status.
+func (s *S3) GetRecentRunsByStatus(ctx context.Context, status storage.RunStatus, limit int) ([]storage.PipelineRun, error) {
+	all, err := s.GetRunsByStatus(ctx, status)
+	if err != nil {
+		return nil, err
+	}
+
+	// Sort by CreatedAt descending (most recent first)
+	sort.Slice(all, func(i, j int) bool {
+		return all[i].CreatedAt.After(all[j].CreatedAt)
+	})
+
+	if limit > 0 && len(all) > limit {
+		all = all[:limit]
+	}
+
+	return all, nil
+}
+
 func (s *S3) UpdateRunStatus(ctx context.Context, runID string, status storage.RunStatus, errorMessage string) error {
 	run, err := s.GetRun(ctx, runID)
 	if err != nil {

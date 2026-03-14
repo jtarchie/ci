@@ -141,6 +141,14 @@ func (f *fakeStorage) GetRunsByStatus(_ context.Context, _ storage.RunStatus) ([
 	return nil, fmt.Errorf("not implemented")
 }
 
+func (f *fakeStorage) GetRunStats(_ context.Context) (map[storage.RunStatus]int, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (f *fakeStorage) GetRecentRunsByStatus(_ context.Context, _ storage.RunStatus, _ int) ([]storage.PipelineRun, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
 func newSequencedLLMServer(t *testing.T, responses []string) (*httptest.Server, *int32) {
 	t.Helper()
 
