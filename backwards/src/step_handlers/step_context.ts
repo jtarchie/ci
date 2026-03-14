@@ -15,6 +15,11 @@ export interface StepContext {
   buildID: string;
   jobName: string;
   processStep: (step: Step, pathContext: string) => Promise<void>;
+  processStepInternal: (
+    step: Step,
+    pathContext: string,
+    attempt?: number,
+  ) => Promise<void>;
   runTask: (
     step: Task,
     stdin?: string,

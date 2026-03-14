@@ -2,56 +2,65 @@
 
 import { TaskFailure } from "../task_runner.ts";
 import type { StepContext } from "./step_context.ts";
+import type { StepHandler } from "./step_handler.ts";
 
-export async function processNotifyStep(
-  ctx: StepContext,
-  step: NotifyStep,
-  pathContext: string,
-): Promise<void> {
-  const storageKey = `${ctx.paths.getBaseStorageKey()}/${pathContext}`;
-  let failure: unknown = undefined;
+export class NotifyStepHandler implements StepHandler {
+  getIdentifier(step: Step): string {
+    const s = step as NotifyStep;
+    const name = Array.isArray(s.notify) ? s.notify.join("-") : s.notify;
+    return `notify/${name}`;
+  }
 
-  try {
-    storage.set(storageKey, { status: "pending" });
+  async process(
+    ctx: StepContext,
+    step: NotifyStep,
+    pathContext: string,
+  ): Promise<void> {
+    const storageKey = `${ctx.paths.getBaseStorageKey()}/${pathContext}`;
+    let failure: unknown = undefined;
 
-    notify.updateJobName(ctx.jobName);
-    notify.updateStatus("running");
+    try {
+      storage.set(storageKey, { status: "pending" });
 
-    const names = Array.isArray(step.notify) ? step.notify : [step.notify];
+      notify.updateJobName(ctx.jobName);
+      notify.updateStatus("running");
 
-    if (step.async) {
-      for (const name of names) {
-        notify.send({ name, message: step.message, async: true });
-      }
-      storage.set(storageKey, { status: "success" });
-    } else {
-      if (names.length === 1) {
-        await notify.send({
-          name: names[0],
-          message: step.message,
-          async: false,
-        });
+      const names = Array.isArray(step.notify) ? step.notify : [step.notify];
+
+      if (step.async) {
+        for (const name of names) {
+          notify.send({ name, message: step.message, async: true });
+        }
+        storage.set(storageKey, { status: "success" });
       } else {
-        await notify.sendMultiple(names, step.message, false);
+        if (names.length === 1) {
+          await notify.send({
+            name: names[0],
+            message: step.message,
+            async: false,
+          });
+        } else {
+          await notify.sendMultiple(names, step.message, false);
+        }
+        storage.set(storageKey, { status: "success" });
       }
-      storage.set(storageKey, { status: "success" });
+    } catch (error) {
+      failure = error;
+      storage.set(storageKey, { status: "failure" });
     }
-  } catch (error) {
-    failure = error;
-    storage.set(storageKey, { status: "failure" });
-  }
 
-  if (failure === undefined && step.on_success) {
-    await ctx.processStep(step.on_success, `${pathContext}/on_success`);
-  } else if (failure && step.on_failure) {
-    await ctx.processStep(step.on_failure, `${pathContext}/on_failure`);
-  }
+    if (failure === undefined && step.on_success) {
+      await ctx.processStep(step.on_success, `${pathContext}/on_success`);
+    } else if (failure && step.on_failure) {
+      await ctx.processStep(step.on_failure, `${pathContext}/on_failure`);
+    }
 
-  if (step.ensure) {
-    await ctx.processStep(step.ensure, `${pathContext}/ensure`);
-  }
+    if (step.ensure) {
+      await ctx.processStep(step.ensure, `${pathContext}/ensure`);
+    }
 
-  if (failure) {
-    throw new TaskFailure(`Notification failed: ${failure}`);
+    if (failure) {
+      throw new TaskFailure(`Notification failed: ${failure}`);
+    }
   }
 }

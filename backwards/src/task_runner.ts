@@ -6,7 +6,7 @@ export class TaskRunner {
   constructor(
     private taskNames: string[],
     private resources: Resource[],
-  ) { }
+  ) {}
 
   async runTask(
     step: Task,
@@ -104,7 +104,7 @@ export class TaskRunner {
         },
       );
 
-      await this.validateTaskResult(step, result, taskStorageKey);
+      this.validateTaskResult(step, result, taskStorageKey);
 
       return result;
     } catch (error) {
@@ -168,13 +168,13 @@ export class TaskRunner {
       .toLowerCase();
   }
 
-  private async validateTaskResult(
+  private validateTaskResult(
     step: Task,
     result: RunTaskResult,
     taskStorageKey: string,
-  ): Promise<void> {
+  ): void {
     if (step.assert?.stdout && step.assert.stdout.trim() !== "") {
-      await this.assertOutputEventuallyContains(
+      this.assertOutputEventuallyContains(
         "stdout",
         step.assert.stdout,
         result,
@@ -183,7 +183,7 @@ export class TaskRunner {
     }
 
     if (step.assert?.stderr && step.assert.stderr.trim() !== "") {
-      await this.assertOutputEventuallyContains(
+      this.assertOutputEventuallyContains(
         "stderr",
         step.assert.stderr,
         result,
@@ -196,12 +196,12 @@ export class TaskRunner {
     }
   }
 
-  private async assertOutputEventuallyContains(
+  private assertOutputEventuallyContains(
     stream: "stdout" | "stderr",
     expected: string,
     result: RunTaskResult,
     taskStorageKey: string,
-  ): Promise<void> {
+  ) {
     assert.eventuallyContainsString(
       () => this.getLatestTaskOutput(stream, result, taskStorageKey),
       expected,
@@ -223,7 +223,9 @@ export class TaskRunner {
 
     if (taskStatus?.logs && Array.isArray(taskStatus.logs)) {
       const buffered = taskStatus.logs
-        .filter((entry) => entry?.type === stream && typeof entry?.content === "string")
+        .filter((entry) =>
+          entry?.type === stream && typeof entry?.content === "string"
+        )
         .map((entry) => entry.content as string)
         .join("");
 
@@ -251,6 +253,6 @@ class CustomError extends Error {
   }
 }
 
-export class TaskFailure extends CustomError { }
-export class TaskErrored extends CustomError { }
-export class TaskAbort extends CustomError { }
+export class TaskFailure extends CustomError {}
+export class TaskErrored extends CustomError {}
+export class TaskAbort extends CustomError {}

@@ -14,19 +14,16 @@ import {
 } from "./job_storage_paths.ts";
 import { StepVariableResolver } from "./step_variable_resolver.ts";
 import type { StepContext } from "./step_handlers/step_context.ts";
-import {
-  processGetStep,
-  processPutStep,
-} from "./step_handlers/resource_steps.ts";
-import { processAgentStep } from "./step_handlers/agent_step.ts";
-import {
-  processDoStep,
-  processParallelSteps,
-  processTryStep,
-} from "./step_handlers/composite_steps.ts";
-import { processTaskStep } from "./step_handlers/task_step.ts";
-import { processNotifyStep } from "./step_handlers/notify_step.ts";
-import { processAcrossStep } from "./step_handlers/across_step.ts";
+import type { StepHandler } from "./step_handlers/step_handler.ts";
+import { AcrossStepHandler } from "./step_handlers/across_step.ts";
+import { AgentStepHandler } from "./step_handlers/agent_step.ts";
+import { DoStepHandler } from "./step_handlers/do_step.ts";
+import { GetStepHandler } from "./step_handlers/get_step.ts";
+import { NotifyStepHandler } from "./step_handlers/notify_step.ts";
+import { ParallelStepHandler } from "./step_handlers/parallel_step.ts";
+import { PutStepHandler } from "./step_handlers/put_step.ts";
+import { TaskStepHandler } from "./step_handlers/task_step.ts";
+import { TryStepHandler } from "./step_handlers/try_step.ts";
 
 const buildID =
   (typeof pipelineContext !== "undefined" && pipelineContext.runID)
@@ -41,6 +38,16 @@ export class JobRunner {
   private concurrency: JobConcurrency;
   private variableResolver: StepVariableResolver;
   private ctx: StepContext;
+
+  private acrossHandler = new AcrossStepHandler();
+  private agentHandler = new AgentStepHandler();
+  private doHandler = new DoStepHandler();
+  private getStepHandler = new GetStepHandler();
+  private notifyHandler = new NotifyStepHandler();
+  private parallelHandler = new ParallelStepHandler(this.doHandler);
+  private putHandler = new PutStepHandler();
+  private taskHandler = new TaskStepHandler();
+  private tryHandler = new TryStepHandler(this.doHandler);
 
   constructor(
     private jobConfig: JobConfig,
@@ -66,6 +73,7 @@ export class JobRunner {
       buildID: this.buildID,
       jobName: this.jobConfig.name,
       processStep: (s, pc) => this.processStep(s, pc),
+      processStepInternal: (s, pc, a) => this.processStepInternal(s, pc, a),
       runTask: (s, stdin, pc) => this.runTask(s, stdin, pc),
     };
   }
@@ -210,38 +218,30 @@ export class JobRunner {
     step = this.variableResolver.injectJobParams(step);
 
     if (step.across && step.across.length > 0) {
-      await processAcrossStep(
-        this.ctx,
-        step,
-        pathContext,
-        (s, pc, a) => this.processStepInternal(s, pc, a),
-      );
+      await this.acrossHandler.process(this.ctx, step, pathContext);
       return;
     }
 
-    const resolvedPath = (s: Step) =>
-      this.paths.withAttemptPath(
-        `${pathContext}/${this.paths.getStepIdentifier(s)}`,
+    const handler = this.getHandler(step);
+    if (handler) {
+      const resolved = this.paths.withAttemptPath(
+        `${pathContext}/${handler.getIdentifier(step)}`,
         attempt,
       );
-
-    if ("get" in step) {
-      await processGetStep(this.ctx, step, resolvedPath(step));
-    } else if ("do" in step) {
-      await processDoStep(this.ctx, step, resolvedPath(step));
-    } else if ("put" in step) {
-      await processPutStep(this.ctx, step, resolvedPath(step));
-    } else if ("try" in step) {
-      await processTryStep(this.ctx, step, resolvedPath(step));
-    } else if ("task" in step) {
-      await processTaskStep(this.ctx, step, resolvedPath(step));
-    } else if ("in_parallel" in step) {
-      await processParallelSteps(this.ctx, step, resolvedPath(step));
-    } else if ("notify" in step) {
-      await processNotifyStep(this.ctx, step, resolvedPath(step));
-    } else if ("agent" in step) {
-      await processAgentStep(this.ctx, step, resolvedPath(step));
+      await handler.process(this.ctx, step, resolved);
     }
+  }
+
+  private getHandler(step: Step): StepHandler | undefined {
+    if ("get" in step) return this.getStepHandler;
+    if ("do" in step) return this.doHandler;
+    if ("put" in step) return this.putHandler;
+    if ("try" in step) return this.tryHandler;
+    if ("task" in step) return this.taskHandler;
+    if ("in_parallel" in step) return this.parallelHandler;
+    if ("notify" in step) return this.notifyHandler;
+    if ("agent" in step) return this.agentHandler;
+    return undefined;
   }
 
   private async runTask(
