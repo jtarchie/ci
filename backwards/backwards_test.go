@@ -14,12 +14,12 @@ import (
 
 	"github.com/goccy/go-yaml"
 	"github.com/jtarchie/pocketci/backwards"
-	"github.com/jtarchie/pocketci/commands"
 	_ "github.com/jtarchie/pocketci/orchestra/docker"
 	_ "github.com/jtarchie/pocketci/orchestra/native"
 	_ "github.com/jtarchie/pocketci/resources/mock"
 	"github.com/jtarchie/pocketci/storage"
 	_ "github.com/jtarchie/pocketci/storage/sqlite"
+	"github.com/jtarchie/pocketci/testhelpers"
 	. "github.com/onsi/gomega"
 )
 
@@ -55,7 +55,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 		logs, logger := createLogger()
 
 		assert := NewGomegaWithT(t)
-		runner := commands.Runner{
+		runner := testhelpers.Runner{
 			Pipeline: "steps/on_failure.yml",
 			Driver:   "native",
 			Storage:  "sqlite://:memory:",
@@ -78,7 +78,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 		const pipelineFile = "steps/on_failure.yml"
 		const runID = "on-failure-elapsed"
 
-		runner := commands.Runner{
+		runner := testhelpers.Runner{
 			Pipeline: pipelineFile,
 			Driver:   "native",
 			Storage:  storageURL,
@@ -127,7 +127,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 		t.Parallel()
 
 		assert := NewGomegaWithT(t)
-		runner := commands.Runner{
+		runner := testhelpers.Runner{
 			Pipeline: "steps/on_success.yml",
 			Driver:   "native",
 			Storage:  "sqlite://:memory:",
@@ -141,7 +141,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 
 		logs, logger := createLogger()
 		assert := NewGomegaWithT(t)
-		runner := commands.Runner{
+		runner := testhelpers.Runner{
 			Pipeline: "steps/ensure.yml",
 			Driver:   "native",
 			Storage:  "sqlite://:memory:",
@@ -156,7 +156,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 
 		logs, logger := createLogger()
 		assert := NewGomegaWithT(t)
-		runner := commands.Runner{
+		runner := testhelpers.Runner{
 			Pipeline: "steps/do.yml",
 			Driver:   "native",
 			Storage:  "sqlite://:memory:",
@@ -170,7 +170,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 		t.Parallel()
 
 		assert := NewGomegaWithT(t)
-		runner := commands.Runner{
+		runner := testhelpers.Runner{
 			Pipeline: "steps/try.yml",
 			Driver:   "native",
 			Storage:  "sqlite://:memory:",
@@ -184,7 +184,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 
 		logs, logger := createLogger()
 		assert := NewGomegaWithT(t)
-		runner := commands.Runner{
+		runner := testhelpers.Runner{
 			Pipeline: "steps/all.yml",
 			Driver:   "native",
 			Storage:  "sqlite://:memory:",
@@ -200,7 +200,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 
 		_, logger := createLogger()
 		assert := NewGomegaWithT(t)
-		runner := commands.Runner{
+		runner := testhelpers.Runner{
 			Pipeline: "steps/caches.yml",
 			Driver:   "native",
 			Storage:  "sqlite://:memory:",
@@ -214,7 +214,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 
 		logs, logger := createLogger()
 		assert := NewGomegaWithT(t)
-		runner := commands.Runner{
+		runner := testhelpers.Runner{
 			Pipeline: "steps/on_error.yml",
 			Driver:   "native",
 			Storage:  "sqlite://:memory:",
@@ -231,7 +231,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 
 		logs, logger := createLogger()
 		assert := NewGomegaWithT(t)
-		runner := commands.Runner{
+		runner := testhelpers.Runner{
 			Pipeline: "steps/on_abort.yml",
 			Driver:   "native",
 			Storage:  "sqlite://:memory:",
@@ -245,7 +245,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 		t.Parallel()
 
 		assert := NewGomegaWithT(t)
-		runner := commands.Runner{
+		runner := testhelpers.Runner{
 			Pipeline: "steps/across.yml",
 			Driver:   "native",
 			Storage:  "sqlite://:memory:",
@@ -258,7 +258,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 		t.Parallel()
 
 		assert := NewGomegaWithT(t)
-		runner := commands.Runner{
+		runner := testhelpers.Runner{
 			Pipeline: "steps/parallelism.yml",
 			Driver:   "native",
 			Storage:  "sqlite://:memory:",
@@ -271,7 +271,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 		t.Parallel()
 
 		assert := NewGomegaWithT(t)
-		runner := commands.Runner{
+		runner := testhelpers.Runner{
 			Pipeline: "steps/in_parallel.yml",
 			Driver:   "native",
 			Storage:  "sqlite://:memory:",
@@ -284,7 +284,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 		t.Parallel()
 
 		assert := NewGomegaWithT(t)
-		runner := commands.Runner{
+		runner := testhelpers.Runner{
 			Pipeline: "steps/task_file.yml",
 			Driver:   "native",
 			Storage:  "sqlite://:memory:",
@@ -307,7 +307,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 		const pipelineFile = "steps/attempts.yml"
 		const runID = "attempts-test"
 
-		runner := commands.Runner{
+		runner := testhelpers.Runner{
 			Pipeline: pipelineFile,
 			Driver:   "native",
 			Storage:  storageURL,
@@ -382,7 +382,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				assert.Expect(file.Close()).NotTo(HaveOccurred())
 
-				runner := commands.Runner{
+				runner := testhelpers.Runner{
 					Pipeline: file.Name(),
 					Driver:   "native",
 					Storage:  "sqlite://:memory:",
@@ -484,7 +484,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 						assert.Expect(err).NotTo(HaveOccurred())
 						assert.Expect(file.Close()).NotTo(HaveOccurred())
 
-						runner := commands.Runner{
+						runner := testhelpers.Runner{
 							Pipeline: file.Name(),
 							Driver:   "native",
 							Storage:  "sqlite://:memory:",
@@ -503,7 +503,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 		t.Parallel()
 
 		assert := NewGomegaWithT(t)
-		runner := commands.Runner{
+		runner := testhelpers.Runner{
 			Pipeline: "versions/modes.yml",
 			Driver:   "native",
 			Storage:  "sqlite://:memory:",
@@ -529,7 +529,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 		const pipelineFile = "../examples/both/hello-world.yml"
 		const runID = "hello-world-regression-test"
 
-		runner := commands.Runner{
+		runner := testhelpers.Runner{
 			Pipeline: pipelineFile,
 			Driver:   "native",
 			Storage:  storageURL,
@@ -622,7 +622,7 @@ func TestVersionEveryWithMock(t *testing.T) {
 		}
 
 		// Run 1: Should fetch the first version
-		runner1 := commands.Runner{
+		runner1 := testhelpers.Runner{
 			Pipeline: pipelineFile,
 			Driver:   "native",
 			Storage:  storageURL,
@@ -636,7 +636,7 @@ func TestVersionEveryWithMock(t *testing.T) {
 		firstVersion := versions1[0]["version"].(map[string]interface{})
 
 		// Run 2: Should fetch a NEW version (mock increments counter each Check)
-		runner2 := commands.Runner{
+		runner2 := testhelpers.Runner{
 			Pipeline: pipelineFile,
 			Driver:   "native",
 			Storage:  storageURL,
@@ -653,7 +653,7 @@ func TestVersionEveryWithMock(t *testing.T) {
 		assert.Expect(secondVersion).NotTo(Equal(firstVersion))
 
 		// Run 3: Get another version
-		runner3 := commands.Runner{
+		runner3 := testhelpers.Runner{
 			Pipeline: pipelineFile,
 			Driver:   "native",
 			Storage:  storageURL,
@@ -672,7 +672,7 @@ func TestVersionEveryWithMock(t *testing.T) {
 		assert := NewGomegaWithT(t)
 
 		// Test that pipeline with undefined resource type fails validation
-		runner := commands.Runner{
+		runner := testhelpers.Runner{
 			Pipeline: "validation/undefined-resource-type.yml",
 			Driver:   "native",
 			Storage:  "sqlite://:memory:",

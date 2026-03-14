@@ -18,7 +18,6 @@ import (
 	"github.com/klauspost/compress/zstd"
 	gonanoid "github.com/matoous/go-nanoid/v2"
 
-	"github.com/jtarchie/pocketci/commands"
 	_ "github.com/jtarchie/pocketci/orchestra/cache/s3"
 	_ "github.com/jtarchie/pocketci/orchestra/docker"
 	_ "github.com/jtarchie/pocketci/orchestra/native"
@@ -125,7 +124,7 @@ jobs:
 
 	// Run pipeline 1: Write to cache
 	t.Log("Running write pipeline...")
-	runner1 := commands.Runner{
+	runner1 := testhelpers.Runner{
 		Pipeline: writePipelinePath,
 		Driver:   driverDSN + "?cache=" + encodedCacheURL + "&cache_compression=zstd&cache_prefix=test",
 		Storage:  "sqlite://:memory:",
@@ -142,7 +141,7 @@ jobs:
 	// Run pipeline 2: Read from cache (completely new runner instance)
 	// This tests that the cache was persisted to S3 and restored
 	t.Log("Running read pipeline (should restore from S3)...")
-	runner2 := commands.Runner{
+	runner2 := testhelpers.Runner{
 		Pipeline: readPipelinePath,
 		Driver:   driverDSN + "?cache=" + encodedCacheURL + "&cache_compression=zstd&cache_prefix=test",
 		Storage:  "sqlite://:memory:",
@@ -220,7 +219,7 @@ jobs:
 
 	// Run pipeline: Write to cache
 	t.Log("Running write pipeline...")
-	runner := commands.Runner{
+	runner := testhelpers.Runner{
 		Pipeline: writePipelinePath,
 		Driver:   driverDSN + "?cache=" + encodedCacheURL + "&cache_compression=zstd&cache_prefix=test",
 		Storage:  "sqlite://:memory:",

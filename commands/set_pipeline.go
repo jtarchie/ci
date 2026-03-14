@@ -245,3 +245,12 @@ func (c *SetPipeline) parseSecrets() (map[string]string, error) {
 
 	return result, nil
 }
+
+func parseSecretFlag(s string) (string, string, bool) {
+	key, value, found := strings.Cut(s, "=")
+	if !found || key == "" {
+		return "", "", false
+	}
+
+	return key, value, true
+}

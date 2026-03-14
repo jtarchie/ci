@@ -4,11 +4,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/jtarchie/pocketci/commands"
 	_ "github.com/jtarchie/pocketci/orchestra/docker"
 	_ "github.com/jtarchie/pocketci/orchestra/native"
 	_ "github.com/jtarchie/pocketci/secrets/sqlite"
 	_ "github.com/jtarchie/pocketci/storage/sqlite"
+	"github.com/jtarchie/pocketci/testhelpers"
 	. "github.com/onsi/gomega"
 )
 
@@ -26,7 +26,7 @@ func TestSecretsBasic(t *testing.T) {
 			examplePath, err := filepath.Abs("both/secrets-basic.ts")
 			assert.Expect(err).NotTo(HaveOccurred())
 
-			runner := commands.Runner{
+			runner := testhelpers.Runner{
 				Pipeline: examplePath,
 				Driver:   driver,
 				Storage:  "sqlite://:memory:",
@@ -47,7 +47,7 @@ func TestSecretsMissingFails(t *testing.T) {
 	examplePath, err := filepath.Abs("both/secrets-basic.ts")
 	assert.Expect(err).NotTo(HaveOccurred())
 
-	runner := commands.Runner{
+	runner := testhelpers.Runner{
 		Pipeline: examplePath,
 		Driver:   "native",
 		Storage:  "sqlite://:memory:",
@@ -66,7 +66,7 @@ func TestSecretsInvalidFlag(t *testing.T) {
 	examplePath, err := filepath.Abs("both/secrets-basic.ts")
 	assert.Expect(err).NotTo(HaveOccurred())
 
-	runner := commands.Runner{
+	runner := testhelpers.Runner{
 		Pipeline: examplePath,
 		Driver:   "native",
 		Storage:  "sqlite://:memory:",
@@ -96,7 +96,7 @@ func TestSecretsGlobal(t *testing.T) {
 			// Set API_KEY as a global secret (not pipeline-scoped)
 			// The pipeline should still find it via global fallback
 			// and the value should be redacted from output
-			runner := commands.Runner{
+			runner := testhelpers.Runner{
 				Pipeline:     examplePath,
 				Driver:       driver,
 				Storage:      "sqlite://:memory:",
@@ -119,7 +119,7 @@ func TestSecretsGlobalOverriddenByPipeline(t *testing.T) {
 
 	// Set API_KEY at both global and pipeline scope
 	// Pipeline scope should win
-	runner := commands.Runner{
+	runner := testhelpers.Runner{
 		Pipeline:     examplePath,
 		Driver:       "native",
 		Storage:      "sqlite://:memory:",

@@ -27,7 +27,6 @@ import (
 
 type CLI struct {
 	Run            commands.Run            `cmd:"" help:"Run a stored pipeline by name on a server"`
-	Runner         commands.Runner         `cmd:"" help:"Run a pipeline"`
 	Resource       commands.Resource       `cmd:"" help:"Execute a native resource operation"`
 	Server         commands.Server         `cmd:"" help:"Run a server"`
 	SetPipeline    commands.SetPipeline    `cmd:"" help:"Upload a pipeline to the server"  name:"set-pipeline"`

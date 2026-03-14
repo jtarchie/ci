@@ -4,9 +4,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/jtarchie/pocketci/commands"
 	_ "github.com/jtarchie/pocketci/orchestra/docker"
 	_ "github.com/jtarchie/pocketci/storage/sqlite"
+	"github.com/jtarchie/pocketci/testhelpers"
 )
 
 // BenchmarkPipeline_HelloWorld measures full pipeline execution overhead
@@ -21,7 +21,7 @@ func BenchmarkPipeline_HelloWorld(b *testing.B) {
 	b.ResetTimer()
 
 	for b.Loop() {
-		runner := commands.Runner{
+		runner := testhelpers.Runner{
 			Pipeline: examplePath,
 			Driver:   "docker",
 			Storage:  "sqlite://:memory:",
@@ -43,7 +43,7 @@ func BenchmarkPipeline_Promises(b *testing.B) {
 	b.ResetTimer()
 
 	for b.Loop() {
-		runner := commands.Runner{
+		runner := testhelpers.Runner{
 			Pipeline: examplePath,
 			Driver:   "docker",
 			Storage:  "sqlite://:memory:",
@@ -65,7 +65,7 @@ func BenchmarkPipeline_Minimal(b *testing.B) {
 	b.ResetTimer()
 
 	for b.Loop() {
-		runner := commands.Runner{
+		runner := testhelpers.Runner{
 			Pipeline: examplePath,
 			Driver:   "docker",
 			Storage:  "sqlite://:memory:",
@@ -87,7 +87,7 @@ func BenchmarkPipeline_Volumes(b *testing.B) {
 	b.ResetTimer()
 
 	for b.Loop() {
-		runner := commands.Runner{
+		runner := testhelpers.Runner{
 			Pipeline: examplePath,
 			Driver:   "docker",
 			Storage:  "sqlite://:memory:",
