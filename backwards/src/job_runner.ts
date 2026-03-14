@@ -177,13 +177,14 @@ export class JobRunner {
   }
 
   private resolveMaxInFlight(localLimit?: number): number {
-    if (localLimit && localLimit > 0) {
-      return localLimit;
-    }
-
+    // job/pipeline max_in_flight takes precedence over in_parallel.limit
     const fallback = this.getDefaultMaxInFlight();
     if (fallback && fallback > 0) {
       return fallback;
+    }
+
+    if (localLimit && localLimit > 0) {
+      return localLimit;
     }
 
     return Number.MAX_SAFE_INTEGER;
@@ -207,7 +208,7 @@ export class JobRunner {
     let nextIndex = 0;
     let activeCount = 0;
     let failed = false;
-    let firstError: unknown = undefined;
+    const allErrors: unknown[] = [];
 
     await new Promise<void>((resolve) => {
       const launch = (): void => {
@@ -228,7 +229,7 @@ export class JobRunner {
           Promise.resolve(worker(items[currentIndex], currentIndex))
             .catch((error) => {
               failed = true;
-              firstError ??= error;
+              allErrors.push(error);
             })
             .finally(() => {
               activeCount -= 1;
@@ -246,6 +247,12 @@ export class JobRunner {
 
       launch();
     });
+
+    // Pick most severe error: abort > errored > failure > first-to-arrive
+    const firstError = allErrors.find((e) => e instanceof TaskAbort) ??
+      allErrors.find((e) => e instanceof TaskErrored) ??
+      allErrors.find((e) => e instanceof TaskFailure) ??
+      allErrors[0];
 
     return { failed, firstError };
   }

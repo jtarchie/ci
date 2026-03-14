@@ -356,12 +356,12 @@ var JobRunner = class {
     return void 0;
   }
   resolveMaxInFlight(localLimit) {
-    if (localLimit && localLimit > 0) {
-      return localLimit;
-    }
     const fallback = this.getDefaultMaxInFlight();
     if (fallback && fallback > 0) {
       return fallback;
+    }
+    if (localLimit && localLimit > 0) {
+      return localLimit;
     }
     return Number.MAX_SAFE_INTEGER;
   }
@@ -376,7 +376,7 @@ var JobRunner = class {
     let nextIndex = 0;
     let activeCount = 0;
     let failed = false;
-    let firstError = void 0;
+    const allErrors = [];
     await new Promise((resolve) => {
       const launch = () => {
         if (nextIndex >= items.length && activeCount === 0) {
@@ -389,7 +389,7 @@ var JobRunner = class {
           activeCount += 1;
           Promise.resolve(worker(items[currentIndex], currentIndex)).catch((error) => {
             failed = true;
-            firstError ??= error;
+            allErrors.push(error);
           }).finally(() => {
             activeCount -= 1;
             launch();
@@ -401,6 +401,7 @@ var JobRunner = class {
       };
       launch();
     });
+    const firstError = allErrors.find((e) => e instanceof TaskAbort) ?? allErrors.find((e) => e instanceof TaskErrored) ?? allErrors.find((e) => e instanceof TaskFailure) ?? allErrors[0];
     return { failed, firstError };
   }
   async processStep(step, pathContext) {

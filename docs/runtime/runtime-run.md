@@ -63,6 +63,15 @@ at the step, job, and pipeline levels:
 - `in_parallel.limit` limits concurrent substeps for an `in_parallel` block.
 - `across.max_in_flight` limits concurrent `across` combinations.
 
+Precedence for `in_parallel` concurrency (highest to lowest):
+
+1. `job.max_in_flight` (or `pipeline.max_in_flight` if no job-level value)
+2. `in_parallel.limit`
+3. Unlimited (all substeps run concurrently)
+
+This means a job-level `max_in_flight` cap applies even if `in_parallel.limit`
+is set higher.
+
 Parallel task instances receive these environment variables:
 
 - `CI_TASK_COUNT`: total number of instances in the fan-out set.
