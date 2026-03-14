@@ -9,7 +9,12 @@ import {
 import { JobConcurrency } from "./job_concurrency.ts";
 import { JobStoragePaths, zeroPadWithLength } from "./job_storage_paths.ts";
 import { StepVariableResolver } from "./step_variable_resolver.ts";
-import { extractJobDependencies, getBuildID } from "./utils.ts";
+import {
+  extractJobDependencies,
+  failureHook,
+  failureStatus,
+  getBuildID,
+} from "./utils.ts";
 import type { StepContext } from "./step_handlers/step_context.ts";
 import type { StepHandler } from "./step_handlers/step_handler.ts";
 import { AcrossStepHandler } from "./step_handlers/across_step.ts";
@@ -33,6 +38,7 @@ export class JobRunner {
   private ctx: StepContext;
 
   private doHandler = new DoStepHandler();
+  private acrossHandler = new AcrossStepHandler();
   private handlers: [string, StepHandler][] = [
     ["get", new GetStepHandler()],
     ["do", this.doHandler],
@@ -42,7 +48,6 @@ export class JobRunner {
     ["in_parallel", this.doHandler],
     ["notify", new NotifyStepHandler()],
     ["agent", new AgentStepHandler()],
-    ["across", new AcrossStepHandler()],
   ];
 
   constructor(
@@ -107,27 +112,19 @@ export class JobRunner {
     } catch (error) {
       console.error(error);
       failure = error;
-
-      if (failure instanceof TaskFailure) {
-        storage.set(storageKey, { status: "failure", dependsOn });
-      } else if (failure instanceof TaskErrored) {
-        storage.set(storageKey, { status: "error", dependsOn });
-      } else if (failure instanceof TaskAbort) {
-        storage.set(storageKey, { status: "abort", dependsOn });
-      } else {
-        storage.set(storageKey, { status: "error", dependsOn });
-      }
+      storage.set(storageKey, { status: failureStatus(failure), dependsOn });
     }
 
     try {
-      if (failure === undefined && this.jobConfig.on_success) {
-        await this.processStep(this.jobConfig.on_success, "hooks/on_success");
-      } else if (failure instanceof TaskFailure && this.jobConfig.on_failure) {
-        await this.processStep(this.jobConfig.on_failure, "hooks/on_failure");
-      } else if (failure instanceof TaskErrored && this.jobConfig.on_error) {
-        await this.processStep(this.jobConfig.on_error, "hooks/on_error");
-      } else if (failure instanceof TaskAbort && this.jobConfig.on_abort) {
-        await this.processStep(this.jobConfig.on_abort, "hooks/on_abort");
+      const hookName = failureHook(failure);
+      if (
+        hookName &&
+        (this.jobConfig as Record<string, unknown>)[hookName]
+      ) {
+        await this.processStep(
+          (this.jobConfig as Record<string, unknown>)[hookName] as Step,
+          `hooks/${hookName}`,
+        );
       }
 
       if (this.jobConfig.ensure) {
@@ -170,16 +167,13 @@ export class JobRunner {
     }
 
     try {
-      if (succeeded && on_success) {
-        await this.processStep(on_success, `${pathContext}/on_success`);
-      } else if (!succeeded) {
-        if (lastError instanceof TaskErrored && on_error) {
-          await this.processStep(on_error, `${pathContext}/on_error`);
-        } else if (lastError instanceof TaskAbort && on_abort) {
-          await this.processStep(on_abort, `${pathContext}/on_abort`);
-        } else if (lastError instanceof TaskFailure && on_failure) {
-          await this.processStep(on_failure, `${pathContext}/on_failure`);
-        }
+      const hookName = failureHook(succeeded ? undefined : lastError);
+      const hooks = { on_success, on_failure, on_error, on_abort };
+      if (hookName && hooks[hookName as keyof typeof hooks]) {
+        await this.processStep(
+          hooks[hookName as keyof typeof hooks]!,
+          `${pathContext}/${hookName}`,
+        );
       }
     } finally {
       if (ensure) {
@@ -200,10 +194,7 @@ export class JobRunner {
     step = this.variableResolver.injectJobParams(step);
 
     if (step.across && step.across.length > 0) {
-      const acrossHandler = this.handlers.find(([k]) => k === "across");
-      if (acrossHandler) {
-        await acrossHandler[1].process(this.ctx, step, pathContext);
-      }
+      await this.acrossHandler.process(this.ctx, step, pathContext);
       return;
     }
 

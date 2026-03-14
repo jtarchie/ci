@@ -1,5 +1,22 @@
 /// <reference path="../../packages/pocketci/src/global.d.ts" />
 
+import { TaskAbort, TaskErrored, TaskFailure } from "./task_runner.ts";
+
+export function failureStatus(failure: unknown): string {
+  if (failure == undefined) return "success";
+  if (failure instanceof TaskFailure) return "failure";
+  if (failure instanceof TaskAbort) return "abort";
+  return "error";
+}
+
+export function failureHook(failure: unknown): string | undefined {
+  if (failure == undefined) return "on_success";
+  if (failure instanceof TaskFailure) return "on_failure";
+  if (failure instanceof TaskErrored) return "on_error";
+  if (failure instanceof TaskAbort) return "on_abort";
+  return undefined;
+}
+
 export function formatElapsed(startedAt: string): string {
   const ms = Date.now() - new Date(startedAt).getTime();
   const totalSeconds = Math.floor(ms / 1000);

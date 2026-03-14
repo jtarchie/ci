@@ -1,6 +1,6 @@
 /// <reference path="../../../packages/pocketci/src/global.d.ts" />
 
-import { TaskAbort, TaskErrored, TaskFailure } from "../task_runner.ts";
+import { failureHook, failureStatus } from "../utils.ts";
 import type { StepContext } from "./step_context.ts";
 
 export function findResource(resources: Resource[], name: string): Resource {
@@ -32,26 +32,14 @@ export async function processHooks(
   storageKey: string,
   failure: unknown,
 ): Promise<void> {
-  if (failure == undefined) {
-    storage.set(storageKey, { status: "success" });
-    if (step.on_success) {
-      await ctx.processStep(step.on_success, `${pathContext}/on_success`);
-    }
-  } else if (failure instanceof TaskFailure) {
-    storage.set(storageKey, { status: "failure" });
-    if (step.on_failure) {
-      await ctx.processStep(step.on_failure, `${pathContext}/on_failure`);
-    }
-  } else if (failure instanceof TaskErrored) {
-    storage.set(storageKey, { status: "error" });
-    if (step.on_error) {
-      await ctx.processStep(step.on_error, `${pathContext}/on_error`);
-    }
-  } else if (failure instanceof TaskAbort) {
-    storage.set(storageKey, { status: "abort" });
-    if (step.on_abort) {
-      await ctx.processStep(step.on_abort, `${pathContext}/on_abort`);
-    }
+  storage.set(storageKey, { status: failureStatus(failure) });
+
+  const hookName = failureHook(failure);
+  if (hookName && (step as Record<string, unknown>)[hookName]) {
+    await ctx.processStep(
+      (step as Record<string, unknown>)[hookName] as Step,
+      `${pathContext}/${hookName}`,
+    );
   }
 
   if (step.ensure) {
