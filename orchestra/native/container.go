@@ -1,6 +1,7 @@
 package native
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"errors"
@@ -9,15 +10,36 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
+	"sync"
 
 	"github.com/jtarchie/pocketci/orchestra"
 )
 
+type logBuffer struct {
+	mu   sync.RWMutex
+	data []byte
+}
+
+func (l *logBuffer) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	l.data = append(l.data, p...)
+
+	return len(p), nil
+}
+
+func (l *logBuffer) Snapshot() string {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+
+	return string(bytes.Clone(l.data))
+}
+
 type Container struct {
 	id      string
 	command *exec.Cmd
-	stdout  *strings.Builder
+	stdout  *logBuffer
 	errChan chan error
 }
 
@@ -39,7 +61,7 @@ func (n *Container) Logs(ctx context.Context, stdout io.Writer, _ io.Writer, fol
 		<-ctx.Done()
 	}
 
-	_, err := io.WriteString(stdout, n.stdout.String())
+	_, err := io.WriteString(stdout, n.stdout.Snapshot())
 	if err != nil {
 		return fmt.Errorf("failed to copy stdout: %w", err)
 	}
@@ -133,7 +155,7 @@ func (n *Native) RunContainer(ctx context.Context, task orchestra.Task) (orchest
 
 	command.Env = env
 
-	stdout := &strings.Builder{}
+	stdout := &logBuffer{}
 	command.Stderr = stdout
 	command.Stdout = stdout
 
