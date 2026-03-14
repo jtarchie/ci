@@ -1,14 +1,13 @@
 /// <reference path="../../packages/pocketci/src/global.d.ts" />
 
+import { zeroPad } from "./job_storage_paths.ts";
+import { safeStorageGet } from "./utils.ts";
+
 // Pure-JS resource version store built on the storage.set/get primitives.
 // Replaces the four Go-backed storage.saveResourceVersion/getLatestResourceVersion/
 // listResourceVersions/getVersionsAfter methods that were removed from the Driver
 // interface.  All keys are scoped under /rv/{name}/… so they are namespaced by
 // the storage Driver's own namespace automatically.
-
-function zeroPad(num: number, places: number): string {
-  return String(num).padStart(places, "0");
-}
 
 // djb2-style 32-bit hash turned into a hex string.  Good enough for dedup
 // keying — we additionally store the original JSON alongside so hash
@@ -39,15 +38,7 @@ function dedupKey(name: string, versionJSON: string): string {
   return `/rv/${name}/v/${hashString(versionJSON)}`;
 }
 
-// Safely call storage.get().  Returns null when the key is not found (the Go
-// driver throws ErrNotFound which Goja surfaces as an exception).
-function safeGet(key: string): unknown {
-  try {
-    return storage.get(key);
-  } catch (_e) {
-    return null;
-  }
-}
+const safeGet = safeStorageGet;
 
 export function saveResourceVersion(
   name: string,

@@ -1,6 +1,7 @@
 /// <reference path="../../../packages/pocketci/src/global.d.ts" />
 
 import { TaskFailure } from "../task_runner.ts";
+import { formatElapsed } from "../utils.ts";
 import type { StepContext } from "./step_context.ts";
 import type { StepHandler } from "./step_handler.ts";
 
@@ -109,7 +110,7 @@ export class AgentStepHandler implements StepHandler {
           ? "limit_exceeded"
           : "success",
         started_at: startedAt,
-        elapsed: this.elapsedSinceStr(startedAt),
+        elapsed: formatElapsed(startedAt),
         stdout: result.text,
         usage: latestUsage ?? result.usage,
         audit_log: result.auditLog,
@@ -122,7 +123,7 @@ export class AgentStepHandler implements StepHandler {
       storage.set(storageKey, {
         status: "failure",
         started_at: startedAt,
-        elapsed: this.elapsedSinceStr(startedAt),
+        elapsed: formatElapsed(startedAt),
         stdout: accumulatedOutput,
         error_message: String(error),
         usage: latestUsage,
@@ -130,16 +131,5 @@ export class AgentStepHandler implements StepHandler {
       });
       throw new TaskFailure(`Agent ${step.agent} failed: ${error}`);
     }
-  }
-
-  private elapsedSinceStr(startedAt: string): string {
-    const ms = Date.now() - new Date(startedAt).getTime();
-    const totalSeconds = Math.floor(ms / 1000);
-    const h = Math.floor(totalSeconds / 3600);
-    const m = Math.floor((totalSeconds % 3600) / 60);
-    const s = totalSeconds % 60;
-    if (h > 0) return `${h}h ${m}m ${s}s`;
-    if (m > 0) return `${m}m ${s}s`;
-    return `${s}s`;
   }
 }

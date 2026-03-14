@@ -1,6 +1,7 @@
 /// <reference path="../../packages/pocketci/src/global.d.ts" />
 
 import { JobRunner } from "./job_runner.ts";
+import { extractJobDependencies, getBuildID } from "./utils.ts";
 
 export class PipelineRunner {
   private jobResults: Map<string, boolean> = new Map();
@@ -36,10 +37,7 @@ export class PipelineRunner {
     }
 
     // Use pipelineContext.runID if available (from server), otherwise fall back to timestamp
-    const buildID =
-      (typeof pipelineContext !== "undefined" && pipelineContext.runID)
-        ? pipelineContext.runID
-        : String(Date.now());
+    const buildID = getBuildID();
 
     // Initialize notify context with pipeline info
     notify.setContext({
@@ -195,32 +193,12 @@ export class PipelineRunner {
   }
 
   private writeAllJobsAsPending(): void {
-    const buildID = this.getBuildID();
+    const buildID = getBuildID();
     for (const job of this.config.jobs) {
-      const dependsOn = this.getJobDependencies(job);
+      const dependsOn = extractJobDependencies(job.plan);
       const storageKey = `/pipeline/${buildID}/jobs/${job.name}`;
       storage.set(storageKey, { status: "pending", dependsOn });
     }
-  }
-
-  private getBuildID(): string {
-    return (typeof pipelineContext !== "undefined" && pipelineContext.runID)
-      ? pipelineContext.runID
-      : String(Date.now());
-  }
-
-  private getJobDependencies(job: Job): string[] {
-    const dependencies: string[] = [];
-    for (const step of job.plan) {
-      if ("get" in step && step.passed) {
-        for (const passedJob of step.passed) {
-          if (!dependencies.includes(passedJob)) {
-            dependencies.push(passedJob);
-          }
-        }
-      }
-    }
-    return dependencies;
   }
 
   private findJobsWithNoDependencies(): Job[] {

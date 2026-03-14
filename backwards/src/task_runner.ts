@@ -1,5 +1,8 @@
 /// <reference path="../../packages/pocketci/src/global.d.ts" />
 
+import { formatElapsed } from "./utils.ts";
+import { safeStorageGet } from "./utils.ts";
+
 export class TaskRunner {
   private knownMounts: KnownMounts = {};
 
@@ -15,16 +18,6 @@ export class TaskRunner {
   ): Promise<RunTaskResult> {
     const taskStorageKey = storageKey;
     const startedAt = new Date().toISOString();
-    const elapsedSince = () => {
-      const ms = Date.now() - new Date(startedAt).getTime();
-      const totalSeconds = Math.floor(ms / 1000);
-      const h = Math.floor(totalSeconds / 3600);
-      const m = Math.floor((totalSeconds % 3600) / 60);
-      const s = totalSeconds % 60;
-      if (h > 0) return `${h}h ${m}m ${s}s`;
-      if (m > 0) return `${m}m ${s}s`;
-      return `${s}s`;
-    };
     const mounts = await this.prepareMounts(step);
     this.taskNames.push(step.task);
 
@@ -99,7 +92,7 @@ export class TaskRunner {
           status: status,
           code: result.code,
           started_at: startedAt,
-          elapsed: elapsedSince(),
+          elapsed: formatElapsed(startedAt),
           logs: logs.slice(),
         },
       );
@@ -111,7 +104,7 @@ export class TaskRunner {
       storage.set(taskStorageKey, {
         status: "error",
         started_at: startedAt,
-        elapsed: elapsedSince(),
+        elapsed: formatElapsed(startedAt),
       });
 
       throw new TaskErrored(
@@ -217,7 +210,7 @@ export class TaskRunner {
   ): string {
     let output = stream === "stdout" ? result.stdout : result.stderr;
 
-    const taskStatus = this.safeStorageGet(taskStorageKey) as {
+    const taskStatus = safeStorageGet(taskStorageKey) as {
       logs?: Array<{ type?: string; content?: string }>;
     } | null;
 
@@ -235,14 +228,6 @@ export class TaskRunner {
     }
 
     return output;
-  }
-
-  private safeStorageGet(key: string): unknown {
-    try {
-      return storage.get(key);
-    } catch {
-      return null;
-    }
   }
 }
 

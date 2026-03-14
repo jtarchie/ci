@@ -7,12 +7,9 @@ import {
   TaskRunner,
 } from "./task_runner.ts";
 import { JobConcurrency } from "./job_concurrency.ts";
-import {
-  JobStoragePaths,
-  zeroPad,
-  zeroPadWithLength,
-} from "./job_storage_paths.ts";
+import { JobStoragePaths, zeroPadWithLength } from "./job_storage_paths.ts";
 import { StepVariableResolver } from "./step_variable_resolver.ts";
+import { extractJobDependencies, getBuildID } from "./utils.ts";
 import type { StepContext } from "./step_handlers/step_context.ts";
 import type { StepHandler } from "./step_handlers/step_handler.ts";
 import { AcrossStepHandler } from "./step_handlers/across_step.ts";
@@ -20,15 +17,11 @@ import { AgentStepHandler } from "./step_handlers/agent_step.ts";
 import { DoStepHandler } from "./step_handlers/do_step.ts";
 import { GetStepHandler } from "./step_handlers/get_step.ts";
 import { NotifyStepHandler } from "./step_handlers/notify_step.ts";
-import { ParallelStepHandler } from "./step_handlers/parallel_step.ts";
 import { PutStepHandler } from "./step_handlers/put_step.ts";
 import { TaskStepHandler } from "./step_handlers/task_step.ts";
 import { TryStepHandler } from "./step_handlers/try_step.ts";
 
-const buildID =
-  (typeof pipelineContext !== "undefined" && pipelineContext.runID)
-    ? pipelineContext.runID
-    : zeroPad(Date.now(), 20);
+const buildID = getBuildID();
 
 export class JobRunner {
   private taskNames: string[] = [];
@@ -39,15 +32,18 @@ export class JobRunner {
   private variableResolver: StepVariableResolver;
   private ctx: StepContext;
 
-  private acrossHandler = new AcrossStepHandler();
-  private agentHandler = new AgentStepHandler();
   private doHandler = new DoStepHandler();
-  private getStepHandler = new GetStepHandler();
-  private notifyHandler = new NotifyStepHandler();
-  private parallelHandler = new ParallelStepHandler(this.doHandler);
-  private putHandler = new PutStepHandler();
-  private taskHandler = new TaskStepHandler();
-  private tryHandler = new TryStepHandler(this.doHandler);
+  private handlers: [string, StepHandler][] = [
+    ["get", new GetStepHandler()],
+    ["do", this.doHandler],
+    ["put", new PutStepHandler()],
+    ["try", new TryStepHandler(this.doHandler)],
+    ["task", new TaskStepHandler()],
+    ["in_parallel", this.doHandler],
+    ["notify", new NotifyStepHandler()],
+    ["agent", new AgentStepHandler()],
+    ["across", new AcrossStepHandler()],
+  ];
 
   constructor(
     private jobConfig: JobConfig,
@@ -81,7 +77,7 @@ export class JobRunner {
   async run(): Promise<void> {
     const storageKey = this.paths.getBaseStorageKey();
     let failure: unknown = undefined;
-    const dependsOn = this.extractDependencies();
+    const dependsOn = extractJobDependencies(this.jobConfig.plan);
 
     const webhookFilter = this.jobConfig.triggers?.webhook?.filter ??
       this.jobConfig.webhook_trigger;
@@ -146,20 +142,6 @@ export class JobRunner {
     }
   }
 
-  private extractDependencies(): string[] {
-    const dependencies: string[] = [];
-    for (const step of this.jobConfig.plan) {
-      if ("get" in step && step.passed) {
-        for (const passedJob of step.passed) {
-          if (!dependencies.includes(passedJob)) {
-            dependencies.push(passedJob);
-          }
-        }
-      }
-    }
-    return dependencies;
-  }
-
   private async processStep(step: Step, pathContext: string): Promise<void> {
     const maxAttempts = step.attempts || 1;
 
@@ -218,7 +200,10 @@ export class JobRunner {
     step = this.variableResolver.injectJobParams(step);
 
     if (step.across && step.across.length > 0) {
-      await this.acrossHandler.process(this.ctx, step, pathContext);
+      const acrossHandler = this.handlers.find(([k]) => k === "across");
+      if (acrossHandler) {
+        await acrossHandler[1].process(this.ctx, step, pathContext);
+      }
       return;
     }
 
@@ -233,14 +218,9 @@ export class JobRunner {
   }
 
   private getHandler(step: Step): StepHandler | undefined {
-    if ("get" in step) return this.getStepHandler;
-    if ("do" in step) return this.doHandler;
-    if ("put" in step) return this.putHandler;
-    if ("try" in step) return this.tryHandler;
-    if ("task" in step) return this.taskHandler;
-    if ("in_parallel" in step) return this.parallelHandler;
-    if ("notify" in step) return this.notifyHandler;
-    if ("agent" in step) return this.agentHandler;
+    for (const [key, handler] of this.handlers) {
+      if (key in step) return handler;
+    }
     return undefined;
   }
 

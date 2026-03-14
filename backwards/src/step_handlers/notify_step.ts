@@ -3,6 +3,7 @@
 import { TaskFailure } from "../task_runner.ts";
 import type { StepContext } from "./step_context.ts";
 import type { StepHandler } from "./step_handler.ts";
+import { processHooks } from "./resource_helpers.ts";
 
 export class NotifyStepHandler implements StepHandler {
   getIdentifier(step: Step): string {
@@ -49,15 +50,7 @@ export class NotifyStepHandler implements StepHandler {
       storage.set(storageKey, { status: "failure" });
     }
 
-    if (failure === undefined && step.on_success) {
-      await ctx.processStep(step.on_success, `${pathContext}/on_success`);
-    } else if (failure && step.on_failure) {
-      await ctx.processStep(step.on_failure, `${pathContext}/on_failure`);
-    }
-
-    if (step.ensure) {
-      await ctx.processStep(step.ensure, `${pathContext}/ensure`);
-    }
+    await processHooks(ctx, step, pathContext, storageKey, failure);
 
     if (failure) {
       throw new TaskFailure(`Notification failed: ${failure}`);

@@ -1,9 +1,9 @@
 /// <reference path="../../../packages/pocketci/src/global.d.ts" />
 
-import { TaskAbort, TaskErrored, TaskFailure } from "../task_runner.ts";
 import { zeroPadWithLength } from "../job_storage_paths.ts";
 import type { StepContext } from "./step_context.ts";
 import type { StepHandler } from "./step_handler.ts";
+import { processHooks } from "./resource_helpers.ts";
 
 export class DoStepHandler implements StepHandler {
   getIdentifier(_step: Step): string {
@@ -59,31 +59,7 @@ export class DoStepHandler implements StepHandler {
       failure = error;
     }
 
-    if (failure == undefined) {
-      storage.set(storageKey, { status: "success" });
-      if (step.on_success) {
-        await ctx.processStep(step.on_success, `${pathContext}/on_success`);
-      }
-    } else if (failure instanceof TaskFailure) {
-      storage.set(storageKey, { status: "failure" });
-      if (step.on_failure) {
-        await ctx.processStep(step.on_failure, `${pathContext}/on_failure`);
-      }
-    } else if (failure instanceof TaskErrored) {
-      storage.set(storageKey, { status: "error" });
-      if (step.on_error) {
-        await ctx.processStep(step.on_error, `${pathContext}/on_error`);
-      }
-    } else if (failure instanceof TaskAbort) {
-      storage.set(storageKey, { status: "abort" });
-      if (step.on_abort) {
-        await ctx.processStep(step.on_abort, `${pathContext}/on_abort`);
-      }
-    }
-
-    if (step.ensure) {
-      await ctx.processStep(step.ensure, `${pathContext}/ensure`);
-    }
+    await processHooks(ctx, step, pathContext, storageKey, failure);
 
     if (failure && !isTryStep) {
       throw failure;
