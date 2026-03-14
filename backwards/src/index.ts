@@ -7,3 +7,7 @@ export function createPipeline(config: PipelineConfig) {
   const runner = new PipelineRunner(config);
   return () => runner.run();
 }
+
+(globalThis as typeof globalThis & {
+  createPipeline: typeof createPipeline;
+}).createPipeline = createPipeline;

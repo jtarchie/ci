@@ -13,7 +13,7 @@ import (
 	"github.com/goccy/go-yaml"
 )
 
-//go:generate go run github.com/evanw/esbuild/... --tree-shaking=true --platform=neutral --bundle --outfile=bundle.js src/index.ts
+//go:generate go run github.com/evanw/esbuild/... --minify --tree-shaking=true --platform=neutral --bundle --outfile=bundle.js src/index.ts
 //go:embed bundle.js
 var pipelineJS string
 
