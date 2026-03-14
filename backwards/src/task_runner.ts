@@ -6,7 +6,7 @@ export class TaskRunner {
   constructor(
     private taskNames: string[],
     private resources: Resource[],
-  ) {}
+  ) { }
 
   async runTask(
     step: Task,
@@ -104,7 +104,7 @@ export class TaskRunner {
         },
       );
 
-      this.validateTaskResult(step, result);
+      await this.validateTaskResult(step, result, taskStorageKey);
 
       return result;
     } catch (error) {
@@ -168,18 +168,88 @@ export class TaskRunner {
       .toLowerCase();
   }
 
-  private validateTaskResult(step: Task, result: RunTaskResult): void {
+  private async validateTaskResult(
+    step: Task,
+    result: RunTaskResult,
+    taskStorageKey: string,
+  ): Promise<void> {
     if (step.assert?.stdout && step.assert.stdout.trim() !== "") {
-      assert.containsString(result.stdout, step.assert.stdout);
+      await this.assertOutputEventuallyContains(
+        "stdout",
+        step.assert.stdout,
+        result,
+        taskStorageKey,
+      );
     }
 
     if (step.assert?.stderr && step.assert.stderr.trim() !== "") {
-      assert.containsString(result.stderr, step.assert.stderr);
+      await this.assertOutputEventuallyContains(
+        "stderr",
+        step.assert.stderr,
+        result,
+        taskStorageKey,
+      );
     }
 
     if (typeof step.assert?.code === "number") {
       assert.equal(step.assert.code, result.code);
     }
+  }
+
+  private async assertOutputEventuallyContains(
+    stream: "stdout" | "stderr",
+    expected: string,
+    result: RunTaskResult,
+    taskStorageKey: string,
+  ): Promise<void> {
+    const timeoutMs = 1000;
+    const intervalMs = 50;
+    const deadline = Date.now() + timeoutMs;
+
+    let actual = this.getLatestTaskOutput(stream, result, taskStorageKey);
+    while (Date.now() < deadline && !actual.includes(expected)) {
+      await this.sleep(intervalMs);
+      actual = this.getLatestTaskOutput(stream, result, taskStorageKey);
+    }
+
+    assert.containsString(actual, expected);
+  }
+
+  private getLatestTaskOutput(
+    stream: "stdout" | "stderr",
+    result: RunTaskResult,
+    taskStorageKey: string,
+  ): string {
+    let output = stream === "stdout" ? result.stdout : result.stderr;
+
+    const taskStatus = this.safeStorageGet(taskStorageKey) as {
+      logs?: Array<{ type?: string; content?: string }>;
+    } | null;
+
+    if (taskStatus?.logs && Array.isArray(taskStatus.logs)) {
+      const buffered = taskStatus.logs
+        .filter((entry) => entry?.type === stream && typeof entry?.content === "string")
+        .map((entry) => entry.content as string)
+        .join("");
+
+      if (buffered.length > output.length) {
+        output = buffered;
+      }
+    }
+
+    return output;
+  }
+
+  private safeStorageGet(key: string): unknown {
+    try {
+      return storage.get(key);
+    } catch {
+      return null;
+    }
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
 
@@ -190,6 +260,6 @@ class CustomError extends Error {
   }
 }
 
-export class TaskFailure extends CustomError {}
-export class TaskErrored extends CustomError {}
-export class TaskAbort extends CustomError {}
+export class TaskFailure extends CustomError { }
+export class TaskErrored extends CustomError { }
+export class TaskAbort extends CustomError { }
