@@ -21,7 +21,7 @@ export default defineConfig({
   // Start the CI server before running tests
   webServer: {
     command:
-      "go run ../main.go server --storage sqlite://e2e-test.db --port 8080",
+      "go run ../main.go server --storage sqlite://e2e-test.db --port 8080 --secrets sqlite://e2e-secrets.db?key=testing",
     url: "http://localhost:8080/health",
     reuseExistingServer: !process.env.CI,
     timeout: 30000,

@@ -8,6 +8,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/jtarchie/pocketci/secrets"
+	_ "github.com/jtarchie/pocketci/secrets/sqlite"
 	"github.com/jtarchie/pocketci/storage"
 	_ "github.com/jtarchie/pocketci/storage/sqlite"
 	"github.com/onsi/gomega"
@@ -32,9 +34,16 @@ func setupRouterWithAuth(t *testing.T, username, password string) *Router {
 	}
 	t.Cleanup(func() { _ = client.Close() })
 
+	secretsManager, err := secrets.GetFromDSN("sqlite://:memory:?key=test-key", slog.Default())
+	if err != nil {
+		t.Fatalf("could not create secrets manager: %v", err)
+	}
+	t.Cleanup(func() { _ = secretsManager.Close() })
+
 	router, err := NewRouter(slog.Default(), client, RouterOptions{
 		BasicAuthUsername: username,
 		BasicAuthPassword: password,
+		SecretsManager:    secretsManager,
 	})
 	if err != nil {
 		t.Fatalf("could not create router: %v", err)

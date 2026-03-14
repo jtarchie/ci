@@ -11,6 +11,8 @@ import (
 
 	"github.com/jtarchie/pocketci/orchestra"
 	_ "github.com/jtarchie/pocketci/orchestra/native"
+	"github.com/jtarchie/pocketci/secrets"
+	_ "github.com/jtarchie/pocketci/secrets/sqlite"
 	"github.com/jtarchie/pocketci/server"
 	"github.com/jtarchie/pocketci/storage"
 	_ "github.com/jtarchie/pocketci/storage/sqlite"
@@ -36,9 +38,14 @@ func TestDriverRestriction(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
+				secretsMgr, err := secrets.GetFromDSN("sqlite://:memory:?key=test-key", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = secretsMgr.Close() }()
+
 				// Create router with only native driver allowed
 				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{
 					AllowedDrivers: "native",
+					SecretsManager: secretsMgr,
 				})
 				assert.Expect(err).NotTo(HaveOccurred())
 
@@ -83,9 +90,14 @@ func TestDriverRestriction(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
+				secretsMgr, err := secrets.GetFromDSN("sqlite://:memory:?key=test-key", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = secretsMgr.Close() }()
+
 				// Create router with wildcard (default)
 				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{
 					AllowedDrivers: "*",
+					SecretsManager: secretsMgr,
 				})
 				assert.Expect(err).NotTo(HaveOccurred())
 
@@ -116,9 +128,14 @@ func TestDriverRestriction(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
+				secretsMgr, err := secrets.GetFromDSN("sqlite://:memory:?key=test-key", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = secretsMgr.Close() }()
+
 				// Create router with native,docker allowed (native should be default)
 				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{
 					AllowedDrivers: "native,docker",
+					SecretsManager: secretsMgr,
 				})
 				assert.Expect(err).NotTo(HaveOccurred())
 
@@ -221,9 +238,14 @@ func TestDriverRestriction(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
+				secretsMgr, err := secrets.GetFromDSN("sqlite://:memory:?key=test-key", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = secretsMgr.Close() }()
+
 				// Create router with native,docker,k8s allowed
 				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{
 					AllowedDrivers: "native,docker,k8s",
+					SecretsManager: secretsMgr,
 				})
 				assert.Expect(err).NotTo(HaveOccurred())
 

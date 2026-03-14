@@ -46,8 +46,7 @@ export const pipeline = async () => {
 				pipeline, err := client.SavePipeline(context.Background(), "success-pipeline", pipelineContent, "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newStrictSecretRouter(t, client, server.RouterOptions{MaxInFlight: 5})
 
 				execService := router.ExecutionService()
 				run, err := execService.TriggerPipeline(context.Background(), pipeline)
@@ -92,8 +91,7 @@ export const pipeline = async () => {
 				pipeline, err := client.SavePipeline(context.Background(), "failure-pipeline", pipelineContent, "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newStrictSecretRouter(t, client, server.RouterOptions{MaxInFlight: 5})
 
 				execService := router.ExecutionService()
 				run, err := execService.TriggerPipeline(context.Background(), pipeline)
@@ -128,8 +126,7 @@ export const pipeline = async () => {
 				pipeline, err := client.SavePipeline(context.Background(), "error-pipeline", pipelineContent, "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newStrictSecretRouter(t, client, server.RouterOptions{MaxInFlight: 5})
 
 				execService := router.ExecutionService()
 				run, err := execService.TriggerPipeline(context.Background(), pipeline)
@@ -162,8 +159,7 @@ export const pipeline = async () => {
 				pipeline, err := client.SavePipeline(context.Background(), "abort-pipeline", pipelineContent, "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newStrictSecretRouter(t, client, server.RouterOptions{MaxInFlight: 5})
 
 				execService := router.ExecutionService()
 				run, err := execService.TriggerPipeline(context.Background(), pipeline)
@@ -203,8 +199,7 @@ export const pipeline = async () => {
 				pipeline, err := client.SavePipeline(context.Background(), "recovery-pipeline", pipelineContent, "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newStrictSecretRouter(t, client, server.RouterOptions{MaxInFlight: 5})
 
 				execService := router.ExecutionService()
 				run, err := execService.TriggerPipeline(context.Background(), pipeline)
@@ -239,8 +234,7 @@ export const pipeline = async () => {
 				pipeline, err := client.SavePipeline(context.Background(), "mixed-pipeline", pipelineContent, "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newStrictSecretRouter(t, client, server.RouterOptions{MaxInFlight: 5})
 
 				execService := router.ExecutionService()
 				run, err := execService.TriggerPipeline(context.Background(), pipeline)
@@ -273,8 +267,7 @@ export const pipeline = async () => {
 				pipeline, err := client.SavePipeline(context.Background(), "error-execution-pipeline", pipelineContent, "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newStrictSecretRouter(t, client, server.RouterOptions{MaxInFlight: 5})
 
 				execService := router.ExecutionService()
 				run, err := execService.TriggerPipeline(context.Background(), pipeline)
@@ -310,8 +303,7 @@ export const pipeline = async () => {
 				pipeline, err := client.SavePipeline(context.Background(), "pending-pipeline", pipelineContent, "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newStrictSecretRouter(t, client, server.RouterOptions{MaxInFlight: 5})
 
 				execService := router.ExecutionService()
 				run, err := execService.TriggerPipeline(context.Background(), pipeline)
@@ -346,8 +338,7 @@ export const pipeline = async () => {
 				pipeline, err := client.SavePipeline(context.Background(), "all-skipped-pipeline", pipelineContent, "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newStrictSecretRouter(t, client, server.RouterOptions{MaxInFlight: 5})
 
 				execService := router.ExecutionService()
 				run, err := execService.TriggerPipeline(context.Background(), pipeline)
@@ -381,8 +372,7 @@ export const pipeline = async () => {
 				pipeline, err := client.SavePipeline(context.Background(), "mixed-skipped-success-pipeline", pipelineContent, "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newStrictSecretRouter(t, client, server.RouterOptions{MaxInFlight: 5})
 
 				execService := router.ExecutionService()
 				run, err := execService.TriggerPipeline(context.Background(), pipeline)
@@ -416,8 +406,7 @@ func TestExecutionServiceExportsForTesting(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newStrictSecretRouter(t, client, server.RouterOptions{MaxInFlight: 5})
 
 				execService := router.ExecutionService()
 				assert.Expect(execService).NotTo(BeNil())

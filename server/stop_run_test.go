@@ -36,8 +36,7 @@ func TestStopRun(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newStrictSecretRouter(t, client, server.RouterOptions{})
 
 				req := httptest.NewRequest(http.MethodPost, "/api/runs/does-not-exist/stop", nil)
 				rec := httptest.NewRecorder()
@@ -67,8 +66,7 @@ func TestStopRun(t *testing.T) {
 					"export const pipeline = async () => {};", "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newStrictSecretRouter(t, client, server.RouterOptions{MaxInFlight: 5})
 
 				execService := router.ExecutionService()
 				run, err := execService.TriggerPipeline(context.Background(), pipeline)
@@ -114,8 +112,7 @@ export const pipeline = async () => {
 					pipelineContent, "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newStrictSecretRouter(t, client, server.RouterOptions{MaxInFlight: 5})
 
 				execService := router.ExecutionService()
 				run, err := execService.TriggerPipeline(context.Background(), pipeline)
@@ -161,8 +158,7 @@ export const pipeline = async () => {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newStrictSecretRouter(t, client, server.RouterOptions{})
 
 				err = router.ExecutionService().StopRun("unknown-run-id")
 				assert.Expect(err).To(MatchError(server.ErrRunNotInFlight))
@@ -181,8 +177,7 @@ export const pipeline = async () => {
 				defer func() { _ = client.Close() }()
 
 				// Create router first so that RecoverOrphanedRuns runs before we create the orphan.
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newStrictSecretRouter(t, client, server.RouterOptions{})
 
 				// Simulate a run that was left in "running" state (e.g. after a server crash)
 				// by saving a run then manually forcing its status to running without a live goroutine.

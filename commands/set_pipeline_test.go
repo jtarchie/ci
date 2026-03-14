@@ -12,6 +12,8 @@ import (
 	"testing"
 
 	"github.com/jtarchie/pocketci/commands"
+	"github.com/jtarchie/pocketci/secrets"
+	_ "github.com/jtarchie/pocketci/secrets/sqlite"
 	"github.com/jtarchie/pocketci/server"
 	"github.com/jtarchie/pocketci/storage"
 	_ "github.com/jtarchie/pocketci/storage/sqlite"
@@ -43,6 +45,13 @@ func newTestServer(t *testing.T, opts server.RouterOptions) (storage.Driver, *ht
 	client, err = initFunc(buildFile.Name(), "test", slog.Default())
 	assert.Expect(err).NotTo(HaveOccurred())
 	t.Cleanup(func() { _ = client.Close() })
+
+	if opts.SecretsManager == nil {
+		secretsManager, secretsErr := secrets.GetFromDSN("sqlite://:memory:?key=test-key", slog.Default())
+		assert.Expect(secretsErr).NotTo(HaveOccurred())
+		t.Cleanup(func() { _ = secretsManager.Close() })
+		opts.SecretsManager = secretsManager
+	}
 
 	router, err := server.NewRouter(slog.Default(), client, opts)
 	assert.Expect(err).NotTo(HaveOccurred())
@@ -100,7 +109,7 @@ export { pipeline };
 				assert.Expect(err).NotTo(HaveOccurred())
 				assert.Expect(result.Items).To(HaveLen(1))
 				assert.Expect(result.Items[0].Name).To(Equal("my-pipeline"))
-				assert.Expect(result.Items[0].DriverDSN).To(Equal("docker://"))
+				assert.Expect(result.Items[0].DriverDSN).To(Equal("docker"))
 			})
 
 			t.Run("uploads a valid TypeScript pipeline", func(t *testing.T) {

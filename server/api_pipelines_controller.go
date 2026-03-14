@@ -61,6 +61,8 @@ type APIPipelinesController struct {
 	secretsMgr      secrets.Manager
 }
 
+const pipelineDriverDSNSecretKey = "driver_dsn"
+
 // Index handles GET /api/pipelines - List all pipelines.
 func (c *APIPipelinesController) Index(ctx *echo.Context) error {
 	page := 1
@@ -221,10 +223,40 @@ func (c *APIPipelinesController) Upsert(ctx *echo.Context) error {
 		}
 	}
 
-	pipeline, err := c.store.SavePipeline(ctx.Request().Context(), name, req.Content, req.DriverDSN, req.ContentType)
+	if !IsFeatureEnabled(FeatureSecrets, c.allowedFeatures) {
+		return ctx.JSON(http.StatusBadRequest, map[string]string{
+			"error": "secrets feature is not enabled",
+		})
+	}
+
+	if c.secretsMgr == nil {
+		return ctx.JSON(http.StatusBadRequest, map[string]string{
+			"error": "secrets backend is not configured on the server",
+		})
+	}
+
+	driverConfig, err := orchestra.ParseDriverDSN(req.DriverDSN)
+	if err != nil {
+		return ctx.JSON(http.StatusBadRequest, map[string]string{
+			"error": fmt.Sprintf("invalid driver DSN: %v", err),
+		})
+	}
+
+	pipeline, err := c.store.SavePipeline(ctx.Request().Context(), name, req.Content, driverConfig.Name, req.ContentType)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, map[string]string{
 			"error": fmt.Sprintf("failed to save pipeline: %v", err),
+		})
+	}
+
+	if err := c.secretsMgr.Set(
+		ctx.Request().Context(),
+		secrets.PipelineScope(pipeline.ID),
+		pipelineDriverDSNSecretKey,
+		req.DriverDSN,
+	); err != nil {
+		return ctx.JSON(http.StatusInternalServerError, map[string]string{
+			"error": fmt.Sprintf("failed to store driver DSN: %v", err),
 		})
 	}
 

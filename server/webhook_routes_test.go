@@ -56,11 +56,10 @@ func TestWebhookAPI(t *testing.T) {
 				)
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{
+				router := newStrictSecretRouter(t, client, server.RouterOptions{
 					MaxInFlight:    5,
 					WebhookTimeout: 100 * time.Millisecond,
 				})
-				assert.Expect(err).NotTo(HaveOccurred())
 
 				req := httptest.NewRequest(http.MethodPost, "/api/webhooks/"+pipeline.ID, strings.NewReader(`{"test": true}`))
 				req.Header.Set("Content-Type", "application/json")
@@ -92,8 +91,7 @@ func TestWebhookAPI(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newStrictSecretRouter(t, client, server.RouterOptions{})
 
 				req := httptest.NewRequest(http.MethodPost, "/api/webhooks/non-existent", nil)
 				rec := httptest.NewRecorder()
@@ -127,12 +125,11 @@ func TestWebhookAPI(t *testing.T) {
 				err = secretsMgr.Set(context.Background(), secrets.PipelineScope(pipeline.ID), "webhook_secret", "my-secret-key")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{
+				router := newStrictSecretRouter(t, client, server.RouterOptions{
 					MaxInFlight:    5,
 					WebhookTimeout: 100 * time.Millisecond,
 					SecretsManager: secretsMgr,
 				})
-				assert.Expect(err).NotTo(HaveOccurred())
 
 				// Valid signature
 				body := `{"event": "push"}`
@@ -175,12 +172,11 @@ func TestWebhookAPI(t *testing.T) {
 				err = secretsMgr.Set(context.Background(), secrets.PipelineScope(pipeline.ID), "webhook_secret", "query-secret")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{
+				router := newStrictSecretRouter(t, client, server.RouterOptions{
 					MaxInFlight:    5,
 					WebhookTimeout: 100 * time.Millisecond,
 					SecretsManager: secretsMgr,
 				})
-				assert.Expect(err).NotTo(HaveOccurred())
 
 				body := `{"event": "push"}`
 				sig := computeSignature(body, "query-secret")
@@ -222,8 +218,7 @@ func TestWebhookAPI(t *testing.T) {
 				err = secretsMgr.Set(context.Background(), secrets.PipelineScope(pipeline.ID), "webhook_secret", "my-secret")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{SecretsManager: secretsMgr})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newStrictSecretRouter(t, client, server.RouterOptions{SecretsManager: secretsMgr})
 
 				req := httptest.NewRequest(http.MethodPost, "/api/webhooks/"+pipeline.ID, strings.NewReader(`{}`))
 				rec := httptest.NewRecorder()
@@ -263,8 +258,7 @@ func TestWebhookAPI(t *testing.T) {
 				err = secretsMgr.Set(context.Background(), secrets.PipelineScope(pipeline.ID), "webhook_secret", "correct-secret")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{SecretsManager: secretsMgr})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newStrictSecretRouter(t, client, server.RouterOptions{SecretsManager: secretsMgr})
 
 				req := httptest.NewRequest(http.MethodPost, "/api/webhooks/"+pipeline.ID, strings.NewReader(`{}`))
 				req.Header.Set("X-Webhook-Signature", "bad-signature-value")
@@ -298,11 +292,10 @@ func TestWebhookAPI(t *testing.T) {
 				)
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{
+				router := newStrictSecretRouter(t, client, server.RouterOptions{
 					MaxInFlight:    5,
 					WebhookTimeout: 100 * time.Millisecond,
 				})
-				assert.Expect(err).NotTo(HaveOccurred())
 
 				req := httptest.NewRequest(http.MethodPost, "/api/webhooks/"+pipeline.ID, strings.NewReader(`{}`))
 				rec := httptest.NewRecorder()
@@ -335,11 +328,10 @@ func TestWebhookAPI(t *testing.T) {
 				)
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{
+				router := newStrictSecretRouter(t, client, server.RouterOptions{
 					MaxInFlight:    5,
 					WebhookTimeout: 100 * time.Millisecond,
 				})
-				assert.Expect(err).NotTo(HaveOccurred())
 
 				// Test with GET
 				req := httptest.NewRequest(http.MethodGet, "/api/webhooks/"+pipeline.ID, nil)
@@ -393,11 +385,10 @@ func TestWebhookAPI(t *testing.T) {
 				)
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{
+				router := newStrictSecretRouter(t, client, server.RouterOptions{
 					MaxInFlight:    5,
 					WebhookTimeout: 5 * time.Second, // Long timeout - pipeline should respond quickly
 				})
-				assert.Expect(err).NotTo(HaveOccurred())
 
 				req := httptest.NewRequest(http.MethodPost, "/api/webhooks/"+pipeline.ID, strings.NewReader(`{"hello": "world"}`))
 				req.Header.Set("Content-Type", "application/json")

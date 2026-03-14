@@ -18,6 +18,27 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+func newRouterWithSecrets(t *testing.T, client storage.Driver, opts server.RouterOptions) *server.Router {
+	t.Helper()
+
+	if opts.SecretsManager == nil {
+		secretsMgr, err := secrets.GetFromDSN("sqlite://:memory:?key=test-key", slog.Default())
+		if err != nil {
+			t.Fatalf("could not create secrets manager: %v", err)
+		}
+
+		t.Cleanup(func() { _ = secretsMgr.Close() })
+		opts.SecretsManager = secretsMgr
+	}
+
+	router, err := server.NewRouter(slog.Default(), client, opts)
+	if err != nil {
+		t.Fatalf("could not create router: %v", err)
+	}
+
+	return router
+}
+
 func TestPipelineAPI(t *testing.T) {
 	t.Parallel()
 
@@ -37,8 +58,7 @@ func TestPipelineAPI(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newRouterWithSecrets(t, client, server.RouterOptions{})
 
 				body := map[string]string{
 					"content":    "export { pipeline };",
@@ -75,8 +95,7 @@ func TestPipelineAPI(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newRouterWithSecrets(t, client, server.RouterOptions{})
 
 				body := map[string]string{}
 				jsonBody, _ := json.Marshal(body)
@@ -104,8 +123,7 @@ func TestPipelineAPI(t *testing.T) {
 				_, err = client.SavePipeline(context.Background(), "pipeline-1", "content1", "docker://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newRouterWithSecrets(t, client, server.RouterOptions{})
 
 				req := httptest.NewRequest(http.MethodGet, "/api/pipelines", nil)
 				rec := httptest.NewRecorder()
@@ -140,8 +158,7 @@ func TestPipelineAPI(t *testing.T) {
 				saved, err := client.SavePipeline(context.Background(), "my-pipeline", "content", "docker://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newRouterWithSecrets(t, client, server.RouterOptions{})
 
 				req := httptest.NewRequest(http.MethodGet, "/api/pipelines/"+saved.ID, nil)
 				rec := httptest.NewRecorder()
@@ -170,8 +187,7 @@ func TestPipelineAPI(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newRouterWithSecrets(t, client, server.RouterOptions{})
 
 				req := httptest.NewRequest(http.MethodGet, "/api/pipelines/non-existent", nil)
 				rec := httptest.NewRecorder()
@@ -195,8 +211,7 @@ func TestPipelineAPI(t *testing.T) {
 				saved, err := client.SavePipeline(context.Background(), "to-delete", "content", "docker://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newRouterWithSecrets(t, client, server.RouterOptions{})
 
 				req := httptest.NewRequest(http.MethodDelete, "/api/pipelines/"+saved.ID, nil)
 				rec := httptest.NewRecorder()
@@ -221,8 +236,7 @@ func TestPipelineAPI(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newRouterWithSecrets(t, client, server.RouterOptions{})
 
 				req := httptest.NewRequest(http.MethodDelete, "/api/pipelines/non-existent", nil)
 				rec := httptest.NewRecorder()

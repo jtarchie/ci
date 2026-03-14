@@ -485,7 +485,7 @@ export class JobRunner {
     if (result.failed) {
       storage.set(storageKey, { status: "failure", total: parallelism });
       throw result.firstError ??
-      new TaskFailure("One or more parallel task instances failed");
+        new TaskFailure("One or more parallel task instances failed");
     }
 
     storage.set(storageKey, { status: "success", total: parallelism });
@@ -549,7 +549,7 @@ export class JobRunner {
       if (failFast) {
         storage.set(storageKey, { status: "failure" });
         throw result.firstError ??
-        new TaskFailure("One or more across combinations failed");
+          new TaskFailure("One or more across combinations failed");
       }
     }
 
@@ -596,8 +596,9 @@ export class JobRunner {
       // Augment the task name with variable values so assertion tracking is
       // informative: e.g. task "build" with {platform:linux,size:small} → "build-linux-small"
       const varSuffix = Object.values(variables).join("-");
-      (clonedStep as Record<string, unknown>).task = `${(clonedStep as Task).task
-        }-${varSuffix}`;
+      (clonedStep as Record<string, unknown>).task = `${
+        (clonedStep as Task).task
+      }-${varSuffix}`;
       clonedStep.config = {
         ...clonedStep.config,
         env: {

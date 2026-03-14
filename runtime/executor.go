@@ -77,7 +77,7 @@ func ExecutePipeline(
 
 	logger = logger.WithGroup("executor").With(
 		"namespace", namespace,
-		"driver", driverDSN,
+		"driver", sanitizeDriverName(driverDSN),
 	)
 
 	logger.Info("driver.initialize")
@@ -90,7 +90,7 @@ func ExecutePipeline(
 	} else {
 		driverConfig, orchestrator, err := orchestra.GetFromDSN(driverDSN)
 		if err != nil {
-			return fmt.Errorf("could not parse driver DSN (%q): %w", driverDSN, err)
+			return fmt.Errorf("could not parse driver DSN: %w", err)
 		}
 
 		// Use namespace from DSN if provided
@@ -146,4 +146,13 @@ func ExecutePipeline(
 	logger.Info("pipeline.completed.success")
 
 	return nil
+}
+
+func sanitizeDriverName(driverDSN string) string {
+	config, err := orchestra.ParseDriverDSN(driverDSN)
+	if err != nil || config == nil || config.Name == "" {
+		return "unknown"
+	}
+
+	return config.Name
 }

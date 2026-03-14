@@ -37,10 +37,15 @@ func TestFeatureRestriction(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
+				secretsMgr, err := secrets.GetFromDSN("sqlite://:memory:?key=test-key", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = secretsMgr.Close() }()
+
 				// Create router with only secrets enabled (no webhooks)
 				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{
 					AllowedDrivers:  "native",
 					AllowedFeatures: "secrets",
+					SecretsManager:  secretsMgr,
 				})
 				assert.Expect(err).NotTo(HaveOccurred())
 
@@ -111,10 +116,15 @@ func TestFeatureRestriction(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
+				secretsMgr, err := secrets.GetFromDSN("sqlite://:memory:?key=test-key", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = secretsMgr.Close() }()
+
 				// Create router with no webhooks
 				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{
 					AllowedDrivers:  "native",
 					AllowedFeatures: "secrets",
+					SecretsManager:  secretsMgr,
 				})
 				assert.Expect(err).NotTo(HaveOccurred())
 
@@ -242,10 +252,15 @@ func TestFeatureRestriction(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
+				secretsMgr, err := secrets.GetFromDSN("sqlite://:memory:?key=test-key", slog.Default())
+				assert.Expect(err).NotTo(HaveOccurred())
+				defer func() { _ = secretsMgr.Close() }()
+
 				// Create router with only secrets (no webhooks)
 				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{
 					AllowedDrivers:  "native",
 					AllowedFeatures: "secrets",
+					SecretsManager:  secretsMgr,
 				})
 				assert.Expect(err).NotTo(HaveOccurred())
 

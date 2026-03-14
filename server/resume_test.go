@@ -42,8 +42,7 @@ export const pipeline = async () => {
 				pipeline, err := client.SavePipeline(context.Background(), "resume-test", pipelineContent, "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newStrictSecretRouter(t, client, server.RouterOptions{MaxInFlight: 5})
 
 				// Trigger the pipeline and wait for it to fail
 				execService := router.ExecutionService()
@@ -100,8 +99,7 @@ export const pipeline = async () => {
 				pipeline, err := client.SavePipeline(context.Background(), "resume-test-success", pipelineContent, "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newStrictSecretRouter(t, client, server.RouterOptions{MaxInFlight: 5})
 
 				execService := router.ExecutionService()
 				run, err := execService.TriggerPipeline(context.Background(), pipeline)
@@ -138,8 +136,7 @@ export const pipeline = async () => {
 				assert.Expect(err).NotTo(HaveOccurred())
 				defer func() { _ = client.Close() }()
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newStrictSecretRouter(t, client, server.RouterOptions{MaxInFlight: 5})
 
 				req := httptest.NewRequest(http.MethodPost, "/api/runs/nonexistent/resume", nil)
 				rec := httptest.NewRecorder()
@@ -181,11 +178,10 @@ func TestOrphanRecovery(t *testing.T) {
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				// Create a new router with resume feature disabled — orphans should be marked failed
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{
+				router := newStrictSecretRouter(t, client, server.RouterOptions{
 					MaxInFlight:     5,
 					AllowedFeatures: "webhooks,secrets,notifications,fetch",
 				})
-				assert.Expect(err).NotTo(HaveOccurred())
 
 				router.WaitForExecutions()
 
@@ -229,10 +225,9 @@ export const pipeline = async () => {
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				// Create router with resume feature enabled — should auto-resume the orphan
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{
+				router := newStrictSecretRouter(t, client, server.RouterOptions{
 					MaxInFlight: 5,
 				})
-				assert.Expect(err).NotTo(HaveOccurred())
 
 				// Wait for resumed execution to complete
 				router.WaitForExecutions()
@@ -270,10 +265,9 @@ export const pipeline = async () => {
 				assert.Expect(err).NotTo(HaveOccurred())
 
 				// Create a new router with resume feature enabled, but pipeline doesn't have resume_enabled
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{
+				router := newStrictSecretRouter(t, client, server.RouterOptions{
 					MaxInFlight: 5,
 				})
-				assert.Expect(err).NotTo(HaveOccurred())
 
 				router.WaitForExecutions()
 
@@ -416,8 +410,7 @@ export const pipeline = async () => {
 				failPipeline, err := client.SavePipeline(context.Background(), "fail-first", failContent, "native://", "")
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newStrictSecretRouter(t, client, server.RouterOptions{MaxInFlight: 5})
 
 				execService := router.ExecutionService()
 				failRun, err := execService.TriggerPipeline(context.Background(), failPipeline)
@@ -459,8 +452,7 @@ export const pipeline = async () => {
 				err = client.UpdatePipelineResumeEnabled(context.Background(), pipeline.ID, true)
 				assert.Expect(err).NotTo(HaveOccurred())
 
-				router, err := server.NewRouter(slog.Default(), client, server.RouterOptions{MaxInFlight: 5})
-				assert.Expect(err).NotTo(HaveOccurred())
+				router := newStrictSecretRouter(t, client, server.RouterOptions{MaxInFlight: 5})
 
 				// GET /api/pipelines/:id should show resume_enabled
 				req := httptest.NewRequest(http.MethodGet, "/api/pipelines/"+pipeline.ID, nil)
