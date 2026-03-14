@@ -192,7 +192,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 		err := runner.Run(logger)
 		assert.Expect(err).NotTo(HaveOccurred())
 		assert.Expect(logs.String()).To(ContainSubstring(`assert`))
-		assert.Expect(strings.Count(logs.String(), `assert`)).To(Equal(21))
+		assert.Expect(strings.Count(logs.String(), `assert`)).To(Equal(22))
 	})
 
 	t.Run("caches", func(t *testing.T) {
@@ -223,7 +223,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 		assert.Expect(err).NotTo(HaveOccurred())
 		assert.Expect(logs.String()).To(ContainSubstring("Task erroring-task errored"))
 		assert.Expect(logs.String()).To(ContainSubstring(`assert`))
-		assert.Expect(strings.Count(logs.String(), `assert`)).To(Equal(12))
+		assert.Expect(strings.Count(logs.String(), `assert`)).To(Equal(13))
 	})
 
 	t.Run("on_abort", func(t *testing.T) {

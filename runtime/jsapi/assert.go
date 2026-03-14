@@ -96,6 +96,78 @@ func (a *Assert) ContainsString(str, substr string, message ...string) {
 	}
 }
 
+func (a *Assert) EventuallyContainsString(
+	getter goja.Value,
+	substr string,
+	timeoutMs int64,
+	intervalMs int64,
+	message ...string,
+) {
+	a.logger.Debug("substring.eventually.checking",
+		"pattern_length", len(substr),
+		"timeout_ms", timeoutMs,
+		"interval_ms", intervalMs)
+
+	matcher, err := regexp.Compile(substr)
+	if err != nil {
+		a.logger.Debug("regex.failed", "err", err)
+		a.fail(fmt.Sprintf("invalid regular expression: %s", err))
+
+		return
+	}
+
+	getterFunc, ok := goja.AssertFunction(getter)
+	if !ok {
+		a.fail("expected getter to be a function")
+
+		return
+	}
+
+	if timeoutMs <= 0 {
+		timeoutMs = 1000
+	}
+
+	if intervalMs <= 0 {
+		intervalMs = 50
+	}
+
+	deadline := time.Now().Add(time.Duration(timeoutMs) * time.Millisecond)
+	interval := time.Duration(intervalMs) * time.Millisecond
+	last := ""
+
+	for {
+		value, callErr := getterFunc(goja.Undefined())
+		if callErr != nil {
+			a.fail(fmt.Sprintf("eventually getter failed: %v", callErr))
+
+			return
+		}
+
+		last = fmt.Sprintf("%v", value.Export())
+		if matcher.MatchString(last) {
+			return
+		}
+
+		if !time.Now().Before(deadline) {
+			break
+		}
+
+		time.Sleep(interval)
+	}
+
+	msg := fmt.Sprintf(
+		"expected %q to eventually contain %q within %s",
+		last,
+		substr,
+		time.Duration(timeoutMs)*time.Millisecond,
+	)
+	if len(message) > 0 {
+		msg = message[0]
+	}
+
+	a.fail(msg)
+}
+
 func (a *Assert) Truthy(value bool, message ...string) {
 	a.logger.Debug("truthiness.checking", "value_type", fmt.Sprintf("%T", value))
 

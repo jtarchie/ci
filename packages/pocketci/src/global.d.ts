@@ -464,6 +464,13 @@ declare global {
       message?: string,
     ): void;
     function equal<T>(expected: T, actual: T, message?: string): void;
+    function eventuallyContainsString(
+      getter: () => unknown,
+      substr: string,
+      timeoutMs?: number,
+      intervalMs?: number,
+      message?: string,
+    ): void;
     function notEqual<T>(expected: T, actual: T, message?: string): void;
     function truthy(value: unknown, message?: string): void;
   }
@@ -491,12 +498,12 @@ declare global {
     jobName: string;
     buildID: string;
     status:
-      | "pending"
-      | "running"
-      | "success"
-      | "failure"
-      | "error"
-      | "limit_exceeded";
+    | "pending"
+    | "running"
+    | "success"
+    | "failure"
+    | "error"
+    | "limit_exceeded";
     startTime: string;
     endTime: string;
     duration: string;
@@ -853,4 +860,4 @@ declare global {
   }
 }
 
-export {};
+export { };

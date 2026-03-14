@@ -202,17 +202,12 @@ export class TaskRunner {
     result: RunTaskResult,
     taskStorageKey: string,
   ): Promise<void> {
-    const timeoutMs = 1000;
-    const intervalMs = 50;
-    const deadline = Date.now() + timeoutMs;
-
-    let actual = this.getLatestTaskOutput(stream, result, taskStorageKey);
-    while (Date.now() < deadline && !actual.includes(expected)) {
-      await this.sleep(intervalMs);
-      actual = this.getLatestTaskOutput(stream, result, taskStorageKey);
-    }
-
-    assert.containsString(actual, expected);
+    assert.eventuallyContainsString(
+      () => this.getLatestTaskOutput(stream, result, taskStorageKey),
+      expected,
+      1000,
+      50,
+    );
   }
 
   private getLatestTaskOutput(
@@ -246,10 +241,6 @@ export class TaskRunner {
     } catch {
       return null;
     }
-  }
-
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
 

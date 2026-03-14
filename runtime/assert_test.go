@@ -22,6 +22,11 @@ func TestAssert(t *testing.T) {
 		assert.Equal(1, 1);
 		assert.NotEqual(1, 2);
 		assert.ContainsString("foobar", "foo");
+		let eventuallyCount = 0;
+		assert.EventuallyContainsString(() => {
+			eventuallyCount += 1;
+			return eventuallyCount >= 3 ? "eventual-output" : "";
+		}, "eventual-output", 200, 10);
 		assert.Truthy(true);
 		assert.ContainsElement([1, 2, 3], 2);
 	`))
@@ -32,6 +37,7 @@ func TestAssert(t *testing.T) {
 		"assert.Equal({a: 1}, {a: 1, b: 2});",
 		"assert.NotEqual(1, 1);",
 		"assert.ContainsString('foobar', 'baz');",
+		"assert.EventuallyContainsString(() => '', 'baz', 30, 10);",
 		"assert.Truthy(false);",
 		"assert.ContainsElement([1, 2, 3], 4);",
 	}
