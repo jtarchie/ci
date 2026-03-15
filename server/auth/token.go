@@ -1,83 +1,75 @@
 package auth
 
 import (
-	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
-// tokenPayload is the data encoded in an API token.
-type tokenPayload struct {
+// tokenClaims extends jwt.RegisteredClaims with user-specific fields.
+type tokenClaims struct {
+	jwt.RegisteredClaims
 	Email    string `json:"email"`
 	Name     string `json:"name"`
 	NickName string `json:"nick_name"`
 	Provider string `json:"provider"`
-	UserID   string `json:"user_id"`
-	Expiry   int64  `json:"exp"`
 }
 
-// GenerateToken creates a signed API token for the given user.
-// The token is base64(payload) + "." + hex(hmac-sha256(payload, secret)).
+// GenerateToken creates a signed JWT for the given user.
 func GenerateToken(user *User, secret string, ttl time.Duration) (string, error) {
-	payload := tokenPayload{
+	now := time.Now()
+	claims := tokenClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   user.UserID,
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
+			Issuer:    "pocketci",
+		},
 		Email:    user.Email,
 		Name:     user.Name,
 		NickName: user.NickName,
 		Provider: user.Provider,
-		UserID:   user.UserID,
-		Expiry:   time.Now().Add(ttl).Unix(),
 	}
 
-	data, err := json.Marshal(payload)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	signed, err := token.SignedString([]byte(secret))
 	if err != nil {
-		return "", fmt.Errorf("could not marshal token payload: %w", err)
+		return "", fmt.Errorf("could not sign token: %w", err)
 	}
 
-	encoded := base64.RawURLEncoding.EncodeToString(data)
-	sig := signHMAC(encoded, secret)
-
-	return encoded + "." + sig, nil
+	return signed, nil
 }
 
-// ValidateToken verifies a signed API token and returns the user.
+// ValidateToken verifies a JWT and returns the user.
 // Returns an error if the signature is invalid or the token has expired.
-func ValidateToken(token, secret string) (*User, error) {
-	parts := splitToken(token)
-	if parts == nil {
-		return nil, errors.New("malformed token")
-	}
-
-	expectedSig := signHMAC(parts[0], secret)
-	if !hmac.Equal([]byte(parts[1]), []byte(expectedSig)) {
-		return nil, errors.New("invalid token signature")
-	}
-
-	data, err := base64.RawURLEncoding.DecodeString(parts[0])
+func ValidateToken(tokenString, secret string) (*User, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &tokenClaims{}, func(_ *jwt.Token) (any, error) {
+		return []byte(secret), nil
+	}, jwt.WithValidMethods([]string{"HS256"}))
 	if err != nil {
-		return nil, fmt.Errorf("could not decode token payload: %w", err)
+		if errors.Is(err, jwt.ErrTokenExpired) {
+			return nil, errors.New("token expired")
+		}
+
+		return nil, errors.New("invalid token")
 	}
 
-	var payload tokenPayload
-	if err := json.Unmarshal(data, &payload); err != nil {
-		return nil, fmt.Errorf("could not parse token payload: %w", err)
-	}
-
-	if time.Now().Unix() > payload.Expiry {
-		return nil, errors.New("token expired")
+	claims, ok := token.Claims.(*tokenClaims)
+	if !ok || !token.Valid {
+		return nil, errors.New("invalid token claims")
 	}
 
 	return &User{
-		Email:    payload.Email,
-		Name:     payload.Name,
-		NickName: payload.NickName,
-		Provider: payload.Provider,
-		UserID:   payload.UserID,
+		Email:    claims.Email,
+		Name:     claims.Name,
+		NickName: claims.NickName,
+		Provider: claims.Provider,
+		UserID:   claims.Subject,
 	}, nil
 }
 
@@ -87,27 +79,6 @@ func TokenValidator(secret string) func(string) (*User, error) {
 	return func(token string) (*User, error) {
 		return ValidateToken(token, secret)
 	}
-}
-
-func signHMAC(data, secret string) string {
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(data))
-
-	return hex.EncodeToString(mac.Sum(nil))
-}
-
-func splitToken(token string) []string {
-	for i, c := range token {
-		if c == '.' {
-			if i > 0 && i < len(token)-1 {
-				return []string{token[:i], token[i+1:]}
-			}
-
-			return nil
-		}
-	}
-
-	return nil
 }
 
 // generateRandomCode creates a cryptographically random hex string for CLI device flow.

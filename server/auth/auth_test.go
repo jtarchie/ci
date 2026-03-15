@@ -1,6 +1,7 @@
 package auth_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -122,12 +123,16 @@ func TestToken(t *testing.T) {
 		assert.Expect(err).NotTo(HaveOccurred())
 		assert.Expect(token).NotTo(BeEmpty())
 
+		// JWT tokens have 3 dot-separated parts: header.payload.signature
+		assert.Expect(strings.Count(token, ".")).To(Equal(2))
+
 		validator := auth.TokenValidator(secret)
 		validatedUser, err := validator(token)
 		assert.Expect(err).NotTo(HaveOccurred())
 		assert.Expect(validatedUser.Email).To(Equal("alice@example.com"))
 		assert.Expect(validatedUser.NickName).To(Equal("alice"))
 		assert.Expect(validatedUser.Provider).To(Equal("github"))
+		assert.Expect(validatedUser.UserID).To(Equal("12345"))
 	})
 
 	t.Run("expired token", func(t *testing.T) {
