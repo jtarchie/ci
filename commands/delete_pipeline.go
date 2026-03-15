@@ -12,8 +12,10 @@ import (
 )
 
 type DeletePipeline struct {
-	Name      string `arg:"" help:"Name or ID of the pipeline to delete" required:""`
-	ServerURL string `env:"CI_SERVER_URL" help:"URL of the CI server" required:"" short:"s"`
+	Name       string `arg:"" help:"Name or ID of the pipeline to delete" required:""`
+	ServerURL  string `env:"CI_SERVER_URL" help:"URL of the CI server" required:"" short:"s"`
+	AuthToken  string `env:"CI_AUTH_TOKEN"  help:"Bearer token for OAuth-authenticated servers" short:"t"`
+	ConfigFile string `env:"CI_AUTH_CONFIG" help:"Path to auth config file (default: ~/.pocketci/auth.config)" short:"c"`
 }
 
 func (c *DeletePipeline) Run(logger *slog.Logger) error {
@@ -32,12 +34,26 @@ func (c *DeletePipeline) Run(logger *slog.Logger) error {
 		endpoint = parsed.String() + "/api/pipelines"
 	}
 
+	// Resolve auth token: explicit flag > config file lookup.
+	token := ResolveAuthToken(c.AuthToken, c.ConfigFile, c.ServerURL)
+	if token != "" {
+		client.SetAuthToken(token)
+	}
+
 	// Resolve name → ID: fetch the pipeline list and match by name or ID.
 	logger.Info("pipeline.list")
 
 	listResp, err := client.R().Get(endpoint)
 	if err != nil {
 		return fmt.Errorf("could not list pipelines: %w", err)
+	}
+
+	if listResp.StatusCode() == 401 {
+		return authRequiredError(serverURL)
+	}
+
+	if listResp.StatusCode() == 403 {
+		return accessDeniedError(serverURL)
 	}
 
 	if listResp.StatusCode() != 200 {
@@ -67,6 +83,14 @@ func (c *DeletePipeline) Run(logger *slog.Logger) error {
 		resp, err := client.R().Delete(endpoint + "/" + p.ID)
 		if err != nil {
 			return fmt.Errorf("could not delete pipeline %q (%s): %w", p.Name, p.ID, err)
+		}
+
+		if resp.StatusCode() == 401 {
+			return authRequiredError(serverURL)
+		}
+
+		if resp.StatusCode() == 403 {
+			return accessDeniedError(serverURL)
 		}
 
 		if resp.StatusCode() != 204 {

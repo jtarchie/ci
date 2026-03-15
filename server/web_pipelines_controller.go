@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/jtarchie/pocketci/orchestra"
+	"github.com/jtarchie/pocketci/server/auth"
 	"github.com/jtarchie/pocketci/storage"
 	"github.com/labstack/echo/v5"
 )
@@ -89,6 +90,22 @@ func (c *WebPipelinesController) Index(ctx *echo.Context) error {
 
 	rows := buildPipelineRows(ctx.Request().Context(), c.store, result.Items, c.execService.DefaultDriver)
 
+	// Filter by pipeline-level RBAC if a user is present.
+	user := auth.GetUser(ctx)
+	if user != nil {
+		filtered := rows[:0]
+		for _, row := range rows {
+			if row.Pipeline.RBACExpression != "" {
+				allowed, err := auth.EvaluateAccess(row.Pipeline.RBACExpression, *user)
+				if err != nil || !allowed {
+					continue
+				}
+			}
+			filtered = append(filtered, row)
+		}
+		rows = filtered
+	}
+
 	// Check if any pipeline has an active (running/queued) latest run.
 	hasActiveRuns := false
 	for _, row := range rows {
@@ -125,6 +142,10 @@ func (c *WebPipelinesController) Show(ctx *echo.Context) error {
 			return ctx.String(http.StatusNotFound, "Pipeline not found")
 		}
 		return fmt.Errorf("could not get pipeline: %w", err)
+	}
+
+	if err := checkPipelineRBAC(ctx, pipeline); err != nil {
+		return err
 	}
 
 	page := 1
@@ -260,6 +281,11 @@ func (c *WebPipelinesController) Source(ctx *echo.Context) error {
 		}
 		return fmt.Errorf("could not get pipeline: %w", err)
 	}
+
+	if err := checkPipelineRBAC(ctx, pipeline); err != nil {
+		return err
+	}
+
 	return ctx.Render(http.StatusOK, "pipeline_source.html", map[string]any{
 		"Pipeline": pipeline,
 	})

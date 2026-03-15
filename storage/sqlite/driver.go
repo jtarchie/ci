@@ -33,14 +33,15 @@ type Sqlite struct {
 // pipelineScan is an intermediate struct for scanning pipeline rows.
 // SQLite stores timestamps as RFC3339 strings, so we scan into strings first.
 type pipelineScan struct {
-	ID            string `db:"id"`
-	Name          string `db:"name"`
-	Content       string `db:"content"`
-	ContentType   string `db:"content_type"`
-	DriverDSN     string `db:"driver_dsn"`
-	ResumeEnabled int    `db:"resume_enabled"`
-	CreatedAt     string `db:"created_at"`
-	UpdatedAt     string `db:"updated_at"`
+	ID             string `db:"id"`
+	Name           string `db:"name"`
+	Content        string `db:"content"`
+	ContentType    string `db:"content_type"`
+	DriverDSN      string `db:"driver_dsn"`
+	ResumeEnabled  int    `db:"resume_enabled"`
+	RBACExpression string `db:"rbac_expression"`
+	CreatedAt      string `db:"created_at"`
+	UpdatedAt      string `db:"updated_at"`
 }
 
 func (p pipelineScan) toStorage() storage.Pipeline {
@@ -48,14 +49,15 @@ func (p pipelineScan) toStorage() storage.Pipeline {
 	updatedAt, _ := time.Parse(time.RFC3339, p.UpdatedAt)
 
 	return storage.Pipeline{
-		ID:            p.ID,
-		Name:          p.Name,
-		Content:       p.Content,
-		ContentType:   p.ContentType,
-		DriverDSN:     p.DriverDSN,
-		ResumeEnabled: p.ResumeEnabled != 0,
-		CreatedAt:     createdAt,
-		UpdatedAt:     updatedAt,
+		ID:             p.ID,
+		Name:           p.Name,
+		Content:        p.Content,
+		ContentType:    p.ContentType,
+		DriverDSN:      p.DriverDSN,
+		ResumeEnabled:  p.ResumeEnabled != 0,
+		RBACExpression: p.RBACExpression,
+		CreatedAt:      createdAt,
+		UpdatedAt:      updatedAt,
 	}
 }
 
@@ -388,7 +390,7 @@ func (s *Sqlite) GetPipeline(ctx context.Context, id string) (*storage.Pipeline,
 	var row pipelineScan
 
 	err := sqlscan.Get(ctx, s.writer, &row, `
-		SELECT id, name, content, content_type, driver_dsn, resume_enabled, created_at, updated_at
+		SELECT id, name, content, content_type, driver_dsn, resume_enabled, rbac_expression, created_at, updated_at
 		FROM pipelines WHERE id = ?
 	`, id)
 	if err != nil {
@@ -409,7 +411,7 @@ func (s *Sqlite) GetPipelineByName(ctx context.Context, name string) (*storage.P
 	var row pipelineScan
 
 	err := sqlscan.Get(ctx, s.writer, &row, `
-		SELECT id, name, content, content_type, driver_dsn, resume_enabled, created_at, updated_at
+		SELECT id, name, content, content_type, driver_dsn, resume_enabled, rbac_expression, created_at, updated_at
 		FROM pipelines WHERE name = ?
 		ORDER BY updated_at DESC LIMIT 1
 	`, name)
@@ -483,6 +485,25 @@ func (s *Sqlite) UpdatePipelineResumeEnabled(ctx context.Context, pipelineID str
 	result, err := s.writer.ExecContext(ctx, `UPDATE pipelines SET resume_enabled = ? WHERE id = ?`, val, pipelineID)
 	if err != nil {
 		return fmt.Errorf("failed to update pipeline resume_enabled: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return storage.ErrNotFound
+	}
+
+	return nil
+}
+
+// UpdatePipelineRBACExpression updates the RBAC expression for a pipeline.
+func (s *Sqlite) UpdatePipelineRBACExpression(ctx context.Context, pipelineID, expression string) error {
+	result, err := s.writer.ExecContext(ctx, `UPDATE pipelines SET rbac_expression = ? WHERE id = ?`, expression, pipelineID)
+	if err != nil {
+		return fmt.Errorf("failed to update pipeline rbac_expression: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
@@ -755,7 +776,7 @@ func (s *Sqlite) SearchPipelines(ctx context.Context, query string, page, perPag
 
 		var rows []pipelineScan
 		err = sqlscan.Select(ctx, s.writer, &rows, `
-			SELECT id, name, content, content_type, driver_dsn, resume_enabled, created_at, updated_at
+			SELECT id, name, content, content_type, driver_dsn, resume_enabled, rbac_expression, created_at, updated_at
 			FROM pipelines ORDER BY created_at DESC
 			LIMIT ? OFFSET ?
 		`, perPage, offset)
@@ -795,7 +816,7 @@ func (s *Sqlite) SearchPipelines(ctx context.Context, query string, page, perPag
 	var rows []pipelineScan
 
 	err = sqlscan.Select(ctx, s.writer, &rows, `
-		SELECT p.id, p.name, p.content, p.content_type, p.driver_dsn, p.resume_enabled, p.created_at, p.updated_at
+		SELECT p.id, p.name, p.content, p.content_type, p.driver_dsn, p.resume_enabled, p.rbac_expression, p.created_at, p.updated_at
 		FROM pipelines p
 		WHERE p.id IN (SELECT id FROM pipelines_fts WHERE pipelines_fts MATCH ?)
 		ORDER BY p.created_at DESC

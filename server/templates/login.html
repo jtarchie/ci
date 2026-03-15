@@ -1,0 +1,80 @@
+{{ template "head" dict "Title" "Login" }}
+
+<main id="main-content" role="main"
+  class="flex items-center justify-center min-h-screen">
+  <div class="w-full max-w-md mx-auto p-8">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8">
+      <div class="text-center mb-8">
+        <svg class="h-12 mx-auto mb-4" viewBox="0 0 100 40"
+          xmlns="http://www.w3.org/2000/svg" role="img"
+          aria-label="PocketCI Logo">
+          <circle cx="25" cy="20" r="15" fill="#FF3B30" stroke="#CC2D26"
+            stroke-width="2" />
+          <circle cx="20" cy="15" r="5" fill="white" opacity="0.3" />
+          <circle cx="75" cy="20" r="15" fill="#34C759" stroke="#28A745"
+            stroke-width="2" />
+          <circle cx="70" cy="15" r="5" fill="white" opacity="0.3" />
+        </svg>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Sign in to
+          PocketCI</h1>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">Select a
+          provider to continue</p>
+      </div>
+
+      {{ if .Error }}
+      <div
+        class="mb-6 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800"
+        role="alert">
+        <p class="text-sm text-red-700 dark:text-red-400">Authentication failed.
+          Please try again.</p>
+      </div>
+      {{ end }}
+
+      <div class="space-y-3">
+        {{ range .Providers }}
+        {{ if eq . "github" }}
+        <a href="/auth/github"
+          class="flex items-center justify-center gap-3 w-full px-4 py-3 bg-gray-900 dark:bg-gray-700 text-white rounded-lg hover:bg-gray-800 dark:hover:bg-gray-600 transition-colors font-medium"
+          role="button">
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"
+            aria-hidden="true">
+            <path fill-rule="evenodd"
+              d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
+              clip-rule="evenodd" />
+          </svg>
+          Sign in with GitHub
+        </a>
+        {{ end }}
+
+        {{ if eq . "gitlab" }}
+        <a href="/auth/gitlab"
+          class="flex items-center justify-center gap-3 w-full px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-500 transition-colors font-medium"
+          role="button">
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"
+            aria-hidden="true">
+            <path
+              d="M22.65 14.39L12 22.13 1.35 14.39a.84.84 0 01-.3-.94l1.22-3.78 2.44-7.51A.42.42 0 014.82 2a.43.43 0 01.58 0 .42.42 0 01.11.18l2.44 7.49h8.1l2.44-7.51A.42.42 0 0118.6 2a.43.43 0 01.58 0 .42.42 0 01.11.18l2.44 7.51L23 13.45a.84.84 0 01-.35.94z" />
+          </svg>
+          Sign in with GitLab
+        </a>
+        {{ end }}
+
+        {{ if eq . "microsoftonline" }}
+        <a href="/auth/microsoftonline"
+          class="flex items-center justify-center gap-3 w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors font-medium"
+          role="button">
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"
+            aria-hidden="true">
+            <path
+              d="M11.4 24H0V12.6h11.4V24zM24 24H12.6V12.6H24V24zM11.4 11.4H0V0h11.4v11.4zM24 11.4H12.6V0H24v11.4z" />
+          </svg>
+          Sign in with Microsoft
+        </a>
+        {{ end }}
+        {{ end }}
+      </div>
+    </div>
+  </div>
+</main>
+
+{{ template "end" }}

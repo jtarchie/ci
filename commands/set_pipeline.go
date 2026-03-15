@@ -25,16 +25,20 @@ type SetPipeline struct {
 	Secret        []string `help:"Set a pipeline-scoped secret as KEY=VALUE (can be repeated)" short:"e"`
 	SecretFile    string   `help:"Path to a file containing secrets in KEY=VALUE format (one per line)" type:"existingfile"`
 	Resume        bool     `help:"Enable automatic resume for this pipeline" default:"false"`
+	RBAC          string   `help:"RBAC expression to control access to this pipeline (expr-lang)" env:"CI_PIPELINE_RBAC"`
+	AuthToken     string   `env:"CI_AUTH_TOKEN"      help:"Bearer token for OAuth-authenticated servers"                   short:"t"`
+	ConfigFile    string   `env:"CI_AUTH_CONFIG"     help:"Path to auth config file (default: ~/.pocketci/auth.config)"   short:"c"`
 }
 
 // pipelineRequest matches the server's expected JSON body for PUT /api/pipelines/:name.
 type pipelineRequest struct {
-	Content       string            `json:"content"`
-	ContentType   string            `json:"content_type"`
-	DriverDSN     string            `json:"driver_dsn"`
-	WebhookSecret string            `json:"webhook_secret"`
-	Secrets       map[string]string `json:"secrets,omitempty"`
-	ResumeEnabled *bool             `json:"resume_enabled,omitempty"`
+	Content        string            `json:"content"`
+	ContentType    string            `json:"content_type"`
+	DriverDSN      string            `json:"driver_dsn"`
+	WebhookSecret  string            `json:"webhook_secret"`
+	Secrets        map[string]string `json:"secrets,omitempty"`
+	ResumeEnabled  *bool             `json:"resume_enabled,omitempty"`
+	RBACExpression *string           `json:"rbac_expression,omitempty"`
 }
 
 func (c *SetPipeline) Run(logger *slog.Logger) error {
@@ -123,6 +127,10 @@ func (c *SetPipeline) Run(logger *slog.Logger) error {
 		ResumeEnabled: &c.Resume,
 	}
 
+	if c.RBAC != "" {
+		reqBody.RBACExpression = &c.RBAC
+	}
+
 	client := resty.New()
 
 	// Extract basic auth from URL if present and strip it from the endpoint.
@@ -131,6 +139,12 @@ func (c *SetPipeline) Run(logger *slog.Logger) error {
 		client.SetBasicAuth(parsed.User.Username(), password)
 		parsed.User = nil
 		endpoint = parsed.String() + "/api/pipelines/" + url.PathEscape(name)
+	}
+
+	// Resolve auth token: explicit flag > config file lookup.
+	token := ResolveAuthToken(c.AuthToken, c.ConfigFile, c.ServerURL)
+	if token != "" {
+		client.SetAuthToken(token)
 	}
 
 	resp, err := client.R().
@@ -143,7 +157,14 @@ func (c *SetPipeline) Run(logger *slog.Logger) error {
 
 	body := resp.Body()
 
-	if resp.StatusCode() != 200 {
+	switch resp.StatusCode() {
+	case 200:
+		// success — handled below
+	case 401:
+		return authRequiredError(serverURL)
+	case 403:
+		return accessDeniedError(serverURL)
+	default:
 		var errResp map[string]string
 		if json.Unmarshal(body, &errResp) == nil {
 			if msg, ok := errResp["error"]; ok {

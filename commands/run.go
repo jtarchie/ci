@@ -25,12 +25,14 @@ import (
 // remote CI server and streams the result back. All execution, secrets, and
 // driver configuration remain server-side.
 type Run struct {
-	Name      string        `arg:""           help:"Pipeline name to execute"`
-	Args      []string      `arg:""           help:"Arguments passed to the pipeline via pipelineContext.args" optional:"" passthrough:""`
-	ServerURL string        `env:"CI_SERVER_URL" help:"URL of the CI server" required:"" short:"s"`
-	Timeout   time.Duration `env:"CI_TIMEOUT"    help:"Client-side timeout for the full execution (0 = no timeout)"`
-	NoWorkdir bool          `help:"Skip uploading the current working directory"`
-	Ignore    []string      `help:"Glob patterns to exclude from the workdir upload (comma-separated)" default:".git/**/*" sep:","`
+	Name       string        `arg:""           help:"Pipeline name to execute"`
+	Args       []string      `arg:""           help:"Arguments passed to the pipeline via pipelineContext.args" optional:"" passthrough:""`
+	ServerURL  string        `env:"CI_SERVER_URL" help:"URL of the CI server" required:"" short:"s"`
+	Timeout    time.Duration `env:"CI_TIMEOUT"    help:"Client-side timeout for the full execution (0 = no timeout)"`
+	NoWorkdir  bool          `help:"Skip uploading the current working directory"`
+	Ignore     []string      `help:"Glob patterns to exclude from the workdir upload (comma-separated)" default:".git/**/*" sep:","`
+	AuthToken  string        `env:"CI_AUTH_TOKEN" help:"Bearer token for OAuth-authenticated servers" short:"t"`
+	ConfigFile string        `env:"CI_AUTH_CONFIG" help:"Path to auth config file (default: ~/.pocketci/auth.config)" short:"c"`
 }
 
 // sseEvent is parsed from a `data: {...}` SSE line.
@@ -141,6 +143,12 @@ func (c *Run) Run(logger *slog.Logger) error {
 		endpoint = parsed.String()
 	}
 
+	// Resolve auth token: explicit flag > config file lookup.
+	token := ResolveAuthToken(c.AuthToken, c.ConfigFile, c.ServerURL)
+	if token != "" {
+		client.SetAuthToken(token)
+	}
+
 	if c.Timeout > 0 {
 		client.SetTimeout(c.Timeout)
 	}
@@ -156,6 +164,14 @@ func (c *Run) Run(logger *slog.Logger) error {
 		return fmt.Errorf("could not connect to server: %w", err)
 	}
 	defer func() { _ = resp.RawBody().Close() }()
+
+	if resp.StatusCode() == 401 {
+		return authRequiredError(serverURL)
+	}
+
+	if resp.StatusCode() == 403 {
+		return accessDeniedError(serverURL)
+	}
 
 	if resp.StatusCode() != 200 {
 		body, _ := io.ReadAll(resp.RawBody())

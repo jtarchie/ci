@@ -37,4 +37,16 @@
     <div id="poll-bar"
       class="fixed top-0 left-0 right-0 h-0.5 bg-blue-500 z-50 opacity-0 transition-opacity duration-200 pointer-events-none"
       aria-hidden="true"></div>
+    {{ with currentUser }}
+    <div
+      class="flex justify-end px-4 py-1 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 text-sm">
+      <div class="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+        {{ if .AvatarURL }}<img src="{{ .AvatarURL }}" alt
+          class="w-5 h-5 rounded-full">{{ end }}
+        <span>{{ .NickName }}</span>
+        <a href="/auth/logout"
+          class="text-blue-600 dark:text-blue-400 hover:underline ml-2">Logout</a>
+      </div>
+    </div>
+    {{ end }}
     {{ end }}

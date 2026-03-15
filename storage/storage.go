@@ -24,14 +24,15 @@ const (
 
 // Pipeline represents a stored pipeline definition.
 type Pipeline struct {
-	ID            string      `json:"id"`
-	Name          string      `json:"name"`
-	Content       string      `json:"content"`
-	ContentType   ContentType `json:"content_type"`
-	DriverDSN     string      `json:"driver_dsn"`
-	ResumeEnabled bool        `json:"resume_enabled"`
-	CreatedAt     time.Time   `json:"created_at"`
-	UpdatedAt     time.Time   `json:"updated_at"`
+	ID             string      `json:"id"`
+	Name           string      `json:"name"`
+	Content        string      `json:"content"`
+	ContentType    ContentType `json:"content_type"`
+	DriverDSN      string      `json:"driver_dsn"`
+	ResumeEnabled  bool        `json:"resume_enabled"`
+	RBACExpression string      `json:"rbac_expression,omitempty"`
+	CreatedAt      time.Time   `json:"created_at"`
+	UpdatedAt      time.Time   `json:"updated_at"`
 }
 
 // RunStatus represents the status of a pipeline run.
@@ -80,6 +81,7 @@ type Driver interface {
 	// Pipeline CRUD operations
 	SavePipeline(ctx context.Context, name, content, driverDSN, contentType string) (*Pipeline, error)
 	UpdatePipelineResumeEnabled(ctx context.Context, pipelineID string, enabled bool) error
+	UpdatePipelineRBACExpression(ctx context.Context, pipelineID, expression string) error
 	GetPipeline(ctx context.Context, id string) (*Pipeline, error)
 	GetPipelineByName(ctx context.Context, name string) (*Pipeline, error)
 	DeletePipeline(ctx context.Context, id string) error

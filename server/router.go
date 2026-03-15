@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jtarchie/pocketci/secrets"
+	"github.com/jtarchie/pocketci/server/auth"
 	"github.com/jtarchie/pocketci/storage"
 	"github.com/labstack/echo/v5"
 	"github.com/labstack/echo/v5/middleware"
@@ -25,6 +26,7 @@ type RouterOptions struct {
 	SecretsManager        secrets.Manager
 	FetchTimeout          time.Duration
 	FetchMaxResponseBytes int64
+	AuthConfig            *auth.Config
 }
 
 // Router wraps echo.Echo and provides access to the execution service.
@@ -155,9 +157,30 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 		return ctx.String(http.StatusOK, "OK")
 	})
 
-	// Create web UI group and apply basic auth middleware
+	// Create web UI group and apply auth middleware
 	web := router.Group("")
-	web.Use(newBasicAuthMiddleware(opts.BasicAuthUsername, opts.BasicAuthPassword))
+
+	// Determine auth strategy: OAuth, basic auth, or open access
+	if opts.AuthConfig != nil && opts.AuthConfig.HasOAuthProviders() {
+		// Initialize OAuth providers and session store
+		auth.InitProviders(opts.AuthConfig)
+		sessionStore := auth.SessionStore(opts.AuthConfig.SessionSecret)
+		tokenValidator := auth.TokenValidator(opts.AuthConfig.SessionSecret)
+
+		// Register OAuth routes (unauthenticated)
+		auth.RegisterRoutes(router, opts.AuthConfig, sessionStore, logger)
+
+		// Apply auth middleware to web and API groups
+		authMiddleware := auth.RequireAuth(opts.AuthConfig, sessionStore, tokenValidator, logger)
+		web.Use(authMiddleware)
+
+		// Apply server-level RBAC if configured
+		if opts.AuthConfig.ServerRBAC != "" {
+			web.Use(auth.RequireRBAC(opts.AuthConfig.ServerRBAC, logger))
+		}
+	} else {
+		web.Use(newBasicAuthMiddleware(opts.BasicAuthUsername, opts.BasicAuthPassword))
+	}
 
 	// Redirect root to pipelines list
 	web.GET("/", func(ctx *echo.Context) error {
@@ -169,9 +192,20 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 		webhookTimeout = 5 * time.Second
 	}
 
-	// Create API group with basic auth middleware (for non-webhook endpoints)
+	// Create API group with auth middleware (for non-webhook endpoints)
 	api := router.Group("/api")
-	api.Use(newBasicAuthMiddleware(opts.BasicAuthUsername, opts.BasicAuthPassword))
+
+	if opts.AuthConfig != nil && opts.AuthConfig.HasOAuthProviders() {
+		sessionStore := auth.SessionStore(opts.AuthConfig.SessionSecret)
+		tokenValidator := auth.TokenValidator(opts.AuthConfig.SessionSecret)
+		api.Use(auth.RequireAuth(opts.AuthConfig, sessionStore, tokenValidator, logger))
+
+		if opts.AuthConfig.ServerRBAC != "" {
+			api.Use(auth.RequireRBAC(opts.AuthConfig.ServerRBAC, logger))
+		}
+	} else {
+		api.Use(newBasicAuthMiddleware(opts.BasicAuthUsername, opts.BasicAuthPassword))
+	}
 
 	registerRoutes(router, api, web, store, execService, allowedDrivers, allowedFeatures, opts.SecretsManager, webhookTimeout, logger)
 

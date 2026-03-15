@@ -303,6 +303,27 @@ func (s *S3) UpdatePipelineResumeEnabled(ctx context.Context, pipelineID string,
 	return nil
 }
 
+// UpdatePipelineRBACExpression updates the RBAC expression for a pipeline.
+func (s *S3) UpdatePipelineRBACExpression(ctx context.Context, pipelineID, expression string) error {
+	pipeline, err := s.GetPipeline(ctx, pipelineID)
+	if err != nil {
+		return err
+	}
+
+	pipeline.RBACExpression = expression
+
+	data, err := json.Marshal(pipeline)
+	if err != nil {
+		return fmt.Errorf("failed to marshal pipeline: %w", err)
+	}
+
+	if err := s.putJSON(ctx, s.pipelineByIDKey(pipelineID), data); err != nil {
+		return fmt.Errorf("failed to update pipeline: %w", err)
+	}
+
+	return nil
+}
+
 // ─── Pipeline Run operations ────────────────────────────────────────────────
 
 func (s *S3) SaveRun(ctx context.Context, pipelineID string) (*storage.PipelineRun, error) {

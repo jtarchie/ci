@@ -12,6 +12,7 @@ import (
 
 	"github.com/jtarchie/pocketci/secrets"
 	"github.com/jtarchie/pocketci/server"
+	"github.com/jtarchie/pocketci/server/auth"
 	"github.com/jtarchie/pocketci/storage"
 	_ "github.com/jtarchie/pocketci/storage/sqlite"
 	"github.com/labstack/echo/v5"
@@ -29,6 +30,21 @@ type Server struct {
 	FetchMaxResponseMB int           `default:"10"               env:"CI_FETCH_MAX_RESPONSE_MB" help:"Maximum response body size in MB for fetch() calls"`
 	Secrets            string        `default:"sqlite://test.db?key=testing"                 env:"CI_SECRETS"              help:"Secrets backend DSN (e.g., 'sqlite://secrets.db?key=my-passphrase')"`
 	Secret             []string      `help:"Set a global secret as KEY=VALUE (can be repeated)" short:"e"`
+
+	// OAuth provider configuration
+	OAuthGithubClientID        string `env:"CI_OAUTH_GITHUB_CLIENT_ID"        help:"GitHub OAuth application client ID"`
+	OAuthGithubClientSecret    string `env:"CI_OAUTH_GITHUB_CLIENT_SECRET"    help:"GitHub OAuth application client secret"`
+	OAuthGitlabClientID        string `env:"CI_OAUTH_GITLAB_CLIENT_ID"        help:"GitLab OAuth application client ID"`
+	OAuthGitlabClientSecret    string `env:"CI_OAUTH_GITLAB_CLIENT_SECRET"    help:"GitLab OAuth application client secret"`
+	OAuthGitlabURL             string `env:"CI_OAUTH_GITLAB_URL"              help:"Self-hosted GitLab URL (defaults to https://gitlab.com)"`
+	OAuthMicrosoftClientID     string `env:"CI_OAUTH_MICROSOFT_CLIENT_ID"     help:"Microsoft/Azure AD OAuth client ID"`
+	OAuthMicrosoftClientSecret string `env:"CI_OAUTH_MICROSOFT_CLIENT_SECRET" help:"Microsoft/Azure AD OAuth client secret"`
+	OAuthMicrosoftTenant       string `env:"CI_OAUTH_MICROSOFT_TENANT"        help:"Azure AD tenant ID (defaults to 'common')"`
+	OAuthSessionSecret         string `env:"CI_OAUTH_SESSION_SECRET"          help:"Secret key for encrypting OAuth session cookies"`
+	OAuthCallbackURL           string `env:"CI_OAUTH_CALLBACK_URL"            help:"Base URL for OAuth callbacks (e.g., 'https://ci.example.com')"`
+
+	// RBAC configuration
+	ServerRBAC string `env:"CI_SERVER_RBAC" help:"Expr expression for server-level access control (e.g., 'Email endsWith \"@company.com\"')"`
 }
 
 func (c *Server) Run(logger *slog.Logger) error {
@@ -67,6 +83,21 @@ func (c *Server) Run(logger *slog.Logger) error {
 		}
 	}
 
+	// Build auth config from OAuth flags
+	authConfig := &auth.Config{
+		GithubClientID:        c.OAuthGithubClientID,
+		GithubClientSecret:    c.OAuthGithubClientSecret,
+		GitlabClientID:        c.OAuthGitlabClientID,
+		GitlabClientSecret:    c.OAuthGitlabClientSecret,
+		GitlabURL:             c.OAuthGitlabURL,
+		MicrosoftClientID:     c.OAuthMicrosoftClientID,
+		MicrosoftClientSecret: c.OAuthMicrosoftClientSecret,
+		MicrosoftTenant:       c.OAuthMicrosoftTenant,
+		SessionSecret:         c.OAuthSessionSecret,
+		CallbackURL:           c.OAuthCallbackURL,
+		ServerRBAC:            c.ServerRBAC,
+	}
+
 	// Parse basic auth credentials if provided
 	var basicAuthUsername, basicAuthPassword string
 	if c.BasicAuth != "" {
@@ -81,6 +112,27 @@ func (c *Server) Run(logger *slog.Logger) error {
 		}
 	}
 
+	// Validate mutual exclusion: basic auth and OAuth cannot coexist
+	if c.BasicAuth != "" && authConfig.HasOAuthProviders() {
+		return fmt.Errorf("basic auth and OAuth providers cannot be used together: choose one authentication method")
+	}
+
+	// Validate OAuth config: session secret required when providers are configured
+	if authConfig.HasOAuthProviders() && authConfig.SessionSecret == "" {
+		return fmt.Errorf("CI_OAUTH_SESSION_SECRET is required when OAuth providers are configured")
+	}
+
+	if authConfig.HasOAuthProviders() && authConfig.CallbackURL == "" {
+		return fmt.Errorf("CI_OAUTH_CALLBACK_URL is required when OAuth providers are configured")
+	}
+
+	// Validate server RBAC expression compiles
+	if c.ServerRBAC != "" {
+		if err := auth.ValidateExpression(c.ServerRBAC); err != nil {
+			return fmt.Errorf("invalid server RBAC expression: %w", err)
+		}
+	}
+
 	router, err := server.NewRouter(logger, client, server.RouterOptions{
 		MaxInFlight:           c.MaxInFlight,
 		WebhookTimeout:        c.WebhookTimeout,
@@ -91,6 +143,7 @@ func (c *Server) Run(logger *slog.Logger) error {
 		SecretsManager:        secretsManager,
 		FetchTimeout:          c.FetchTimeout,
 		FetchMaxResponseBytes: int64(c.FetchMaxResponseMB) * 1024 * 1024,
+		AuthConfig:            authConfig,
 	})
 	if err != nil {
 		return fmt.Errorf("could not create router: %w", err)

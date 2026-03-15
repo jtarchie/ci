@@ -137,6 +137,10 @@ func (f *fakeStorage) UpdatePipelineResumeEnabled(_ context.Context, _ string, _
 	return fmt.Errorf("not implemented")
 }
 
+func (f *fakeStorage) UpdatePipelineRBACExpression(_ context.Context, _ string, _ string) error {
+	return fmt.Errorf("not implemented")
+}
+
 func (f *fakeStorage) GetRunsByStatus(_ context.Context, _ storage.RunStatus) ([]storage.PipelineRun, error) {
 	return nil, fmt.Errorf("not implemented")
 }

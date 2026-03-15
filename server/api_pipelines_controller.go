@@ -11,6 +11,7 @@ import (
 
 	"github.com/jtarchie/pocketci/orchestra"
 	"github.com/jtarchie/pocketci/secrets"
+	"github.com/jtarchie/pocketci/server/auth"
 	"github.com/jtarchie/pocketci/storage"
 	"github.com/klauspost/compress/zstd"
 	"github.com/labstack/echo/v5"
@@ -18,23 +19,25 @@ import (
 
 // PipelineRequest represents the JSON body for creating or updating a pipeline.
 type PipelineRequest struct {
-	Content       string            `json:"content"`
-	ContentType   string            `json:"content_type"`
-	DriverDSN     string            `json:"driver_dsn"`
-	WebhookSecret *string           `json:"webhook_secret,omitempty"`
-	Secrets       map[string]string `json:"secrets,omitempty"`
-	ResumeEnabled *bool             `json:"resume_enabled,omitempty"`
+	Content        string            `json:"content"`
+	ContentType    string            `json:"content_type"`
+	DriverDSN      string            `json:"driver_dsn"`
+	WebhookSecret  *string           `json:"webhook_secret,omitempty"`
+	Secrets        map[string]string `json:"secrets,omitempty"`
+	ResumeEnabled  *bool             `json:"resume_enabled,omitempty"`
+	RBACExpression *string           `json:"rbac_expression,omitempty"`
 }
 
 // PipelineAPIResponse is a sanitized pipeline representation for the public API.
 type PipelineAPIResponse struct {
-	ID            string    `json:"id"`
-	Name          string    `json:"name"`
-	Content       string    `json:"content"`
-	ContentType   string    `json:"content_type"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
-	ResumeEnabled bool      `json:"resume_enabled"`
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`
+	Content        string    `json:"content"`
+	ContentType    string    `json:"content_type"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+	ResumeEnabled  bool      `json:"resume_enabled"`
+	RBACExpression string    `json:"rbac_expression,omitempty"`
 }
 
 func toPipelineAPIResponse(pipeline *storage.Pipeline) PipelineAPIResponse {
@@ -43,13 +46,14 @@ func toPipelineAPIResponse(pipeline *storage.Pipeline) PipelineAPIResponse {
 	}
 
 	return PipelineAPIResponse{
-		ID:            pipeline.ID,
-		Name:          pipeline.Name,
-		Content:       pipeline.Content,
-		ContentType:   pipeline.ContentType,
-		CreatedAt:     pipeline.CreatedAt,
-		UpdatedAt:     pipeline.UpdatedAt,
-		ResumeEnabled: pipeline.ResumeEnabled,
+		ID:             pipeline.ID,
+		Name:           pipeline.Name,
+		Content:        pipeline.Content,
+		ContentType:    pipeline.ContentType,
+		CreatedAt:      pipeline.CreatedAt,
+		UpdatedAt:      pipeline.UpdatedAt,
+		ResumeEnabled:  pipeline.ResumeEnabled,
+		RBACExpression: pipeline.RBACExpression,
 	}
 }
 
@@ -62,6 +66,29 @@ type APIPipelinesController struct {
 }
 
 const pipelineDriverDSNSecretKey = "driver_dsn"
+
+// checkPipelineRBAC evaluates a pipeline's RBAC expression against the current user.
+// Returns nil if access is allowed, or an error response if denied.
+func checkPipelineRBAC(ctx *echo.Context, pipeline *storage.Pipeline) error {
+	if pipeline.RBACExpression == "" {
+		return nil
+	}
+
+	user := auth.GetUser(ctx)
+	if user == nil {
+		// No user in context means no OAuth configured — allow access.
+		return nil
+	}
+
+	allowed, err := auth.EvaluateAccess(pipeline.RBACExpression, *user)
+	if err != nil || !allowed {
+		return ctx.JSON(http.StatusForbidden, map[string]string{
+			"error": "access denied to this pipeline",
+		})
+	}
+
+	return nil
+}
 
 // Index handles GET /api/pipelines - List all pipelines.
 func (c *APIPipelinesController) Index(ctx *echo.Context) error {
@@ -96,6 +123,18 @@ func (c *APIPipelinesController) Index(ctx *echo.Context) error {
 	items := make([]PipelineAPIResponse, 0, len(result.Items))
 	for i := range result.Items {
 		item := result.Items[i]
+
+		// Filter by pipeline-level RBAC if a user is present.
+		if item.RBACExpression != "" {
+			user := auth.GetUser(ctx)
+			if user != nil {
+				allowed, err := auth.EvaluateAccess(item.RBACExpression, *user)
+				if err != nil || !allowed {
+					continue
+				}
+			}
+		}
+
 		items = append(items, toPipelineAPIResponse(&item))
 	}
 
@@ -124,6 +163,10 @@ func (c *APIPipelinesController) Show(ctx *echo.Context) error {
 		return ctx.JSON(http.StatusInternalServerError, map[string]string{
 			"error": fmt.Sprintf("failed to get pipeline: %v", err),
 		})
+	}
+
+	if err := checkPipelineRBAC(ctx, pipeline); err != nil {
+		return err
 	}
 
 	return ctx.JSON(http.StatusOK, toPipelineAPIResponse(pipeline))
@@ -316,6 +359,25 @@ func (c *APIPipelinesController) Upsert(ctx *echo.Context) error {
 		pipeline.ResumeEnabled = *req.ResumeEnabled
 	}
 
+	// Handle RBAC expression update
+	if req.RBACExpression != nil {
+		if *req.RBACExpression != "" {
+			if err := auth.ValidateExpression(*req.RBACExpression); err != nil {
+				return ctx.JSON(http.StatusBadRequest, map[string]string{
+					"error": fmt.Sprintf("invalid RBAC expression: %v", err),
+				})
+			}
+		}
+
+		if err := c.store.UpdatePipelineRBACExpression(ctx.Request().Context(), pipeline.ID, *req.RBACExpression); err != nil {
+			return ctx.JSON(http.StatusInternalServerError, map[string]string{
+				"error": fmt.Sprintf("failed to update rbac_expression: %v", err),
+			})
+		}
+
+		pipeline.RBACExpression = *req.RBACExpression
+	}
+
 	return ctx.JSON(http.StatusOK, toPipelineAPIResponse(pipeline))
 }
 
@@ -323,7 +385,7 @@ func (c *APIPipelinesController) Upsert(ctx *echo.Context) error {
 func (c *APIPipelinesController) Destroy(ctx *echo.Context) error {
 	id := ctx.Param("id")
 
-	err := c.store.DeletePipeline(ctx.Request().Context(), id)
+	pipeline, err := c.store.GetPipeline(ctx.Request().Context(), id)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return ctx.JSON(http.StatusNotFound, map[string]string{
@@ -331,6 +393,17 @@ func (c *APIPipelinesController) Destroy(ctx *echo.Context) error {
 			})
 		}
 
+		return ctx.JSON(http.StatusInternalServerError, map[string]string{
+			"error": fmt.Sprintf("failed to get pipeline: %v", err),
+		})
+	}
+
+	if err := checkPipelineRBAC(ctx, pipeline); err != nil {
+		return err
+	}
+
+	err = c.store.DeletePipeline(ctx.Request().Context(), id)
+	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, map[string]string{
 			"error": fmt.Sprintf("failed to delete pipeline: %v", err),
 		})
@@ -373,6 +446,10 @@ func (c *APIPipelinesController) Trigger(ctx *echo.Context) error {
 		return ctx.JSON(http.StatusInternalServerError, map[string]string{
 			"error": fmt.Sprintf("failed to get pipeline: %v", err),
 		})
+	}
+
+	if err := checkPipelineRBAC(ctx, pipeline); err != nil {
+		return err
 	}
 
 	run, err := c.execService.TriggerPipeline(ctx.Request().Context(), pipeline)
@@ -443,7 +520,25 @@ func (c *APIPipelinesController) Run(ctx *echo.Context) error {
 
 	w := ctx.Response()
 
-	err := c.execService.RunByNameSync(ctx.Request().Context(), name, args, workdirTar, w)
+	// Check pipeline-level RBAC before executing.
+	pipeline, err := c.store.GetPipelineByName(ctx.Request().Context(), name)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return ctx.JSON(http.StatusNotFound, map[string]string{
+				"error": "pipeline not found",
+			})
+		}
+
+		return ctx.JSON(http.StatusInternalServerError, map[string]string{
+			"error": fmt.Sprintf("failed to get pipeline: %v", err),
+		})
+	}
+
+	if err := checkPipelineRBAC(ctx, pipeline); err != nil {
+		return err
+	}
+
+	err = c.execService.RunByNameSync(ctx.Request().Context(), name, args, workdirTar, w)
 	if err != nil {
 		echoResp, _ := echo.UnwrapResponse(ctx.Response())
 		if echoResp == nil || !echoResp.Committed {

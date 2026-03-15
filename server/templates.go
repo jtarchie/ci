@@ -10,6 +10,7 @@ import (
 	"time"
 
 	sprig "github.com/go-task/slim-sprig/v3"
+	"github.com/jtarchie/pocketci/server/auth"
 	"github.com/labstack/echo/v5"
 )
 
@@ -27,7 +28,26 @@ type TemplateRender struct {
 }
 
 func (t *TemplateRender) Render(c *echo.Context, w io.Writer, name string, data any) error {
-	err := t.templates.ExecuteTemplate(w, name, data)
+	// Inject authenticated user into template data when available.
+	if m, ok := data.(map[string]any); ok {
+		if user := auth.GetUser(c); user != nil {
+			m["CurrentUser"] = user
+		}
+	}
+
+	// Clone templates and add context-aware functions for this render call.
+	tmpl, err := t.templates.Clone()
+	if err != nil {
+		return fmt.Errorf("could not clone templates: %w", err)
+	}
+
+	tmpl = tmpl.Funcs(template.FuncMap{
+		"currentUser": func() *auth.User {
+			return auth.GetUser(c)
+		},
+	})
+
+	err = tmpl.ExecuteTemplate(w, name, data)
 	if err != nil {
 		return fmt.Errorf("could not execute template: %w", err)
 	}
@@ -99,6 +119,10 @@ func newTemplates() (*TemplateRender, error) {
 				default:
 					return fmt.Sprintf("%v", s)
 				}
+			},
+			// Placeholder — overridden per-render in Render() with the actual echo context.
+			"currentUser": func() *auth.User {
+				return nil
 			},
 		}).
 		ParseFS(templatesFS, "templates/*")
