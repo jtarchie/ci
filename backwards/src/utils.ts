@@ -9,7 +9,9 @@ export function failureStatus(failure: unknown): string {
   return "error";
 }
 
-export function failureHook(failure: unknown): string | undefined {
+export type HookName = "on_success" | "on_failure" | "on_error" | "on_abort";
+
+export function failureHook(failure: unknown): HookName | undefined {
   if (failure == undefined) return "on_success";
   if (failure instanceof TaskFailure) return "on_failure";
   if (failure instanceof TaskErrored) return "on_error";

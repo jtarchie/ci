@@ -117,12 +117,9 @@ export class JobRunner {
 
     try {
       const hookName = failureHook(failure);
-      if (
-        hookName &&
-        (this.jobConfig as Record<string, unknown>)[hookName]
-      ) {
+      if (hookName && this.jobConfig[hookName]) {
         await this.processStep(
-          (this.jobConfig as Record<string, unknown>)[hookName] as Step,
+          this.jobConfig[hookName]!,
           `hooks/${hookName}`,
         );
       }

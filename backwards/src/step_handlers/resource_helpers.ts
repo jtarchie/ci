@@ -35,9 +35,9 @@ export async function processHooks(
   storage.set(storageKey, { status: failureStatus(failure) });
 
   const hookName = failureHook(failure);
-  if (hookName && (step as Record<string, unknown>)[hookName]) {
+  if (hookName && step[hookName]) {
     await ctx.processStep(
-      (step as Record<string, unknown>)[hookName] as Step,
+      step[hookName]!,
       `${pathContext}/${hookName}`,
     );
   }
