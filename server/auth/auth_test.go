@@ -119,7 +119,7 @@ func TestToken(t *testing.T) {
 
 	t.Run("generate and validate", func(t *testing.T) {
 		assert := NewGomegaWithT(t)
-		token, err := auth.GenerateToken(user, secret, 24*time.Hour)
+		token, err := auth.GenerateToken(user, secret, 24*time.Hour, nil)
 		assert.Expect(err).NotTo(HaveOccurred())
 		assert.Expect(token).NotTo(BeEmpty())
 
@@ -137,7 +137,7 @@ func TestToken(t *testing.T) {
 
 	t.Run("expired token", func(t *testing.T) {
 		assert := NewGomegaWithT(t)
-		token, err := auth.GenerateToken(user, secret, -1*time.Hour)
+		token, err := auth.GenerateToken(user, secret, -1*time.Hour, nil)
 		assert.Expect(err).NotTo(HaveOccurred())
 
 		validator := auth.TokenValidator(secret)
@@ -154,7 +154,7 @@ func TestToken(t *testing.T) {
 
 	t.Run("wrong secret", func(t *testing.T) {
 		assert := NewGomegaWithT(t)
-		token, err := auth.GenerateToken(user, secret, 24*time.Hour)
+		token, err := auth.GenerateToken(user, secret, 24*time.Hour, nil)
 		assert.Expect(err).NotTo(HaveOccurred())
 
 		validator := auth.TokenValidator("wrong-secret-key")

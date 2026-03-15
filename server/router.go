@@ -13,6 +13,7 @@ import (
 	"github.com/jtarchie/pocketci/storage"
 	"github.com/labstack/echo/v5"
 	"github.com/labstack/echo/v5/middleware"
+	mcpauth "github.com/modelcontextprotocol/go-sdk/auth"
 )
 
 // RouterOptions configures the router.
@@ -167,8 +168,18 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 		sessionStore := auth.SessionStore(opts.AuthConfig.SessionSecret)
 		tokenValidator := auth.TokenValidator(opts.AuthConfig.SessionSecret)
 
-		// Register OAuth routes (unauthenticated)
-		auth.RegisterRoutes(router, opts.AuthConfig, sessionStore, logger)
+		// Create OAuth authorization server for MCP clients.
+		oauthSrv := auth.NewOAuthServer(opts.AuthConfig, sessionStore, logger)
+
+		// Register OAuth routes (unauthenticated), including /oauth/authorize and /oauth/token.
+		auth.RegisterRoutes(router, opts.AuthConfig, sessionStore, logger, oauthSrv)
+
+		// Mount well-known metadata endpoints (unauthenticated).
+		baseURL := opts.AuthConfig.CallbackURL
+		resourceMeta := auth.NewProtectedResourceMetadata(baseURL)
+		authServerMeta := auth.NewAuthServerMetadata(baseURL)
+		router.GET("/.well-known/oauth-protected-resource", echo.WrapHandler(auth.ProtectedResourceMetadataHandler(resourceMeta)))
+		router.GET("/.well-known/oauth-authorization-server", echo.WrapHandler(auth.AuthServerMetadataHandler(authServerMeta)))
 
 		// Apply auth middleware to web and API groups
 		authMiddleware := auth.RequireAuth(opts.AuthConfig, sessionStore, tokenValidator, logger)
@@ -178,8 +189,24 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 		if opts.AuthConfig.ServerRBAC != "" {
 			web.Use(auth.RequireRBAC(opts.AuthConfig.ServerRBAC, logger))
 		}
+
+		// MCP endpoint — protected with MCP SDK bearer token middleware.
+		mcpHandler := newMCPHandler(store)
+		verifier := auth.MCPTokenVerifier(opts.AuthConfig.SessionSecret)
+		bearerOpts := &mcpauth.RequireBearerTokenOptions{
+			ResourceMetadataURL: baseURL + "/.well-known/oauth-protected-resource",
+			Scopes:              []string{auth.MCPScope},
+		}
+		protectedMCP := mcpauth.RequireBearerToken(verifier, bearerOpts)(mcpHandler)
+		router.Any("/mcp", echo.WrapHandler(protectedMCP))
+		router.Any("/mcp/*", echo.WrapHandler(protectedMCP))
 	} else {
 		web.Use(newBasicAuthMiddleware(opts.BasicAuthUsername, opts.BasicAuthPassword))
+
+		// MCP endpoint — behind basic auth middleware on the web group.
+		mcpHandler := newMCPHandler(store)
+		web.Any("/mcp", echo.WrapHandler(mcpHandler))
+		web.Any("/mcp/*", echo.WrapHandler(mcpHandler))
 	}
 
 	// Redirect root to pipelines list
@@ -208,11 +235,6 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	}
 
 	registerRoutes(router, api, web, store, execService, allowedDrivers, allowedFeatures, opts.SecretsManager, webhookTimeout, logger)
-
-	// MCP endpoint (authenticated)
-	mcpHandler := newMCPHandler(store)
-	web.Any("/mcp", echo.WrapHandler(mcpHandler))
-	web.Any("/mcp/*", echo.WrapHandler(mcpHandler))
 
 	return &Router{Echo: router, execService: execService, webGroup: web, allowedDrivers: allowedDrivers, allowedFeatures: allowedFeatures}, nil
 }

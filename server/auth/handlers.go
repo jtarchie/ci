@@ -17,7 +17,8 @@ import (
 
 // RegisterRoutes adds OAuth authentication routes to the Echo router.
 // These routes are NOT behind auth middleware — they ARE the auth flow.
-func RegisterRoutes(router *echo.Echo, cfg *Config, store *sessions.CookieStore, logger *slog.Logger) {
+// If oauthSrv is non-nil, OAuth authorization code endpoints are also registered.
+func RegisterRoutes(router *echo.Echo, cfg *Config, store *sessions.CookieStore, logger *slog.Logger, oauthSrv *OAuthServer) {
 	gothic.Store = store
 
 	h := &authHandler{
@@ -25,6 +26,7 @@ func RegisterRoutes(router *echo.Echo, cfg *Config, store *sessions.CookieStore,
 		store:    store,
 		logger:   logger,
 		cliCodes: make(map[string]*cliLoginState),
+		oauthSrv: oauthSrv,
 	}
 
 	router.GET("/auth/login", h.LoginPage)
@@ -37,6 +39,12 @@ func RegisterRoutes(router *echo.Echo, cfg *Config, store *sessions.CookieStore,
 	router.POST("/auth/cli/begin", h.CLIBegin)
 	router.POST("/auth/cli/poll", h.CLIPoll)
 	router.GET("/auth/cli/approve", h.CLIApprove)
+
+	// OAuth authorization server endpoints (for MCP clients).
+	if oauthSrv != nil {
+		router.GET("/oauth/authorize", echo.WrapHandler(http.HandlerFunc(oauthSrv.HandleAuthorize)))
+		router.POST("/oauth/token", echo.WrapHandler(http.HandlerFunc(oauthSrv.HandleToken)))
+	}
 }
 
 type cliLoginState struct {
@@ -48,9 +56,10 @@ type cliLoginState struct {
 }
 
 type authHandler struct {
-	cfg    *Config
-	store  *sessions.CookieStore
-	logger *slog.Logger
+	cfg      *Config
+	store    *sessions.CookieStore
+	logger   *slog.Logger
+	oauthSrv *OAuthServer
 
 	mu       sync.Mutex
 	cliCodes map[string]*cliLoginState
@@ -137,6 +146,11 @@ func (h *authHandler) Callback(c *echo.Context) error {
 		if ok {
 			return c.HTML(http.StatusOK, `<!DOCTYPE html><html><head><title>CLI Login</title></head><body><h1>CLI Login Approved</h1><p>You can close this window and return to your terminal.</p></body></html>`)
 		}
+	}
+
+	// Check if this was triggered by an MCP OAuth authorization flow.
+	if h.oauthSrv != nil && h.oauthSrv.CompleteAuthorize(c.Response(), c.Request(), user) {
+		return nil
 	}
 
 	return c.Redirect(http.StatusFound, "/")
@@ -246,8 +260,8 @@ func (h *authHandler) CLIPoll(c *echo.Context) error {
 		})
 	}
 
-	// Generate API token for the CLI.
-	token, err := GenerateToken(state.User, h.cfg.SessionSecret, 30*24*time.Hour)
+	// Generate API token for the CLI (no scope restriction).
+	token, err := GenerateToken(state.User, h.cfg.SessionSecret, 30*24*time.Hour, nil)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "could not generate token",

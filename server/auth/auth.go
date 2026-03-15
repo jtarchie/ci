@@ -16,6 +16,7 @@ type User struct {
 	Organizations []string       `json:"organizations" expr:"Organizations"`
 	Groups        []string       `json:"groups"        expr:"Groups"`
 	RawData       map[string]any `json:"raw_data"      expr:"RawData"`
+	Scopes        []string       `json:"scopes,omitempty"`
 }
 
 // Config holds all authentication and authorization settings for the server.

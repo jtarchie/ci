@@ -13,14 +13,16 @@ import (
 // tokenClaims extends jwt.RegisteredClaims with user-specific fields.
 type tokenClaims struct {
 	jwt.RegisteredClaims
-	Email    string `json:"email"`
-	Name     string `json:"name"`
-	NickName string `json:"nick_name"`
-	Provider string `json:"provider"`
+	Email    string   `json:"email"`
+	Name     string   `json:"name"`
+	NickName string   `json:"nick_name"`
+	Provider string   `json:"provider"`
+	Scopes   []string `json:"scopes,omitempty"`
 }
 
 // GenerateToken creates a signed JWT for the given user.
-func GenerateToken(user *User, secret string, ttl time.Duration) (string, error) {
+// If scopes is non-nil, the token includes scope claims (e.g., ["ci:read"]).
+func GenerateToken(user *User, secret string, ttl time.Duration, scopes []string) (string, error) {
 	now := time.Now()
 	claims := tokenClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -33,6 +35,7 @@ func GenerateToken(user *User, secret string, ttl time.Duration) (string, error)
 		Name:     user.Name,
 		NickName: user.NickName,
 		Provider: user.Provider,
+		Scopes:   scopes,
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -48,6 +51,23 @@ func GenerateToken(user *User, secret string, ttl time.Duration) (string, error)
 // ValidateToken verifies a JWT and returns the user.
 // Returns an error if the signature is invalid or the token has expired.
 func ValidateToken(tokenString, secret string) (*User, error) {
+	claims, err := validateTokenClaims(tokenString, secret)
+	if err != nil {
+		return nil, err
+	}
+
+	return &User{
+		Email:    claims.Email,
+		Name:     claims.Name,
+		NickName: claims.NickName,
+		Provider: claims.Provider,
+		UserID:   claims.Subject,
+		Scopes:   claims.Scopes,
+	}, nil
+}
+
+// validateTokenClaims parses and validates a JWT, returning the full claims.
+func validateTokenClaims(tokenString, secret string) (*tokenClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &tokenClaims{}, func(_ *jwt.Token) (any, error) {
 		return []byte(secret), nil
 	}, jwt.WithValidMethods([]string{"HS256"}))
@@ -64,13 +84,7 @@ func ValidateToken(tokenString, secret string) (*User, error) {
 		return nil, errors.New("invalid token claims")
 	}
 
-	return &User{
-		Email:    claims.Email,
-		Name:     claims.Name,
-		NickName: claims.NickName,
-		Provider: claims.Provider,
-		UserID:   claims.Subject,
-	}, nil
+	return claims, nil
 }
 
 // TokenValidator returns a function that validates tokens using the given secret.
