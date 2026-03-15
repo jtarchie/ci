@@ -11,6 +11,8 @@ pipelines and supports Concourse-style YAML compatibility.
 
 ## Operations
 
+- [Authentication](operations/authentication)
+- [Authorization (RBAC)](operations/rbac)
 - [Secrets Management](operations/secrets)
 - [Caching](operations/caching)
 - [Feature Gates](operations/feature-gates)
@@ -27,12 +29,17 @@ pipelines and supports Concourse-style YAML compatibility.
 - [Pipelines API](api/pipelines)
 - [Runs API](api/runs)
 - [Webhooks API](api/webhooks)
+- [MCP](api/mcp)
 
 ## CLI Commands
 
 - [CLI Overview](cli/)
 - [Runner](cli/runner)
 - [Server](cli/server)
+- [Login](cli/login)
+- [Set Pipeline](cli/set-pipeline)
+- [Run](cli/run)
+- [Delete Pipeline](cli/delete-pipeline)
 
 ## Runtime
 

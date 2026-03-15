@@ -27,10 +27,21 @@ export default defineConfig({
       ],
       "/operations/": [
         { text: "Overview", link: "/operations/" },
+        { text: "Authentication", link: "authentication" },
+        { text: "Authorization (RBAC)", link: "rbac" },
         { text: "Storage", link: "storage" },
         { text: "Secrets", link: "secrets" },
         { text: "Caching", link: "caching" },
         { text: "Feature Gates", link: "feature-gates" },
+      ],
+      "/cli/": [
+        { text: "Overview", link: "/cli/" },
+        { text: "Runner", link: "runner" },
+        { text: "Server", link: "server" },
+        { text: "Login", link: "login" },
+        { text: "Set Pipeline", link: "set-pipeline" },
+        { text: "Run", link: "run" },
+        { text: "Delete Pipeline", link: "delete-pipeline" },
       ],
       "/drivers/": [
         { text: "Overview", link: "/drivers/" },

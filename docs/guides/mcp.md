@@ -51,6 +51,35 @@ echo -n 'admin:yourpassword' | base64
 
 VS Code will prompt for the value on first use and remember it for the session.
 
+#### With OAuth (Bearer Token)
+
+If the server uses OAuth instead of Basic Auth, pass a Bearer token:
+
+```jsonc
+{
+  "servers": {
+    "ci": {
+      "url": "https://ci.example.com/mcp",
+      "type": "http",
+      "headers": {
+        "Authorization": "Bearer ${input:ciToken}"
+      }
+    }
+  },
+  "inputs": [
+    {
+      "id": "ciToken",
+      "type": "promptString",
+      "description": "PocketCI auth token (from: pocketci login)",
+      "password": true
+    }
+  ]
+}
+```
+
+Get a token by running `pocketci login -s https://ci.example.com`, then paste
+the printed token when VS Code prompts.
+
 ### 3. Use the tools
 
 Open GitHub Copilot Chat (or any MCP-compatible assistant) and ask questions

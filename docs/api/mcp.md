@@ -13,6 +13,12 @@ Inspect and search pipeline runs programmatically using MCP tools:
 - `search_tasks` — full-text search task outputs
 - `search_pipelines` — search stored pipelines by name/content
 
+## Authentication
+
+When the server has authentication enabled, MCP requests require an
+`Authorization` header — either `Bearer <token>` (OAuth) or `Basic <base64>`
+(Basic Auth). See [Authentication](../operations/authentication.md).
+
 ## Client Setup
 
 See [MCP](../guides/mcp.md) for VS Code extension setup and detailed usage.
@@ -22,6 +28,7 @@ See [MCP](../guides/mcp.md) for VS Code extension setup and detailed usage.
 ```bash
 curl -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
   -d '{
     "jsonrpc": "2.0",
     "id": 1,
@@ -40,6 +47,7 @@ See [MCP](../guides/mcp.md) for full tool reference and client implementations.
 ```bash
 curl -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
   -d '{
     "jsonrpc": "2.0",
     "id": 2,
