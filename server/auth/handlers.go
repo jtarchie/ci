@@ -37,7 +37,7 @@ func RegisterRoutes(router *echo.Echo, cfg *Config, store *sessions.CookieStore,
 
 	// CLI device flow endpoints.
 	router.POST("/auth/cli/begin", h.CLIBegin)
-	router.POST("/auth/cli/poll", h.CLIPoll)
+	router.GET("/auth/cli/poll", h.CLIPoll)
 	router.GET("/auth/cli/approve", h.CLIApprove)
 
 	// OAuth authorization server endpoints (for MCP clients).
@@ -144,7 +144,9 @@ func (h *authHandler) Callback(c *echo.Context) error {
 		h.mu.Unlock()
 
 		if ok {
-			return c.HTML(http.StatusOK, `<!DOCTYPE html><html><head><title>CLI Login</title></head><body><h1>CLI Login Approved</h1><p>You can close this window and return to your terminal.</p></body></html>`)
+			return c.Render(http.StatusOK, "cli_approve.html", map[string]any{
+				"Approved": true,
+			})
 		}
 	}
 
@@ -214,20 +216,17 @@ func (h *authHandler) CLIApprove(c *echo.Context) error {
 		state.Approved = true
 		h.mu.Unlock()
 
-		return c.HTML(http.StatusOK, `<!DOCTYPE html><html><head><title>CLI Login</title></head><body><h1>CLI Login Approved</h1><p>You can close this window and return to your terminal.</p></body></html>`)
+		return c.Render(http.StatusOK, "cli_approve.html", map[string]any{
+			"Approved": true,
+		})
 	}
 
 	// Show login page with the code passed through.
-	providers := h.cfg.EnabledProviders()
-	html := `<!DOCTYPE html><html><head><title>CLI Login - PocketCI</title></head><body>
-<h1>Approve CLI Login</h1>
-<p>Select a provider to authenticate your CLI session:</p>`
-	for _, p := range providers {
-		html += fmt.Sprintf(`<p><a href="/auth/%s?cli_code=%s">Login with %s</a></p>`, p, code, p)
-	}
-	html += `</body></html>`
-
-	return c.HTML(http.StatusOK, html)
+	return c.Render(http.StatusOK, "cli_approve.html", map[string]any{
+		"Approved":  false,
+		"Code":      code,
+		"Providers": h.cfg.EnabledProviders(),
+	})
 }
 
 // CLIPoll checks if the CLI login has been approved. Returns token if approved.

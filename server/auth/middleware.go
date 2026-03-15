@@ -89,6 +89,7 @@ func RequireAuth(cfg *Config, store *sessions.CookieStore, tokenValidator func(s
 				user, err := tokenValidator(tokenStr)
 				if err != nil {
 					logger.Warn("auth.token.invalid", "error", err)
+
 					return c.JSON(http.StatusUnauthorized, map[string]string{
 						"error": "invalid or expired token",
 					})
@@ -116,6 +117,7 @@ func RequireAuth(cfg *Config, store *sessions.CookieStore, tokenValidator func(s
 			}
 
 			return c.Redirect(http.StatusFound, "/auth/login")
+
 		}
 	}
 }
@@ -135,23 +137,46 @@ func RequireRBAC(expression string, logger *slog.Logger) echo.MiddlewareFunc {
 			user := GetUser(c)
 			if user == nil {
 				// No user in context — RequireAuth should run first.
-				return c.JSON(http.StatusUnauthorized, map[string]string{
-					"error": "authentication required",
+				if isAPIRequest(c) {
+					return c.JSON(http.StatusUnauthorized, map[string]string{
+						"error": "authentication required",
+					})
+				}
+
+				return c.Render(http.StatusUnauthorized, "error.html", map[string]any{
+					"Title":   "Authentication Required",
+					"Message": "Please sign in to access this page.",
 				})
 			}
 
 			allowed, err := EvaluateAccess(expression, *user)
 			if err != nil {
 				logger.Error("rbac.eval.error", "error", err, "user", user.Email)
-				return c.JSON(http.StatusForbidden, map[string]string{
-					"error": "access denied",
+
+				if isAPIRequest(c) {
+					return c.JSON(http.StatusForbidden, map[string]string{
+						"error": "access denied",
+					})
+				}
+
+				return c.Render(http.StatusForbidden, "error.html", map[string]any{
+					"Title":   "Access Denied",
+					"Message": "You do not have permission to access this page.",
 				})
 			}
 
 			if !allowed {
 				logger.Warn("rbac.access.denied", "user", user.Email, "provider", user.Provider)
-				return c.JSON(http.StatusForbidden, map[string]string{
-					"error": "access denied",
+
+				if isAPIRequest(c) {
+					return c.JSON(http.StatusForbidden, map[string]string{
+						"error": "access denied",
+					})
+				}
+
+				return c.Render(http.StatusForbidden, "error.html", map[string]any{
+					"Title":   "Access Denied",
+					"Message": "You do not have permission to access this page.",
 				})
 			}
 
