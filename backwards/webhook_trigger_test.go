@@ -9,6 +9,7 @@ import (
 	"github.com/jtarchie/pocketci/orchestra"
 	_ "github.com/jtarchie/pocketci/orchestra/native"
 	"github.com/jtarchie/pocketci/runtime"
+	"github.com/jtarchie/pocketci/runtime/jsapi"
 	"github.com/jtarchie/pocketci/storage"
 	_ "github.com/jtarchie/pocketci/storage/sqlite"
 	. "github.com/onsi/gomega"
@@ -36,7 +37,7 @@ func setupStorage(t *testing.T) storage.Driver {
 	return store
 }
 
-func runYAMLPipeline(t *testing.T, yamlContent string, webhookData *runtime.WebhookData) error {
+func runYAMLPipeline(t *testing.T, yamlContent string, webhookData *jsapi.WebhookData) error {
 	t.Helper()
 	assert := NewGomegaWithT(t)
 
@@ -103,7 +104,7 @@ func TestWebhookTriggerYAML(t *testing.T) {
 	t.Run("job runs when no webhook_trigger set (webhook trigger)", func(t *testing.T) {
 		t.Parallel()
 		assert := NewGomegaWithT(t)
-		err := runYAMLPipeline(t, simpleEchoYAML, &runtime.WebhookData{
+		err := runYAMLPipeline(t, simpleEchoYAML, &jsapi.WebhookData{
 			Provider:  "slack",
 			EventType: "message",
 			Method:    "POST",
@@ -117,7 +118,7 @@ func TestWebhookTriggerYAML(t *testing.T) {
 	t.Run("job runs when webhook_trigger matches", func(t *testing.T) {
 		t.Parallel()
 		assert := NewGomegaWithT(t)
-		err := runYAMLPipeline(t, webhookGatedYAML, &runtime.WebhookData{
+		err := runYAMLPipeline(t, webhookGatedYAML, &jsapi.WebhookData{
 			Provider:  "github",
 			EventType: "push",
 			Method:    "POST",
@@ -133,7 +134,7 @@ func TestWebhookTriggerYAML(t *testing.T) {
 		assert := NewGomegaWithT(t)
 		// This job has a failing task, but the job should be SKIPPED because the
 		// webhook provider is "slack" and the trigger requires "github".
-		err := runYAMLPipeline(t, webhookGatedFailingYAML, &runtime.WebhookData{
+		err := runYAMLPipeline(t, webhookGatedFailingYAML, &jsapi.WebhookData{
 			Provider:  "slack",
 			EventType: "message",
 			Method:    "POST",
@@ -245,7 +246,7 @@ func TestTriggersWebhook(t *testing.T) {
 	t.Run("filter: job runs when expression matches", func(t *testing.T) {
 		t.Parallel()
 		assert := NewGomegaWithT(t)
-		err := runYAMLPipeline(t, triggersWebhookFilterYAML, &runtime.WebhookData{
+		err := runYAMLPipeline(t, triggersWebhookFilterYAML, &jsapi.WebhookData{
 			Provider:  "github",
 			EventType: "push",
 			Method:    "POST",
@@ -260,7 +261,7 @@ func TestTriggersWebhook(t *testing.T) {
 		t.Parallel()
 		assert := NewGomegaWithT(t)
 		// Failing inner task must NOT run — skipped status is expected.
-		err := runYAMLPipeline(t, triggersWebhookFilterFailingYAML, &runtime.WebhookData{
+		err := runYAMLPipeline(t, triggersWebhookFilterFailingYAML, &jsapi.WebhookData{
 			Provider:  "slack",
 			EventType: "message",
 			Method:    "POST",
@@ -281,7 +282,7 @@ func TestTriggersWebhook(t *testing.T) {
 	t.Run("params: provider and eventType injected as env vars into task", func(t *testing.T) {
 		t.Parallel()
 		assert := NewGomegaWithT(t)
-		err := runYAMLPipeline(t, triggersWebhookParamsYAML, &runtime.WebhookData{
+		err := runYAMLPipeline(t, triggersWebhookParamsYAML, &jsapi.WebhookData{
 			Provider:  "github",
 			EventType: "pull_request",
 			Method:    "POST",
@@ -296,7 +297,7 @@ func TestTriggersWebhook(t *testing.T) {
 		t.Parallel()
 		assert := NewGomegaWithT(t)
 		body := `{"number":42,"pull_request":{"head":{"repo":{"full_name":"org/repo"}}}}`
-		err := runYAMLPipeline(t, triggersWebhookParamsPayloadYAML, &runtime.WebhookData{
+		err := runYAMLPipeline(t, triggersWebhookParamsPayloadYAML, &jsapi.WebhookData{
 			Provider:  "github",
 			EventType: "pull_request",
 			Method:    "POST",

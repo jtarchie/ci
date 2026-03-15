@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/jtarchie/pocketci/orchestra/docker"
-	"github.com/jtarchie/pocketci/runtime"
+	"github.com/jtarchie/pocketci/runtime/runner"
 	sqliteStorage "github.com/jtarchie/pocketci/storage/sqlite"
 	. "github.com/onsi/gomega"
 )
@@ -46,10 +46,10 @@ func TestTaskStatusPersistence(t *testing.T) {
 		defer func() { _ = driver.Close() }()
 
 		runID := "test-run-success"
-		runner := runtime.NewPipelineRunner(ctx, driver, store, logger, "task-status-ns", runID)
-		defer func() { _ = runner.CleanupVolumes() }()
+		r := runner.NewPipelineRunner(ctx, driver, store, logger, "task-status-ns", runID)
+		defer func() { _ = r.CleanupVolumes() }()
 
-		result, err := runner.Run(runtime.RunInput{
+		result, err := r.Run(runner.RunInput{
 			Name:  "echo-task",
 			Image: "busybox",
 			Command: struct {
@@ -62,7 +62,7 @@ func TestTaskStatusPersistence(t *testing.T) {
 			},
 		})
 		assert.Expect(err).NotTo(HaveOccurred())
-		assert.Expect(result.Status).To(Equal(runtime.RunComplete))
+		assert.Expect(result.Status).To(Equal(runner.RunComplete))
 		assert.Expect(result.Code).To(Equal(0))
 
 		// Verify task status was persisted to storage via GetAll (same query the UI uses)
@@ -111,10 +111,10 @@ func TestTaskStatusPersistence(t *testing.T) {
 		defer func() { _ = driver.Close() }()
 
 		runID := "test-run-failure"
-		runner := runtime.NewPipelineRunner(ctx, driver, store, logger, "task-fail-ns", runID)
-		defer func() { _ = runner.CleanupVolumes() }()
+		r := runner.NewPipelineRunner(ctx, driver, store, logger, "task-fail-ns", runID)
+		defer func() { _ = r.CleanupVolumes() }()
 
-		result, err := runner.Run(runtime.RunInput{
+		result, err := r.Run(runner.RunInput{
 			Name:  "failing-task",
 			Image: "busybox",
 			Command: struct {
@@ -127,7 +127,7 @@ func TestTaskStatusPersistence(t *testing.T) {
 			},
 		})
 		assert.Expect(err).NotTo(HaveOccurred())
-		assert.Expect(result.Status).To(Equal(runtime.RunComplete))
+		assert.Expect(result.Status).To(Equal(runner.RunComplete))
 		assert.Expect(result.Code).To(Equal(1))
 
 		// Verify task status was persisted as failure
@@ -171,11 +171,11 @@ func TestTaskStatusPersistence(t *testing.T) {
 		defer func() { _ = driver.Close() }()
 
 		runID := "test-run-multi"
-		runner := runtime.NewPipelineRunner(ctx, driver, store, logger, "task-multi-ns", runID)
-		defer func() { _ = runner.CleanupVolumes() }()
+		r := runner.NewPipelineRunner(ctx, driver, store, logger, "task-multi-ns", runID)
+		defer func() { _ = r.CleanupVolumes() }()
 
 		// Run first task
-		result1, err := runner.Run(runtime.RunInput{
+		result1, err := r.Run(runner.RunInput{
 			Name:  "task-a",
 			Image: "busybox",
 			Command: struct {
@@ -191,7 +191,7 @@ func TestTaskStatusPersistence(t *testing.T) {
 		assert.Expect(result1.Code).To(Equal(0))
 
 		// Run second task
-		result2, err := runner.Run(runtime.RunInput{
+		result2, err := r.Run(runner.RunInput{
 			Name:  "task-b",
 			Image: "busybox",
 			Command: struct {
@@ -252,10 +252,10 @@ func TestTaskStatusPersistence(t *testing.T) {
 		defer func() { _ = driver.Close() }()
 
 		runID := "test-run-ui"
-		runner := runtime.NewPipelineRunner(ctx, driver, store, logger, "task-ui-ns", runID)
-		defer func() { _ = runner.CleanupVolumes() }()
+		r := runner.NewPipelineRunner(ctx, driver, store, logger, "task-ui-ns", runID)
+		defer func() { _ = r.CleanupVolumes() }()
 
-		_, err = runner.Run(runtime.RunInput{
+		_, err = r.Run(runner.RunInput{
 			Name:  "ui-task",
 			Image: "busybox",
 			Command: struct {
@@ -303,10 +303,10 @@ func TestTaskStatusPersistence(t *testing.T) {
 		defer func() { _ = driver.Close() }()
 
 		// No runID - should skip storage writes
-		runner := runtime.NewPipelineRunner(ctx, driver, store, logger, "task-noid-ns", "")
-		defer func() { _ = runner.CleanupVolumes() }()
+		r := runner.NewPipelineRunner(ctx, driver, store, logger, "task-noid-ns", "")
+		defer func() { _ = r.CleanupVolumes() }()
 
-		result, err := runner.Run(runtime.RunInput{
+		result, err := r.Run(runner.RunInput{
 			Name:  "no-runid-task",
 			Image: "busybox",
 			Command: struct {
@@ -339,10 +339,10 @@ func TestTaskStatusPersistence(t *testing.T) {
 		defer func() { _ = driver.Close() }()
 
 		// nil storage - should not panic
-		runner := runtime.NewPipelineRunner(ctx, driver, nil, logger, "task-nostorage-ns", "some-run")
-		defer func() { _ = runner.CleanupVolumes() }()
+		r := runner.NewPipelineRunner(ctx, driver, nil, logger, "task-nostorage-ns", "some-run")
+		defer func() { _ = r.CleanupVolumes() }()
 
-		result, err := runner.Run(runtime.RunInput{
+		result, err := r.Run(runner.RunInput{
 			Name:  "nil-storage-task",
 			Image: "busybox",
 			Command: struct {
@@ -380,10 +380,10 @@ func TestTaskStatusPersistence(t *testing.T) {
 		defer func() { _ = driver.Close() }()
 
 		runID := "test-run-timeout-" + time.Now().Format("150405")
-		runner := runtime.NewPipelineRunner(ctx, driver, store, logger, uniqueNS, runID)
-		defer func() { _ = runner.CleanupVolumes() }()
+		r := runner.NewPipelineRunner(ctx, driver, store, logger, uniqueNS, runID)
+		defer func() { _ = r.CleanupVolumes() }()
 
-		result, err := runner.Run(runtime.RunInput{
+		result, err := r.Run(runner.RunInput{
 			Name:  "timeout-task",
 			Image: "busybox",
 			Command: struct {
@@ -397,7 +397,7 @@ func TestTaskStatusPersistence(t *testing.T) {
 			Timeout: "2s",
 		})
 		assert.Expect(err).NotTo(HaveOccurred())
-		assert.Expect(result.Status).To(Equal(runtime.RunAbort))
+		assert.Expect(result.Status).To(Equal(runner.RunAbort))
 
 		// Verify task status was persisted as abort
 		taskPath := "/pipeline/" + runID + "/tasks/0-timeout-task"

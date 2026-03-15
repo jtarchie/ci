@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/jtarchie/pocketci/runtime"
+	"github.com/jtarchie/pocketci/runtime/jsapi"
 	. "github.com/onsi/gomega"
 )
 
@@ -18,7 +18,7 @@ func TestHTTPRuntime(t *testing.T) {
 		jsVM := goja.New()
 		jsVM.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
 
-		webhookData := &runtime.WebhookData{
+		webhookData := &jsapi.WebhookData{
 			Method:  "POST",
 			URL:     "/api/webhooks/test-id?foo=bar",
 			Headers: map[string]string{"Content-Type": "application/json"},
@@ -26,8 +26,8 @@ func TestHTTPRuntime(t *testing.T) {
 			Query:   map[string]string{"foo": "bar"},
 		}
 
-		responseChan := make(chan *runtime.HTTPResponse, 1)
-		httpRuntime := runtime.NewHTTPRuntime(jsVM, webhookData, responseChan)
+		responseChan := make(chan *jsapi.HTTPResponse, 1)
+		httpRuntime := jsapi.NewHTTPRuntime(jsVM, webhookData, responseChan)
 
 		err := jsVM.Set("http", httpRuntime)
 		assert.Expect(err).NotTo(HaveOccurred())
@@ -56,7 +56,7 @@ func TestHTTPRuntime(t *testing.T) {
 
 		jsVM := goja.New()
 		jsVM.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
-		httpRuntime := runtime.NewHTTPRuntime(jsVM, nil, nil)
+		httpRuntime := jsapi.NewHTTPRuntime(jsVM, nil, nil)
 
 		err := jsVM.Set("http", httpRuntime)
 		assert.Expect(err).NotTo(HaveOccurred())
@@ -73,9 +73,9 @@ func TestHTTPRuntime(t *testing.T) {
 		jsVM := goja.New()
 		jsVM.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
 
-		webhookData := &runtime.WebhookData{Method: "POST"}
-		responseChan := make(chan *runtime.HTTPResponse, 1)
-		httpRuntime := runtime.NewHTTPRuntime(jsVM, webhookData, responseChan)
+		webhookData := &jsapi.WebhookData{Method: "POST"}
+		responseChan := make(chan *jsapi.HTTPResponse, 1)
+		httpRuntime := jsapi.NewHTTPRuntime(jsVM, webhookData, responseChan)
 
 		err := jsVM.Set("http", httpRuntime)
 		assert.Expect(err).NotTo(HaveOccurred())
@@ -103,9 +103,9 @@ func TestHTTPRuntime(t *testing.T) {
 		jsVM := goja.New()
 		jsVM.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
 
-		webhookData := &runtime.WebhookData{Method: "POST"}
-		responseChan := make(chan *runtime.HTTPResponse, 1)
-		httpRuntime := runtime.NewHTTPRuntime(jsVM, webhookData, responseChan)
+		webhookData := &jsapi.WebhookData{Method: "POST"}
+		responseChan := make(chan *jsapi.HTTPResponse, 1)
+		httpRuntime := jsapi.NewHTTPRuntime(jsVM, webhookData, responseChan)
 
 		err := jsVM.Set("http", httpRuntime)
 		assert.Expect(err).NotTo(HaveOccurred())
@@ -125,9 +125,9 @@ func TestHTTPRuntime(t *testing.T) {
 		jsVM := goja.New()
 		jsVM.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
 
-		webhookData := &runtime.WebhookData{Method: "POST"}
-		responseChan := make(chan *runtime.HTTPResponse, 1)
-		httpRuntime := runtime.NewHTTPRuntime(jsVM, webhookData, responseChan)
+		webhookData := &jsapi.WebhookData{Method: "POST"}
+		responseChan := make(chan *jsapi.HTTPResponse, 1)
+		httpRuntime := jsapi.NewHTTPRuntime(jsVM, webhookData, responseChan)
 
 		err := jsVM.Set("http", httpRuntime)
 		assert.Expect(err).NotTo(HaveOccurred())
@@ -150,7 +150,7 @@ func TestHTTPRuntime(t *testing.T) {
 		jsVM := goja.New()
 		jsVM.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
 
-		httpRuntime := runtime.NewHTTPRuntime(jsVM, nil, nil)
+		httpRuntime := jsapi.NewHTTPRuntime(jsVM, nil, nil)
 
 		err := jsVM.Set("http", httpRuntime)
 		assert.Expect(err).NotTo(HaveOccurred())
@@ -167,9 +167,9 @@ func TestHTTPRuntime(t *testing.T) {
 		jsVM := goja.New()
 		jsVM.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
 
-		webhookData := &runtime.WebhookData{Method: "POST"}
-		responseChan := make(chan *runtime.HTTPResponse, 1)
-		httpRuntime := runtime.NewHTTPRuntime(jsVM, webhookData, responseChan)
+		webhookData := &jsapi.WebhookData{Method: "POST"}
+		responseChan := make(chan *jsapi.HTTPResponse, 1)
+		httpRuntime := jsapi.NewHTTPRuntime(jsVM, webhookData, responseChan)
 
 		err := jsVM.Set("http", httpRuntime)
 		assert.Expect(err).NotTo(HaveOccurred())

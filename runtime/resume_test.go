@@ -7,7 +7,7 @@ import (
 
 	_ "github.com/jtarchie/pocketci/orchestra/docker"
 	_ "github.com/jtarchie/pocketci/orchestra/native"
-	"github.com/jtarchie/pocketci/runtime"
+	"github.com/jtarchie/pocketci/runtime/runner"
 	storage "github.com/jtarchie/pocketci/storage/sqlite"
 	. "github.com/onsi/gomega"
 )
@@ -20,18 +20,18 @@ func TestStepState(t *testing.T) {
 		assert := NewGomegaWithT(t)
 
 		cases := []struct {
-			status   runtime.StepStatus
+			status   runner.StepStatus
 			terminal bool
 		}{
-			{runtime.StepStatusPending, false},
-			{runtime.StepStatusRunning, false},
-			{runtime.StepStatusCompleted, true},
-			{runtime.StepStatusFailed, true},
-			{runtime.StepStatusAborted, true},
+			{runner.StepStatusPending, false},
+			{runner.StepStatusRunning, false},
+			{runner.StepStatusCompleted, true},
+			{runner.StepStatusFailed, true},
+			{runner.StepStatusAborted, true},
 		}
 
 		for _, tc := range cases {
-			step := &runtime.StepState{Status: tc.status}
+			step := &runner.StepState{Status: tc.status}
 			assert.Expect(step.IsTerminal()).To(Equal(tc.terminal), "status %s", tc.status)
 		}
 	})
@@ -41,21 +41,21 @@ func TestStepState(t *testing.T) {
 		assert := NewGomegaWithT(t)
 
 		// Running step with container ID is resumable
-		step := &runtime.StepState{
-			Status:      runtime.StepStatusRunning,
+		step := &runner.StepState{
+			Status:      runner.StepStatusRunning,
 			ContainerID: "container-123",
 		}
 		assert.Expect(step.IsResumable()).To(BeTrue())
 
 		// Running step without container ID is not resumable
-		step = &runtime.StepState{
-			Status: runtime.StepStatusRunning,
+		step = &runner.StepState{
+			Status: runner.StepStatusRunning,
 		}
 		assert.Expect(step.IsResumable()).To(BeFalse())
 
 		// Completed step is not resumable
-		step = &runtime.StepState{
-			Status:      runtime.StepStatusCompleted,
+		step = &runner.StepState{
+			Status:      runner.StepStatusCompleted,
 			ContainerID: "container-123",
 		}
 		assert.Expect(step.IsResumable()).To(BeFalse())
@@ -66,25 +66,25 @@ func TestStepState(t *testing.T) {
 		assert := NewGomegaWithT(t)
 
 		// Completed step with result can be skipped
-		step := &runtime.StepState{
-			Status: runtime.StepStatusCompleted,
-			Result: &runtime.RunResult{
-				Status: runtime.RunComplete,
+		step := &runner.StepState{
+			Status: runner.StepStatusCompleted,
+			Result: &runner.RunResult{
+				Status: runner.RunComplete,
 				Code:   0,
 			},
 		}
 		assert.Expect(step.CanSkip()).To(BeTrue())
 
 		// Completed step without result cannot be skipped
-		step = &runtime.StepState{
-			Status: runtime.StepStatusCompleted,
+		step = &runner.StepState{
+			Status: runner.StepStatusCompleted,
 		}
 		assert.Expect(step.CanSkip()).To(BeFalse())
 
 		// Running step cannot be skipped
-		step = &runtime.StepState{
-			Status: runtime.StepStatusRunning,
-			Result: &runtime.RunResult{},
+		step = &runner.StepState{
+			Status: runner.StepStatusRunning,
+			Result: &runner.RunResult{},
 		}
 		assert.Expect(step.CanSkip()).To(BeFalse())
 	})
@@ -97,7 +97,7 @@ func TestPipelineState(t *testing.T) {
 		t.Parallel()
 		assert := NewGomegaWithT(t)
 
-		state := runtime.NewPipelineState("run-123", true)
+		state := runner.NewPipelineState("run-123", true)
 		assert.Expect(state.RunID).To(Equal("run-123"))
 		assert.Expect(state.ResumeEnabled).To(BeTrue())
 		assert.Expect(state.Steps).To(BeEmpty())
@@ -109,19 +109,19 @@ func TestPipelineState(t *testing.T) {
 		t.Parallel()
 		assert := NewGomegaWithT(t)
 
-		state := runtime.NewPipelineState("run-123", true)
+		state := runner.NewPipelineState("run-123", true)
 
-		step1 := &runtime.StepState{
+		step1 := &runner.StepState{
 			StepID: "step-1",
 			Name:   "First Step",
-			Status: runtime.StepStatusRunning,
+			Status: runner.StepStatusRunning,
 		}
 		state.SetStep(step1)
 
-		step2 := &runtime.StepState{
+		step2 := &runner.StepState{
 			StepID: "step-2",
 			Name:   "Second Step",
-			Status: runtime.StepStatusPending,
+			Status: runner.StepStatusPending,
 		}
 		state.SetStep(step2)
 
@@ -138,14 +138,14 @@ func TestPipelineState(t *testing.T) {
 		t.Parallel()
 		assert := NewGomegaWithT(t)
 
-		state := runtime.NewPipelineState("run-123", true)
+		state := runner.NewPipelineState("run-123", true)
 		assert.Expect(state.LastStep()).To(BeNil())
 
-		step1 := &runtime.StepState{StepID: "step-1", Name: "First"}
+		step1 := &runner.StepState{StepID: "step-1", Name: "First"}
 		state.SetStep(step1)
 		assert.Expect(state.LastStep()).To(Equal(step1))
 
-		step2 := &runtime.StepState{StepID: "step-2", Name: "Second"}
+		step2 := &runner.StepState{StepID: "step-2", Name: "Second"}
 		state.SetStep(step2)
 		assert.Expect(state.LastStep()).To(Equal(step2))
 	})
@@ -154,12 +154,12 @@ func TestPipelineState(t *testing.T) {
 		t.Parallel()
 		assert := NewGomegaWithT(t)
 
-		state := runtime.NewPipelineState("run-123", true)
+		state := runner.NewPipelineState("run-123", true)
 
-		state.SetStep(&runtime.StepState{StepID: "step-1", Status: runtime.StepStatusCompleted})
-		state.SetStep(&runtime.StepState{StepID: "step-2", Status: runtime.StepStatusRunning})
-		state.SetStep(&runtime.StepState{StepID: "step-3", Status: runtime.StepStatusPending})
-		state.SetStep(&runtime.StepState{StepID: "step-4", Status: runtime.StepStatusRunning})
+		state.SetStep(&runner.StepState{StepID: "step-1", Status: runner.StepStatusCompleted})
+		state.SetStep(&runner.StepState{StepID: "step-2", Status: runner.StepStatusRunning})
+		state.SetStep(&runner.StepState{StepID: "step-3", Status: runner.StepStatusPending})
+		state.SetStep(&runner.StepState{StepID: "step-4", Status: runner.StepStatusRunning})
 
 		inProgress := state.InProgressSteps()
 		assert.Expect(inProgress).To(HaveLen(2))
@@ -181,24 +181,24 @@ func TestResumableRunnerStatePersistence(t *testing.T) {
 		// We can't easily test the full execution without a driver,
 		// but we can test the state management logic
 		now := time.Now()
-		state := runtime.NewPipelineState("test-run", true)
+		state := runner.NewPipelineState("test-run", true)
 
-		step := &runtime.StepState{
+		step := &runner.StepState{
 			StepID:    "step-1",
 			Name:      "test-step",
-			Status:    runtime.StepStatusRunning,
+			Status:    runner.StepStatusRunning,
 			StartedAt: &now,
 		}
 		state.SetStep(step)
 
 		// Verify state contains the step
 		assert.Expect(state.GetStep("step-1")).NotTo(BeNil())
-		assert.Expect(state.GetStep("step-1").Status).To(Equal(runtime.StepStatusRunning))
+		assert.Expect(state.GetStep("step-1").Status).To(Equal(runner.StepStatusRunning))
 
 		// Update step to completed
-		step.Status = runtime.StepStatusCompleted
-		step.Result = &runtime.RunResult{
-			Status: runtime.RunComplete,
+		step.Status = runner.StepStatusCompleted
+		step.Result = &runner.RunResult{
+			Status: runner.RunComplete,
 			Code:   0,
 			Stdout: "Hello, World!",
 		}

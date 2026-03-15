@@ -8,7 +8,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/jtarchie/pocketci/runtime"
+	"github.com/jtarchie/pocketci/runtime/jsapi"
+	"github.com/jtarchie/pocketci/runtime/runner"
 	"github.com/jtarchie/pocketci/secrets"
 	. "github.com/onsi/gomega"
 )
@@ -65,13 +66,13 @@ func TestNotifierSecretResolutionInURL(t *testing.T) {
 	defer server.Close()
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	notifier := runtime.NewNotifier(logger)
+	notifier := jsapi.NewNotifier(logger)
 
 	mgr := newMapSecretsManager(map[string]string{
 		"pipeline/pipe1/WEBHOOK_URL": server.URL,
 	})
 	notifier.SetSecretsManager(mgr, "pipe1")
-	notifier.SetConfigs(map[string]runtime.NotifyConfig{
+	notifier.SetConfigs(map[string]jsapi.NotifyConfig{
 		"http-url-secret": {
 			Type:   "http",
 			URL:    "secret:WEBHOOK_URL",
@@ -99,13 +100,13 @@ func TestNotifierSecretResolutionInHeaders(t *testing.T) {
 	defer server.Close()
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	notifier := runtime.NewNotifier(logger)
+	notifier := jsapi.NewNotifier(logger)
 
 	mgr := newMapSecretsManager(map[string]string{
 		"pipeline/pipe1/API_TOKEN": "my-resolved-token",
 	})
 	notifier.SetSecretsManager(mgr, "pipe1")
-	notifier.SetConfigs(map[string]runtime.NotifyConfig{
+	notifier.SetConfigs(map[string]jsapi.NotifyConfig{
 		"http-header-secret": {
 			Type:   "http",
 			URL:    server.URL,
@@ -130,11 +131,11 @@ func TestNotifierSecretMissingReturnsError(t *testing.T) {
 	assert := NewGomegaWithT(t)
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	notifier := runtime.NewNotifier(logger)
+	notifier := jsapi.NewNotifier(logger)
 
 	mgr := newMapSecretsManager(map[string]string{}) // empty — secret not stored
 	notifier.SetSecretsManager(mgr, "pipe1")
-	notifier.SetConfigs(map[string]runtime.NotifyConfig{
+	notifier.SetConfigs(map[string]jsapi.NotifyConfig{
 		"slack-missing": {
 			Type:  "slack",
 			Token: "secret:MISSING_SLACK_TOKEN",
@@ -157,16 +158,16 @@ func TestResourceRunnerSecretResolutionRecursive(t *testing.T) {
 	assert := NewGomegaWithT(t)
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	runner := runtime.NewResourceRunner(context.Background(), logger)
+	rr := runner.NewResourceRunner(context.Background(), logger)
 
 	mgr := newMapSecretsManager(map[string]string{
 		"pipeline/pipe1/DB_PASS": "s3cr3t",
 	})
-	runner.SetSecretsManager(mgr, "pipe1")
+	rr.SetSecretsManager(mgr, "pipe1")
 
 	// The type "nonexistent-type" is not registered; we expect
 	// "resource type not found", which means secret resolution succeeded.
-	_, err := runner.Check(runtime.ResourceCheckInput{
+	_, err := rr.Check(runner.ResourceCheckInput{
 		Type: "nonexistent-type",
 		Source: map[string]any{
 			"nested": map[string]any{
@@ -189,12 +190,12 @@ func TestResourceRunnerSecretMissingReturnsError(t *testing.T) {
 	assert := NewGomegaWithT(t)
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	runner := runtime.NewResourceRunner(context.Background(), logger)
+	rr := runner.NewResourceRunner(context.Background(), logger)
 
 	mgr := newMapSecretsManager(map[string]string{}) // no secrets stored
-	runner.SetSecretsManager(mgr, "pipe1")
+	rr.SetSecretsManager(mgr, "pipe1")
 
-	_, err := runner.Check(runtime.ResourceCheckInput{
+	_, err := rr.Check(runner.ResourceCheckInput{
 		Type:   "git",
 		Source: map[string]any{"token": "secret:GH_TOKEN"},
 	})
@@ -209,12 +210,12 @@ func TestResourceRunnerFetchSecretMissing(t *testing.T) {
 	assert := NewGomegaWithT(t)
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	runner := runtime.NewResourceRunner(context.Background(), logger)
+	rr := runner.NewResourceRunner(context.Background(), logger)
 
 	mgr := newMapSecretsManager(map[string]string{})
-	runner.SetSecretsManager(mgr, "pipe1")
+	rr.SetSecretsManager(mgr, "pipe1")
 
-	_, err := runner.Fetch(runtime.ResourceFetchInput{
+	_, err := rr.Fetch(runner.ResourceFetchInput{
 		Type:    "git",
 		Source:  map[string]any{"password": "secret:GH_PASSWORD"},
 		Version: map[string]string{"ref": "abc123"},
@@ -231,12 +232,12 @@ func TestResourceRunnerPushSecretMissing(t *testing.T) {
 	assert := NewGomegaWithT(t)
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	runner := runtime.NewResourceRunner(context.Background(), logger)
+	rr := runner.NewResourceRunner(context.Background(), logger)
 
 	mgr := newMapSecretsManager(map[string]string{})
-	runner.SetSecretsManager(mgr, "pipe1")
+	rr.SetSecretsManager(mgr, "pipe1")
 
-	_, err := runner.Push(runtime.ResourcePushInput{
+	_, err := rr.Push(runner.ResourcePushInput{
 		Type:   "s3",
 		Source: map[string]any{"secret_key": "secret:S3_SECRET"},
 		SrcDir: t.TempDir(),

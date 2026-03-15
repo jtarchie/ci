@@ -16,6 +16,7 @@ import (
 	"github.com/jtarchie/pocketci/orchestra"
 	"github.com/jtarchie/pocketci/orchestra/cache"
 	"github.com/jtarchie/pocketci/runtime"
+	"github.com/jtarchie/pocketci/runtime/jsapi"
 	"github.com/jtarchie/pocketci/secrets"
 	"github.com/jtarchie/pocketci/storage"
 )
@@ -128,8 +129,8 @@ func (s *ExecutionService) TriggerPipeline(ctx context.Context, pipeline *storag
 func (s *ExecutionService) TriggerWebhookPipeline(
 	ctx context.Context,
 	pipeline *storage.Pipeline,
-	webhookData *runtime.WebhookData,
-	responseChan chan *runtime.HTTPResponse,
+	webhookData *jsapi.WebhookData,
+	responseChan chan *jsapi.HTTPResponse,
 ) (*storage.PipelineRun, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -217,8 +218,8 @@ func (s *ExecutionService) RecoverOrphanedRuns(ctx context.Context) {
 
 // webhookExecData holds webhook-specific execution data.
 type webhookExecData struct {
-	webhookData  *runtime.WebhookData
-	responseChan chan *runtime.HTTPResponse
+	webhookData  *jsapi.WebhookData
+	responseChan chan *jsapi.HTTPResponse
 }
 
 // execOptions holds options for executePipeline.

@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/jtarchie/pocketci/runtime"
+	"github.com/jtarchie/pocketci/runtime/jsapi"
 	"github.com/jtarchie/pocketci/secrets"
 	"github.com/jtarchie/pocketci/storage"
 	"github.com/jtarchie/pocketci/webhooks"
@@ -117,7 +117,7 @@ func (c *APIWebhooksController) Trigger(ctx *echo.Context) error {
 		})
 	}
 
-	webhookData := &runtime.WebhookData{
+	webhookData := &jsapi.WebhookData{
 		Provider:  event.Provider,
 		EventType: event.EventType,
 		Method:    event.Method,
@@ -127,7 +127,7 @@ func (c *APIWebhooksController) Trigger(ctx *echo.Context) error {
 		Query:     event.Query,
 	}
 
-	responseChan := make(chan *runtime.HTTPResponse, 1)
+	responseChan := make(chan *jsapi.HTTPResponse, 1)
 
 	run, err := c.execService.TriggerWebhookPipeline(ctx.Request().Context(), pipeline, webhookData, responseChan)
 	if err != nil {

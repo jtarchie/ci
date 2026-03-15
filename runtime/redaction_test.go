@@ -3,7 +3,7 @@ package runtime_test
 import (
 	"testing"
 
-	"github.com/jtarchie/pocketci/runtime"
+	"github.com/jtarchie/pocketci/runtime/support"
 	. "github.com/onsi/gomega"
 )
 
@@ -15,7 +15,7 @@ func TestRedactSecrets(t *testing.T) {
 
 		assert := NewGomegaWithT(t)
 
-		result := runtime.RedactSecrets("my password is secret123", []string{"secret123"})
+		result := support.RedactSecrets("my password is secret123", []string{"secret123"})
 		assert.Expect(result).To(Equal("my password is ***REDACTED***"))
 	})
 
@@ -24,7 +24,7 @@ func TestRedactSecrets(t *testing.T) {
 
 		assert := NewGomegaWithT(t)
 
-		result := runtime.RedactSecrets("key=abc token=xyz", []string{"abc", "xyz"})
+		result := support.RedactSecrets("key=abc token=xyz", []string{"abc", "xyz"})
 		assert.Expect(result).To(Equal("key=***REDACTED*** token=***REDACTED***"))
 	})
 
@@ -34,7 +34,7 @@ func TestRedactSecrets(t *testing.T) {
 		assert := NewGomegaWithT(t)
 
 		// "secret" is a substring of "secret123" - the longer one should be replaced first
-		result := runtime.RedactSecrets("the value is secret123", []string{"secret", "secret123"})
+		result := support.RedactSecrets("the value is secret123", []string{"secret", "secret123"})
 		assert.Expect(result).To(Equal("the value is ***REDACTED***"))
 	})
 
@@ -43,7 +43,7 @@ func TestRedactSecrets(t *testing.T) {
 
 		assert := NewGomegaWithT(t)
 
-		result := runtime.RedactSecrets("value is $DOLLAR.*STAR", []string{"$DOLLAR", ".*STAR"})
+		result := support.RedactSecrets("value is $DOLLAR.*STAR", []string{"$DOLLAR", ".*STAR"})
 		assert.Expect(result).To(Equal("value is ***REDACTED******REDACTED***"))
 	})
 
@@ -52,7 +52,7 @@ func TestRedactSecrets(t *testing.T) {
 
 		assert := NewGomegaWithT(t)
 
-		result := runtime.RedactSecrets("nothing to redact", []string{})
+		result := support.RedactSecrets("nothing to redact", []string{})
 		assert.Expect(result).To(Equal("nothing to redact"))
 	})
 
@@ -61,7 +61,7 @@ func TestRedactSecrets(t *testing.T) {
 
 		assert := NewGomegaWithT(t)
 
-		result := runtime.RedactSecrets("", []string{"secret"})
+		result := support.RedactSecrets("", []string{"secret"})
 		assert.Expect(result).To(Equal(""))
 	})
 
@@ -70,7 +70,7 @@ func TestRedactSecrets(t *testing.T) {
 
 		assert := NewGomegaWithT(t)
 
-		result := runtime.RedactSecrets("hello world", []string{"", ""})
+		result := support.RedactSecrets("hello world", []string{"", ""})
 		assert.Expect(result).To(Equal("hello world"))
 	})
 
@@ -79,7 +79,7 @@ func TestRedactSecrets(t *testing.T) {
 
 		assert := NewGomegaWithT(t)
 
-		result := runtime.RedactSecrets("pass=abc pass=abc pass=abc", []string{"abc"})
+		result := support.RedactSecrets("pass=abc pass=abc pass=abc", []string{"abc"})
 		assert.Expect(result).To(Equal("pass=***REDACTED*** pass=***REDACTED*** pass=***REDACTED***"))
 	})
 
@@ -89,7 +89,7 @@ func TestRedactSecrets(t *testing.T) {
 		assert := NewGomegaWithT(t)
 
 		text := "line1: secret-val\nline2: other\nline3: secret-val\n"
-		result := runtime.RedactSecrets(text, []string{"secret-val"})
+		result := support.RedactSecrets(text, []string{"secret-val"})
 		assert.Expect(result).To(Equal("line1: ***REDACTED***\nline2: other\nline3: ***REDACTED***\n"))
 	})
 
@@ -98,7 +98,7 @@ func TestRedactSecrets(t *testing.T) {
 
 		assert := NewGomegaWithT(t)
 
-		result := runtime.RedactSecrets(`path is C:\Users\admin`, []string{`C:\Users\admin`})
+		result := support.RedactSecrets(`path is C:\Users\admin`, []string{`C:\Users\admin`})
 		assert.Expect(result).To(Equal("path is ***REDACTED***"))
 	})
 }

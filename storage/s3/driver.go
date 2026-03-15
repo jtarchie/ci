@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jtarchie/pocketci/runtime"
+	"github.com/jtarchie/pocketci/runtime/support"
 	"github.com/jtarchie/pocketci/s3config"
 	"github.com/jtarchie/pocketci/storage"
 )
@@ -193,7 +193,7 @@ func (s *S3) UpdateStatusForPrefix(ctx context.Context, prefix string, matchStat
 // ─── Pipeline CRUD ──────────────────────────────────────────────────────────
 
 func (s *S3) SavePipeline(ctx context.Context, name, content, driverDSN, contentType string) (*storage.Pipeline, error) {
-	newID := runtime.PipelineID(name, content)
+	newID := support.PipelineID(name, content)
 	now := time.Now().UTC()
 
 	var storedID string
@@ -306,7 +306,7 @@ func (s *S3) UpdatePipelineResumeEnabled(ctx context.Context, pipelineID string,
 // ─── Pipeline Run operations ────────────────────────────────────────────────
 
 func (s *S3) SaveRun(ctx context.Context, pipelineID string) (*storage.PipelineRun, error) {
-	id := runtime.UniqueID()
+	id := support.UniqueID()
 	now := time.Now().UTC()
 
 	run := &storage.PipelineRun{

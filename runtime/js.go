@@ -15,6 +15,7 @@ import (
 	"github.com/evanw/esbuild/pkg/api"
 	"github.com/jtarchie/pocketci/orchestra"
 	"github.com/jtarchie/pocketci/runtime/jsapi"
+	"github.com/jtarchie/pocketci/runtime/runner"
 	"github.com/jtarchie/pocketci/secrets"
 	"github.com/jtarchie/pocketci/storage"
 	"github.com/jtarchie/pocketci/webhooks/filter"
@@ -33,9 +34,9 @@ type ExecuteOptions struct {
 	// Namespace is the namespace for this execution.
 	Namespace string
 	// WebhookData contains the incoming HTTP request when triggered via webhook.
-	WebhookData *WebhookData
+	WebhookData *jsapi.WebhookData
 	// ResponseChan receives the HTTP response from the pipeline.
-	ResponseChan chan *HTTPResponse
+	ResponseChan chan *jsapi.HTTPResponse
 	// SecretsManager provides access to encrypted secrets for this pipeline.
 	// If nil, secret resolution is disabled.
 	SecretsManager secrets.Manager
@@ -55,7 +56,7 @@ type ExecuteOptions struct {
 	PreseededVolumes map[string]orchestra.Volume
 	// OutputCallback, if set, is applied to every container task so that
 	// stdout/stderr chunks are forwarded to the caller in real time.
-	OutputCallback OutputCallback
+	OutputCallback runner.OutputCallback
 }
 
 type JS struct {
@@ -111,10 +112,10 @@ func (j *JS) Execute(ctx context.Context, source string, driver orchestra.Driver
 
 // ExecuteWithOptions runs a pipeline with the given options.
 func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orchestra.Driver, storage storage.Driver, opts ExecuteOptions) error {
-	var runner Runner
+	var r runner.Runner
 
 	if opts.Resume {
-		resumableRunner, err := NewResumableRunner(ctx, driver, storage, j.logger, opts.Namespace, ResumeOptions{
+		resumableRunner, err := runner.NewResumableRunner(ctx, driver, storage, j.logger, opts.Namespace, runner.ResumeOptions{
 			RunID:  opts.RunID,
 			Resume: opts.Resume,
 		})
@@ -134,9 +135,9 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 			resumableRunner.SetOutputCallback(opts.OutputCallback)
 		}
 
-		runner = resumableRunner
+		r = resumableRunner
 	} else {
-		pipelineRunner := NewPipelineRunner(ctx, driver, storage, j.logger, opts.Namespace, opts.RunID)
+		pipelineRunner := runner.NewPipelineRunner(ctx, driver, storage, j.logger, opts.Namespace, opts.RunID)
 		if opts.SecretsManager != nil {
 			pipelineRunner.SetSecretsManager(opts.SecretsManager, opts.PipelineID)
 		}
@@ -149,7 +150,7 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 			pipelineRunner.SetOutputCallback(opts.OutputCallback)
 		}
 
-		runner = pipelineRunner
+		r = pipelineRunner
 	}
 
 	finalSource, err := TranspileAndValidate(source)
@@ -185,17 +186,17 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 
 	_ = jsVM.Set("console", require.Require(jsVM, "console"))
 
-	err = jsVM.Set("assert", NewAssert(jsVM, j.logger))
+	err = jsVM.Set("assert", jsapi.NewAssert(jsVM, j.logger))
 	if err != nil {
 		return fmt.Errorf("could not set assert: %w", err)
 	}
 
-	err = jsVM.Set("YAML", NewYAML(jsVM, j.logger))
+	err = jsVM.Set("YAML", jsapi.NewYAML(jsVM, j.logger))
 	if err != nil {
 		return fmt.Errorf("could not set YAML: %w", err)
 	}
 
-	runtime := NewRuntime(jsVM, runner, opts.Namespace, opts.RunID)
+	runtime := NewRuntime(jsVM, r, opts.Namespace, opts.RunID)
 	runtime.secretsManager = opts.SecretsManager
 	runtime.pipelineID = opts.PipelineID
 	runtime.ctx = ctx
@@ -207,12 +208,12 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 	}
 
 	// Set up notification runtime (disabled when feature is gated)
-	notifier := NewNotifier(j.logger)
+	notifier := jsapi.NewNotifier(j.logger)
 	notifier.Disabled = opts.DisableNotifications
 	if opts.SecretsManager != nil {
 		notifier.SetSecretsManager(opts.SecretsManager, opts.PipelineID)
 	}
-	notifyRuntime := NewNotifyRuntime(ctx, jsVM, notifier, runtime.promises, runtime.tasks)
+	notifyRuntime := jsapi.NewNotifyRuntime(ctx, jsVM, notifier, runtime.promises, runtime.tasks)
 
 	err = jsVM.Set("notify", notifyRuntime)
 	if err != nil {
@@ -220,7 +221,7 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 	}
 
 	// Set up native resource runner
-	resourceRunner := NewResourceRunner(ctx, j.logger)
+	resourceRunner := runner.NewResourceRunner(ctx, j.logger)
 	if opts.SecretsManager != nil {
 		resourceRunner.SetSecretsManager(opts.SecretsManager, opts.PipelineID)
 	}
@@ -241,7 +242,7 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 	}
 
 	// Set up fetch runtime for outbound HTTP requests
-	fetchRuntime := NewFetchRuntime(ctx, jsVM, runtime.promises, runtime.tasks, opts.FetchTimeout, opts.FetchMaxResponseBytes)
+	fetchRuntime := jsapi.NewFetchRuntime(ctx, jsVM, runtime.promises, runtime.tasks, opts.FetchTimeout, opts.FetchMaxResponseBytes)
 	fetchRuntime.Disabled = opts.DisableFetch
 
 	err = jsVM.Set("fetch", fetchRuntime.Fetch)
@@ -250,7 +251,7 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 	}
 
 	// Set up HTTP runtime for webhook support
-	httpRuntime := NewHTTPRuntime(jsVM, opts.WebhookData, opts.ResponseChan)
+	httpRuntime := jsapi.NewHTTPRuntime(jsVM, opts.WebhookData, opts.ResponseChan)
 
 	err = jsVM.Set("http", httpRuntime)
 	if err != nil {
@@ -388,7 +389,7 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 	err = runtime.Wait()
 	if err != nil {
 		// Mark in-progress steps as aborted if using resumable runner
-		if resumable, ok := runner.(*ResumableRunner); ok {
+		if resumable, ok := r.(*runner.ResumableRunner); ok {
 			resumable.MarkInProgressAsAborted()
 		}
 
@@ -397,13 +398,13 @@ func (j *JS) ExecuteWithOptions(ctx context.Context, source string, driver orche
 
 	// If the context was cancelled, mark any remaining in-progress steps as aborted
 	if ctx.Err() != nil {
-		if resumable, ok := runner.(*ResumableRunner); ok {
+		if resumable, ok := r.(*runner.ResumableRunner); ok {
 			resumable.MarkInProgressAsAborted()
 		}
 	}
 
 	// Cleanup volumes after pipeline completes - this triggers cache persistence
-	err = runner.CleanupVolumes()
+	err = r.CleanupVolumes()
 	if err != nil {
 		j.logger.Error("volume.cleanup.failed", "err", err)
 		// Don't fail the pipeline on volume cleanup errors, just log

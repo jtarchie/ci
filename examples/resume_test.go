@@ -8,7 +8,7 @@ import (
 
 	"github.com/jtarchie/pocketci/orchestra"
 	"github.com/jtarchie/pocketci/orchestra/docker"
-	"github.com/jtarchie/pocketci/runtime"
+	"github.com/jtarchie/pocketci/runtime/runner"
 	storage "github.com/jtarchie/pocketci/storage/sqlite"
 	. "github.com/onsi/gomega"
 )
@@ -36,14 +36,14 @@ func TestResumeSkipsCompletedSteps(t *testing.T) {
 	t.Run("first run executes all steps", func(t *testing.T) {
 		assert := NewGomegaWithT(t)
 
-		runner, err := runtime.NewResumableRunner(ctx, driver, store, logger, "resume-test-ns", runtime.ResumeOptions{
+		r, err := runner.NewResumableRunner(ctx, driver, store, logger, "resume-test-ns", runner.ResumeOptions{
 			RunID:  runID,
 			Resume: true,
 		})
 		assert.Expect(err).NotTo(HaveOccurred())
 
 		// Run first step
-		result1, err := runner.Run(runtime.RunInput{
+		result1, err := r.Run(runner.RunInput{
 			Name:  "step-1",
 			Image: "busybox",
 			Command: struct {
@@ -56,11 +56,11 @@ func TestResumeSkipsCompletedSteps(t *testing.T) {
 			},
 		})
 		assert.Expect(err).NotTo(HaveOccurred())
-		assert.Expect(result1.Status).To(Equal(runtime.RunComplete))
+		assert.Expect(result1.Status).To(Equal(runner.RunComplete))
 		assert.Expect(result1.Stdout).To(ContainSubstring("step 1 output"))
 
 		// Run second step
-		result2, err := runner.Run(runtime.RunInput{
+		result2, err := r.Run(runner.RunInput{
 			Name:  "step-2",
 			Image: "busybox",
 			Command: struct {
@@ -73,11 +73,11 @@ func TestResumeSkipsCompletedSteps(t *testing.T) {
 			},
 		})
 		assert.Expect(err).NotTo(HaveOccurred())
-		assert.Expect(result2.Status).To(Equal(runtime.RunComplete))
+		assert.Expect(result2.Status).To(Equal(runner.RunComplete))
 		assert.Expect(result2.Stdout).To(ContainSubstring("step 2 output"))
 
 		// Verify state has both steps completed
-		state := runner.State()
+		state := r.State()
 		assert.Expect(len(state.Steps)).To(Equal(2))
 	})
 
@@ -85,14 +85,14 @@ func TestResumeSkipsCompletedSteps(t *testing.T) {
 	t.Run("resume skips completed steps", func(t *testing.T) {
 		assert := NewGomegaWithT(t)
 
-		runner, err := runtime.NewResumableRunner(ctx, driver, store, logger, "resume-test-ns", runtime.ResumeOptions{
+		r, err := runner.NewResumableRunner(ctx, driver, store, logger, "resume-test-ns", runner.ResumeOptions{
 			RunID:  runID,
 			Resume: true,
 		})
 		assert.Expect(err).NotTo(HaveOccurred())
 
 		// Run first step again - should be skipped
-		result1, err := runner.Run(runtime.RunInput{
+		result1, err := r.Run(runner.RunInput{
 			Name:  "step-1",
 			Image: "busybox",
 			Command: struct {
@@ -106,11 +106,11 @@ func TestResumeSkipsCompletedSteps(t *testing.T) {
 		})
 		assert.Expect(err).NotTo(HaveOccurred())
 		// Result should come from cache, not a new execution
-		assert.Expect(result1.Status).To(Equal(runtime.RunComplete))
+		assert.Expect(result1.Status).To(Equal(runner.RunComplete))
 		assert.Expect(result1.Stdout).To(ContainSubstring("step 1 output"))
 
 		// Run second step again - should be skipped
-		result2, err := runner.Run(runtime.RunInput{
+		result2, err := r.Run(runner.RunInput{
 			Name:  "step-2",
 			Image: "busybox",
 			Command: struct {
@@ -123,11 +123,11 @@ func TestResumeSkipsCompletedSteps(t *testing.T) {
 			},
 		})
 		assert.Expect(err).NotTo(HaveOccurred())
-		assert.Expect(result2.Status).To(Equal(runtime.RunComplete))
+		assert.Expect(result2.Status).To(Equal(runner.RunComplete))
 		assert.Expect(result2.Stdout).To(ContainSubstring("step 2 output"))
 
 		// Run a third step - this should actually execute
-		result3, err := runner.Run(runtime.RunInput{
+		result3, err := r.Run(runner.RunInput{
 			Name:  "step-3",
 			Image: "busybox",
 			Command: struct {
@@ -140,11 +140,11 @@ func TestResumeSkipsCompletedSteps(t *testing.T) {
 			},
 		})
 		assert.Expect(err).NotTo(HaveOccurred())
-		assert.Expect(result3.Status).To(Equal(runtime.RunComplete))
+		assert.Expect(result3.Status).To(Equal(runner.RunComplete))
 		assert.Expect(result3.Stdout).To(ContainSubstring("step 3 new output"))
 
 		// Verify state now has three steps
-		state := runner.State()
+		state := r.State()
 		assert.Expect(len(state.Steps)).To(Equal(3))
 	})
 }

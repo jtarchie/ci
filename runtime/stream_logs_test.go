@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/jtarchie/pocketci/orchestra/docker"
-	"github.com/jtarchie/pocketci/runtime"
+	"github.com/jtarchie/pocketci/runtime/runner"
 	storage "github.com/jtarchie/pocketci/storage/sqlite"
 	. "github.com/onsi/gomega"
 )
@@ -36,8 +36,8 @@ func TestStreamLogsWithCallback(t *testing.T) {
 		runID := "stream-test-run"
 
 		// Create pipeline runner
-		runner := runtime.NewPipelineRunner(ctx, driver, store, logger, "stream-test-ns", runID)
-		defer func() { _ = runner.CleanupVolumes() }()
+		r := runner.NewPipelineRunner(ctx, driver, store, logger, "stream-test-ns", runID)
+		defer func() { _ = r.CleanupVolumes() }()
 
 		// Track callback invocations
 		var mu sync.Mutex
@@ -45,7 +45,7 @@ func TestStreamLogsWithCallback(t *testing.T) {
 		var callbackCount int
 
 		// Run a task that produces output with small delays
-		result, err := runner.Run(runtime.RunInput{
+		result, err := r.Run(runner.RunInput{
 			Name:  "streaming-task",
 			Image: "busybox",
 			Command: struct {
@@ -66,7 +66,7 @@ func TestStreamLogsWithCallback(t *testing.T) {
 			},
 		})
 		assert.Expect(err).NotTo(HaveOccurred())
-		assert.Expect(result.Status).To(Equal(runtime.RunComplete))
+		assert.Expect(result.Status).To(Equal(runner.RunComplete))
 		assert.Expect(result.Code).To(Equal(0))
 
 		// Verify callback was invoked
@@ -109,11 +109,11 @@ func TestStreamLogsWithCallback(t *testing.T) {
 		runID := "stream-test-optional"
 
 		// Create pipeline runner
-		runner := runtime.NewPipelineRunner(ctx, driver, store, logger, "stream-test-ns-optional", runID)
-		defer func() { _ = runner.CleanupVolumes() }()
+		r := runner.NewPipelineRunner(ctx, driver, store, logger, "stream-test-ns-optional", runID)
+		defer func() { _ = r.CleanupVolumes() }()
 
 		// Run a task WITHOUT callback - should still work
-		result, err := runner.Run(runtime.RunInput{
+		result, err := r.Run(runner.RunInput{
 			Name:  "no-streaming-task",
 			Image: "busybox",
 			Command: struct {
@@ -127,7 +127,7 @@ func TestStreamLogsWithCallback(t *testing.T) {
 			// No OnOutput callback provided
 		})
 		assert.Expect(err).NotTo(HaveOccurred())
-		assert.Expect(result.Status).To(Equal(runtime.RunComplete))
+		assert.Expect(result.Status).To(Equal(runner.RunComplete))
 		assert.Expect(result.Stdout).To(ContainSubstring("hello without streaming"))
 	})
 
@@ -151,15 +151,15 @@ func TestStreamLogsWithCallback(t *testing.T) {
 		runID := "stream-error-run"
 
 		// Create pipeline runner
-		runner := runtime.NewPipelineRunner(ctx, driver, store, logger, "stream-error-ns", runID)
-		defer func() { _ = runner.CleanupVolumes() }()
+		r := runner.NewPipelineRunner(ctx, driver, store, logger, "stream-error-ns", runID)
+		defer func() { _ = r.CleanupVolumes() }()
 
 		// Track callback invocations
 		var mu sync.Mutex
 		var capturedStdout string
 
 		// Run a task that outputs then fails
-		result, err := runner.Run(runtime.RunInput{
+		result, err := r.Run(runner.RunInput{
 			Name:  "error-task",
 			Image: "busybox",
 			Command: struct {
@@ -179,7 +179,7 @@ func TestStreamLogsWithCallback(t *testing.T) {
 			},
 		})
 		assert.Expect(err).NotTo(HaveOccurred())
-		assert.Expect(result.Status).To(Equal(runtime.RunComplete))
+		assert.Expect(result.Status).To(Equal(runner.RunComplete))
 		assert.Expect(result.Code).To(Equal(1))
 		assert.Expect(result.Stdout).To(ContainSubstring("before-error"))
 
@@ -213,11 +213,11 @@ func TestStreamLogsWithCallback(t *testing.T) {
 		runID := "stream-cancel-run-" + time.Now().Format("150405")
 
 		// Create pipeline runner
-		runner := runtime.NewPipelineRunner(ctx, driver, store, logger, uniqueNS, runID)
-		defer func() { _ = runner.CleanupVolumes() }()
+		r := runner.NewPipelineRunner(ctx, driver, store, logger, uniqueNS, runID)
+		defer func() { _ = r.CleanupVolumes() }()
 
 		// Run a task that takes longer than the timeout
-		result, err := runner.Run(runtime.RunInput{
+		result, err := r.Run(runner.RunInput{
 			Name:  "cancel-task",
 			Image: "busybox",
 			Command: struct {
@@ -235,6 +235,6 @@ func TestStreamLogsWithCallback(t *testing.T) {
 
 		// The task should be aborted due to context cancellation
 		assert.Expect(err).NotTo(HaveOccurred())
-		assert.Expect(result.Status).To(Equal(runtime.RunAbort))
+		assert.Expect(result.Status).To(Equal(runner.RunAbort))
 	})
 }

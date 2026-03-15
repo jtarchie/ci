@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jtarchie/pocketci/runtime"
+	"github.com/jtarchie/pocketci/runtime/jsapi"
 	. "github.com/onsi/gomega"
 )
 
@@ -21,10 +21,10 @@ func TestNotifyRenderTemplate(t *testing.T) {
 	assert := NewGomegaWithT(t)
 
 	logger := slog.Default()
-	notifier := runtime.NewNotifier(logger)
+	notifier := jsapi.NewNotifier(logger)
 
 	// Set up context
-	notifier.SetContext(runtime.NotifyContext{
+	notifier.SetContext(jsapi.NotifyContext{
 		PipelineName: "test-pipeline",
 		JobName:      "test-job",
 		BuildID:      "123",
@@ -48,17 +48,17 @@ func TestNotifyContextUpdates(t *testing.T) {
 	assert := NewGomegaWithT(t)
 
 	logger := slog.Default()
-	notifier := runtime.NewNotifier(logger)
+	notifier := jsapi.NewNotifier(logger)
 
 	// Set initial context
-	notifier.SetContext(runtime.NotifyContext{
+	notifier.SetContext(jsapi.NotifyContext{
 		PipelineName: "my-pipeline",
 		JobName:      "job-1",
 		Status:       "pending",
 	})
 
 	// Update job name using UpdateContext
-	notifier.UpdateContext(func(ctx *runtime.NotifyContext) {
+	notifier.UpdateContext(func(ctx *jsapi.NotifyContext) {
 		ctx.JobName = "job-2"
 	})
 
@@ -67,7 +67,7 @@ func TestNotifyContextUpdates(t *testing.T) {
 	assert.Expect(result).To(Equal("Job: job-2"))
 
 	// Update status
-	notifier.UpdateContext(func(ctx *runtime.NotifyContext) {
+	notifier.UpdateContext(func(ctx *jsapi.NotifyContext) {
 		ctx.Status = "running"
 	})
 
@@ -82,10 +82,10 @@ func TestNotifyConfigLookup(t *testing.T) {
 	assert := NewGomegaWithT(t)
 
 	logger := slog.Default()
-	notifier := runtime.NewNotifier(logger)
+	notifier := jsapi.NewNotifier(logger)
 
 	// Set configs using map
-	notifier.SetConfigs(map[string]runtime.NotifyConfig{
+	notifier.SetConfigs(map[string]jsapi.NotifyConfig{
 		"slack-channel": {
 			Type:     "slack",
 			Token:    "xoxb-token",
@@ -118,14 +118,14 @@ func TestNotifySetConfigs(t *testing.T) {
 	assert := NewGomegaWithT(t)
 
 	logger := slog.Default()
-	notifier := runtime.NewNotifier(logger)
+	notifier := jsapi.NewNotifier(logger)
 
 	// Initially empty
 	_, exists := notifier.GetConfig("test")
 	assert.Expect(exists).To(BeFalse())
 
 	// Set configs
-	notifier.SetConfigs(map[string]runtime.NotifyConfig{
+	notifier.SetConfigs(map[string]jsapi.NotifyConfig{
 		"test": {
 			Type: "http",
 			URL:  "https://example.com/webhook",
@@ -187,9 +187,9 @@ func TestNotifyHTTPIntegration(t *testing.T) {
 
 	// Create notifier with HTTP config pointing to test server
 	logger := slog.Default()
-	notifier := runtime.NewNotifier(logger)
+	notifier := jsapi.NewNotifier(logger)
 
-	notifier.SetConfigs(map[string]runtime.NotifyConfig{
+	notifier.SetConfigs(map[string]jsapi.NotifyConfig{
 		"test-webhook": {
 			Type:   "http",
 			URL:    server.URL,
@@ -202,7 +202,7 @@ func TestNotifyHTTPIntegration(t *testing.T) {
 	})
 
 	// Set up context for template rendering
-	notifier.SetContext(runtime.NotifyContext{
+	notifier.SetContext(jsapi.NotifyContext{
 		PipelineName: "integration-test-pipeline",
 		JobName:      "build-job",
 		BuildID:      "build-123",
@@ -261,9 +261,9 @@ func TestNotifyHTTPIntegrationWithMultipleNotifications(t *testing.T) {
 
 	// Create notifier with multiple HTTP configs
 	logger := slog.Default()
-	notifier := runtime.NewNotifier(logger)
+	notifier := jsapi.NewNotifier(logger)
 
-	notifier.SetConfigs(map[string]runtime.NotifyConfig{
+	notifier.SetConfigs(map[string]jsapi.NotifyConfig{
 		"webhook-1": {
 			Type: "http",
 			URL:  server.URL + "/webhook1",
@@ -274,7 +274,7 @@ func TestNotifyHTTPIntegrationWithMultipleNotifications(t *testing.T) {
 		},
 	})
 
-	notifier.SetContext(runtime.NotifyContext{
+	notifier.SetContext(jsapi.NotifyContext{
 		PipelineName: "multi-notify-pipeline",
 		JobName:      "deploy",
 		Status:       "success",
@@ -310,16 +310,16 @@ func TestNotifyHTTPIntegrationServerError(t *testing.T) {
 	defer server.Close()
 
 	logger := slog.Default()
-	notifier := runtime.NewNotifier(logger)
+	notifier := jsapi.NewNotifier(logger)
 
-	notifier.SetConfigs(map[string]runtime.NotifyConfig{
+	notifier.SetConfigs(map[string]jsapi.NotifyConfig{
 		"failing-webhook": {
 			Type: "http",
 			URL:  server.URL,
 		},
 	})
 
-	notifier.SetContext(runtime.NotifyContext{
+	notifier.SetContext(jsapi.NotifyContext{
 		PipelineName: "error-test",
 		Status:       "failure",
 	})
@@ -339,7 +339,7 @@ func TestNotifyHTTPIntegrationMissingConfig(t *testing.T) {
 	assert := NewGomegaWithT(t)
 
 	logger := slog.Default()
-	notifier := runtime.NewNotifier(logger)
+	notifier := jsapi.NewNotifier(logger)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

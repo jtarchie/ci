@@ -14,7 +14,7 @@ import (
 
 	"github.com/georgysavva/scany/v2/sqlscan"
 	"github.com/jtarchie/lqs"
-	"github.com/jtarchie/pocketci/runtime"
+	"github.com/jtarchie/pocketci/runtime/support"
 	"github.com/jtarchie/pocketci/storage"
 	"github.com/samber/lo"
 	_ "modernc.org/sqlite"
@@ -328,7 +328,7 @@ func (s *Sqlite) Close() error {
 // Pipeline names are unique; saving with an existing name updates the record
 // while preserving the original ID so existing pipeline_runs references remain valid.
 func (s *Sqlite) SavePipeline(ctx context.Context, name, content, driverDSN, contentType string) (*storage.Pipeline, error) {
-	newID := runtime.PipelineID(name, content)
+	newID := support.PipelineID(name, content)
 	now := time.Now().UTC()
 
 	// Look up any existing pipeline by name so we can preserve its ID and clean up FTS.
@@ -499,7 +499,7 @@ func (s *Sqlite) UpdatePipelineResumeEnabled(ctx context.Context, pipelineID str
 
 // SaveRun creates a new pipeline run record.
 func (s *Sqlite) SaveRun(ctx context.Context, pipelineID string) (*storage.PipelineRun, error) {
-	id := runtime.UniqueID()
+	id := support.UniqueID()
 	now := time.Now().UTC()
 
 	_, err := s.writer.ExecContext(ctx, `

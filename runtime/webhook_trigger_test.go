@@ -6,10 +6,11 @@ import (
 	"testing"
 
 	"github.com/jtarchie/pocketci/runtime"
+	"github.com/jtarchie/pocketci/runtime/jsapi"
 	. "github.com/onsi/gomega"
 )
 
-func runWithWebhook(t *testing.T, src string, data *runtime.WebhookData) error {
+func runWithWebhook(t *testing.T, src string, data *jsapi.WebhookData) error {
 	t.Helper()
 	js := runtime.NewJS(slog.Default())
 	return js.ExecuteWithOptions(context.Background(), src, nil, nil, runtime.ExecuteOptions{
@@ -40,7 +41,7 @@ func TestWebhookTriggerGlobal(t *testing.T) {
 				assert.equal(webhookTrigger('provider == "github" && eventType == "push"'), true);
 			}
 			export { pipeline };
-		`, &runtime.WebhookData{
+		`, &jsapi.WebhookData{
 			Provider:  "github",
 			EventType: "push",
 			Method:    "POST",
@@ -59,7 +60,7 @@ func TestWebhookTriggerGlobal(t *testing.T) {
 				assert.equal(webhookTrigger('eventType == "pull_request"'), false);
 			}
 			export { pipeline };
-		`, &runtime.WebhookData{
+		`, &jsapi.WebhookData{
 			Provider:  "github",
 			EventType: "push",
 			Method:    "POST",
@@ -78,7 +79,7 @@ func TestWebhookTriggerGlobal(t *testing.T) {
 				assert.equal(webhookTrigger('payload["ref"] == "refs/heads/main"'), true);
 			}
 			export { pipeline };
-		`, &runtime.WebhookData{
+		`, &jsapi.WebhookData{
 			Provider:  "github",
 			EventType: "push",
 			Method:    "POST",
@@ -97,7 +98,7 @@ func TestWebhookTriggerGlobal(t *testing.T) {
 				assert.equal(webhookTrigger('not valid expr !!!'), false);
 			}
 			export { pipeline };
-		`, &runtime.WebhookData{
+		`, &jsapi.WebhookData{
 			Provider:  "github",
 			EventType: "push",
 			Method:    "POST",
@@ -134,7 +135,7 @@ func TestWebhookParamsGlobal(t *testing.T) {
 				assert.equal(params['MY_PROVIDER'], 'github');
 			}
 			export { pipeline };
-		`, &runtime.WebhookData{
+		`, &jsapi.WebhookData{
 			Provider:  "github",
 			EventType: "pull_request",
 			Method:    "POST",
@@ -158,7 +159,7 @@ func TestWebhookParamsGlobal(t *testing.T) {
 				assert.equal(params['PR_REPO'], 'https://github.com/org/repo.git');
 			}
 			export { pipeline };
-		`, &runtime.WebhookData{
+		`, &jsapi.WebhookData{
 			Provider:  "github",
 			EventType: "pull_request",
 			Method:    "POST",
@@ -182,7 +183,7 @@ func TestWebhookParamsGlobal(t *testing.T) {
 				assert.equal(params['BAD'], undefined);
 			}
 			export { pipeline };
-		`, &runtime.WebhookData{
+		`, &jsapi.WebhookData{
 			Provider:  "github",
 			EventType: "push",
 			Method:    "POST",

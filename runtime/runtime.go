@@ -10,6 +10,9 @@ import (
 
 	"github.com/dop251/goja"
 
+	"github.com/jtarchie/pocketci/runtime/agent"
+	"github.com/jtarchie/pocketci/runtime/runner"
+	"github.com/jtarchie/pocketci/runtime/support"
 	"github.com/jtarchie/pocketci/secrets"
 	"github.com/jtarchie/pocketci/storage"
 )
@@ -17,7 +20,7 @@ import (
 type Runtime struct {
 	jsVM           *goja.Runtime
 	promises       *sync.WaitGroup
-	runner         Runner
+	runner         runner.Runner
 	tasks          chan func() error
 	namespace      string
 	runID          string
@@ -32,7 +35,7 @@ type Runtime struct {
 
 func NewRuntime(
 	jsVM *goja.Runtime,
-	runner Runner,
+	runner runner.Runner,
 	namespace string,
 	runID string,
 ) *Runtime {
@@ -62,7 +65,7 @@ func (r *Runtime) Run(call goja.FunctionCall) goja.Value {
 	inputObj := call.Arguments[0].ToObject(r.jsVM)
 
 	// Parse the input struct (goja will map fields by json tags)
-	var input RunInput
+	var input runner.RunInput
 	if err := r.jsVM.ExportTo(inputObj, &input); err != nil {
 		_ = reject(r.jsVM.NewGoError(fmt.Errorf("invalid input: %w", err)))
 		return r.jsVM.ToValue(promise)
@@ -134,14 +137,14 @@ func (r *Runtime) Run(call goja.FunctionCall) goja.Value {
 	return r.jsVM.ToValue(promise)
 }
 
-func (r *Runtime) CreateVolume(input VolumeInput) *goja.Promise {
+func (r *Runtime) CreateVolume(input runner.VolumeInput) *goja.Promise {
 	if input.Name == "" {
 		// Generate deterministic volume name using counter
 		r.mu.Lock()
 		volumeID := fmt.Sprintf("vol-%d", r.volumeIndex)
 		r.volumeIndex++
 		r.mu.Unlock()
-		input.Name = DeterministicVolumeID(r.namespace, fmt.Sprintf("%s-%s", r.runID, volumeID))
+		input.Name = support.DeterministicVolumeID(r.namespace, fmt.Sprintf("%s-%s", r.runID, volumeID))
 	}
 
 	promise, resolve, reject := r.jsVM.NewPromise()
@@ -197,7 +200,7 @@ func (r *Runtime) StartSandbox(call goja.FunctionCall) goja.Value {
 
 	inputObj := call.Arguments[0].ToObject(r.jsVM)
 
-	var input SandboxInput
+	var input runner.SandboxInput
 	if err := r.jsVM.ExportTo(inputObj, &input); err != nil {
 		_ = reject(r.jsVM.NewGoError(fmt.Errorf("invalid startSandbox input: %w", err)))
 		return r.jsVM.ToValue(promise)
@@ -244,7 +247,7 @@ func (r *Runtime) StartSandbox(call goja.FunctionCall) goja.Value {
 
 				execInputObj := call.Arguments[0].ToObject(r.jsVM)
 
-				var execInput ExecInput
+				var execInput runner.ExecInput
 				if err := r.jsVM.ExportTo(execInputObj, &execInput); err != nil {
 					_ = execReject(r.jsVM.NewGoError(fmt.Errorf("invalid exec input: %w", err)))
 					return r.jsVM.ToValue(execPromise)
@@ -372,7 +375,7 @@ func (r *Runtime) Agent(call goja.FunctionCall) goja.Value {
 
 	inputObj := call.Arguments[0].ToObject(r.jsVM)
 
-	var config AgentConfig
+	var config agent.AgentConfig
 	if err := r.jsVM.ExportTo(inputObj, &config); err != nil {
 		_ = reject(r.jsVM.NewGoError(fmt.Errorf("invalid agent input: %w", err)))
 		return r.jsVM.ToValue(promise)
@@ -395,7 +398,7 @@ func (r *Runtime) Agent(call goja.FunctionCall) goja.Value {
 	onUsageVal := inputObj.Get("onUsage")
 	if onUsageVal != nil && !goja.IsUndefined(onUsageVal) && !goja.IsNull(onUsageVal) {
 		if onUsageFunc, ok := goja.AssertFunction(onUsageVal); ok {
-			config.OnUsage = func(usage AgentUsage) {
+			config.OnUsage = func(usage agent.AgentUsage) {
 				r.tasks <- func() error {
 					_, _ = onUsageFunc(goja.Undefined(), r.jsVM.ToValue(usage))
 					return nil
@@ -408,7 +411,7 @@ func (r *Runtime) Agent(call goja.FunctionCall) goja.Value {
 	onAuditEventVal := inputObj.Get("onAuditEvent")
 	if onAuditEventVal != nil && !goja.IsUndefined(onAuditEventVal) && !goja.IsNull(onAuditEventVal) {
 		if onAuditEventFunc, ok := goja.AssertFunction(onAuditEventVal); ok {
-			config.OnAuditEvent = func(event AuditEvent) {
+			config.OnAuditEvent = func(event agent.AuditEvent) {
 				r.tasks <- func() error {
 					_, _ = onAuditEventFunc(goja.Undefined(), r.jsVM.ToValue(event))
 					return nil
@@ -448,7 +451,7 @@ func (r *Runtime) Agent(call goja.FunctionCall) goja.Value {
 			// Unmarshal the serializable parts of config, keeping the
 			// non-serialisable fields (callbacks, Storage, etc.) from the
 			// outer config closure.
-			var serializableConfig AgentConfig
+			var serializableConfig agent.AgentConfig
 			if err := json.Unmarshal(configJSON, &serializableConfig); err != nil {
 				return nil, fmt.Errorf("could not unmarshal agent config: %w", err)
 			}
@@ -463,7 +466,7 @@ func (r *Runtime) Agent(call goja.FunctionCall) goja.Value {
 			serializableConfig.PipelineID = config.PipelineID
 			serializableConfig.TriggeredBy = config.TriggeredBy
 
-			result, err := RunAgent(ctx, r.runner, r.secretsManager, r.pipelineID, serializableConfig)
+			result, err := agent.RunAgent(ctx, r.runner, r.secretsManager, r.pipelineID, serializableConfig)
 			if err != nil {
 				return nil, err
 			}
@@ -502,7 +505,7 @@ func (r *Runtime) Agent(call goja.FunctionCall) goja.Value {
 				return nil
 			}
 
-			var result AgentResult
+			var result agent.AgentResult
 			if unmarshalErr := json.Unmarshal(resultJSON, &result); unmarshalErr != nil {
 				return reject(r.jsVM.NewGoError(fmt.Errorf("could not unmarshal agent result: %w", unmarshalErr)))
 			}

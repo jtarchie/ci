@@ -8,6 +8,8 @@ import (
 
 	"github.com/jtarchie/pocketci/orchestra"
 	"github.com/jtarchie/pocketci/orchestra/cache"
+	"github.com/jtarchie/pocketci/runtime/jsapi"
+	"github.com/jtarchie/pocketci/runtime/support"
 	"github.com/jtarchie/pocketci/secrets"
 	"github.com/jtarchie/pocketci/storage"
 )
@@ -26,10 +28,10 @@ type ExecutorOptions struct {
 	Namespace string
 	// WebhookData contains the incoming HTTP request when triggered via webhook.
 	// Nil when not triggered via webhook.
-	WebhookData *WebhookData
+	WebhookData *jsapi.WebhookData
 	// ResponseChan receives the HTTP response from the pipeline.
 	// Nil when not triggered via webhook.
-	ResponseChan chan *HTTPResponse
+	ResponseChan chan *jsapi.HTTPResponse
 	// SecretsManager provides access to encrypted secrets.
 	// If nil, secret resolution is disabled.
 	SecretsManager secrets.Manager
@@ -70,7 +72,7 @@ func ExecutePipeline(
 	}
 
 	// Generate a namespace for this execution
-	namespace := "ci-" + UniqueID()
+	namespace := "ci-" + support.UniqueID()
 	if opts.RunID != "" {
 		namespace = "ci-" + opts.RunID
 	}

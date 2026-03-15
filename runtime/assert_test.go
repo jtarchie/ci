@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/jtarchie/pocketci/runtime"
+	"github.com/jtarchie/pocketci/runtime/jsapi"
 	. "github.com/onsi/gomega"
 )
 
@@ -16,7 +16,7 @@ func TestAssert(t *testing.T) {
 	assert := NewGomegaWithT(t)
 
 	jsVM := goja.New()
-	err := jsVM.Set("assert", runtime.NewAssert(jsVM, slog.Default()))
+	err := jsVM.Set("assert", jsapi.NewAssert(jsVM, slog.Default()))
 	assert.Expect(err).NotTo(HaveOccurred())
 	_, err = jsVM.RunString(strings.TrimSpace(`
 		assert.Equal(1, 1);
