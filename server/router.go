@@ -72,6 +72,8 @@ func newSlogMiddleware(logger *slog.Logger) echo.MiddlewareFunc {
 
 			err := next(c)
 
+			level := slog.LevelInfo
+
 			attrs := []slog.Attr{
 				slog.String("method", req.Method),
 				slog.String("path", req.URL.Path),
@@ -79,11 +81,25 @@ func newSlogMiddleware(logger *slog.Logger) echo.MiddlewareFunc {
 				slog.String("remote_ip", c.RealIP()),
 			}
 
-			if resp, rErr := echo.UnwrapResponse(c.Response()); rErr == nil {
+			if rid, ok := c.Get("request_id").(string); ok && rid != "" {
+				attrs = append(attrs, slog.String("request_id", rid))
+			}
+
+			if err != nil {
+				level = slog.LevelError
+				attrs = append(attrs, slog.String("error", err.Error()))
+
+				// Use the HTTP error code if Echo provides one.
+				if he, ok := err.(*echo.HTTPError); ok {
+					attrs = append(attrs, slog.Int("status", he.Code))
+				} else {
+					attrs = append(attrs, slog.Int("status", http.StatusInternalServerError))
+				}
+			} else if resp, rErr := echo.UnwrapResponse(c.Response()); rErr == nil {
 				attrs = append(attrs, slog.Int("status", resp.Status))
 			}
 
-			logger.LogAttrs(req.Context(), slog.LevelInfo, "request", attrs...)
+			logger.LogAttrs(req.Context(), level, "request", attrs...)
 
 			return err
 		}
@@ -125,6 +141,7 @@ func NewRouter(logger *slog.Logger, store storage.Driver, opts RouterOptions) (*
 	// Recover orphaned runs from previous server instance
 	execService.RecoverOrphanedRuns(context.Background())
 
+	router.Use(middleware.RequestID())
 	router.Use(newSlogMiddleware(logger))
 	router.Use(middleware.Recover())
 

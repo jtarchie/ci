@@ -23,6 +23,9 @@ import (
 //go:embed schema.sql
 var schemaSQL string
 
+//go:embed migrations.sql
+var migrationsSQL string
+
 type Sqlite struct {
 	writer    *sql.DB
 	reader    *sql.DB
@@ -131,16 +134,17 @@ func NewSqlite(dsn string, namespace string, _ *slog.Logger) (storage.Driver, er
 		return nil, fmt.Errorf("failed to apply schema: %w", err)
 	}
 
-	// Idempotent migration: add content_type column to existing databases.
-	// This is a no-op if the column already exists (new databases created from
-	// the current schema will already have it).
-	//nolint: noctx
-	_, _ = writer.Exec(`ALTER TABLE pipelines ADD COLUMN content_type TEXT NOT NULL DEFAULT ''`)
+	// Run idempotent migrations from migrations.sql.
+	// Each ALTER TABLE is a no-op if the column already exists.
+	for _, stmt := range strings.Split(migrationsSQL, ";") {
+		stmt = strings.TrimSpace(stmt)
+		if stmt == "" {
+			continue
+		}
 
-	// Idempotent migration: add resume_enabled column to existing databases.
-	// This is a no-op if the column already exists.
-	//nolint: noctx
-	_, _ = writer.Exec(`ALTER TABLE pipelines ADD COLUMN resume_enabled INTEGER NOT NULL DEFAULT 0`)
+		//nolint: noctx
+		_, _ = writer.Exec(stmt)
+	}
 
 	writer.SetMaxIdleConns(1)
 	writer.SetMaxOpenConns(1)

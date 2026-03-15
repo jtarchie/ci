@@ -52,6 +52,21 @@ enable multiple providers simultaneously — users choose at the login screen.
 | `--oauth-session-secret` | Secret key for encrypting session cookies and signing JWT tokens. Use a strong random string (32+ characters). |
 | `--oauth-callback-url`   | Full public URL for OAuth callbacks (e.g., `https://ci.example.com`).                                          |
 
+### Provider Callback URLs
+
+The `--oauth-callback-url` flag is your server's **base URL** (no trailing
+path). PocketCI automatically appends the provider-specific callback path. When
+registering your OAuth application with each provider, use the corresponding
+full callback URL:
+
+| Provider  | Callback URL to register                               |
+| --------- | ------------------------------------------------------ |
+| GitHub    | `https://ci.example.com/auth/github/callback`          |
+| GitLab    | `https://ci.example.com/auth/gitlab/callback`          |
+| Microsoft | `https://ci.example.com/auth/microsoftonline/callback` |
+
+Replace `https://ci.example.com` with your actual `--oauth-callback-url` value.
+
 ### Example
 
 ```bash
