@@ -48,7 +48,7 @@ require (
 	github.com/onsi/gomega v1.41.0
 	github.com/phayes/freeport v0.0.0-20220201140144-74d24b5ae9f5
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
-	github.com/posthog/posthog-go v1.13.1
+	github.com/posthog/posthog-go v1.17.2
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/samber/lo v1.53.0
 	github.com/schollz/progressbar/v3 v3.19.0
@@ -80,6 +80,7 @@ require (
 	github.com/agnivade/levenshtein v1.2.1 // indirect
 	github.com/alexflint/go-arg v1.6.1 // indirect
 	github.com/alexflint/go-scalar v1.2.0 // indirect
+	github.com/andybalholm/brotli v1.1.1 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/anthropics/anthropic-sdk-go v1.46.0 // indirect
 	github.com/atc0005/go-teams-notify/v2 v2.14.0 // indirect
